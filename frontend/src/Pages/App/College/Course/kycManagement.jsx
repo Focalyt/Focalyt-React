@@ -2662,7 +2662,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-6 firstDatepicker">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -7794,9 +7794,16 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
+.firstDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(0px)!important;
+}
 .react-calendar{
-width:min-content !important;
+// width:min-content !important;
 height:min-content !important;
+transform: translateX(-110px)!important;
+    width: 250px !important;
 }
 @media (max-width: 768px) {
   .multi-select-options-new {

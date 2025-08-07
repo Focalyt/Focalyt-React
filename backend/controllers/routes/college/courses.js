@@ -796,7 +796,9 @@ router.route('/leadStatus')
 	router.route('/get-branches')
 	.get(async (req, res) => {
 		try {
-			const { courseId } = req.query;
+			const { profileId } = req.query;
+			const appliedCourse = await AppliedCourses.findById(profileId);
+			const courseId = appliedCourse._course;
 			const branches = await Courses.findById(courseId).populate('center').select('center');
 			res.status(200).json({ status: true, data: branches.center });
 		} catch (err) {

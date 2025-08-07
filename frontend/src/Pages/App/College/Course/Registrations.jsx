@@ -686,19 +686,19 @@ const CRMDashboard = () => {
 
   const candidateRef = useRef();
 
-  useEffect(() => {
-    console.log('CandidateRef initialized:', candidateRef.current);
-  }, []);
+  // useEffect(() => {
+  //   console.log('CandidateRef initialized:', candidateRef.current);
+  // }, []);
 
-  useEffect(() => {
-    console.log('CandidateRef current changed:', candidateRef.current);
-  }, [candidateRef.current]);
+  // useEffect(() => {
+  //   console.log('CandidateRef current changed:', candidateRef.current);
+  // }, [candidateRef.current]);
 
   const fetchProfile = (id) => {
-    console.log('fetchProfile called with id:', id);
-    console.log('candidateRef.current:', candidateRef.current);
+    // console.log('fetchProfile called with id:', id);
+    // console.log('candidateRef.current:', candidateRef.current);
     if (candidateRef.current) {
-      console.log('candidateRef.current exists, calling fetchProfile');
+      // console.log('candidateRef.current exists, calling fetchProfile');
       candidateRef.current.fetchProfile(id);
     } else {
       console.log('candidateRef.current is null - this is the problem!');
@@ -1471,7 +1471,8 @@ const CRMDashboard = () => {
     'Profile',
     'Job History',
     'Course History',
-    'Documents'
+    'Documents',
+    'Pre QV Verification'
   ];
 
   // Check if device is mobile
@@ -1958,9 +1959,15 @@ const CRMDashboard = () => {
     }
   };
 
+  const handleBranchChange = async (profile) => {
+    setShowBranchModal(true);
+    getBranches(profile);
+    setSelectedProfile(profile);
+  }
+
   const getBranches = async (profile) => {
-    const courseId = profile._course._id;
-    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+    const profileId = profile._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?profileId=${profileId}`, {
       headers: {
         'x-auth': token,
         'Content-Type': 'multipart/form-data',
@@ -1975,18 +1982,19 @@ const CRMDashboard = () => {
     }
   }
 
-  const updateBranch = async (profile, selectedBranchId) => {
+  const updateBranch = async () => {
+
     console.log("updateBranch")
-    if (!selectedBranchId) {
+    if (!selectedBranch) {
       alert('Please select a branch first');
       return;
     }
 
-    const profileId = profile._id;
-    console.log("profile" , profileId)
-    console.log("profileId" , profileId)
-    console.log("selectedBranchId" , selectedBranchId)
-    
+    const profileId = selectedProfile._id;
+    const selectedBranchId = selectedBranch;
+    console.log("selectedBranchId", selectedBranchId)
+    console.log("profileId", profileId)
+
     try {
       const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
         centerId: selectedBranchId
@@ -2001,7 +2009,7 @@ const CRMDashboard = () => {
         alert('Branch updated successfully!');
         // Optionally refresh the data or close modal
         setShowBranchModal(false);
-        
+
         // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
         // setAllProfiles(prevProfiles => 
         //   prevProfiles.map(p => 
@@ -2013,12 +2021,12 @@ const CRMDashboard = () => {
         //       : p
         //   )
         // );
-      
-      setSelectedBranch('');
+
+        setSelectedBranch('');
 
 
-        
-      await fetchProfileData();
+
+        await fetchProfileData();
       } else {
         alert('Failed to update branch');
       }
@@ -2072,36 +2080,36 @@ const CRMDashboard = () => {
     setLeadDetailsVisible(null);
     fetchRegistrationCrmFilterCounts();
 
-      if (!token) {
-        console.warn('No token found in session storage.');
-        setIsLoadingProfiles(false);
-        return;
-      }
+    if (!token) {
+      console.warn('No token found in session storage.');
+      setIsLoadingProfiles(false);
+      return;
+    }
 
-      // Prepare query parameters
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        ...(filters.name && { name: filters.name }),
-        ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters.sector && { sector: filters.sector }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        // Multi-select filters
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
-      });
-    
+    // Prepare query parameters
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      // Multi-select filters
+      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+    });
+
     try {
-      
+
       console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
@@ -2129,42 +2137,42 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     } finally {
       setIsLoadingProfiles(false);
-      
+
 
     }
   };
   const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage) => {
 
-      if (!token) {
-        console.warn('No token found in session storage.');
-        setIsLoadingProfiles(false);
-        return;
-      }
+    if (!token) {
+      console.warn('No token found in session storage.');
+      setIsLoadingProfiles(false);
+      return;
+    }
 
-      // Prepare query parameters
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        ...(filters.name && { name: filters.name }),
-        ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters.sector && { sector: filters.sector }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        // Multi-select filters
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
-      });
-    
+    // Prepare query parameters
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      // Multi-select filters
+      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+    });
+
     try {
-      
+
       console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/registrationCrmFilterCounts?${queryParams}`, {
@@ -2187,10 +2195,10 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     const fetchLeadDetails = async () => {
-      if(leadDetailsVisible === null || leadDetailsVisible === undefined){
+      if (leadDetailsVisible === null || leadDetailsVisible === undefined) {
         return;
       }
-      try{
+      try {
         setIsLoadingProfilesData(true);
         const leadId = allProfiles[leadDetailsVisible]._id;
         console.log('leadId', leadId)
@@ -2201,12 +2209,13 @@ const CRMDashboard = () => {
         if (response.data.success && response.data.data) {
 
           const data = response.data;
+          console.log("applied candidate details", data)
           // Sirf ek state me data set karo - paginated data
-          if(!isLoadingProfiles){
+          if (!isLoadingProfiles) {
             allProfiles[leadDetailsVisible] = data.data;
           }
-  
-          
+
+
         } else {
           console.error('Failed to fetch profile data', response.data.message);
         }
@@ -2513,21 +2522,7 @@ const CRMDashboard = () => {
     }
   };
 
-  const openChangeCenterPanel = async (profile = null) => {
-    if (profile) {
-      // Set selected profile
-      setSelectedProfile(profile);
 
-    }
-
-    setShowPopup(null);
-    setShowPanel('changeCenter');
-    setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
 
   useEffect(() => {
     console.log('selectedProfile', selectedProfile);
@@ -3495,149 +3490,6 @@ const CRMDashboard = () => {
     ) : null;
   };
 
-  const renderChangeCenterPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-history text-primary"></i>
-            </div>
-            <h6 className="mb-0 fw-medium">Change Center</h6>
-          </div>
-          <button className="btn-close" type="button" onClick={closePanel}>
-          </button>
-        </div>
-
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-              <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
-                      </div>
-                      {index !== selectedProfile.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
-
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
-                            </small>
-                          </div>
-
-                          <div className="mb-2">
-                            <label className="form-label fw-semibold text-dark mb-2">
-                              Select Center<span className="text-danger">*</span>
-                            </label>
-                            <div className="position-relative">
-                              <select
-                                className="form-select border-0 shadow-sm"
-                                id="course"
-                                style={{
-                                  height: '48px',
-                                  padding: '12px 16px',
-                                  backgroundColor: '#f8f9fa',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  transition: 'all 0.3s ease',
-                                  border: '1px solid #e9ecef',
-
-                                }}
-
-                              >
-                                <option value="">Select Center</option>
-                              </select>
-                            </div>
-                          </div>
-
-
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                </div>
-                <h6 className="text-muted mb-2">No Center Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-
-
-
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closePanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return showPanel === 'changeCenter' ? (
-        <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '85vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      ) : null;
-    }
-
-    return showPanel === 'changeCenter' ? (
-      <div className="col-12 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
   return (
     <div className="container-fluid">
       <div className="row">
@@ -4513,7 +4365,6 @@ const CRMDashboard = () => {
                                           >
                                             Profile Edit
                                           </button>
-
                                           <button
                                             className="btn btn-primary border-0 text-black"
                                             style={{
@@ -4527,34 +4378,11 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
+                                              handleBranchChange(profile);
 
                                             }}
                                           >
-                                            Change Center
-                                          </button>
-
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              getBranches(profile);
-                                              setShowBranchModal(true);
-                                              console.log('change Branch')
-
-                                            }}
-                                          >
-                                            Change Branch
+                                            Add Center
                                           </button>
 
                                         </div>
@@ -4726,26 +4554,7 @@ const CRMDashboard = () => {
                                           >
                                             Profile Edit
                                           </button>
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
 
-                                            }}
-                                          >
-                                            Change Center
-                                          </button>
                                           <button
                                             className="btn btn-primary border-0 text-black"
                                             style={{
@@ -4759,12 +4568,10 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              getBranches(profile);
-                                              console.log('change Branch')
-                                              setShowBranchModal(true);
+                                              handleBranchChange(profile);
                                             }}
                                           >
-                                            Change Branch
+                                            Add Branch
                                           </button>
 
                                         </div>
@@ -4814,1160 +4621,1350 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
                                 ) : (
-                                <div className="tab-content">
+                                  <div className="tab-content">
 
-                                  {/* Lead Details Tab */}
-                                  {/* {activeTab === 0 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 0 && (
-                                    <div className="tab-pane active" id="lead-details">
-                                      {/* Your lead details content here */}
-                                      <div className="scrollable-container">
-                                        <div className="scrollable-content">
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD AGE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
-                                              <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">COURSE / JOB NAME</div>
-                                              <div className="info-value">{profile._course?.name}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">TYPE OF PROJECT</div>
-                                              <div className="info-value">{profile._course?.typeOfProject}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">PROJECT</div>
-                                              <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">SECTOR</div>
-                                              <div className="info-value">{profile.sector}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD CREATION DATE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">City</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                            </div>                               
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD MODIFICATION DATE</div>
-                                              <div className="info-value">{profile.updatedAt ?
-                                                new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Remarks</div>
-                                              <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                      <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-
-                                      <div className="desktop-view">
-                                        <div className="row g-4">
-
-                                          <div className="col-12">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
-                                                  </div>
-                                                </div>
+                                    {/* Lead Details Tab */}
+                                    {/* {activeTab === 0 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 0 && (
+                                      <div className="tab-pane active" id="lead-details">
+                                        {/* Your lead details content here */}
+                                        <div className="scrollable-container">
+                                          <div className="scrollable-content">
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD AGE</div>
+                                                <div className="info-value">{profile.createdAt ?
+                                                  Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                  : 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Lead Owner</div>
+                                                <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{profile._course?.name}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BATCH NAME</div>
+                                                <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                               </div>
                                             </div>
-                                            <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                            <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
 
-                                            <div className="desktop-view">
-                                              <div className="row">
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                </div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{profile._course?.typeOfProject}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">PROJECT</div>
+                                                <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">SECTOR</div>
+                                                <div className="info-value">{profile.sector}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">{profile.createdAt ?
+                                                  new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                              </div>
+                                            </div>
 
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Sector</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                </div>
-
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">NEXT ACTION DATE</div>
-                                                    <div className="info-value">
-                                                      {profile.followups?.length > 0
-                                                        ?
-                                                        (() => {
-                                                          const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                          }).replace(/ /g, '-');
-                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: true,
-                                                          });
-                                                          return `${datePart}, ${timePart}`;
-                                                        })()
-                                                        : 'N/A'}
-                                                    </div>
-
-                                                  </div>
-                                                </div>
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ? (() => {
-                                                      const dateObj = new Date(profile.createdAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ? (() => {
-                                                      const dateObj = new Date(profile.updatedAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                                                                  <div className="info-group">
-                                                  <div className="info-label">Counsellor Name</div>
-                                                  <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
-                                                </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD OWNER</div>
-                                                    <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
-                                                  </div>
-                                                </div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">STATE</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">City</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BRANCH NAME</div>
+                                                <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">{profile.updatedAt ?
+                                                  new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Remarks</div>
+                                                <div className="info-value">{profile.remarks || 'N/A'}</div>
                                               </div>
                                             </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  )}
 
-                                  {/* Profile Tab */}
-                                  {/* {activeTab === 1 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 1 && (
-                                    <div className="tab-pane active" id="profile">
-                                      <div className="resume-preview-body">
-                                        <div id="resume-download" className="resume-document">
 
-                                          <div className="resume-document-header">
-                                            <div className="resume-profile-section">
-                                              {profile._candidate?.personalInfo?.image ? (
-                                                <img
-                                                  src={`${profile._candidate?.personalInfo?.image}`}
-                                                  alt="Profile"
-                                                  className="resume-profile-image"
-                                                />
-                                              ) : (
-                                                <div className="resume-profile-placeholder">
-                                                  <i className="bi bi-person-circle"></i>
+                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+
+                                        <div className="desktop-view">
+                                          <div className="row g-4">
+
+                                            <div className="col-12">
+                                              <div className="scrollable-container">
+                                                <div className="scrollable-content">
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD AGE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                        : 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Lead Owner</div>
+                                                      <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">COURSE / JOB NAME</div>
+                                                      <div className="info-value">{profile._course?.name}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BATCH NAME</div>
+                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">TYPE OF PROJECT</div>
+                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">PROJECT</div>
+                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">SECTOR</div>
+                                                      <div className="info-value">{profile._course?.sectors}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CREATION DATE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">STATE</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">City</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BRANCH NAME</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                      <div className="info-value">{profile.updatedAt ?
+                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Remarks</div>
+                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION By</div>
+                                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Counsellor Name</div>
+                                                      <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              )}
+                                              </div>
+                                              <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                              <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
 
-                                              <div className="resume-header-content">
-                                                <h1 className="resume-name">
-                                                  {profile._candidate?.name || 'Your Name'}
-                                                </h1>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                </p>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.sex || 'Sex'}
-                                                </p>
+                                              <div className="desktop-view">
+                                                <div className="row">
+                                                  <div className="col-xl-3 col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD AGE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                        : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
 
-                                                <div className="resume-contact-details">
-
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profile._candidate?.mobile}</span>
+                                                  <div className="col-xl-3 col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">STATE</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">CITY</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">TYPE OF PROJECT</div>
+                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">PROJECT</div>
+                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Sector</div>
+                                                      <div className="info-value">{profile._course?.sectors}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">COURSE / JOB NAME</div>
+                                                      <div className="info-value">{profile._course?.name}</div>
+                                                    </div>
                                                   </div>
 
 
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-envelope-fill"></i>
-                                                    <span>{profile._candidate?.email}</span>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">BRANCH NAME</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">NEXT ACTION DATE</div>
+                                                      <div className="info-value">
+                                                        {profile.followups?.length > 0
+                                                          ?
+                                                          (() => {
+                                                            const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '-');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })()
+                                                          : 'N/A'}
+                                                      </div>
+
+                                                    </div>
                                                   </div>
 
-                                                  {profile._candidate?.dob && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-calendar-heart-fill"></i>
-                                                      {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                        day: '2-digit',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                      })}
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CREATION DATE</div>
+                                                      <div className="info-value">{profile.createdAt ? (() => {
+                                                        const dateObj = new Date(profile.createdAt);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}</div>
                                                     </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-geo-alt-fill"></i>
-                                                      <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                      <div className="info-value">{profile.updatedAt ? (() => {
+                                                        const dateObj = new Date(profile.updatedAt);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}</div>
                                                     </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-house-fill"></i>
-                                                      <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Remarks</div>
+                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                     </div>
-                                                  )}
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION BY</div>
+                                                      <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Counsellor Name</div>
+                                                      <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD OWNER</div>
+                                                      <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
+                                                    </div>
+                                                  </div>
                                                 </div>
                                               </div>
                                             </div>
-
-                                            <div className="resume-summary">
-                                              <h2 className="resume-section-title">Professional Summary</h2>
-                                              <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                            </div>
                                           </div>
+                                        </div>
+                                      </div>
+                                    )}
 
+                                    {/* Profile Tab */}
+                                    {/* {activeTab === 1 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 1 && (
+                                      <div className="tab-pane active" id="profile">
+                                        <div className="resume-preview-body">
+                                          <div id="resume-download" className="resume-document">
 
-                                          <div className="resume-document-body">
+                                            <div className="resume-document-header">
+                                              <div className="resume-profile-section">
+                                                {profile._candidate?.personalInfo?.image ? (
+                                                  <img
+                                                    src={`${profile._candidate?.personalInfo?.image}`}
+                                                    alt="Profile"
+                                                    className="resume-profile-image"
+                                                  />
+                                                ) : (
+                                                  <div className="resume-profile-placeholder">
+                                                    <i className="bi bi-person-circle"></i>
+                                                  </div>
+                                                )}
 
-                                            <div className="resume-column resume-left-column">
+                                                <div className="resume-header-content">
+                                                  <h1 className="resume-name">
+                                                    {profile._candidate?.name || 'Your Name'}
+                                                  </h1>
+                                                  <p className="resume-title">
+                                                    {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                  </p>
+                                                  <p className="resume-title">
+                                                    {profile._candidate?.sex || 'Sex'}
+                                                  </p>
 
-                                              {profile._candidate?.isExperienced === false ? (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Work Experience</h2>
-                                                  <div className="resume-experience-item">
-                                                    <div className="resume-item-header">
-                                                      <h3 className="resume-item-title">Fresher</h3>
+                                                  <div className="resume-contact-details">
+
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-telephone-fill"></i>
+                                                      <span>{profile._candidate?.mobile}</span>
                                                     </div>
-                                                    <div className="resume-item-content">
-                                                      <p>Looking for opportunities to start my career</p>
+
+
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-envelope-fill"></i>
+                                                      <span>{profile._candidate?.email}</span>
                                                     </div>
+
+                                                    {profile._candidate?.dob && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-calendar-heart-fill"></i>
+                                                        {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                          day: '2-digit',
+                                                          month: 'long',
+                                                          year: 'numeric'
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-geo-alt-fill"></i>
+                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-house-fill"></i>
+                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
                                                   </div>
                                                 </div>
-                                              ) : (
-                                                profile._candidate?.experiences?.length > 0 && (
+                                              </div>
+
+                                              <div className="resume-summary">
+                                                <h2 className="resume-section-title">Professional Summary</h2>
+                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                              </div>
+                                            </div>
+
+
+                                            <div className="resume-document-body">
+
+                                              <div className="resume-column resume-left-column">
+
+                                                {profile._candidate?.isExperienced === false ? (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Work Experience</h2>
-                                                    {profile._candidate.experiences.map((exp, index) => (
-                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {exp.jobTitle && (
-                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                          )}
-                                                          {exp.companyName && (
-                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                          )}
-                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                            <p className="resume-item-period">
-                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                              }) : 'Start Date'}
-                                                              {" - "}
-                                                              {exp.currentlyWorking ? 'Present' :
-                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'End Date'}
-                                                            </p>
-                                                          )}
-                                                        </div>
-                                                        {exp.jobDescription && (
-                                                          <div className="resume-item-content">
-                                                            <p>{exp.jobDescription}</p>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )
-                                              )}
-
-                                              {profile._candidate?.qualifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Education</h2>
-                                                  {profile._candidate.qualifications.map((edu, index) => (
-                                                    <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                    <div className="resume-experience-item">
                                                       <div className="resume-item-header">
-                                                        {edu.education && (
-                                                          <h3 className="resume-item-title">{edu.education}</h3>
-                                                        )}
-                                                        {edu.course && (
-                                                          <h3 className="resume-item-title">{edu.course}</h3>
-                                                        )}
-                                                        {edu.universityName && (
-                                                          <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                        )}
-                                                        {edu.schoolName && (
-                                                          <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                        )}
-                                                        {edu.collegeName && (
-                                                          <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                        )}
-                                                        {edu.passingYear && (
-                                                          <p className="resume-item-period">{edu.passingYear}</p>
-                                                        )}
+                                                        <h3 className="resume-item-title">Fresher</h3>
                                                       </div>
                                                       <div className="resume-item-content">
-                                                        {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                        {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        <p>Looking for opportunities to start my career</p>
                                                       </div>
                                                     </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-
-
-                                            <div className="resume-column resume-right-column">
-
-                                              {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Skills</h2>
-                                                  <div className="resume-skills-list">
-                                                    {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
-                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
-                                                        {skill?.skillPercent && (
-                                                          <div className="resume-skill-bar-container">
-                                                            <div
-                                                              className="resume-skill-bar"
-                                                              style={{ width: `${skill?.skillPercent || 0}%` }}
-                                                            ></div>
-                                                            <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
                                                   </div>
-                                                </div>
-                                              )}
-
-
-
-                                              {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Languages</h2>
-                                                  <div className="resume-languages-list">
-                                                    {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
-                                                        {lang.level && (
-                                                          <div className="resume-language-level">
-                                                            {[1, 2, 3, 4, 5].map(dot => (
-                                                              <span
-                                                                key={`resume-lang-dot-${index}-${dot}`}
-                                                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                              ></span>
-                                                            ))}
+                                                ) : (
+                                                  profile._candidate?.experiences?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                      {profile._candidate.experiences.map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'End Date'}
+                                                              </p>
+                                                            )}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Certifications</h2>
-                                                  <ul className="resume-certifications-list">
-                                                    {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                        <strong>{cert.certificateName || cert.name}</strong>
-                                                        {cert.orgName && (
-                                                          <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                        )}
-                                                        {(cert.month || cert.year) && (
-                                                          <span className="resume-cert-date">
-                                                            {cert.month && cert.year ?
-                                                              ` (${cert.month}/${cert.year})` :
-                                                              cert.month ?
-                                                                ` (${cert.month})` :
-                                                                cert.year ?
-                                                                  ` (${cert.year})` :
-                                                                  ''}
-                                                          </span>
-                                                        )}
-                                                      </li>
-                                                    ))}
-                                                  </ul>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Projects</h2>
-                                                  {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-project-title">
-                                                          {proj.projectName || 'Project'}
-                                                          {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                        </h3>
-                                                      </div>
-                                                      {proj.description && (
-                                                        <div className="resume-item-content">
-                                                          <p>{proj.description}</p>
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
+                                                            </div>
+                                                          )}
                                                         </div>
-                                                      )}
+                                                      ))}
                                                     </div>
-                                                  ))}
-                                                </div>
-                                              )}
+                                                  )
+                                                )}
 
-
-                                              {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Interests</h2>
-                                                  <div className="resume-interests-tags">
-                                                    {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                      <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                        {interest}
-                                                      </span>
+                                                {profile._candidate?.qualifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Education</h2>
+                                                    {profile._candidate.qualifications.map((edu, index) => (
+                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          {edu.education && (
+                                                            <h3 className="resume-item-title">{edu.education}</h3>
+                                                          )}
+                                                          {edu.course && (
+                                                            <h3 className="resume-item-title">{edu.course}</h3>
+                                                          )}
+                                                          {edu.universityName && (
+                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                          )}
+                                                          {edu.schoolName && (
+                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                          )}
+                                                          {edu.collegeName && (
+                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                          )}
+                                                          {edu.passingYear && (
+                                                            <p className="resume-item-period">{edu.passingYear}</p>
+                                                          )}
+                                                        </div>
+                                                        <div className="resume-item-content">
+                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        </div>
+                                                      </div>
                                                     ))}
                                                   </div>
-                                                </div>
-                                              )}
+                                                )}
+                                              </div>
 
+
+                                              <div className="resume-column resume-right-column">
+
+                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Skills</h2>
+                                                    <div className="resume-skills-list">
+                                                      {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
+                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
+                                                          {skill?.skillPercent && (
+                                                            <div className="resume-skill-bar-container">
+                                                              <div
+                                                                className="resume-skill-bar"
+                                                                style={{ width: `${skill?.skillPercent || 0}%` }}
+                                                              ></div>
+                                                              <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+
+                                                {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Languages</h2>
+                                                    <div className="resume-languages-list">
+                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                          <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
+                                                          {lang.level && (
+                                                            <div className="resume-language-level">
+                                                              {[1, 2, 3, 4, 5].map(dot => (
+                                                                <span
+                                                                  key={`resume-lang-dot-${index}-${dot}`}
+                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                ></span>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Certifications</h2>
+                                                    <ul className="resume-certifications-list">
+                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                          <strong>{cert.certificateName || cert.name}</strong>
+                                                          {cert.orgName && (
+                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                          )}
+                                                          {(cert.month || cert.year) && (
+                                                            <span className="resume-cert-date">
+                                                              {cert.month && cert.year ?
+                                                                ` (${cert.month}/${cert.year})` :
+                                                                cert.month ?
+                                                                  ` (${cert.month})` :
+                                                                  cert.year ?
+                                                                    ` (${cert.year})` :
+                                                                    ''}
+                                                            </span>
+                                                          )}
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Projects</h2>
+                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          <h3 className="resume-project-title">
+                                                            {proj.projectName || 'Project'}
+                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                          </h3>
+                                                        </div>
+                                                        {proj.description && (
+                                                          <div className="resume-item-content">
+                                                            <p>{proj.description}</p>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Interests</h2>
+                                                    <div className="resume-interests-tags">
+                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                          {interest}
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                              </div>
                                             </div>
+
+
+                                            {profile._candidate?.personalInfo?.declaration?.text && (
+                                              <div className="resume-declaration">
+                                                <h2 className="resume-section-title">Declaration</h2>
+                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
+
+                                              </div>
+                                            )}
                                           </div>
-
-
-                                          {profile._candidate?.personalInfo?.declaration?.text && (
-                                            <div className="resume-declaration">
-                                              <h2 className="resume-section-title">Declaration</h2>
-                                              <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                            </div>
-                                          )}
                                         </div>
                                       </div>
-                                    </div>
 
 
-                                  )}
+                                    )}
 
-                                  {/* Job History Tab */}
-                                  {/* {activeTab === 2 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 2 && (
-                                    <div className="tab-pane active" id="job-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered job-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Company Name</th>
-                                                <th>Position</th>
-                                                <th>Duration</th>
-                                                <th>Location</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {profile._candidate?.experiences?.map((job, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{job.companyName}</td>
-                                                  <td>{job.jobTitle}</td>
-                                                  <td>
-                                                    {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                    {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                  </td>
-                                                  <td>Remote</td>
-                                                  <td><span className="text-success">Completed</span></td>
+                                    {/* Job History Tab */}
+                                    {/* {activeTab === 2 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 2 && (
+                                      <div className="tab-pane active" id="job-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered job-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Company Name</th>
+                                                  <th>Position</th>
+                                                  <th>Duration</th>
+                                                  <th>Location</th>
+                                                  <th>Status</th>
                                                 </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Course History Tab */}
-                                  {/* {activeTab === 3 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 3 && (
-                                    <div className="tab-pane active" id="course-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered course-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Applied Date</th>
-                                                <th>Course Name</th>
-                                                <th>Lead Added By</th>
-                                                <th>Counsellor</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                profile._candidate._appliedCourses.map((course, index) => (
+                                              </thead>
+                                              <tbody>
+                                                {profile._candidate?.experiences?.map((job, index) => (
                                                   <tr key={index}>
                                                     <td>{index + 1}</td>
-                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                    <td>{course._course?.name || 'N/A'}</td>
-                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                    <td>{course.month || ''} {course.year || ''}</td>
-                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                    <td>{job.companyName}</td>
+                                                    <td>{job.jobTitle}</td>
+                                                    <td>
+                                                      {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                      {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                    </td>
+                                                    <td>Remote</td>
+                                                    <td><span className="text-success">Completed</span></td>
                                                   </tr>
-                                                ))
-                                              ) : (
-                                                <tr>
-                                                  <td colSpan={6} className="text-center">No course history available</td>
-                                                </tr>
-                                              )}
-
-                                            </tbody>
-                                          </table>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {/* Documents Tab */}
-                                  {/* {activeTab === 4 && ( */}
+                                    {/* Course History Tab */}
+                                    {/* {activeTab === 3 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 3 && (
+                                      <div className="tab-pane active" id="course-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered course-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Applied Date</th>
+                                                  <th>Course Name</th>
+                                                  <th>Lead Added By</th>
+                                                  <th>Counsellor</th>
+                                                  <th>Status</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
+                                                  profile._candidate._appliedCourses.map((course, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                      <td>{course._course?.name || 'N/A'}</td>
+                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                      <td>{course.month || ''} {course.year || ''}</td>
+                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No course history available</td>
+                                                  </tr>
+                                                )}
 
-                                  {(activeTab[profileIndex] || 0) === 4 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || [];
-                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
 
-                                        // If no documents are required, show a message
-                                        if (totalRequired === 0) {
-                                          return (
-                                            <div className="col-12 text-center py-5">
-                                              <div className="text-muted">
-                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                <h5 className="text-success">No Documents Required</h5>
-                                                <p>This course does not require any document verification.</p>
-                                              </div>
-                                            </div>
+                                    {/* Documents Tab */}
+                                    {/* {activeTab === 4 && ( */}
 
-                                          );
-                                        }
+                                    {(activeTab[profileIndex] || 0) === 4 && (
+                                      <div className="tab-pane active" id='studentsDocuments'>
+                                        {(() => {
+                                          const documentsToDisplay = profile.uploadedDocs || [];
+                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-                                        // If documents are required, show the full interface
-                                        return (
-                                          <div className="enhanced-documents-panel">
-                                            {/* Enhanced Stats Grid */}
-                                            <div className="stats-grid">
-                                              {(() => {
-                                                // Use backend counts only, remove static document fallback
-                                                const backendCounts = profile?.docCounts || {};
-                                                return (
-                                                  <>
-                                                    <div className="stat-card total-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-file-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.totalRequired || 0}</h4>
-                                                        <p>Total Required</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-list"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card uploaded-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-cloud-upload-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                        <p>Uploaded</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card pending-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-clock"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                        <p>Pending Review</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-exclamation-triangle"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card verified-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-check-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                        <p>Approved</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-thumbs-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card rejected-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-times-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                        <p>Rejected</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-down"></i>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-
-                                            {/* Enhanced Filter Section */}
-                                            <div className="filter-section-enhanced">
-                                              <div className="filter-tabs-container">
-                                                <h5 className="filter-title">
-                                                  <i className="fas fa-filter me-2"></i>
-                                                  Filter Documents
-                                                </h5>
-                                                <div className="filter-tabs">
-                                                  {(() => {
-                                                    const backendCounts = profile?.docCounts || {};
-                                                    return (
-                                                      <>
-                                                        <button
-                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('all')}
-                                                        >
-                                                          <i className="fas fa-list-ul"></i>
-                                                          All Documents
-                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('pending')}
-                                                        >
-                                                          <i className="fas fa-clock"></i>
-                                                          Pending
-                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('verified')}
-                                                        >
-                                                          <i className="fas fa-check-circle"></i>
-                                                          Verified
-                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('rejected')}
-                                                        >
-                                                          <i className="fas fa-times-circle"></i>
-                                                          Rejected
-                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                        </button>
-                                                      </>
-                                                    );
-                                                  })()}
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Documents Required</h5>
+                                                  <p>This course does not require any document verification.</p>
                                                 </div>
                                               </div>
-                                            </div>
 
-                                            {/* Enhanced Documents Grid */}
-                                            <div className="documents-grid-enhanced">
-                                              {(() => {
-                                                // Filter documents based on status filter
-                                                const filteredDocs = filterDocuments(documentsToDisplay);
+                                            );
+                                          }
 
-                                                if (filteredDocs.length === 0) {
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid">
+                                                {(() => {
+                                                  // Use backend counts only, remove static document fallback
+                                                  const backendCounts = profile?.docCounts || {};
                                                   return (
-                                                    <div className="col-12 text-center py-5">
-                                                      <div className="text-muted">
-                                                        <i className="fas fa-filter fa-3x mb-3"></i>
-                                                        <h5>No Documents Found</h5>
-                                                        <p>No documents match the current filter criteria.</p>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                }
-
-                                                return filteredDocs.map((doc, index) => {
-                                                  // Check if this is a document with upload data or just uploaded file info
-                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                    ? doc.uploads[doc.uploads.length - 1]
-                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                  return (
-                                                    <div key={doc._id || index} className="document-card-enhanced">
-                                                      <div className="document-image-container">
-                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                          <>
-                                                            {(() => {
-                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                              const fileType = getFileType(fileUrl);
-
-                                                              if (fileType === 'image') {
-                                                                return (
-                                                                  <img
-                                                                    src={fileUrl}
-                                                                    alt="Document Preview"
-                                                                    className="document-image"
-                                                                  />
-                                                                );
-                                                              } else if (fileType === 'pdf') {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                  </div>
-                                                                );
-                                                              } else {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                      {fileType === 'document' ? 'Document' :
-                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                    </p>
-                                                                  </div>
-                                                                );
-                                                              }
-                                                            })()}
-                                                            <div className="image-overlay">
-                                                              <button
-                                                                className="preview-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                              >
-                                                                <i className="fas fa-search-plus"></i>
-                                                                Preview
-                                                              </button>
-                                                            </div>
-                                                          </>
-                                                        ) : (
-                                                          <div className="no-document-placeholder">
-                                                            <i className="fas fa-file-upload"></i>
-                                                            <p>No Document</p>
-                                                          </div>
-                                                        )}
-
-                                                        {/* Status Badge Overlay */}
-                                                        <div className="status-badge-overlay">
-                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                            <span className="status-badge-new pending">
-                                                              <i className="fas fa-clock"></i>
-                                                              Pending
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                            <span className="status-badge-new verified">
-                                                              <i className="fas fa-check-circle"></i>
-                                                              Verified
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                            <span className="status-badge-new rejected">
-                                                              <i className="fas fa-times-circle"></i>
-                                                              Rejected
-                                                            </span>
-                                                          )}
-                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                            <span className="status-badge-new not-uploaded">
-                                                              <i className="fas fa-upload"></i>
-                                                              Required
-                                                            </span>
-                                                          )}
+                                                    <>
+                                                      <div className="stat-card total-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-file-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.totalRequired || 0}</h4>
+                                                          <p>Total Required</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="document-info-section">
-                                                        <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                          <div className="document-actions">
-                                                            {(!latestUpload) ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
-                                                                setSelectedProfile(profile); // Set the current profile
-                                                                openUploadModal(doc);        // Open the upload modal
-                                                              }}>
-                                                                <i className="fas fa-cloud-upload-alt"></i>
-                                                                Upload
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn verify-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="Verify Document"
-                                                              >
-                                                                <i className="fas fa-search"></i>
-                                                                PREVIEW
-                                                              </button>
+                                                      <div className="stat-card uploaded-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                          <p>Uploaded</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card pending-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-clock"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                          <p>Pending Review</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-exclamation-triangle"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card verified-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-check-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                          <p>Approved</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-thumbs-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card rejected-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-times-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                          <p>Rejected</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-down"></i>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  );
+                                                })()}
+                                              </div>
+
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced">
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title">
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs">
+                                                    {(() => {
+                                                      const backendCounts = profile?.docCounts || {};
+                                                      return (
+                                                        <>
+                                                          <button
+                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('all')}
+                                                          >
+                                                            <i className="fas fa-list-ul"></i>
+                                                            All Documents
+                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('pending')}
+                                                          >
+                                                            <i className="fas fa-clock"></i>
+                                                            Pending
+                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('verified')}
+                                                          >
+                                                            <i className="fas fa-check-circle"></i>
+                                                            Verified
+                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('rejected')}
+                                                          >
+                                                            <i className="fas fa-times-circle"></i>
+                                                            Rejected
+                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                          </button>
+                                                        </>
+                                                      );
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced">
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    // Check if this is a document with upload data or just uploaded file info
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                      ? doc.uploads[doc.uploads.length - 1]
+                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced">
+                                                        <div className="document-image-container">
+                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            <>
+                                                              {(() => {
+                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                const fileType = getFileType(fileUrl);
+
+                                                                if (fileType === 'image') {
+                                                                  return (
+                                                                    <img
+                                                                      src={fileUrl}
+                                                                      alt="Document Preview"
+                                                                      className="document-image"
+                                                                    />
+                                                                  );
+                                                                } else if (fileType === 'pdf') {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                    </div>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                        {fileType === 'document' ? 'Document' :
+                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                      </p>
+                                                                    </div>
+                                                                  );
+                                                                }
+                                                              })()}
+                                                              <div className="image-overlay">
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder">
+                                                              <i className="fas fa-file-upload"></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay">
+                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                              <span className="status-badge-new pending">
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                              <span className="status-badge-new verified">
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                              <span className="status-badge-new rejected">
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                              <span className="status-badge-new not-uploaded">
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
                                                             )}
                                                           </div>
                                                         </div>
 
-                                                        <div className="document-meta">
-                                                          <div className="meta-item">
-                                                            <i className="fas fa-calendar-alt text-muted"></i>
-                                                            <span className="meta-text">
-                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric'
-                                                                }) :
-                                                                'Not uploaded'
-                                                              }
-                                                            </span>
+                                                        <div className="document-info-section">
+                                                          <div className="document-header">
+                                                            <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {(!latestUpload) ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
+                                                                  setSelectedProfile(profile); // Set the current profile
+                                                                  openUploadModal(doc);        // Open the upload modal
+                                                                }}>
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="Verify Document"
+                                                                >
+                                                                  <i className="fas fa-search"></i>
+                                                                  PREVIEW
+                                                                </button>
+                                                              )}
+                                                            </div>
                                                           </div>
 
-                                                          {latestUpload && (
+                                                          <div className="document-meta">
                                                             <div className="meta-item">
-                                                              <i className="fas fa-clock text-muted"></i>
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
                                                               <span className="meta-text">
-                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit'
-                                                                })}
+                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
                                                               </span>
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                });
-                                              })()}
-                                            </div>
 
-                                            {/* <DocumentModal /> */}
-                                            {showDocumentModal && (
-                                              <DocumentModal
-                                                showDocumentModal={showDocumentModal}
-                                                selectedDocument={selectedDocument}
-                                                closeDocumentModal={closeDocumentModal}
-                                                updateDocumentStatus={updateDocumentStatus}
-                                                getFileType={getFileType}
-                                              />
-                                            )}
-                                            <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                              <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
-                                                <div className="modal-content p-0 w-100">
-                                                  <div className="modal-header">
-                                                    <h3>
-                                                      <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                      Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                    </h3>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
-                                                  </div>
-                                                  <div className="modal-body">
-
-
-
-                                                    <div className="upload-section">
-                                                      {!selectedFile ? (
-                                                        <div className="file-drop-zone">
-                                                          <div className="drop-zone-content">
-                                                            <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                            <h4>Choose a file to upload</h4>
-                                                            <p>Drag and drop a file here, or click to select</p>
-                                                            <div className="file-types">
-                                                              <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                              <span>Max size: 10MB</span>
-                                                            </div>
-                                                            <input
-                                                              type="file"
-                                                              id="file-input"
-                                                              accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                              onChange={handleFileSelect}
-                                                              style={{ display: 'none' }}
-                                                            />
-                                                            <button
-                                                              className="btn btn-primary"
-
-                                                              onClick={() => document.getElementById('file-input').click()}
-                                                            >
-                                                              <i className="fas fa-folder-open me-2"></i>
-                                                              Choose File
-                                                            </button>
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
                                                           </div>
                                                         </div>
-                                                      ) : (
-                                                        <div className="file-preview-section">
-                                                          <div className="selected-file-info">
-                                                            <h4>Selected File:</h4>
-                                                            <div className="file-details">
-                                                              <div className="file-icon">
-                                                                <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                      </div>
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
+
+                                              {/* <DocumentModal /> */}
+                                              {showDocumentModal && (
+                                                <DocumentModal
+                                                  showDocumentModal={showDocumentModal}
+                                                  selectedDocument={selectedDocument}
+                                                  closeDocumentModal={closeDocumentModal}
+                                                  updateDocumentStatus={updateDocumentStatus}
+                                                  getFileType={getFileType}
+                                                />
+                                              )}
+                                              <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                                <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
+                                                  <div className="modal-content p-0 w-100">
+                                                    <div className="modal-header">
+                                                      <h3>
+                                                        <i className="fas fa-cloud-upload-alt me-2"></i>
+                                                        Upload {selectedDocumentForUpload?.Name || 'Document'}
+                                                      </h3>
+                                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
+                                                    </div>
+                                                    <div className="modal-body">
+
+
+
+                                                      <div className="upload-section">
+                                                        {!selectedFile ? (
+                                                          <div className="file-drop-zone">
+                                                            <div className="drop-zone-content">
+                                                              <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                                                              <h4>Choose a file to upload</h4>
+                                                              <p>Drag and drop a file here, or click to select</p>
+                                                              <div className="file-types">
+                                                                <span>Supported: JPG, PNG, GIF, PDF</span>
+                                                                <span>Max size: 10MB</span>
                                                               </div>
-                                                              <div className="file-info">
-                                                                <p className="file-name">{selectedFile.name}</p>
-                                                                <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                              </div>
+                                                              <input
+                                                                type="file"
+                                                                id="file-input"
+                                                                accept=".jpg,.jpeg,.png,.gif,.pdf"
+                                                                onChange={handleFileSelect}
+                                                                style={{ display: 'none' }}
+                                                              />
                                                               <button
-                                                                className="btn btn-sm btn-outline-secondary"
-                                                                onClick={() => {
-                                                                  setSelectedFile(null);
-                                                                  setUploadPreview(null);
-                                                                }}
+                                                                className="btn btn-primary"
+
+                                                                onClick={() => document.getElementById('file-input').click()}
                                                               >
-                                                                <i className="fas fa-trash"></i>
+                                                                <i className="fas fa-folder-open me-2"></i>
+                                                                Choose File
                                                               </button>
                                                             </div>
                                                           </div>
-
-                                                          {uploadPreview && (
-                                                            <div className="upload-preview">
-                                                              <h5>Preview:</h5>
-                                                              <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                            </div>
-                                                          )}
-
-                                                          {isUploading && (
-                                                            <div className="upload-progress-section">
-                                                              <h5>Uploading...</h5>
-                                                              <div className="progress-bar-container">
-                                                                <div
-                                                                  className="progress-bar"
-                                                                  style={{ width: `${uploadProgress}%` }}
-                                                                ></div>
+                                                        ) : (
+                                                          <div className="file-preview-section">
+                                                            <div className="selected-file-info">
+                                                              <h4>Selected File:</h4>
+                                                              <div className="file-details">
+                                                                <div className="file-icon">
+                                                                  <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                                </div>
+                                                                <div className="file-info">
+                                                                  <p className="file-name">{selectedFile.name}</p>
+                                                                  <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                </div>
+                                                                <button
+                                                                  className="btn btn-sm btn-outline-secondary"
+                                                                  onClick={() => {
+                                                                    setSelectedFile(null);
+                                                                    setUploadPreview(null);
+                                                                  }}
+                                                                >
+                                                                  <i className="fas fa-trash"></i>
+                                                                </button>
                                                               </div>
-                                                              <p>{uploadProgress}% Complete</p>
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      )}
+
+                                                            {uploadPreview && (
+                                                              <div className="upload-preview">
+                                                                <h5>Preview:</h5>
+                                                                <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                                                              </div>
+                                                            )}
+
+                                                            {isUploading && (
+                                                              <div className="upload-progress-section">
+                                                                <h5>Uploading...</h5>
+                                                                <div className="progress-bar-container">
+                                                                  <div
+                                                                    className="progress-bar"
+                                                                    style={{ width: `${uploadProgress}%` }}
+                                                                  ></div>
+                                                                </div>
+                                                                <p>{uploadProgress}% Complete</p>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+
+
+
                                                     </div>
-
-
-
-                                                  </div>
-                                                  <div className="modal-footer">
-                                                    <button
-                                                      className="btn btn-secondary"
-                                                      onClick={closeUploadModal}
-                                                      disabled={isUploading}
-                                                    >
-                                                      Cancel
-                                                    </button>
-                                                    <button
-                                                      className="btn btn-primary"
-                                                      onClick={handleFileUpload}
-                                                      disabled={!selectedFile || isUploading}
-                                                    >
-                                                      {isUploading ? (
-                                                        <>
-                                                          <i className="fas fa-spinner fa-spin me-2"></i>
-                                                          Uploading...
-                                                        </>
-                                                      ) : (
-                                                        <>
-                                                          <i className="fas fa-upload me-2"></i>
-                                                          Upload Document
-                                                        </>
-                                                      )}
-                                                    </button>
+                                                    <div className="modal-footer">
+                                                      <button
+                                                        className="btn btn-secondary"
+                                                        onClick={closeUploadModal}
+                                                        disabled={isUploading}
+                                                      >
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        className="btn btn-primary"
+                                                        onClick={handleFileUpload}
+                                                        disabled={!selectedFile || isUploading}
+                                                      >
+                                                        {isUploading ? (
+                                                          <>
+                                                            <i className="fas fa-spinner fa-spin me-2"></i>
+                                                            Uploading...
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            <i className="fas fa-upload me-2"></i>
+                                                            Upload Document
+                                                          </>
+                                                        )}
+                                                      </button>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                    {(activeTab[profileIndex] || 0) === 5 && (
+                                      <div className="tab-pane active" id='preverification'>
+                                        <div className="row">
+                                          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
+                                            <div className="card mt-1 mb-2">
+                                              <div className="col-xl-12 p-3">
+                                                <div className="row">
+                                                  <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
+                                                    <h4 className="card-title mb-0" id="wrapping-bottom">Pre Verification</h4>
+                                                  </div>
 
-                                </div>)
+                                                </div>
+                                              </div>
+                                              <div className="card-content">
+                                                <div className="table-responsive">
+                                                  
+                                                  <table className="verification-table">
+                                                    <thead>
+                                                      <tr>
+                                                        <th>S.NO</th>
+                                                        <th>Questions</th>
+                                                        <th>Answer</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      <tr>
+                                                        <td className="s-no">1</td>
+                                                        <td className="question">Is the Candidate Aware of the Course</td>
+                                                        <td>
+                                                          <div className="checkbox-group">
+                                                            <label className="checkbox-wrapper positive">
+                                                              <input type="radio" name="q1" value="Yes" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Yes</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper negative">
+                                                              <input type="radio" name="q1" value="No" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">No</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q1" value="Not Sure" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Not Sure</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td className="s-no">2</td>
+                                                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
+                                                        <td>
+                                                          <div className="checkbox-group">
+                                                            <label className="checkbox-wrapper positive">
+                                                              <input type="radio" name="q2" value="Yes" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Yes</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper negative">
+                                                              <input type="radio" name="q2" value="No" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">No</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q2" value="Not Sure" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Not Sure</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td className="s-no">3</td>
+                                                        <td className="question">Currently Work Status</td>
+                                                        <td>
+                                                          <div className="checkbox-group">
+                                                            <label className="checkbox-wrapper positive">
+                                                              <input type="radio" name="q3" value="Working" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Working</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper negative">
+                                                              <input type="radio" name="q3" value="Not Working" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Not Working</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q3" value="Study" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Study</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td className="s-no">4</td>
+                                                        <td className="question">Is Candidate Interested for Course</td>
+                                                        <td>
+                                                          <div className="checkbox-group">
+                                                            <label className="checkbox-wrapper positive">
+                                                              <input type="radio" name="q4" value="Yes" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Yes</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper negative">
+                                                              <input type="radio" name="q4" value="No" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">No</span>
+                                                            </label>
+                                                            <label className="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q4" value="Not Sure" />
+                                                                <span className="custom-checkbox"></span>
+                                                                <span className="checkbox-label">Not Sure</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td class="s-no">5</td>
+                                                        <td class="question">If we offered a job outside Odisha, would you be</td>
+                                                        <td>
+                                                          <div class="checkbox-group">
+                                                            <label class="checkbox-wrapper positive">
+                                                              <input type="radio" name="q5" value="Yes" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Yes</span>
+                                                            </label>
+                                                            <label class="checkbox-wrapper negative">
+                                                              <input type="radio" name="q5" value="No" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">No</span>
+                                                            </label>
+                                                            <label class="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q5" value="Not Sure" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Not Sure</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td class="s-no">6</td>
+                                                        <td class="question">Parent Confirmation</td>
+                                                        <td>
+                                                          <div class="checkbox-group">
+                                                            <label class="checkbox-wrapper positive">
+                                                              <input type="radio" name="q6" value="Yes" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Yes</span>
+                                                            </label>
+                                                            <label class="checkbox-wrapper negative">
+                                                              <input type="radio" name="q6" value="No" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">No</span>
+                                                            </label>
+                                                            <label class="checkbox-wrapper neutral">
+                                                              <input type="radio" name="q6" value="Not Sure" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Not Sure</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                      <tr>
+                                                        <td class="s-no">7</td>
+                                                        <td class="question">Recommendation from Placement</td>
+                                                        <td>
+                                                          <div class="checkbox-group">
+                                                            <label class="checkbox-wrapper positive">
+                                                              <input type="radio" name="q7" value="Selected" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Selected</span>
+                                                            </label>
+                                                            <label class="checkbox-wrapper negative">
+                                                              <input type="radio" name="q7" value="Rejected" />
+                                                                <span class="custom-checkbox"></span>
+                                                                <span class="checkbox-label">Rejected</span>
+                                                            </label>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                  </div>)
                               )}
                             </div>
 
@@ -6053,7 +6050,7 @@ const CRMDashboard = () => {
                                         setShowBranchModal(false);
                                         setSelectedBranch('');
                                       }}>Close</button>
-                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(profile, selectedBranch)}>Save Branch</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch()}>Save Center</button>
                                     </div>
                                   </div>
                                 </div>
@@ -6166,7 +6163,6 @@ const CRMDashboard = () => {
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
               {renderAllLeadPanel()}
-              {renderChangeCenterPanel()}
             </div>
           </div>
         )}
@@ -6177,7 +6173,6 @@ const CRMDashboard = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
-        {isMobile && renderChangeCenterPanel()}
       </div>
       <UploadModal />
 
@@ -13654,7 +13649,261 @@ max-width: 600px;
     z-index: 10000 !important;
   }
 
-  
+
+  // table styling 
+  #wrapping-bottom {
+    white-space: pre-wrap !important;
+}
+    .card .card-title {
+    font-weight: 500;
+    letter-spacing: 0.05rem;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            background: #fafbfc;
+            padding: 4px;
+        }
+
+        .verification-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .verification-table thead {
+            background: #f8f9fc;
+        }
+
+        .verification-table th {
+            padding: 16px 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .verification-table td {
+            padding: 5px;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+
+        .verification-table tbody tr {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .verification-table tbody tr:hover {
+            background-color: #f9fafb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .verification-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .s-no {
+            font-weight: 600;
+            color: #374151;
+            font-size: 16px;
+            width: 60px;
+            text-align: center;
+        }
+
+        .question {
+            color: #374151;
+            font-size: 15px;
+            font-weight: 500;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        /* Checkbox Group Styles */
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .checkbox-wrapper:hover {
+            background-color: #f3f4f6;
+        }
+
+        /* Hide default radio button */
+        .checkbox-wrapper input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Custom checkbox design */
+        .custom-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        /* Checkmark */
+        .custom-checkbox::after {
+            content: '';
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg) scale(0);
+            transition: transform 0.3s ease;
+        }
+
+        /* Checked state */
+        .checkbox-wrapper input[type="radio"]:checked ~ .custom-checkbox {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+
+        .checkbox-wrapper input[type="radio"]:checked ~ .custom-checkbox::after {
+            transform: rotate(45deg) scale(1);
+        }
+
+        /* Label styling */
+        .checkbox-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #4b5563;
+            transition: color 0.3s ease;
+        }
+
+        .checkbox-wrapper input[type="radio"]:checked ~ .checkbox-label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        /* Color variations for different answer types */
+        .checkbox-wrapper.positive input[type="radio"]:checked ~ .custom-checkbox {
+            background-color: #22c55e;
+            border-color: #22c55e;
+        }
+
+        .checkbox-wrapper.positive input[type="radio"]:checked ~ .checkbox-label {
+            color: #15803d;
+        }
+
+        .checkbox-wrapper.negative input[type="radio"]:checked ~ .custom-checkbox {
+            background-color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .checkbox-wrapper.negative input[type="radio"]:checked ~ .checkbox-label {
+            color: #dc2626;
+        }
+
+        .checkbox-wrapper.neutral input[type="radio"]:checked ~ .custom-checkbox {
+            background-color: #eab308;
+            border-color: #eab308;
+        }
+
+        .checkbox-wrapper.neutral input[type="radio"]:checked ~ .checkbox-label {
+            color: #a16207;
+        }
+
+
+        /* Status badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 12px;
+        }
+
+        .status-complete {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-incomplete {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+
+            .verification-table {
+                font-size: 14px;
+            }
+
+            .verification-table th,
+            .verification-table td {
+                padding: 12px;
+            }
+
+            .checkbox-group {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+
+            .question {
+                font-size: 14px;
+            }
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+
+        .verification-table tbody tr {
+            animation: fadeIn 0.4s ease-out forwards;
+            opacity: 0;
+        }
+
+        .verification-table tbody tr:nth-child(1) { animation-delay: 0.1s; }
+        .verification-table tbody tr:nth-child(2) { animation-delay: 0.15s; }
+        .verification-table tbody tr:nth-child(3) { animation-delay: 0.2s; }
+        .verification-table tbody tr:nth-child(4) { animation-delay: 0.25s; }
+        .verification-table tbody tr:nth-child(5) { animation-delay: 0.3s; }
+        .verification-table tbody tr:nth-child(6) { animation-delay: 0.35s; }
+        .verification-table tbody tr:nth-child(7) { animation-delay: 0.4s; }
+   
+        
           `
         }
       </style>
