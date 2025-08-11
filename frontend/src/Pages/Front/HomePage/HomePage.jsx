@@ -76,41 +76,301 @@ const HomePage = () => {
 
   return (
     <FrontLayout>
+      <style>
+        {
+          ` .mainBackgroundImage{
+      background-image: url('/Assets/public_assets/images/mainbg.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      position: relative;
+      z-index: 1;
+      /* Add gradient overlay for better text readability */
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.4) 100%);
+        z-index: 1;
+      }
+    }
+    
+    /* Make the navbar appear above the background */
+    .site-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 999;
+      background-color: rgba(18, 18, 18, 0.9) !important;
+    }
+    
+    /* Ensure the hero section content is above the background */
+    .home-2_hero-section {
+      position: relative;
+      z-index: 2;
+    }
 
+    /* Enhanced styling for Future Technology text */
+    div#features_cta h4.head {
+      font-size: 16px !important;
+      color: #fff !important;
+      text-align: center;
+      font-weight: 600 !important;
+      word-wrap: break-word;
+      transition: all 0.4s ease;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 0.5px;
+      margin-top: 15px;
+      position: relative;
+      
+      /* Add gradient text effect with new color scheme */
+      background: linear-gradient(108deg, rgba(199,51,72,1) 15%, rgba(81,63,139,1) 40%, rgba(199,51,72,1) 60%, rgba(81,63,139,1) 80%, rgba(199,51,72,1) 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradientShift 3s ease-in-out infinite;
+    }
+
+    /* Hover effect for Future Technology text */
+    .cta_cols:hover h4.head {
+      transition: all 0.5s ease !important;
+      background: linear-gradient(108deg, rgba(199,51,72,1) 15%, rgba(81,63,139,1) 40%, rgba(199,51,72,1) 60%, rgba(81,63,139,1) 80%, rgba(199,51,72,1) 100%) !important;
+      background-size: 200% 200% !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
+      animation: gradientShift 1.5s ease-in-out infinite !important;
+      transform: scale(1.05) !important;
+      text-shadow: 0 4px 8px rgba(255, 213, 66, 0.3) !important;
+    }
+
+    /* Animation for gradient shift */
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Enhanced card styling */
+    .cta_cols {
+      transition: all 0.3s ease;
+      padding: 20px 10px;
+      border-radius: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin: 10px 5px;
+    }
+
+    .cta_cols:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(255, 213, 66, 0.2);
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 213, 66, 0.3);
+    }
+
+    /* Enhanced image styling */
+    div#features_cta figure {
+      margin: 0;
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    div#features_cta figure:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 20px rgba(255, 213, 66, 0.3);
+    }
+
+    /* Add glow effect to images */
+    div#features_cta img {
+      width: 100px;
+      height: auto;
+      text-align: center;
+      margin: 0 auto;
+      filter: drop-shadow(0 0 10px rgba(255, 213, 66, 0.3));
+      transition: all 0.3s ease;
+    }
+
+    div#features_cta img:hover {
+      filter: drop-shadow(0 0 15px rgba(255, 213, 66, 0.6));
+    }
+
+    /* Enhanced background effects */
+    .mainBackgroundImage::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(255, 213, 66, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 107, 53, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(255, 42, 86, 0.1) 0%, transparent 50%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Floating animation for background elements */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* Add subtle particle effect */
+    .mainBackgroundImage::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        radial-gradient(circle at 25% 25%, rgba(255, 213, 66, 0.1) 1px, transparent 1px),
+        radial-gradient(circle at 75% 75%, rgba(255, 107, 53, 0.1) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: float 6s ease-in-out infinite;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Infinite Scroll Animation for Technology Images */
+    .infinite-scroll-container {
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      height: 120px;
+      margin: 20px 0;
+    }
+
+    .infinite-scroll-track {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      animation: scroll 20s linear infinite;
+      width: max-content;
+    }
+
+    .infinite-scroll-track a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .infinite-scroll-track .img1 {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 10px rgba(255, 213, 66, 0.3));
+      transition: all 0.3s ease;
+    }
+
+    .infinite-scroll-track a:hover .img1 {
+      transform: scale(1.1);
+      filter: drop-shadow(0 0 15px rgba(255, 213, 66, 0.6));
+    }
+
+    /* Keyframe animation for infinite scroll */
+    @keyframes scroll {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+
+    /* Pause animation on hover */
+    .infinite-scroll-container:hover .infinite-scroll-track {
+      animation-play-state: paused;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .infinite-scroll-track {
+        gap: 20px;
+      }
+      
+      .infinite-scroll-track .img1 {
+        width: 60px;
+        height: 60px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .infinite-scroll-track {
+        gap: 15px;
+      }
+      
+      .infinite-scroll-track .img1 {
+        width: 50px;
+        height: 50px;
+      }
+    }
+`
+        }
+      </style>
       {/* main page display on web for large screens  */}
-      <section className="d-xxl-block d-xl-block d-lg-block d-md-block d-md-block d-sm-none d-none">
+      <section className="d-xxl-block d-xl-block d-lg-block d-md-block d-md-block d-sm-none d-none mainBackgroundImage">
         <div className="home-2_hero-section section-padding-120 mt-5" id="hero">
           <div className="container">
             <div className="row row--custom">
               <div className="col-xxl-6 col-lg-6 col-md-12 col-xs-8 col-12" data-aos-duration="1000" data-aos="fade-left"
                 data-aos-delay="300">
-                {/* <!-- <div className="home-2_hero-image-block">
+                {/* <div className="home-2_hero-image-block">
                 <div className="home-2_hero-image">
                   <img src="public_assets/images/newpage/index/focalyt2.gif" alt="hero image" className="img-fluid"
                     draggable="false"/>
                 </div>
-              </div> --> */}
+              </div> */}
                 <div className="home-2_hero-image-block">
                   <h2 className="tagline">
                     #Building Future Ready Minds
                   </h2>
                 </div>
-                <div className="images">
-                  <a href="/candidate/login">
-                    <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
-                  </a>
-                  <a href="/candidate/login">'
-                    <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" />
-                  </a>
-                  <a href="/candidate/login">
-                    <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
-                  </a>
-                  <a href="/candidate/login">
-                    <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
-                  </a>
-                  <a href="/candidate/login">
-                    <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
-                  </a>
+                <div className="images infinite-scroll-container">
+                  <div className="infinite-scroll-track">
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/drone.png" alt="drone" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ai.png" alt="ai" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/robotics.png" alt="robotic" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/iot.png" alt="iot" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ar_vr.png" alt="ar vr" className="img1" />
+                    </a>
+                    {/* Duplicate images for seamless loop */}
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/drone.png" alt="drone" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ai.png" alt="ai" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/robotics.png" alt="robotic" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/iot.png" alt="iot" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ar_vr.png" alt="ar vr" className="img1" />
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -182,13 +442,13 @@ const HomePage = () => {
         </div>
 
         {/* carousel  */}
-        <div className='' style={{ background: "#121212" }}>
+        <div className='' style={{ background: "rgba(255, 255, 255 , 0.7)" }}>
           <TechnologySlider />
 
         </div>
 
       </section>
-      <section className="d-xxl-none d-xl-none d-lg-none d-md-none d-sm-block d-block" id="hero_sm">
+      <section className="d-xxl-none d-xl-none d-lg-none d-md-none d-sm-block d-block mainBackgroundImage" id="hero_sm">
         <div className="home-2_hero-section section-padding-120 mt-5" id="hero">
           <div className="container">
             <div className="row row--custom">
@@ -205,7 +465,7 @@ const HomePage = () => {
                     #Building Future Ready Minds
                   </h2>
                 </div>
-                <div className="images">
+                {/* <div className="images">
                   <a href="/candidate/login">
                     <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
                   </a>
@@ -221,6 +481,41 @@ const HomePage = () => {
                   <a href="/candidate/login">
                     <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
                   </a>
+                </div> */}
+                 <div className="images infinite-scroll-container">
+                  <div className="infinite-scroll-track">
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/drone.png" alt="drone" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ai.png" alt="ai" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/robotics.png" alt="robotic" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/iot.png" alt="iot" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ar_vr.png" alt="ar vr" className="img1" />
+                    </a>
+                    {/* Duplicate images for seamless loop */}
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/drone.png" alt="drone" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ai.png" alt="ai" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/robotics.png" alt="robotic" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/iot.png" alt="iot" className="img1" />
+                    </a>
+                    <a href="/candidate/login">
+                      <img src="/Assets/public_assets/images/banner_img/ar_vr.png" alt="ar vr" className="img1" />
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -292,7 +587,7 @@ const HomePage = () => {
         </div>
 
         {/* carousel  */}
-        <div className='' style={{ background: "#121212" }}>
+        <div className='' style={{ background: "rgba(255, 255, 255 , 0.7)" }}>
           <TechnologySlider />
 
         </div>
@@ -1377,10 +1672,10 @@ const HomePage = () => {
     
 }
 .home-2_hero-content-text h1 {
-   background: -webkit-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
-   background: -o-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
-   background: -moz-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
-   background: linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%); 
+   background: -webkit-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+   background: -o-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+   background: -moz-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+   background: linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%); 
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   transition: .4s ease-in;
@@ -1464,7 +1759,7 @@ div#features_cta figure {
 .home-2_hero-section {
   padding-top: 100px;
   padding-bottom: 60px;
-  background-color: #121212;
+  // background-color: #121212;
   overflow: hidden;
   position: relative;
 }
@@ -1503,8 +1798,8 @@ div#features_cta figure {
 }
 
 .images img {
-  width: 70px;
-  height: 70px;
+  width: 100px;
+  height: 100px;
   transition: transform 0.3s ease;
 }
 
@@ -1874,13 +2169,13 @@ div#features_cta figure {
 }
 section#hero_sm .home-2_hero-content-text h1 {
   font-size: 55px;
-  background: -webkit-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
-  background: -o-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
-  background: -moz-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
-  background: linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 20%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
+  background: -webkit-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+  background: -o-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+  background: -moz-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
+  background: linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  transition: .4sease-in;
+  transition: .4s ease-in;
   margin-top: 10px;
 }
 

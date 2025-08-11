@@ -325,7 +325,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
 
-
   // Add this useEffect to handle clicking outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -351,6 +350,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
 
   // Static document data for demonstration
   useEffect(() => {
@@ -475,6 +475,72 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     };
     fetchFilterOptions();
   }, []);
+
+  // post questions here 
+
+  // useEffect(()=>{
+
+    const [questionFormData , setQuestionFormData] = useState({});
+    const [isLoadingQuestionAnswers, setIsLoadingQuestionAnswers] = useState(false);
+    const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+
+    // Function to fetch existing question answers
+    // const fetchQuestionAnswers = async (appliedcourseId) => {
+    //   try {
+    //     setIsLoadingQuestionAnswers(true);
+    //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    //     const token = userData.token;
+    //     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        
+    //     const response = await axios.get(`${backendUrl}/college/questionAnswer/${appliedcourseId}`, {
+    //       headers: { 'x-auth': token }
+    //     });
+        
+    //     if (response.data.status && response.data.data) {
+    //       const existingData = response.data.data.responses;
+    //       const formData = {};
+          
+    //       existingData.forEach((response, index) => {
+    //         formData[`q${index + 1}`] = response.answer;
+    //       });
+          
+    //       setQuestionFormData(formData);
+    //     }
+    //   } catch (error) {
+    //     // If no existing data found, that's fine - just start with empty form
+    //     console.log('No existing question answers found or error:', error);
+    //     setQuestionFormData({});
+    //   } finally {
+    //     setIsLoadingQuestionAnswers(false);
+    //   }
+    // };
+
+    const QuestionAnswer = async () => {
+      try {
+        setIsSubmittingAnswers(true);
+
+        console.log(questionFormData, 'questionFormData')
+        
+        const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
+          headers: { 'x-auth': token }
+        });
+        console.log("responnse" , response)
+        if (response.data.status) {
+          alert("Pre-verification questions submitted successfully!");
+          showSetPreVerification(false);
+          setQuestionFormData({}); // Reset form
+        } else {
+          alert("Error: " + response.data.message);
+        }
+        
+        console.log(response, 'response');
+      } catch (error) {
+        console.log(error, 'error');
+        alert("Error submitting pre-verification questions. Please try again.");
+      } finally {
+        setIsSubmittingAnswers(false);
+      }
+    }
 
   // ========================================
   // 🎯 Modal Scroll Management
@@ -837,24 +903,15 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       setActiveCrmFilter(index);
       return;
     } else if (index === 2) {
-      // Placement Verification filter
-      setFilterData({
-        ...filterData,
-        stage: 'placementVerification',
-      })
-      setActiveCrmFilter(index);
-      return;
-    } else if (index === 3) {
-      // All profiles filter
       setFilterData({
         ...filterData,
         kyc: 'all',
-        stage: '',
       })
       setActiveCrmFilter(index);
       return;
     }
     setActiveCrmFilter(index);
+
   };
 
   // Filter state from Registration component
@@ -1069,76 +1126,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setSelectedStatus(e.target.value);
   };
 
-  const handleMoveToPlacementVerification = async (profile) => {
-    try {
-      if (!profile || !profile._id) {
-        alert('No profile selected');
-        return;
-      }
-
-      const uploadedDocs = profile.uploadedDocs;
-
-      for (const doc of uploadedDocs) {
-        const docStatus = doc.status;
-        if (doc.mandatory && !docStatus) {
-          console.log('Document requiring verification:', doc);  // Log the document
-          alert('All documents must be verified before moving to placement verification list');
-          return;
-        }
-      }
-
-      // Show confirmation dialog
-      const confirmMove = window.confirm('Do you really want to move this profile to placement verification list?');
-      if (!confirmMove) {
-        return;
-      }
-
-      // Check if backend URL and token exist
-      if (!backendUrl) {
-        alert('Backend URL not configured');
-        return;
-      }
-
-      if (!token) {
-        alert('Authentication token missing');
-        return;
-      }
-
-      const payload = {
-        stage: 'placementVerification', // Set placement verification as done
-        remarks: 'Moved to placement verification'
-      };
-
-      // console.log('Sending data to backend:', payload);  
-
-      // Send PUT request to backend API to update status
-      const response = await axios.put(
-        `${backendUrl}/college/update/${profile._id}`,
-        payload,
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      // console.log('API Response:', response.data);  
-      if (response.data.success) {
-        alert('Profile moved to placement verification successfully!');
-        await fetchProfileData();
-      } else {
-        console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to move to placement verification');
-      }
-    } catch (error) {
-      console.error('Error moving to placement verification:', error);
-      alert('Failed to move to placement verification');
-    }
-  };
-
-
-
   const handleMoveToAdmission = async (profile) => {
     try {
       if (!profile || !profile._id) {
@@ -1156,6 +1143,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           return;
         }
       }
+
 
       // Show confirmation dialog
       const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
@@ -1254,6 +1242,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       alert('Failed to fetch Status');
     }
   };
+
+
 
   const fetchSubStatus = async () => {
     try {
@@ -1480,7 +1470,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
-        ...(filters.stage && { stage: filters.stage }),
         ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
         ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
         ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
@@ -1765,6 +1754,19 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  const addQuestionAnswer = async (data) => {
+    try {
+      const response = await axios.post(`${backendUrl}/college/questionAnswer`, data, {
+        headers: {
+          'x-auth': token
+        }
+      });
+      console.log('response', response);
+    } catch (error) {
+      console.error('Error adding question answer:', error);
+    }
+  }
+
   // यह function DocumentModal के बाहर, component के अंदर कहीं भी define करें:
 
   // Auto Height Document Thumbnail Function - DocumentModal के बाहर define करें
@@ -1807,7 +1809,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
     const handleRejectClick = useCallback(() => {
       setShowRejectionForm(true);
-      console.log('reupload')
     }, []);
 
     const handleCancelRejection = useCallback(() => {
@@ -2286,43 +2287,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Static buttons for accidentally approved documents */}
-              {(latestUpload?.status || selectedDocument?.status) === 'Verified' && (
-                <div className="document-actions mt-4">
-                  {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button className="btn btn-warning me-2" onClick={handleRejectClick}>
-                        <i className="fas fa-undo"></i> Reject Document
-                      </button>
-                      <button className="btn btn-info">
-                        <i className="fas fa-eye"></i>  Reupload Document
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="8"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-danger" onClick={handleConfirmRejection}>
-                          Confirm Rejection
-                        </button>
-                        <button className="btn btn-secondary" onClick={handleCancelRejection}>
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
+                </div>)}
 
 
             </div>
@@ -2561,7 +2526,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
               backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
               WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
               pointerEvents: 'none',
-              zIndex: 8,
+              zIndex: 9,
               transition: 'all 0.3s ease',
               opacity: isScrolled ? 1 : 0
             }}
@@ -2577,7 +2542,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             }}>
               <div className="container-fluid py-2">
                 <div className="row align-items-center justify-content-between">
-                  <div className="col-md-6 d-md-block d-sm-none">
+                  <div className="col-md-8 d-md-block d-sm-none">
                     <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
                       <div className="btn-group" role="group" aria-label="eKYC Filters">
                         {ekycFilters.map((filter, index) => (
@@ -2616,7 +2581,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                     </div>
                   </div>
 
-                  <div className="col-md-6">
+                  <div className="col-md-4">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
 
@@ -2634,7 +2599,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           style={{ whiteSpace: 'nowrap' }}
                         >
                           <i className={`fas fa-search me-1`}></i>
-                          Search
+                          {/* Search */}
 
                         </button>
                       </div>
@@ -2646,7 +2611,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         style={{ whiteSpace: 'nowrap' }}
                       >
                         <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
+                        {/* Filters */}
                         {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
                           <span className="bg-light text-dark ms-1">
                             {Object.values(filterData).filter(val => val && val !== 'true').length}
@@ -2811,7 +2776,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6 firstDatepicker">
+                            <div className="col-6">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -3177,34 +3142,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 8,
+                                                  zIndex: 9,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup ? "auto" : "none",
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
-
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
-                                                  }}
-                                                  onClick={() => handleMoveToPlacementVerification(profile)}
-                                                >
-                                                  Move to Placement Verification
-                                                </button>
-
-
-
                                                 {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
@@ -3216,8 +3160,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       textAlign: "left",
                                                       cursor: "pointer",
                                                       fontSize: "12px",
-                                                      fontWeight: "600",
-                                                      textWrap: "auto"
+                                                      fontWeight: "600"
                                                     }}
                                                     onClick={() => handleMoveToAdmission(profile)}
                                                   >
@@ -3233,8 +3176,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   onClick={() => handleMarkDropout(profile)}
                                                 >
@@ -3250,8 +3192,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   // onClick={() => {
                                                   //   openleadHistoryPanel(profile);
@@ -3274,8 +3215,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   // onClick={() => {
                                                   //   openEditPanel(profile, 'SetFollowup');
@@ -3298,8 +3238,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
@@ -3308,6 +3247,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 >
                                                   Edit Profile
                                                 </button>
+
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -3322,10 +3262,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textWrap: "auto"
                                                   }}
                                                   onClick={() => {
+                                                    setSelectedProfile(profile)
                                                     showSetPreVerification(true)
+                                                    // Fetch existing question answers if any
+                                                   
                                                   }}
                                                 >
-                                                  Add Pre QV Verification
+                                                  Add Pre Verification
                                                 </button>
                                               </div>
                                             </div>
@@ -3380,32 +3323,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 8,
+                                                  zIndex: 9,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup === profileIndex ? "auto" : "none",
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
-
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
-                                                  }}
-                                                  onClick={() => handleMoveToPlacementVerification(profile)}
-                                                >
-                                                  Move to Placement Verification
-                                                </button>
-
                                                 {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
@@ -3417,14 +3341,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       textAlign: "left",
                                                       cursor: "pointer",
                                                       fontSize: "12px",
-                                                      fontWeight: "600",
-                                                      textWrap: "auto"
+                                                      fontWeight: "600"
                                                     }}
                                                     onClick={() => handleMoveToAdmission(profile)}
                                                   >
                                                     Move to Admission
                                                   </button>)}
-
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -3435,8 +3357,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   onClick={() => handleMarkDropout(profile)}
                                                 >
@@ -3452,8 +3373,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   // onClick={() => openleadHistoryPanel(profile)}
                                                   onClick={() => {
@@ -3497,8 +3417,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
+                                                    fontWeight: "600"
                                                   }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
@@ -3507,6 +3426,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 >
                                                   Edit Profile
                                                 </button>
+
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -3521,10 +3441,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textWrap: "auto"
                                                   }}
                                                   onClick={() => {
+                                                    setSelectedProfile(profile)
                                                     showSetPreVerification(true)
+                                                    // Fetch existing question answers if any
+                                                   
                                                   }}
                                                 >
-                                                  Add Pre QV Verification
+                                                  Add Pre Verification
                                                 </button>
                                               </div>
                                             </div>
@@ -4825,197 +4748,210 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           </div>
         )}
 
-      </div>
 
-
-      {setPreVerification && (
-        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
-            <div className="modal-content p-0 w-100">
-              <div className="modal-header">
-                <h1 className="modal-title fs-5">Pre QV Verification</h1>
-                <button type="button" className="btn-close" onClick={() => { showSetPreVerification(false) }}></button>
-              </div>
-              <div className="modal-body">
-
-
-                <div className="table-responsive">
-
-                  <table className="verification-table">
-                    <thead>
-                      <tr>
-                        <th>S.NO</th>
-                        <th>Questions</th>
-                        <th>Answer</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="s-no">1</td>
-                        <td className="question">Is the Candidate Aware of the Course</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <label className="checkbox-wrapper positive">
-                              <input type="radio" name="q1" value="Yes" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Yes</span>
-                            </label>
-                            <label className="checkbox-wrapper negative">
-                              <input type="radio" name="q1" value="No" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">No</span>
-                            </label>
-                            <label className="checkbox-wrapper neutral">
-                              <input type="radio" name="q1" value="Not Sure" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Not Sure</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">2</td>
-                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <label className="checkbox-wrapper positive">
-                              <input type="radio" name="q2" value="Yes" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Yes</span>
-                            </label>
-                            <label className="checkbox-wrapper negative">
-                              <input type="radio" name="q2" value="No" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">No</span>
-                            </label>
-                            <label className="checkbox-wrapper neutral">
-                              <input type="radio" name="q2" value="Not Sure" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Not Sure</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">3</td>
-                        <td className="question">Currently Work Status</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <label className="checkbox-wrapper positive">
-                              <input type="radio" name="q3" value="Working" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Working</span>
-                            </label>
-                            <label className="checkbox-wrapper negative">
-                              <input type="radio" name="q3" value="Not Working" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Not Working</span>
-                            </label>
-                            <label className="checkbox-wrapper neutral">
-                              <input type="radio" name="q3" value="Study" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Study</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">4</td>
-                        <td className="question">Is Candidate Interested for Course</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <label className="checkbox-wrapper positive">
-                              <input type="radio" name="q4" value="Yes" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Yes</span>
-                            </label>
-                            <label className="checkbox-wrapper negative">
-                              <input type="radio" name="q4" value="No" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">No</span>
-                            </label>
-                            <label className="checkbox-wrapper neutral">
-                              <input type="radio" name="q4" value="Not Sure" />
-                              <span className="custom-checkbox"></span>
-                              <span className="checkbox-label">Not Sure</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="s-no">5</td>
-                        <td class="question">If we offered a job outside Odisha, would you be</td>
-                        <td>
-                          <div class="checkbox-group">
-                            <label class="checkbox-wrapper positive">
-                              <input type="radio" name="q5" value="Yes" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Yes</span>
-                            </label>
-                            <label class="checkbox-wrapper negative">
-                              <input type="radio" name="q5" value="No" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">No</span>
-                            </label>
-                            <label class="checkbox-wrapper neutral">
-                              <input type="radio" name="q5" value="Not Sure" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Not Sure</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="s-no">6</td>
-                        <td class="question">Parent Confirmation</td>
-                        <td>
-                          <div class="checkbox-group">
-                            <label class="checkbox-wrapper positive">
-                              <input type="radio" name="q6" value="Yes" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Yes</span>
-                            </label>
-                            <label class="checkbox-wrapper negative">
-                              <input type="radio" name="q6" value="No" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">No</span>
-                            </label>
-                            <label class="checkbox-wrapper neutral">
-                              <input type="radio" name="q6" value="Not Sure" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Not Sure</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="s-no">7</td>
-                        <td class="question">Recommendation from Placement</td>
-                        <td>
-                          <div class="checkbox-group">
-                            <label class="checkbox-wrapper positive">
-                              <input type="radio" name="q7" value="Selected" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Selected</span>
-                            </label>
-                            <label class="checkbox-wrapper negative">
-                              <input type="radio" name="q7" value="Rejected" />
-                              <span class="custom-checkbox"></span>
-                              <span class="checkbox-label">Rejected</span>
-                            </label>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+        {setPreVerification && (
+          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
+              <div className="modal-content p-0 w-100">
+                <div className="modal-header">
+                  <h1 className="modal-title fs-5">Pre Verification</h1>
+                  <button type="button" className="btn-close" onClick={() => { 
+                    showSetPreVerification(false);
+                    setQuestionFormData({}); // Reset form when modal is closed
+                  }}></button>
                 </div>
-              </div>
+                <div className="modal-body">
 
+                  {isLoadingQuestionAnswers && (
+                    <div className="text-center mb-3">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading existing answers...</span>
+                      </div>
+                      <p className="mt-2 text-muted">Loading existing answers...</p>
+                    </div>
+                  )}
+
+                  <div className="table-responsive">
+
+                    <table className="verification-table">
+                      <thead>
+                        <tr>
+                          <th>S.NO</th>
+                          <th>Questions</th>
+                          <th>Answer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="s-no">1</td>
+                          <td className="question">Is the Candidate Aware of the Course</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q1_select" 
+                                  className="form-select"
+                                  value={questionFormData.q1}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q1: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">2</td>
+                          <td className="question">Is the Candidate Aware from the Course Curriculum</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q2_select" 
+                                  className="form-select"
+                                  value={questionFormData.q2}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q2: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">3</td>
+                          <td className="question">Currently Work Status</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q3_select" 
+                                  className="form-select"
+                                  value={questionFormData.q3}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q3: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Working">Working</option>
+                                  <option value="Not Working">Not Working</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">4</td>
+                          <td className="question">Is Candidate Interested for Course</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q4_select" 
+                                  className="form-select"
+                                  value={questionFormData.q4}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q4: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">5</td>
+                          <td className="question">If we offered a job outside Odisha, would you be</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q5_select" 
+                                  className="form-select"
+                                  value={questionFormData.q5}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q5: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">6</td>
+                          <td className="question">Parent Confirmation</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q6_select" 
+                                  className="form-select"
+                                  value={questionFormData.q6}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q6: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="Not sure">Not Sure</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="s-no">7</td>
+                          <td className="question">Recommendation from Placement</td>
+                          <td>
+                            <div className="checkbox-group">
+                              <div className="select-option">
+                                <select 
+                                  name="q7_select" 
+                                  className="form-select"
+                                  value={questionFormData.q7}
+                                  onChange={(e) => setQuestionFormData({...questionFormData, q7: e.target.value})}
+                                >
+                                  <option value="">Select Option</option>
+                                  <option value="Selected">Selected</option>
+                                  <option value="Rejected">Rejected</option>
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <button 
+                        onClick={QuestionAnswer} 
+                        className="btn btn-primary"
+                        disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
+                      >
+                        {isSubmittingAnswers ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit'
+                        )}
+                      </button>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
+        )}
+      </div>
 
       <style>
         {`
@@ -8412,16 +8348,9 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
-.firstDatepicker .react-calendar {
-    width: 250px !important;
-    height: min-content !important;
-    transform: translateX(0px)!important;
-}
 .react-calendar{
-// width:min-content !important;
+width:min-content !important;
 height:min-content !important;
-transform: translateX(-110px)!important;
-    width: 250px !important;
 }
 @media (max-width: 768px) {
   .multi-select-options-new {

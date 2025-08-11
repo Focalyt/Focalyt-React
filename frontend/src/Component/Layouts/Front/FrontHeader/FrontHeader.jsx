@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import "./FrontHeader.css";
+
+// Register ScrollTrigger plugin
+gsap.registerPlugin(ScrollTrigger);
 
 const FrontHeader = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -10,11 +15,180 @@ const FrontHeader = () => {
   const menuOverlayRef = useRef(null);
   const dropdownRef = useRef(null);
   const botContainerRef = useRef(null);
+  
+  // GSAP refs
+  const headerRef = useRef(null);
+  const logoRef = useRef(null);
+  const navLinksRef = useRef(null);
+  const loginBtnRef = useRef(null);
 
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDropdownActive, setIsDropdownActive] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+
+  // GSAP Animations
+  useEffect(() => {
+    // Initial page load animation
+    const tl = gsap.timeline();
+    
+    // Header entrance animation
+    tl.fromTo(headerRef.current, 
+      { 
+        y: -100, 
+        opacity: 0,
+        duration: 0.8,
+        ease: "power3.out"
+      },
+      { 
+        y: 0, 
+        opacity: 1,
+        duration: 0.8,
+        ease: "power3.out"
+      }
+    );
+
+    // Logo animation
+    tl.fromTo(logoRef.current,
+      {
+        scale: 0.8,
+        opacity: 0,
+        rotation: -5
+      },
+      {
+        scale: 1,
+        opacity: 1,
+        rotation: 0,
+        duration: 0.6,
+        ease: "back.out(1.7)"
+      },
+      "-=0.4"
+    );
+
+    // Navigation links stagger animation
+    const navLinks = navLinksRef.current?.querySelectorAll('.nav-link-item');
+    if (navLinks) {
+      tl.fromTo(navLinks,
+        {
+          y: -30,
+          opacity: 0
+        },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "power2.out"
+        },
+        "-=0.3"
+      );
+    }
+
+    // Login button animation
+    tl.fromTo(loginBtnRef.current,
+      {
+        scale: 0.9,
+        opacity: 0,
+        y: -20
+      },
+      {
+        scale: 1,
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "back.out(1.4)"
+      },
+      "-=0.2"
+    );
+
+    // Scroll-triggered animations
+    ScrollTrigger.create({
+      trigger: "body",
+      start: "top top",
+      end: "bottom bottom",
+      onUpdate: (self) => {
+        const progress = self.progress;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Update scroll states
+        const newIsScrolled = scrollTop > 50;
+        const newIsRevealed = scrollTop > 700;
+        
+        if (newIsScrolled !== isScrolled) {
+          setIsScrolled(newIsScrolled);
+          
+          // Animate header on scroll
+          if (newIsScrolled) {
+            gsap.to(headerRef.current, {
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.1)',
+              duration: 0.3,
+              ease: "power2.out"
+            });
+          } else {
+            gsap.to(headerRef.current, {
+              backgroundColor: 'transparent',
+              backdropFilter: 'blur(0px)',
+              boxShadow: 'none',
+              duration: 0.3,
+              ease: "power2.out"
+            });
+          }
+        }
+        
+        if (newIsRevealed !== isRevealed) {
+          setIsRevealed(newIsRevealed);
+        }
+      }
+    });
+
+    // Hover animations for nav links
+    const navItems = navLinksRef.current?.querySelectorAll('.nav-link-item');
+    if (navItems) {
+      navItems.forEach(item => {
+        item.addEventListener('mouseenter', () => {
+          gsap.to(item, {
+            scale: 1.05,
+            duration: 0.2,
+            ease: "power2.out"
+          });
+        });
+        
+        item.addEventListener('mouseleave', () => {
+          gsap.to(item, {
+            scale: 1,
+            duration: 0.2,
+            ease: "power2.out"
+          });
+        });
+      });
+    }
+
+    // Login button hover animation
+    if (loginBtnRef.current) {
+      loginBtnRef.current.addEventListener('mouseenter', () => {
+        gsap.to(loginBtnRef.current, {
+          scale: 1.05,
+          duration: 0.2,
+          ease: "power2.out"
+        });
+      });
+      
+      loginBtnRef.current.addEventListener('mouseleave', () => {
+        gsap.to(loginBtnRef.current, {
+          scale: 1,
+          duration: 0.2,
+          ease: "power2.out"
+        });
+      });
+    }
+
+    return () => {
+      // Cleanup ScrollTrigger
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    };
+  }, []);
 
   const toggleMenu = () => {
     setIsMenuActive(!isMenuActive);
@@ -25,6 +199,11 @@ const FrontHeader = () => {
     if (menuOverlayRef.current) {
       menuOverlayRef.current.classList.toggle("active");
       menuOverlayRef.current.classList.add("transition");
+    }
+    // Add hamburger animation
+    const trigger = document.querySelector('.mobile-menu-trigger');
+    if (trigger) {
+      trigger.classList.toggle("active");
     }
   };
 
@@ -187,21 +366,22 @@ const FrontHeader = () => {
 
   // Dynamic header classes
   const headerClasses = [
-    'site-header',
+    
     'site-header--transparent',
     'site-header--sticky',
+    'header-blur',
     isScrolled ? 'scrolling' : '',
     isRevealed ? 'reveal-header' : ''
   ].filter(Boolean).join(' ');
 
   // Dynamic header styles
-  const headerStyles = {
-    backgroundColor: isScrolled ? '#ffffff' : '#121212',
-  };
+  // const headerStyles = {
+  //   backgroundColor: isScrolled ? '#ffffff' : '#121212',
+  // };
 
   // Dynamic nav link styles
   const navLinkStyles = {
-    color: isScrolled ? '#000' : '#fff'
+    color: isScrolled ? '#000' : '#000'
   };
 
   // Dynamic login button styles
@@ -213,95 +393,135 @@ const FrontHeader = () => {
   return (
     <>
       <div className="page-wrapper overflow-hidden">
-        <header className={headerClasses} style={headerStyles}>
+        <header className={headerClasses} ref={headerRef}>
           <div className="container">
             <nav className="navbar site-navbar">
-              <div className="brand-logo">
+              {/* Logo - Left Side */}
+              <div className="brand-logo" ref={logoRef}>
                 <a href="#">
                   <img className="logo-light" src={logo} alt="brand logo" />
                   <img className="logo-dark" src={logo} alt="brand logo" />
                 </a>
               </div>
               
-              <div className="menu-block-wrapper" onClick={toggleMenu}>
-                <div className="menu-overlay" ref={menuOverlayRef}></div>
-                <nav className="menu-block" ref={menuRef} id="append-menu-header">
-                  <div className="mobile-menu-head">
-                    <a href='index.html'>
-                      <img src="/Assets/public_assets/images/newpage/logo-ha.svg" alt="brand logo" />
-                    </a>
-                    <div className="current-menu-title"></div>
-                    <div className="mobile-menu-close">&times;</div>
-                  </div>
-                  
-                  <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/" style={navLinkStyles}>Home</Link>
-                    </li>
-                    <li className="nav-item nav-item-has-children">
-                      <Link to="/about" className="nav-link-item drop-trigger" style={navLinkStyles}>About Us</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/socialimpact" style={navLinkStyles}>Social Impact</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/joblisting" style={navLinkStyles}>Jobs</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/courses' style={navLinkStyles}>Courses</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/labs' style={navLinkStyles}>Labs</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/events' style={navLinkStyles}>Events</Link>
-                    </li>
-                    <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
-                    </li>
-                    <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
-                    </li>
-                    
-                    {/* Fixed Login Dropdown */}
-                    <li className="nav-item small smallMobile">
-                      <div 
-                        className={`dropdown-container ${isDropdownActive ? 'active' : ''}`}
-                        ref={dropdownRef}
-                      >
-                        <span 
-                          className="drop-trigger active_menu loginbtnn homeMenu" 
-                          id="loginLink"
-                          onClick={toggleDropdown}
-                          style={loginButtonStyles}
-                        >
-                          Login
-                        </span>
-
-                        <ul className="dropdown-menu" id="loginDropdown">
-                          <li>
-                            <Link to={`${backendUrl}/company/login`} className="dropdown-item">
-                              Login as Corporate
-                            </Link>
-                          </li>
-                          <li>
-                            <Link to="/candidate/login" className="dropdown-item">
-                              Login as Student
-                            </Link>
-                          </li>
-                        </ul>
-                      </div>
-                    </li>
-                  </ul>
-                </nav>
+              {/* Navigation Links - Center */}
+              <div className="nav-center" ref={navLinksRef}>
+                <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to="/" style={navLinkStyles}>Home</Link>
+                  </li>
+                  <li className="nav-item nav-item-has-children">
+                    <Link to="/about" className="nav-link-item drop-trigger" style={navLinkStyles}>About Us</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to="/socialimpact" style={navLinkStyles}>Social Impact</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to="/joblisting" style={navLinkStyles}>Jobs</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to='/courses' style={navLinkStyles}>Courses</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to='/labs' style={navLinkStyles}>Labs</Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link className='nav-link-item drop-trigger' to='/events' style={navLinkStyles}>Events</Link>
+                  </li>
+                  <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
+                    <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
+                  </li>
+                  <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
+                    <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
+                  </li>
+                </ul>
               </div>
               
+              {/* Login Button - Right Side */}
+              <div className="nav-right">
+                <div 
+                  className={`dropdown-container ${isDropdownActive ? 'active' : ''}`}
+                  ref={dropdownRef}
+                >
+                  <span 
+                    className="drop-trigger active_menu loginbtnn homeMenu" 
+                    id="loginLink"
+                    onClick={toggleDropdown}
+                    style={loginButtonStyles}
+                    ref={loginBtnRef}
+                  >
+                    Login
+                  </span>
+
+                  <ul className="dropdown-menu" id="loginDropdown">
+                    <li>
+                      <Link to={`${backendUrl}/company/login`} className="dropdown-item">
+                        Login as Corporate
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/candidate/login" className="dropdown-item">
+                        Login as Student
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Mobile Menu Trigger */}
               <div className="mobile-menu-trigger" onClick={toggleMenu}>
                 <span></span>
+                <span></span>
+                <span></span>
               </div>
+              
+              {/*  Mobile Navigation Menu  */}
+            <div className={`mobile-nav ${isMenuActive ? 'active' : ''}`} id="mobile-nav" ref={menuRef}>
+                {/* Close Button */}
+                <div className="mobile-close-btn" onClick={toggleMenu}>
+                  <span></span>
+                  <span></span>
+                </div>
+                
+                <nav className="nav-menu mobile-nav-menu">
+                    <Link to="/" className="nav-link" onClick={toggleMenu}>Home</Link>
+                    <Link to="/about" className="nav-link" onClick={toggleMenu}>About Us</Link>
+                    <Link to="/socialimpact" className="nav-link" onClick={toggleMenu}>Social Impact</Link>
+                    <Link to="/joblisting" className="nav-link" onClick={toggleMenu}>Jobs</Link>
+                    <Link to="/courses" className="nav-link" onClick={toggleMenu}>Courses</Link>
+                    <Link to="/labs" className="nav-link" onClick={toggleMenu}>Labs</Link>
+                    <Link to="/events" className="nav-link" onClick={toggleMenu}>Events</Link>
+                    <Link to="/contact" className="nav-link" onClick={toggleMenu}>Contact Us</Link>
+                </nav>
+                <div className="mobile-login">
+                    <div className="dropdown-container">
+                      <button className="login-btn" onClick={toggleDropdown}>Login</button>
+                      <ul className={`dropdown-menu ${isDropdownActive ? 'active' : ''}`}>
+                        <li>
+                          <Link to={`${backendUrl}/company/login`} className="dropdown-item" onClick={toggleMenu}>
+                            Login as Corporate
+                          </Link>
+                        </li>
+                        <li>
+                          <Link to="/candidate/login" className="dropdown-item" onClick={toggleMenu}>
+                            Login as Student
+                          </Link>
+                        </li>
+                      </ul>
+                    </div>
+                </div>
+            </div>
+
+            {/* Mobile Menu Overlay */}
+            <div className={`mobile-nav-overlay ${isMenuActive ? 'active' : ''}`} ref={menuOverlayRef} onClick={toggleMenu}></div>
+
+             
+           
             </nav>
           </div>
         </header>
+
+        
       </div>
     </>
   );
