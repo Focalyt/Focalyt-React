@@ -13,8 +13,7 @@
 }
 
 .technology-slider-section {
-  /* background: #1a1a1a; */
-  background: rgba(255, 255, 255, 0.5);
+  background: #1a1a1a;
   padding: 60px 0;
 }
 
@@ -27,17 +26,9 @@
 }
 
 .gradient-text {
-  background: -webkit-linear-gradient(99deg, rgba(199, 51, 72, 1) 0%, rgba(81, 63, 139, 1) 25%, rgba(199, 51, 72, 1) 40%, rgba(81, 63, 139, 1) 75%, rgba(199, 51, 72, 1) 100%);
-    background: -o-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
-    background: -moz-linear-gradient(99deg, rgba(199,51,72,1) 0%, rgba(81,63,139,1) 25%, rgba(199,51,72,1) 40%, rgba(81,63,139,1) 75%, rgba(199,51,72,1) 100%);
-    background: linear-gradient(99deg, rgba(199, 51, 72, 1) 0%, rgba(81, 63, 139, 1) 25%, rgba(199, 51, 72, 1) 40%, rgba(81, 63, 139, 1) 75%, rgba(199, 51, 72, 1) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    transition: .4s ease-in;
+  background: linear-gradient(to right, #ff3366, #ff6b6b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  font-size: 3.5rem;
-  font-family: 'Space Grotesk', sans-serif;
 }
 
 .slider-container {

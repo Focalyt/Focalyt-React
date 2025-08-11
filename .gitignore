@@ -57,6 +57,9 @@ frontend/.env
 /frontend/src/Component/Layouts/Front
 /frontend/src/Pages/Front
 
+
+/frontend/src/Pages/App/College/Course/text.jsx
 # /frontend/src/Pages/App/College/Course/AdmissionPost.jsx
 # /frontend/src/Pages/App/College/Course/kycManagement.jsx
 # /frontend/src/Pages/App/College
+/frontend/src/Pages/App/College/Course/AdmissionList copy.jsx

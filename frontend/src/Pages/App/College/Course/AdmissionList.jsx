@@ -287,30 +287,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   //   }
   // };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
 
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleSaveCV = async () => {
     if (candidateRef.current) {
@@ -2226,7 +2203,6 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           </div>
 
           <div className="upload-modal-body">
-            console.log("upload-modal-body render....")
             <div className="upload-section">
               {!selectedFile ? (
                 <div className="file-drop-zone">
@@ -2332,6 +2308,35 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       </div>
     );
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+      const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
+      
+      if (isAnyModalOpen) {
+        return; // Do nothing if any modal is open
+      }
+      
+      if (!isMultiSelectClick) {
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDocumentModal, showUploadModal, openModalId, showEditPanel, showFollowupPanel, showWhatsappPanel]); // Add modal states to dependencies
+
 
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');

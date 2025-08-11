@@ -147,8 +147,8 @@ const useNavHeight = (dependencies = []) => {
 
       // Calculate Width from parent (position-relative container)
       // const parentContainer = navRef.current.closest('.position-relative');
-      const parentContainer = navRef.current.closest('[class*="col-"]') || 
-      navRef.current.parentElement;
+      const parentContainer = navRef.current.closest('[class*="col-"]') ||
+        navRef.current.parentElement;
 
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
@@ -222,7 +222,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
+const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -241,30 +241,6 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   // const handleSaveCV = async () => {
   //   if (candidateRef.current) {
@@ -283,7 +259,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
-        setAllProfiles(prevProfiles => 
+        setAllProfiles(prevProfiles =>
           prevProfiles.map(profile => {
             if (profile._id === selectedProfile._id) {
               // Update the _candidate data with the updated profile from result
@@ -295,7 +271,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             return profile;
           })
         );
-        setOpenModalId(null); 
+        setOpenModalId(null);
         setSelectedProfile(null)
       }
     }
@@ -392,7 +368,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   ]);
 
 
-  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel,showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
+  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel, showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -472,72 +448,128 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   }, []);
 
 
-  
+
   // useEffect(()=>{
 
-    const [questionFormData , setQuestionFormData] = useState({});
-    const [isLoadingQuestionAnswers, setIsLoadingQuestionAnswers] = useState(false);
-    const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+  const [questionFormData, setQuestionFormData] = useState({});
+  const [isLoadingQuestionAnswers, setIsLoadingQuestionAnswers] = useState(false);
+  const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+  const [questionAnswers, setQuestionAnswers] = useState([]);
+  const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
+  const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
+  // Function to fetch existing question answers
+  const fetchQuestionAnswers = async (appliedcourseId) => {
+    try {
 
-    // Function to fetch existing question answers
-    // const fetchQuestionAnswers = async (appliedcourseId) => {
-    //   try {
-    //     setIsLoadingQuestionAnswers(true);
-    //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-    //     const token = userData.token;
-    //     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        
-    //     const response = await axios.get(`${backendUrl}/college/questionAnswer/${appliedcourseId}`, {
-    //       headers: { 'x-auth': token }
-    //     });
-        
-    //     if (response.data.status && response.data.data) {
-    //       const existingData = response.data.data.responses;
-    //       const formData = {};
-          
-    //       existingData.forEach((response, index) => {
-    //         formData[`q${index + 1}`] = response.answer;
-    //       });
-          
-    //       setQuestionFormData(formData);
-    //     }
-    //   } catch (error) {
-    //     // If no existing data found, that's fine - just start with empty form
-    //     console.log('No existing question answers found or error:', error);
-    //     setQuestionFormData({});
-    //   } finally {
-    //     setIsLoadingQuestionAnswers(false);
-    //   }
-    // };
+      console.log('appliedcourseId', appliedcourseId)
+      setQuestionAnswers([])
+      setIsLoadingAnswers(true);
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
 
-    const QuestionAnswer = async () => {
-      try {
-        setIsSubmittingAnswers(true);
+      const response = await axios.get(`${backendUrl}/college/candidate/questionAnswer/${appliedcourseId}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log('response question answer', response)
 
-        console.log(questionFormData, 'questionFormData')
-        
-        const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
-          headers: { 'x-auth': token }
-        });
-        console.log("responnse" , response)
-        if (response.data.status) {
-          alert("Pre-verification questions submitted successfully!");
-          showSetPreVerification(false);
-          setQuestionFormData({}); // Reset form
-        } else {
-          alert("Error: " + response.data.message);
-        }
-        
-        console.log(response, 'response');
-      } catch (error) {
-        console.log(error, 'error');
-        alert("Error submitting pre-verification questions. Please try again.");
-      } finally {
-        setIsSubmittingAnswers(false);
+      if (response.data.status && response.data.data) {
+        const existingData = response.data.data.responses;
+
+          console.log('existingData', existingData)
+
+        setQuestionAnswers(existingData);
+    
+      } else {
+        setQuestionFormData({});
+        setQuestionAnswers([]);
       }
+    } catch (error) {
+      console.log('No existing question answers found or error:', error);
+      setQuestionFormData({});
+      setQuestionAnswers([]);
+    } finally {
+      setIsLoadingAnswers(false);
     }
+  };
 
+  const QuestionAnswer = async () => {
+    try {
+      setIsSubmittingAnswers(true);
 
+      console.log(questionFormData, 'questionFormData')
+      console.log(selectedProfile, 'selectedProfile')
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      if (!token) {
+        alert("Authentication token not found. Please login again.");
+        return;
+      }
+      // Transform questionFormData into responses array format
+      const responses = [];
+      const questions = [
+        "Is the Candidate Aware of the Course",
+        "Is the Candidate Aware from the Course Curriculum",
+        "Currently Work Status",
+        "Is Candidate Interested for Course",
+        "Is Candidate Ready for Course",
+        "Is Candidate Ready for Course Fee",
+        "Is Candidate Ready for Course Duration"
+      ];
+
+      questions.forEach((question, index) => {
+        const answer = questionFormData[`q${index + 1}`];
+        if (answer) {
+          responses.push({
+            question: question,
+            answer: answer
+          });
+        }
+      });
+
+      if (!selectedProfile || !selectedProfile._id) {
+        alert("No profile selected. Please try again.");
+        return;
+      }
+
+      if (responses.length === 0) {
+        alert("Please answer at least one question before submitting.");
+        return;
+      }
+
+      const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
+        appliedcourse: selectedProfile._id,
+        responses: responses
+      }, {
+        headers: { 'x-auth': token }
+      });
+      console.log("responnse", response)
+      if (response.data.status) {
+        alert("Pre-verification questions submitted successfully!");
+        showSetPreVerification(false);
+        setQuestionFormData({}); // Reset form
+      } else {
+        alert("Error: " + response.data.message);
+      }
+
+      console.log(response, 'response');
+    } catch (error) {
+      console.log(error, 'error');
+      alert("Error submitting pre-verification questions. Please try again.");
+    } finally {
+      setIsSubmittingAnswers(false);
+    }
+  }
+
+  useEffect(() => {
+    if (selectedProfile) {
+      fetchQuestionAnswers(selectedProfile._id);
+    } else {
+      // Clear pre-verification data when no profile is selected
+      setQuestionAnswers([]);
+      setQuestionFormData({});
+      setCurrentPreVerificationProfile(null);
+    }
+  }, [selectedProfile]);
 
   // ========================================
   // 🎯 Modal Scroll Management
@@ -547,13 +579,13 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     if (showDocumentModal || showUploadModal || showEditPanel || showWhatsappPanel) {
       // Store the current scroll position
       const scrollY = window.scrollY;
-      
+
       // Add styles to prevent scrolling
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-      
+
       // Return function to restore scrolling when modal closes
       return () => {
         // Restore body styles
@@ -561,7 +593,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         document.body.style.top = '';
         document.body.style.width = '';
         document.body.style.overflow = '';
-        
+
         // Restore scroll position
         window.scrollTo(0, scrollY);
       };
@@ -908,7 +940,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       return;
     }
     setActiveCrmFilter(index);
-   
+
   };
 
   // Filter state from Registration component
@@ -1139,8 +1171,8 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           alert('All documents must be verified before moving to admission list');
           return;
         }
-      }    
-      
+      }
+
 
       // Show confirmation dialog
       const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
@@ -1534,6 +1566,15 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
+    
+    // If Pre Verification tab is clicked (index 5), fetch the data for this specific candidate
+    if (tabIndex === 5) {
+      const currentProfile = allProfiles[profileIndex];
+      if (currentProfile && currentProfile._id) {
+        setSelectedProfile(currentProfile);
+        setCurrentPreVerificationProfile(currentProfile);
+      }
+    }
   };
 
   const handleFilterChange = (e) => {
@@ -1553,7 +1594,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     if (!isMobile) {
       // setMainContentClass('col-12');
       const hasOtherPanelsOpen = leadHistoryPanel || showWhatsappPanel;
-    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
+      setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
     }
   };
 
@@ -1584,7 +1625,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     if (!isMobile) {
       // setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
       const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
-    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
+      setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
     }
   };
 
@@ -1627,7 +1668,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom In"
         >
-          <i className="fas fa-search-plus"></i> 
+          <i className="fas fa-search-plus"></i>
         </button>
 
         <button
@@ -1636,7 +1677,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom Out"
         >
-          <i className="fas fa-search-minus"></i> 
+          <i className="fas fa-search-minus"></i>
         </button>
 
         {/* Show rotation button only for images */}
@@ -1647,7 +1688,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             style={{ whiteSpace: 'nowrap' }}
             title="Rotate 90°"
           >
-            <i className="fas fa-redo"></i> 
+            <i className="fas fa-redo"></i>
           </button>
         )}
 
@@ -1671,7 +1712,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
           title="Download Document"
         >
-          <i className="fas fa-download"></i> 
+          <i className="fas fa-download"></i>
         </a>
 
         {/* Zoom Level Indicator */}
@@ -1692,18 +1733,18 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   // Function to fetch user details by ID
   const fetchUserDetails = async (userId) => {
     if (!userId) return null;
-    
+
     try {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      
+
       const response = await axios.get(`${backendUrl}/college/users/users-details/${userId}`, {
         headers: {
           'x-auth': token
         }
       });
-      
+
       return response.data.data;
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -1711,30 +1752,30 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-  // Function to fetch user details when document modal opens
+  // Function to fetch u Apply Filtersser details when document modal opens
   const fetchUserDetailsForDocument = async (document) => {
     if (!document) return;
-    
+
     setIsLoadingUserDetails(true);
-    
+
     try {
       const latestUpload = document.uploads && document.uploads.length > 0
         ? document.uploads[document.uploads.length - 1]
         : (document.fileUrl && document.status !== "Not Uploaded" ? document : null);
-      
+
       if (latestUpload) {
         // Fetch verifiedBy user details
         if (latestUpload.verifiedBy) {
           const verifiedByDetails = await fetchUserDetails(latestUpload.verifiedBy);
           setVerifiedByUser(verifiedByDetails);
         }
-        
+
         // Fetch rejectedBy user details
         if (latestUpload.rejectedBy) {
           const rejectedByDetails = await fetchUserDetails(latestUpload.rejectedBy);
           setRejectedByUser(rejectedByDetails);
         }
-        
+
         // Fetch uploadedBy user details
         if (latestUpload.uploadedBy) {
           const uploadedByDetails = await fetchUserDetails(latestUpload.uploadedBy);
@@ -1767,7 +1808,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
     }, [selectedDocument]);
 
-   
+
 
     const handleZoomIn = useCallback(() => {
       setDocumentZoom(prev => Math.min(prev + 0.1, 2));
@@ -2215,12 +2256,12 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                         Error loading user details
                       </span>
                     ) : (
-                      latestUpload?.status === 'Verified' && verifiedByUser?.name ? 
+                      latestUpload?.status === 'Verified' && verifiedByUser?.name ?
                         `${verifiedByUser.name}${verifiedByUser.designation ? ` (${verifiedByUser.designation})` : ''}` :
-                      latestUpload?.status === 'Rejected' && rejectedByUser?.name ? 
-                        `${rejectedByUser.name}${rejectedByUser.designation ? ` (${rejectedByUser.designation})` : ''}` :
-                      uploadedByUser?.name ? 
-                        `${uploadedByUser.name}${uploadedByUser.designation ? ` (${uploadedByUser.designation})` : ''}` : 'N/A'
+                        latestUpload?.status === 'Rejected' && rejectedByUser?.name ?
+                          `${rejectedByUser.name}${rejectedByUser.designation ? ` (${rejectedByUser.designation})` : ''}` :
+                          uploadedByUser?.name ?
+                            `${uploadedByUser.name}${uploadedByUser.designation ? ` (${uploadedByUser.designation})` : ''}` : 'N/A'
                     )}
                   </span>
                 </div>
@@ -2401,6 +2442,34 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     );
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+      const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
+      
+      if (isAnyModalOpen) {
+        return; // Do nothing if any modal is open
+      }
+      
+      if (!isMultiSelectClick) {
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDocumentModal, showUploadModal, openModalId, showEditPanel, showFollowupPanel, showWhatsappPanel]); // Add modal states to dependencies
+
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
     if (container) {
@@ -2566,7 +2635,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
-                       
+
                         <input
                           type="text"
                           name="name"
@@ -2575,17 +2644,17 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                           value={filterData.name}
                           onChange={handleFilterChange}
                         />
-                         <button
-                        onClick={() => fetchProfileData()}
-                        className={`btn btn-outline-primary`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-search me-1`}></i>
-                        Search
-                        
-                      </button>
+                        <button
+                          onClick={() => fetchProfileData()}
+                          className={`btn btn-outline-primary`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          Search
+
+                        </button>
                       </div>
-                     
+
 
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -2601,7 +2670,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                         )}
                       </button>
 
-                    
+
                     </div>
                   </div>
                 </div>
@@ -3078,12 +3147,12 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                             </div>
 
                                             {profile.batch && (
-                                          <div style={{marginLeft: '15px', backgroundColor: 'green', padding: '5px', borderRadius: '5px'}}>
+                                              <div style={{ marginLeft: '15px', backgroundColor: 'green', padding: '5px', borderRadius: '5px' }}>
 
-                                            <h5 style={{ fontWeight: 'bold', color: 'white'}}>Batch Assigned</h5>
+                                                <h5 style={{ fontWeight: 'bold', color: 'white' }}>Batch Assigned</h5>
 
-                                          </div>
-                                        )}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
 
@@ -3246,7 +3315,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     setSelectedProfile(profile)
                                                     showSetPreVerification(true)
                                                     // Fetch existing question answers if any
-                                                   
+
                                                   }}
                                                 >
                                                   Add Pre Verification
@@ -3256,7 +3325,10 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => setLeadDetailsVisible(profileIndex)}
+                                              onClick={() => {
+                                                setLeadDetailsVisible(profileIndex)
+                                                setSelectedProfile(profile)
+                                              }}
                                             >
                                               {leadDetailsVisible === profileIndex ? (
                                                 <i className="fas fa-chevron-up"></i>
@@ -3424,7 +3496,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     setSelectedProfile(profile)
                                                     showSetPreVerification(true)
                                                     // Fetch existing question answers if any
-                                                   
+
                                                   }}
                                                 >
                                                   Add Pre Verification
@@ -3434,7 +3506,10 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => toggleLeadDetails(profileIndex)}
+                                              onClick={() => {
+                                                toggleLeadDetails(profileIndex)
+                                                setSelectedProfile(profile)
+                                              }}
                                             >
                                               {leadDetailsVisible === profileIndex ? (
                                                 <i className="fas fa-chevron-up"></i>
@@ -3474,257 +3549,258 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                           </div>
                                         </div>
                                       ) : (
-                                      <div className="tab-content">
-                                        {/* Lead Details Tab */}
-                                        {(activeTab[profileIndex] || 0) === 0 && (
-                                          <div className="tab-pane active" id="lead-details">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
+                                        <div className="tab-content">
+                                          {/* Lead Details Tab */}
+                                          {(activeTab[profileIndex] || 0) === 0 && (
+                                            <div className="tab-pane active" id="lead-details">
+                                              <div className="scrollable-container">
+                                                <div className="scrollable-content">
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD AGE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                        : 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Lead Owner</div>
+                                                      <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">COURSE / JOB NAME</div>
+                                                      <div className="info-value">{profile._course?.name}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BATCH NAME</div>
+                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">TYPE OF PROJECT</div>
+                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">PROJECT</div>
+                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">SECTOR</div>
+                                                      <div className="info-value">{profile.sector}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CREATION DATE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{profile.sector}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">STATE</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">City</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BRANCH NAME</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                      <div className="info-value">{profile.updatedAt ?
+                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
-                                            </div>
 
-                                            <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                            <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+                                              <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                              <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
 
-                                            <div className="desktop-view">
-                                              <div className="row g-4">
-                                                <div className="col-12">
-                                                  <div className="scrollable-container">
-                                                    <div className="scrollable-content">
-                                                      <div className="info-card">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD AGE</div>
-                                                          <div className="info-value">{profile.createdAt ?
-                                                            Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                            : 'N/A'}</div>
+                                              <div className="desktop-view">
+                                                <div className="row g-4">
+                                                  <div className="col-12">
+                                                    <div className="scrollable-container">
+                                                      <div className="scrollable-content">
+                                                        <div className="info-card">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD AGE</div>
+                                                            <div className="info-value">{profile.createdAt ?
+                                                              Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                              : 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">Lead Owner</div>
+                                                            <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">COURSE / JOB NAME</div>
+                                                            <div className="info-value">{profile._course?.name}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">BATCH NAME</div>
+                                                            <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">Lead Owner</div>
-                                                          <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
+
+                                                        <div className="info-card">
+                                                          <div className="info-group">
+                                                            <div className="info-label">TYPE OF PROJECT</div>
+                                                            <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">PROJECT</div>
+                                                            <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">SECTOR</div>
+                                                            <div className="info-value">{profile._course?.sectors}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD CREATION DATE</div>
+                                                            <div className="info-value">{profile.createdAt ?
+                                                              new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">COURSE / JOB NAME</div>
-                                                          <div className="info-value">{profile._course?.name}</div>
-                                                        </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">BATCH NAME</div>
-                                                          <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+
+                                                        <div className="info-card">
+                                                          <div className="info-group">
+                                                            <div className="info-label">STATE</div>
+                                                            <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">City</div>
+                                                            <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">BRANCH NAME</div>
+                                                            <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                            <div className="info-value">{profile.updatedAt ?
+                                                              new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                          </div>
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD MODIFICATION By</div>
+                                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                          </div>
+                                                          <div className="col-xl- col-3">
+                                                            <div className="info-group">
+                                                              <div className="info-label">Counsellor Name</div>
+                                                              <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                            </div>
+                                                          </div>
                                                         </div>
                                                       </div>
+                                                    </div>
+                                                    <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                                    <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
 
-                                                      <div className="info-card">
-                                                        <div className="info-group">
-                                                          <div className="info-label">TYPE OF PROJECT</div>
-                                                          <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    <div className="desktop-view">
+                                                      <div className="row">
+                                                        <div className="col-xl-3 col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD AGE</div>
+                                                            <div className="info-value">{profile.createdAt ?
+                                                              Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                              : 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">PROJECT</div>
-                                                          <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                        </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">SECTOR</div>
-                                                          <div className="info-value">{profile._course?.sectors}</div>
-                                                        </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD CREATION DATE</div>
-                                                          <div className="info-value">{profile.createdAt ?
-                                                            new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                        </div>
-                                                      </div>
 
-                                                      <div className="info-card">
-                                                        <div className="info-group">
-                                                          <div className="info-label">STATE</div>
-                                                          <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                        <div className="col-xl-3 col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">STATE</div>
+                                                            <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">City</div>
-                                                          <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                        <div className="col-xl-3 col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">City</div>
+                                                            <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">BRANCH NAME</div>
-                                                          <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">COURSE / JOB NAME</div>
+                                                            <div className="info-value">{profile._course?.name}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                          <div className="info-value">{profile.updatedAt ?
-                                                            new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+
+
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">BRANCH NAME</div>
+                                                            <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                          </div>
                                                         </div>
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD MODIFICATION By</div>
-                                                          <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">NEXT ACTION DATE</div>
+                                                            <div className="info-value">
+                                                              {profile.followups.length > 0
+                                                                ? (() => {
+                                                                  const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                                  const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric',
+                                                                  }).replace(/ /g, '/');
+                                                                  const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true,
+                                                                  });
+                                                                  return `${datePart}, ${timePart}`;
+                                                                })()
+                                                                : 'N/A'}
+                                                            </div>
+
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD CREATION DATE</div>
+                                                            <div className="info-value">{profile.createdAt ?
+                                                              new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                          </div>
+                                                        </div>
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                            <div className="info-value">{profile.updatedAt ?
+                                                              new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                          </div>
+                                                        </div>
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">Remarks</div>
+                                                            <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                                          </div>
+                                                        </div>
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD MODIFICATION BY</div>
+                                                            <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                            </div>
+                                                          </div>
                                                         </div>
                                                         <div className="col-xl- col-3">
                                                           <div className="info-group">
                                                             <div className="info-label">Counsellor Name</div>
-                                                            <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                            <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
                                                           </div>
                                                         </div>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                                  <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
-
-                                                  <div className="desktop-view">
-                                                    <div className="row">
-                                                      <div className="col-xl-3 col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD AGE</div>
-                                                          <div className="info-value">{profile.createdAt ?
-                                                            Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                            : 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="col-xl-3 col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">STATE</div>
-                                                          <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl-3 col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">City</div>
-                                                          <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">COURSE / JOB NAME</div>
-                                                          <div className="info-value">{profile._course?.name}</div>
-                                                        </div>
-                                                      </div>
-
-
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">BRANCH NAME</div>
-                                                          <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">NEXT ACTION DATE</div>
-                                                          <div className="info-value">
-                                                            {profile.followups.length > 0
-                                                              ? (() => {
-                                                                const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                                const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric',
-                                                                }).replace(/ /g, '/');
-                                                                const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit',
-                                                                  hour12: true,
-                                                                });
-                                                                return `${datePart}, ${timePart}`;
-                                                              })()
-                                                              : 'N/A'}
+                                                        <div className="col-xl- col-3">
+                                                          <div className="info-group">
+                                                            <div className="info-label">LEAD OWNER</div>
+                                                            <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                           </div>
-
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD CREATION DATE</div>
-                                                          <div className="info-value">{profile.createdAt ?
-                                                            new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                          <div className="info-value">{profile.updatedAt ?
-                                                            new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">Remarks</div>
-                                                          <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD MODIFICATION BY</div>
-                                                          <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">Counsellor Name</div>
-                                                          <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="col-xl- col-3">
-                                                        <div className="info-group">
-                                                          <div className="info-label">LEAD OWNER</div>
-                                                          <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                         </div>
                                                       </div>
                                                     </div>
@@ -3732,900 +3808,778 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                 </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        )}
+                                          )}
 
-                                        {/* Profile Tab */}
-                                        {(activeTab[profileIndex] || 0) === 1 && (
-                                          <div className="tab-pane active" id="profile">
-                                            <div className="resume-preview-body">
-                                              <div id="resume-download" className="resume-document">
-                                                <div className="resume-document-header">
-                                                  <div className="resume-profile-section">
-                                                    {profile._candidate?.personalInfo?.image ? (
-                                                      <img
-                                                        src={`${profile._candidate?.personalInfo?.image}`}
-                                                        alt="Profile"
-                                                        className="resume-profile-image"
-                                                      />
-                                                    ) : (
-                                                      <div className="resume-profile-placeholder">
-                                                        <i className="bi bi-person-circle"></i>
-                                                      </div>
-                                                    )}
-
-                                                    <div className="resume-header-content">
-                                                      <h1 className="resume-name">
-                                                        {profile._candidate?.name || 'Your Name'}
-                                                      </h1>
-                                                      <p className="resume-title">
-                                                        {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                      </p>
-                                                      <p className="resume-title">
-                                                        {profile._candidate?.sex || 'Sex'}
-                                                      </p>
-
-                                                      <div className="resume-contact-details">
-                                                        <div className="resume-contact-item">
-                                                          <i className="bi bi-telephone-fill"></i>
-                                                          <span>{profile._candidate?.mobile}</span>
+                                          {/* Profile Tab */}
+                                          {(activeTab[profileIndex] || 0) === 1 && (
+                                            <div className="tab-pane active" id="profile">
+                                              <div className="resume-preview-body">
+                                                <div id="resume-download" className="resume-document">
+                                                  <div className="resume-document-header">
+                                                    <div className="resume-profile-section">
+                                                      {profile._candidate?.personalInfo?.image ? (
+                                                        <img
+                                                          src={`${profile._candidate?.personalInfo?.image}`}
+                                                          alt="Profile"
+                                                          className="resume-profile-image"
+                                                        />
+                                                      ) : (
+                                                        <div className="resume-profile-placeholder">
+                                                          <i className="bi bi-person-circle"></i>
                                                         </div>
+                                                      )}
 
-                                                        <div className="resume-contact-item">
-                                                          <i className="bi bi-envelope-fill"></i>
-                                                          <span>{profile._candidate?.email}</span>
+                                                      <div className="resume-header-content">
+                                                        <h1 className="resume-name">
+                                                          {profile._candidate?.name || 'Your Name'}
+                                                        </h1>
+                                                        <p className="resume-title">
+                                                          {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                        </p>
+                                                        <p className="resume-title">
+                                                          {profile._candidate?.sex || 'Sex'}
+                                                        </p>
+
+                                                        <div className="resume-contact-details">
+                                                          <div className="resume-contact-item">
+                                                            <i className="bi bi-telephone-fill"></i>
+                                                            <span>{profile._candidate?.mobile}</span>
+                                                          </div>
+
+                                                          <div className="resume-contact-item">
+                                                            <i className="bi bi-envelope-fill"></i>
+                                                            <span>{profile._candidate?.email}</span>
+                                                          </div>
+
+                                                          {profile._candidate?.dob && (
+                                                            <div className="resume-contact-item">
+                                                              <i className="bi bi-calendar-heart-fill"></i>
+                                                              {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                                day: '2-digit',
+                                                                month: 'long',
+                                                                year: 'numeric'
+                                                              })}
+                                                            </div>
+                                                          )}
+                                                          {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                            <div className="resume-contact-item">
+                                                              <i className="bi bi-geo-alt-fill"></i>
+                                                              <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                            </div>
+                                                          )}
+                                                          {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                            <div className="resume-contact-item">
+                                                              <i className="bi bi-house-fill"></i>
+                                                              <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                            </div>
+                                                          )}
                                                         </div>
-
-                                                        {profile._candidate?.dob && (
-                                                          <div className="resume-contact-item">
-                                                            <i className="bi bi-calendar-heart-fill"></i>
-                                                            {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                              day: '2-digit',
-                                                              month: 'long',
-                                                              year: 'numeric'
-                                                            })}
-                                                          </div>
-                                                        )}
-                                                        {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                          <div className="resume-contact-item">
-                                                            <i className="bi bi-geo-alt-fill"></i>
-                                                            <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                          </div>
-                                                        )}
-                                                        {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                          <div className="resume-contact-item">
-                                                            <i className="bi bi-house-fill"></i>
-                                                            <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                          </div>
-                                                        )}
                                                       </div>
+                                                    </div>
+
+                                                    <div className="resume-summary">
+                                                      <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
+                                                      <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                                     </div>
                                                   </div>
 
-                                                  <div className="resume-summary">
-                                                    <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                    <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                                  </div>
-                                                </div>
-
-                                                <div className="resume-document-body">
-                                                  <div className="resume-column resume-left-column">
-                                                    {profile._candidate?.isExperienced === false ? (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Work Experience</h2>
-                                                        <div className="resume-experience-item">
-                                                          <div className="resume-item-header">
-                                                            <h3 className="resume-item-title">Fresher</h3>
-                                                          </div>
-                                                          <div className="resume-item-content">
-                                                            <p>Looking for opportunities to start my career</p>
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                    ) : (
-                                                      profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
+                                                  <div className="resume-document-body">
+                                                    <div className="resume-column resume-left-column">
+                                                      {profile._candidate?.isExperienced === false ? (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Work Experience</h2>
-                                                          {profile._candidate.experiences.map((exp, index) => (
-                                                            <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                              <div className="resume-item-header">
-                                                                {exp.jobTitle && (
-                                                                  <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                                )}
-                                                                {exp.companyName && (
-                                                                  <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                                )}
-                                                                {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                                  <p className="resume-item-period">
-                                                                    {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                      year: 'numeric',
-                                                                      month: 'short',
-                                                                    }) : 'Start Date'}
-                                                                    {" - "}
-                                                                    {exp.currentlyWorking ? 'Present' :
-                                                                      exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                        year: 'numeric',
-                                                                        month: 'short',
-                                                                      }) : 'End Date'}
-                                                                  </p>
-                                                                )}
-                                                              </div>
-                                                              {exp.jobDescription && (
-                                                                <div className="resume-item-content">
-                                                                  <p>{exp.jobDescription}</p>
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          ))}
-                                                        </div>
-                                                      )
-                                                    )}
-
-                                                    {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Education</h2>
-                                                        {profile._candidate.qualifications.map((edu, index) => (
-                                                          <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                          <div className="resume-experience-item">
                                                             <div className="resume-item-header">
-                                                              {edu.education && (
-                                                                <h3 className="resume-item-title">{edu.education}</h3>
-                                                              )}
-                                                              {edu.course && (
-                                                                <h3 className="resume-item-title">{edu.course}</h3>
-                                                              )}
-                                                              {edu.universityName && (
-                                                                <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                              )}
-                                                              {edu.schoolName && (
-                                                                <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                              )}
-                                                              {edu.collegeName && (
-                                                                <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                              )}
-                                                              {edu.passingYear && (
-                                                                <p className="resume-item-period">{edu.passingYear}</p>
-                                                              )}
+                                                              <h3 className="resume-item-title">Fresher</h3>
                                                             </div>
                                                             <div className="resume-item-content">
-                                                              {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                              {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                              <p>Looking for opportunities to start my career</p>
                                                             </div>
                                                           </div>
-                                                        ))}
-                                                      </div>
-                                                    )}
-                                                  </div>
-
-                                                  <div className="resume-column resume-right-column">
-                                                    {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Skills</h2>
-                                                        <div className="resume-skills-list">
-                                                          {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                            <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                              <div className="resume-skill-name">{skill.skillName || (typeof skill === 'string' ? skill : 'Skill')}</div>
-                                                              {skill.skillPercent && (
-                                                                <div className="resume-skill-bar-container">
-                                                                  <div
-                                                                    className="resume-skill-bar"
-                                                                    style={{ width: `${skill.skillPercent}%` }}
-                                                                  ></div>
-                                                                  <span className="resume-skill-percent">{skill.skillPercent}%</span>
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          ))}
                                                         </div>
-                                                      </div>
-                                                    )}
-
-                                                    {profile._candidate?.personalInfo?.languages && profile._candidate.personalInfo.languages.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Languages</h2>
-                                                        <div className="resume-languages-list">
-                                                          {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                            <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                              <div className="resume-language-name">{lang.name || lang.lname || (typeof lang === 'string' ? lang : 'Language')}</div>
-                                                              {lang.level && (
-                                                                <div className="resume-language-level">
-                                                                  {[1, 2, 3, 4, 5].map(dot => (
-                                                                    <span
-                                                                      key={`resume-lang-dot-${index}-${dot}`}
-                                                                      className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                                    ></span>
-                                                                  ))}
+                                                      ) : (
+                                                        profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
+                                                          <div className="resume-section">
+                                                            <h2 className="resume-section-title">Work Experience</h2>
+                                                            {profile._candidate.experiences.map((exp, index) => (
+                                                              <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                                <div className="resume-item-header">
+                                                                  {exp.jobTitle && (
+                                                                    <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                                  )}
+                                                                  {exp.companyName && (
+                                                                    <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                                  )}
+                                                                  {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                    <p className="resume-item-period">
+                                                                      {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                        year: 'numeric',
+                                                                        month: 'short',
+                                                                      }) : 'Start Date'}
+                                                                      {" - "}
+                                                                      {exp.currentlyWorking ? 'Present' :
+                                                                        exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                          year: 'numeric',
+                                                                          month: 'short',
+                                                                        }) : 'End Date'}
+                                                                    </p>
+                                                                  )}
                                                                 </div>
-                                                              )}
-                                                            </div>
-                                                          ))}
-                                                        </div>
-                                                      </div>
-                                                    )}
-
-                                                    {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Certifications</h2>
-                                                        <ul className="resume-certifications-list">
-                                                          {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                            <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                              <strong>{cert.certificateName || cert.name || 'Certification'}</strong>
-                                                              {cert.orgName && (
-                                                                <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                              )}
-                                                              {(cert.month || cert.year) && (
-                                                                <span className="resume-cert-date">
-                                                                  {cert.month && cert.year ?
-                                                                    ` (${cert.month}/${cert.year})` :
-                                                                    cert.month ?
-                                                                      ` (${cert.month})` :
-                                                                      cert.year ?
-                                                                        ` (${cert.year})` :
-                                                                        ''}
-                                                                </span>
-                                                              )}
-                                                            </li>
-                                                          ))}
-                                                        </ul>
-                                                      </div>
-                                                    )}
-
-                                                    {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Projects</h2>
-                                                        {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                          <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                            <div className="resume-item-header">
-                                                              <h3 className="resume-project-title">
-                                                                {proj.projectName || 'Project'}
-                                                                {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                              </h3>
-                                                            </div>
-                                                            {proj.description && (
-                                                              <div className="resume-item-content">
-                                                                <p>{proj.description}</p>
+                                                                {exp.jobDescription && (
+                                                                  <div className="resume-item-content">
+                                                                    <p>{exp.jobDescription}</p>
+                                                                  </div>
+                                                                )}
                                                               </div>
-                                                            )}
+                                                            ))}
                                                           </div>
-                                                        ))}
-                                                      </div>
-                                                    )}
+                                                        )
+                                                      )}
 
-                                                    {profile._candidate?.personalInfo?.interest && profile._candidate.personalInfo.interest.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Interests</h2>
-                                                        <div className="resume-interests-tags">
-                                                          {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                            <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                              {interest}
-                                                            </span>
+                                                      {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Education</h2>
+                                                          {profile._candidate.qualifications.map((edu, index) => (
+                                                            <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                              <div className="resume-item-header">
+                                                                {edu.education && (
+                                                                  <h3 className="resume-item-title">{edu.education}</h3>
+                                                                )}
+                                                                {edu.course && (
+                                                                  <h3 className="resume-item-title">{edu.course}</h3>
+                                                                )}
+                                                                {edu.universityName && (
+                                                                  <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                                )}
+                                                                {edu.schoolName && (
+                                                                  <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                                )}
+                                                                {edu.collegeName && (
+                                                                  <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                                )}
+                                                                {edu.passingYear && (
+                                                                  <p className="resume-item-period">{edu.passingYear}</p>
+                                                                )}
+                                                              </div>
+                                                              <div className="resume-item-content">
+                                                                {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                                {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                              </div>
+                                                            </div>
                                                           ))}
                                                         </div>
-                                                      </div>
-                                                    )}
+                                                      )}
+                                                    </div>
+
+                                                    <div className="resume-column resume-right-column">
+                                                      {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Skills</h2>
+                                                          <div className="resume-skills-list">
+                                                            {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                              <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                                <div className="resume-skill-name">{skill.skillName || (typeof skill === 'string' ? skill : 'Skill')}</div>
+                                                                {skill.skillPercent && (
+                                                                  <div className="resume-skill-bar-container">
+                                                                    <div
+                                                                      className="resume-skill-bar"
+                                                                      style={{ width: `${skill.skillPercent}%` }}
+                                                                    ></div>
+                                                                    <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      )}
+
+                                                      {profile._candidate?.personalInfo?.languages && profile._candidate.personalInfo.languages.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Languages</h2>
+                                                          <div className="resume-languages-list">
+                                                            {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                              <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                                <div className="resume-language-name">{lang.name || lang.lname || (typeof lang === 'string' ? lang : 'Language')}</div>
+                                                                {lang.level && (
+                                                                  <div className="resume-language-level">
+                                                                    {[1, 2, 3, 4, 5].map(dot => (
+                                                                      <span
+                                                                        key={`resume-lang-dot-${index}-${dot}`}
+                                                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                      ></span>
+                                                                    ))}
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      )}
+
+                                                      {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Certifications</h2>
+                                                          <ul className="resume-certifications-list">
+                                                            {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                              <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                                <strong>{cert.certificateName || cert.name || 'Certification'}</strong>
+                                                                {cert.orgName && (
+                                                                  <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                                )}
+                                                                {(cert.month || cert.year) && (
+                                                                  <span className="resume-cert-date">
+                                                                    {cert.month && cert.year ?
+                                                                      ` (${cert.month}/${cert.year})` :
+                                                                      cert.month ?
+                                                                        ` (${cert.month})` :
+                                                                        cert.year ?
+                                                                          ` (${cert.year})` :
+                                                                          ''}
+                                                                  </span>
+                                                                )}
+                                                              </li>
+                                                            ))}
+                                                          </ul>
+                                                        </div>
+                                                      )}
+
+                                                      {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Projects</h2>
+                                                          {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                            <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                              <div className="resume-item-header">
+                                                                <h3 className="resume-project-title">
+                                                                  {proj.projectName || 'Project'}
+                                                                  {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                                </h3>
+                                                              </div>
+                                                              {proj.description && (
+                                                                <div className="resume-item-content">
+                                                                  <p>{proj.description}</p>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      )}
+
+                                                      {profile._candidate?.personalInfo?.interest && profile._candidate.personalInfo.interest.length > 0 && (
+                                                        <div className="resume-section">
+                                                          <h2 className="resume-section-title">Interests</h2>
+                                                          <div className="resume-interests-tags">
+                                                            {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                                {interest}
+                                                              </span>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </div>
+
+                                                  {profile._candidate?.personalInfo?.declaration?.text && (
+                                                    <div className="resume-declaration">
+                                                      <h2 className="resume-section-title">Declaration</h2>
+                                                      <p>{profile._candidate.personalInfo.declaration.text}</p>
+                                                    </div>
+                                                  )}
                                                 </div>
-
-                                                {profile._candidate?.personalInfo?.declaration?.text && (
-                                                  <div className="resume-declaration">
-                                                    <h2 className="resume-section-title">Declaration</h2>
-                                                    <p>{profile._candidate.personalInfo.declaration.text}</p>
-                                                  </div>
-                                                )}
                                               </div>
                                             </div>
-                                          </div>
-                                        )}
+                                          )}
 
-                                        {/* Job History Tab */}
-                                        {(activeTab[profileIndex] || 0) === 2 && (
-                                          <div className="tab-pane active" id="job-history">
-                                            <div className="section-card">
-                                              <div className="table-responsive">
-                                                <table className="table table-hover table-bordered job-history-table">
-                                                  <thead className="table-light">
-                                                    <tr>
-                                                      <th>S.No</th>
-                                                      <th>Company Name</th>
-                                                      <th>Position</th>
-                                                      <th>Duration</th>
-                                                      <th>Location</th>
-                                                      <th>Status</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody>
-                                                    {experiences.map((job, index) => (
-                                                      <tr key={index}>
-                                                        <td>{index + 1}</td>
-                                                        <td>{job.companyName}</td>
-                                                        <td>{job.jobTitle}</td>
-                                                        <td>
-                                                          {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                          {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                        </td>
-                                                        <td>Remote</td>
-                                                        <td><span className="text-success">Completed</span></td>
+                                          {/* Job History Tab */}
+                                          {(activeTab[profileIndex] || 0) === 2 && (
+                                            <div className="tab-pane active" id="job-history">
+                                              <div className="section-card">
+                                                <div className="table-responsive">
+                                                  <table className="table table-hover table-bordered job-history-table">
+                                                    <thead className="table-light">
+                                                      <tr>
+                                                        <th>S.No</th>
+                                                        <th>Company Name</th>
+                                                        <th>Position</th>
+                                                        <th>Duration</th>
+                                                        <th>Location</th>
+                                                        <th>Status</th>
                                                       </tr>
-                                                    ))}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {/* Course History Tab */}
-                                        {(activeTab[profileIndex] || 0) === 3 && (
-                                          <div className="tab-pane active" id="course-history">
-                                            <div className="section-card">
-                                              <div className="table-responsive">
-                                                <table className="table table-hover table-bordered course-history-table">
-                                                  <thead className="table-light">
-                                                    <tr>
-                                                      <th>S.No</th>
-                                                      <th>Applied Date</th>
-                                                      <th>Course Name</th>
-                                                      <th>Lead Added By</th>
-                                                      <th>Counsellor</th>
-                                                      <th>Status</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody>
-                                                    {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                      profile._candidate._appliedCourses.map((course, index) => (
+                                                    </thead>
+                                                    <tbody>
+                                                      {experiences.map((job, index) => (
                                                         <tr key={index}>
                                                           <td>{index + 1}</td>
-                                                          <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                          <td>{course._course?.name || 'N/A'}</td>
-                                                          <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                          <td>{course.month || ''} {course.year || ''}</td>
-                                                          <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                          <td>{job.companyName}</td>
+                                                          <td>{job.jobTitle}</td>
+                                                          <td>
+                                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                          </td>
+                                                          <td>Remote</td>
+                                                          <td><span className="text-success">Completed</span></td>
                                                         </tr>
-                                                      ))
-                                                    ) : (
-                                                      <tr>
-                                                        <td colSpan={6} className="text-center">No course history available</td>
-                                                      </tr>
-                                                    )}
-                                                  </tbody>
-                                                </table>
+                                                      ))}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        )}
+                                          )}
+
+                                          {/* Course History Tab */}
+                                          {(activeTab[profileIndex] || 0) === 3 && (
+                                            <div className="tab-pane active" id="course-history">
+                                              <div className="section-card">
+                                                <div className="table-responsive">
+                                                  <table className="table table-hover table-bordered course-history-table">
+                                                    <thead className="table-light">
+                                                      <tr>
+                                                        <th>S.No</th>
+                                                        <th>Applied Date</th>
+                                                        <th>Course Name</th>
+                                                        <th>Lead Added By</th>
+                                                        <th>Counsellor</th>
+                                                        <th>Status</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
+                                                        profile._candidate._appliedCourses.map((course, index) => (
+                                                          <tr key={index}>
+                                                            <td>{index + 1}</td>
+                                                            <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                            <td>{course._course?.name || 'N/A'}</td>
+                                                            <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                            <td>{course.month || ''} {course.year || ''}</td>
+                                                            <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                          </tr>
+                                                        ))
+                                                      ) : (
+                                                        <tr>
+                                                          <td colSpan={6} className="text-center">No course history available</td>
+                                                        </tr>
+                                                      )}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
 
 
-                                        {/* Documents Tab */}
-                                        {(activeTab[profileIndex] || 0) === 4 && (
-                                          <div className="tab-pane active" id='studentsDocuments'>
-                                            {(() => {
-                                              const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
-                                              const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                          {/* Documents Tab */}
+                                          {(activeTab[profileIndex] || 0) === 4 && (
+                                            <div className="tab-pane active" id='studentsDocuments'>
+                                              {(() => {
+                                                const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
+                                                const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-                                              // If no documents are required, show a message
-                                              if (totalRequired === 0) {
-                                                return (
-                                                  <div className="col-12 text-center py-5">
-                                                    <div className="text-muted">
-                                                      <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                      <h5 className="text-success">No Documents Required</h5>
-                                                      <p>This course does not require any document verification.</p>
-                                                    </div>
-                                                  </div>
-
-                                                );
-                                              }
-
-                                              // If documents are required, show the full interface
-                                              return (
-                                                <div className="enhanced-documents-panel">
-                                                  {/* Enhanced Stats Grid */}
-                                                  <div className="stats-grid">
-                                                    {(() => {
-                                                      // Use backend counts only, remove static document fallback
-                                                      const backendCounts = profile?.docCounts || {};
-                                                      return (
-                                                        <>
-                                                          <div className="stat-card total-docs">
-                                                            <div className="stat-icon">
-                                                              <i className="fas fa-file-alt"></i>
-                                                            </div>
-                                                            <div className="stat-info">
-                                                              <h4>{backendCounts.totalRequired || 0}</h4>
-                                                              <p>Total Required</p>
-                                                            </div>
-                                                            <div className="stat-trend">
-                                                              <i className="fas fa-list"></i>
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="stat-card uploaded-docs">
-                                                            <div className="stat-icon">
-                                                              <i className="fas fa-cloud-upload-alt"></i>
-                                                            </div>
-                                                            <div className="stat-info">
-                                                              <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                              <p>Uploaded</p>
-                                                            </div>
-                                                            <div className="stat-trend">
-                                                              <i className="fas fa-arrow-up"></i>
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="stat-card pending-docs">
-                                                            <div className="stat-icon">
-                                                              <i className="fas fa-clock"></i>
-                                                            </div>
-                                                            <div className="stat-info">
-                                                              <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                              <p>Pending Review</p>
-                                                            </div>
-                                                            <div className="stat-trend">
-                                                              <i className="fas fa-exclamation-triangle"></i>
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="stat-card verified-docs">
-                                                            <div className="stat-icon">
-                                                              <i className="fas fa-check-circle"></i>
-                                                            </div>
-                                                            <div className="stat-info">
-                                                              <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                              <p>Approved</p>
-                                                            </div>
-                                                            <div className="stat-trend">
-                                                              <i className="fas fa-thumbs-up"></i>
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="stat-card rejected-docs">
-                                                            <div className="stat-icon">
-                                                              <i className="fas fa-times-circle"></i>
-                                                            </div>
-                                                            <div className="stat-info">
-                                                              <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                              <p>Rejected</p>
-                                                            </div>
-                                                            <div className="stat-trend">
-                                                              <i className="fas fa-arrow-down"></i>
-                                                            </div>
-                                                          </div>
-                                                        </>
-                                                      );
-                                                    })()}
-                                                  </div>
-
-                                                  {/* Enhanced Filter Section */}
-                                                  <div className="filter-section-enhanced">
-                                                    <div className="filter-tabs-container">
-                                                      <h5 className="filter-title">
-                                                        <i className="fas fa-filter me-2"></i>
-                                                        Filter Documents
-                                                      </h5>
-                                                      <div className="filter-tabs">
-                                                        {(() => {
-                                                          const backendCounts = profile?.docCounts || {};
-                                                          return (
-                                                            <>
-                                                              <button
-                                                                className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                                onClick={() => setStatusFilter('all')}
-                                                              >
-                                                                <i className="fas fa-list-ul"></i>
-                                                                All Documents
-                                                                <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                              </button>
-                                                              <button
-                                                                className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                                onClick={() => setStatusFilter('pending')}
-                                                              >
-                                                                <i className="fas fa-clock"></i>
-                                                                Pending
-                                                                <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                              </button>
-                                                              <button
-                                                                className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                                onClick={() => setStatusFilter('verified')}
-                                                              >
-                                                                <i className="fas fa-check-circle"></i>
-                                                                Verified
-                                                                <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                              </button>
-                                                              <button
-                                                                className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                                onClick={() => setStatusFilter('rejected')}
-                                                              >
-                                                                <i className="fas fa-times-circle"></i>
-                                                                Rejected
-                                                                <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                              </button>
-                                                            </>
-                                                          );
-                                                        })()}
+                                                // If no documents are required, show a message
+                                                if (totalRequired === 0) {
+                                                  return (
+                                                    <div className="col-12 text-center py-5">
+                                                      <div className="text-muted">
+                                                        <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                        <h5 className="text-success">No Documents Required</h5>
+                                                        <p>This course does not require any document verification.</p>
                                                       </div>
                                                     </div>
-                                                  </div>
 
-                                                  {/* Enhanced Documents Grid */}
-                                                  <div className="documents-grid-enhanced">
-                                                    {(() => {
-                                                      // Filter documents based on status filter
-                                                      const filteredDocs = filterDocuments(documentsToDisplay);
+                                                  );
+                                                }
 
-                                                      if (filteredDocs.length === 0) {
+                                                // If documents are required, show the full interface
+                                                return (
+                                                  <div className="enhanced-documents-panel">
+                                                    {/* Enhanced Stats Grid */}
+                                                    <div className="stats-grid">
+                                                      {(() => {
+                                                        // Use backend counts only, remove static document fallback
+                                                        const backendCounts = profile?.docCounts || {};
                                                         return (
-                                                          <div className="col-12 text-center py-5">
-                                                            <div className="text-muted">
-                                                              <i className="fas fa-filter fa-3x mb-3"></i>
-                                                              <h5>No Documents Found</h5>
-                                                              <p>No documents match the current filter criteria.</p>
-                                                            </div>
-                                                          </div>
-                                                        );
-                                                      }
-
-                                                      return filteredDocs.map((doc, index) => {
-
-                                                        // Check if this is a document with upload data or just uploaded file info
-                                                        const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                          ? doc.uploads[doc.uploads.length - 1]
-                                                          : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                        return (
-                                                          <div key={doc._id || index} className="document-card-enhanced">
-                                                            <div className="document-image-container">
-                                                              <h5 className='badge position-absolute'>{latestUpload?.status ? latestUpload.status : ''}</h5>
-                                                              {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                                <>
-                                                                  {(() => {
-                                                                    const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                                    const fileType = getFileType(fileUrl);
-
-                                                                    if (fileType === 'image') {
-                                                                      return (
-
-                                                                        <img
-                                                                          src={fileUrl}
-                                                                          alt="Document Preview"
-                                                                          className="document-image"
-                                                                        />
-                                                                      );
-                                                                    } else if (fileType === 'pdf') {
-                                                                      return (
-                                                                        <div className="document-preview-icon">
-                                                                          <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
-                                                                          <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                        </div>
-                                                                      );
-                                                                    } else {
-                                                                      return (
-                                                                        <div className="document-preview-icon">
-                                                                          <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
-                                                                            fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                            }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                          <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                            {fileType === 'document' ? 'Document' :
-                                                                              fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                          </p>
-                                                                        </div>
-                                                                      );
-                                                                    }
-                                                                  })()}
-                                                                  <div className="image-overlay">
-                                                                    <button
-                                                                      className="preview-btn"
-                                                                      onClick={() => openDocumentModal(doc, profile)}
-                                                                    >
-                                                                      <i className="fas fa-search-plus"></i>
-                                                                      Preview
-                                                                    </button>
-                                                                  </div>
-                                                                </>
-                                                              ) : (
-                                                                <div className="no-document-placeholder">
-                                                                  <i className="fas fa-file-upload"></i>
-                                                                  <p>No Document</p>
-                                                                </div>
-                                                              )}
-
-                                                              {/* Status Badge Overlay */}
-                                                              <div className="status-badge-overlay">
-                                                                {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                                  <span className="status-badge-new pending">
-                                                                    <i className="fas fa-clock"></i>
-                                                                    Pending
-                                                                  </span>
-                                                                )}
-                                                                {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                                  <span className="status-badge-new verified">
-                                                                    <i className="fas fa-check-circle"></i>
-                                                                    Verified
-                                                                  </span>
-                                                                )}
-                                                                {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                                  <span className="status-badge-new rejected">
-                                                                    <i className="fas fa-times-circle"></i>
-                                                                    Rejected
-                                                                  </span>
-                                                                )}
-                                                                {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                                  <span className="status-badge-new not-uploaded">
-                                                                    <i className="fas fa-upload"></i>
-                                                                    Required
-                                                                  </span>
-                                                                )}
+                                                          <>
+                                                            <div className="stat-card total-docs">
+                                                              <div className="stat-icon">
+                                                                <i className="fas fa-file-alt"></i>
+                                                              </div>
+                                                              <div className="stat-info">
+                                                                <h4>{backendCounts.totalRequired || 0}</h4>
+                                                                <p>Total Required</p>
+                                                              </div>
+                                                              <div className="stat-trend">
+                                                                <i className="fas fa-list"></i>
                                                               </div>
                                                             </div>
 
-                                                            <div className="document-info-section">
+                                                            <div className="stat-card uploaded-docs">
+                                                              <div className="stat-icon">
+                                                                <i className="fas fa-cloud-upload-alt"></i>
+                                                              </div>
+                                                              <div className="stat-info">
+                                                                <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                                <p>Uploaded</p>
+                                                              </div>
+                                                              <div className="stat-trend">
+                                                                <i className="fas fa-arrow-up"></i>
+                                                              </div>
+                                                            </div>
 
-                                                              <div className="document-header">
-                                                                <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
-                                                                <div className="document-actions">
-                                                                  {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected') ? (
-                                                                    <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                      setSelectedProfile(profile); // Set the current profile
-                                                                      openUploadModal(doc);        // Open the upload modal
-                                                                    }}>
-                                                                      <i className="fas fa-cloud-upload-alt"></i>
-                                                                      Upload
-                                                                    </button>
-                                                                  ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
-                                                                    <button
-                                                                      className="action-btn verify-btn"
-                                                                      onClick={() => openDocumentModal(doc, profile)}
-                                                                      title="Verify Document"
-                                                                    >
-                                                                      <i className="fas fa-check"></i>
-                                                                      VERIFY
-                                                                    </button>
-                                                                  ) : (
-                                                                    <button
-                                                                      className="action-btn view-btn"
-                                                                      onClick={() => openDocumentModal(doc)}
-                                                                      title="View Document"
-                                                                    >
-                                                                      <i className="fas fa-eye"></i>
-                                                                      View
-                                                                    </button>
+                                                            <div className="stat-card pending-docs">
+                                                              <div className="stat-icon">
+                                                                <i className="fas fa-clock"></i>
+                                                              </div>
+                                                              <div className="stat-info">
+                                                                <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                                <p>Pending Review</p>
+                                                              </div>
+                                                              <div className="stat-trend">
+                                                                <i className="fas fa-exclamation-triangle"></i>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="stat-card verified-docs">
+                                                              <div className="stat-icon">
+                                                                <i className="fas fa-check-circle"></i>
+                                                              </div>
+                                                              <div className="stat-info">
+                                                                <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                                <p>Approved</p>
+                                                              </div>
+                                                              <div className="stat-trend">
+                                                                <i className="fas fa-thumbs-up"></i>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="stat-card rejected-docs">
+                                                              <div className="stat-icon">
+                                                                <i className="fas fa-times-circle"></i>
+                                                              </div>
+                                                              <div className="stat-info">
+                                                                <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                                <p>Rejected</p>
+                                                              </div>
+                                                              <div className="stat-trend">
+                                                                <i className="fas fa-arrow-down"></i>
+                                                              </div>
+                                                            </div>
+                                                          </>
+                                                        );
+                                                      })()}
+                                                    </div>
+
+                                                    {/* Enhanced Filter Section */}
+                                                    <div className="filter-section-enhanced">
+                                                      <div className="filter-tabs-container">
+                                                        <h5 className="filter-title">
+                                                          <i className="fas fa-filter me-2"></i>
+                                                          Filter Documents
+                                                        </h5>
+                                                        <div className="filter-tabs">
+                                                          {(() => {
+                                                            const backendCounts = profile?.docCounts || {};
+                                                            return (
+                                                              <>
+                                                                <button
+                                                                  className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                                  onClick={() => setStatusFilter('all')}
+                                                                >
+                                                                  <i className="fas fa-list-ul"></i>
+                                                                  All Documents
+                                                                  <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                                </button>
+                                                                <button
+                                                                  className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                                  onClick={() => setStatusFilter('pending')}
+                                                                >
+                                                                  <i className="fas fa-clock"></i>
+                                                                  Pending
+                                                                  <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                                </button>
+                                                                <button
+                                                                  className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                                  onClick={() => setStatusFilter('verified')}
+                                                                >
+                                                                  <i className="fas fa-check-circle"></i>
+                                                                  Verified
+                                                                  <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                                </button>
+                                                                <button
+                                                                  className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                                  onClick={() => setStatusFilter('rejected')}
+                                                                >
+                                                                  <i className="fas fa-times-circle"></i>
+                                                                  Rejected
+                                                                  <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                                </button>
+                                                              </>
+                                                            );
+                                                          })()}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+
+                                                    {/* Enhanced Documents Grid */}
+                                                    <div className="documents-grid-enhanced">
+                                                      {(() => {
+                                                        // Filter documents based on status filter
+                                                        const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                        if (filteredDocs.length === 0) {
+                                                          return (
+                                                            <div className="col-12 text-center py-5">
+                                                              <div className="text-muted">
+                                                                <i className="fas fa-filter fa-3x mb-3"></i>
+                                                                <h5>No Documents Found</h5>
+                                                                <p>No documents match the current filter criteria.</p>
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        }
+
+                                                        return filteredDocs.map((doc, index) => {
+
+                                                          // Check if this is a document with upload data or just uploaded file info
+                                                          const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                            ? doc.uploads[doc.uploads.length - 1]
+                                                            : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                          return (
+                                                            <div key={doc._id || index} className="document-card-enhanced">
+                                                              <div className="document-image-container">
+                                                                <h5 className='badge position-absolute'>{latestUpload?.status ? latestUpload.status : ''}</h5>
+                                                                {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                                  <>
+                                                                    {(() => {
+                                                                      const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                      const fileType = getFileType(fileUrl);
+
+                                                                      if (fileType === 'image') {
+                                                                        return (
+
+                                                                          <img
+                                                                            src={fileUrl}
+                                                                            alt="Document Preview"
+                                                                            className="document-image"
+                                                                          />
+                                                                        );
+                                                                      } else if (fileType === 'pdf') {
+                                                                        return (
+                                                                          <div className="document-preview-icon">
+                                                                            <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
+                                                                            <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                          </div>
+                                                                        );
+                                                                      } else {
+                                                                        return (
+                                                                          <div className="document-preview-icon">
+                                                                            <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
+                                                                              fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                              }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                            <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                              {fileType === 'document' ? 'Document' :
+                                                                                fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                            </p>
+                                                                          </div>
+                                                                        );
+                                                                      }
+                                                                    })()}
+                                                                    <div className="image-overlay">
+                                                                      <button
+                                                                        className="preview-btn"
+                                                                        onClick={() => openDocumentModal(doc, profile)}
+                                                                      >
+                                                                        <i className="fas fa-search-plus"></i>
+                                                                        Preview
+                                                                      </button>
+                                                                    </div>
+                                                                  </>
+                                                                ) : (
+                                                                  <div className="no-document-placeholder">
+                                                                    <i className="fas fa-file-upload"></i>
+                                                                    <p>No Document</p>
+                                                                  </div>
+                                                                )}
+
+                                                                {/* Status Badge Overlay */}
+                                                                <div className="status-badge-overlay">
+                                                                  {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                                    <span className="status-badge-new pending">
+                                                                      <i className="fas fa-clock"></i>
+                                                                      Pending
+                                                                    </span>
+                                                                  )}
+                                                                  {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                                    <span className="status-badge-new verified">
+                                                                      <i className="fas fa-check-circle"></i>
+                                                                      Verified
+                                                                    </span>
+                                                                  )}
+                                                                  {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                                    <span className="status-badge-new rejected">
+                                                                      <i className="fas fa-times-circle"></i>
+                                                                      Rejected
+                                                                    </span>
+                                                                  )}
+                                                                  {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                                    <span className="status-badge-new not-uploaded">
+                                                                      <i className="fas fa-upload"></i>
+                                                                      Required
+                                                                    </span>
                                                                   )}
                                                                 </div>
                                                               </div>
 
-                                                              <div className="document-meta">
-                                                                <div className="meta-item">
-                                                                  <i className="fas fa-calendar-alt text-muted"></i>
-                                                                  <span className="meta-text">
-                                                                    {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                      new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                        day: '2-digit',
-                                                                        month: 'short',
-                                                                        year: 'numeric'
-                                                                      }) :
-                                                                      'Not uploaded'
-                                                                    }
-                                                                  </span>
+                                                              <div className="document-info-section">
+
+                                                                <div className="document-header">
+                                                                  <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
+                                                                  <div className="document-actions">
+                                                                    {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected') ? (
+                                                                      <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                        setSelectedProfile(profile); // Set the current profile
+                                                                        openUploadModal(doc);        // Open the upload modal
+                                                                      }}>
+                                                                        <i className="fas fa-cloud-upload-alt"></i>
+                                                                        Upload
+                                                                      </button>
+                                                                    ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
+                                                                      <button
+                                                                        className="action-btn verify-btn"
+                                                                        onClick={() => openDocumentModal(doc, profile)}
+                                                                        title="Verify Document"
+                                                                      >
+                                                                        <i className="fas fa-check"></i>
+                                                                        VERIFY
+                                                                      </button>
+                                                                    ) : (
+                                                                      <button
+                                                                        className="action-btn view-btn"
+                                                                        onClick={() => openDocumentModal(doc)}
+                                                                        title="View Document"
+                                                                      >
+                                                                        <i className="fas fa-eye"></i>
+                                                                        View
+                                                                      </button>
+                                                                    )}
+                                                                  </div>
                                                                 </div>
 
-                                                                {latestUpload && (
+                                                                <div className="document-meta">
                                                                   <div className="meta-item">
-                                                                    <i className="fas fa-clock text-muted"></i>
+                                                                    <i className="fas fa-calendar-alt text-muted"></i>
                                                                     <span className="meta-text">
-                                                                      {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit'
-                                                                      })}
+                                                                      {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                        new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                          day: '2-digit',
+                                                                          month: 'short',
+                                                                          year: 'numeric'
+                                                                        }) :
+                                                                        'Not uploaded'
+                                                                      }
                                                                     </span>
                                                                   </div>
-                                                                )}
+
+                                                                  {latestUpload && (
+                                                                    <div className="meta-item">
+                                                                      <i className="fas fa-clock text-muted"></i>
+                                                                      <span className="meta-text">
+                                                                        {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                          hour: '2-digit',
+                                                                          minute: '2-digit'
+                                                                        })}
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                </div>
                                                               </div>
                                                             </div>
-                                                          </div>
-                                                        );
-                                                      });
-                                                    })()}
+                                                          );
+                                                        });
+                                                      })()}
+                                                    </div>
+
+                                                    <DocumentModal />
+                                                    <UploadModal />
                                                   </div>
+                                                );
+                                              })()}
+                                            </div>
+                                          )}
 
-                                                  <DocumentModal />
-                                                  <UploadModal />
-                                                </div>
-                                              );
-                                            })()}
-                                          </div>
-                                        )}
-
-{(activeTab[profileIndex] || 0) === 5 && (
+                                          {(activeTab[profileIndex] || 0) === 5 && (
                                             <div className="tab-pane active" id='preverification'>
                                               <div className="row">
                                                 <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
                                                   <div className="card mt-1 mb-2">
                                                     <div className="col-xl-12 p-3">
                                                       <div className="row">
-                                                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
+                                                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto">
                                                           <h4 className="card-title mb-0" id="wrapping-bottom">Pre Verification</h4>
                                                         </div>
-
+                                                       
                                                       </div>
                                                     </div>
-                                                    <div className="card-content">
-                                                      <div className="table-responsive">
 
-                                                        <table className="verification-table">
-                                                          <thead>
-                                                            <tr>
-                                                              <th>S.NO</th>
-                                                              <th>Questions</th>
-                                                              <th>Answer</th>
-                                                            </tr>
-                                                          </thead>
-                                                          <tbody>
-                                                            <tr>
-                                                              <td className="s-no">1</td>
-                                                              <td className="question">Is the Candidate Aware of the Course</td>
-                                                              <td>
-                                                                <div className="checkbox-group">
-                                                                  <label className="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q1" value="Yes" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Yes</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q1" value="No" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">No</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q1" value="Not Sure" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Not Sure</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td className="s-no">2</td>
-                                                              <td className="question">Is the Candidate Aware from the Course Curriculum</td>
-                                                              <td>
-                                                                <div className="checkbox-group">
-                                                                  <label className="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q2" value="Yes" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Yes</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q2" value="No" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">No</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q2" value="Not Sure" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Not Sure</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td className="s-no">3</td>
-                                                              <td className="question">Currently Work Status</td>
-                                                              <td>
-                                                                <div className="checkbox-group">
-                                                                  <label className="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q3" value="Working" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Working</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q3" value="Not Working" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Not Working</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q3" value="Study" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Study</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td className="s-no">4</td>
-                                                              <td className="question">Is Candidate Interested for Course</td>
-                                                              <td>
-                                                                <div className="checkbox-group">
-                                                                  <label className="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q4" value="Yes" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Yes</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q4" value="No" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">No</span>
-                                                                  </label>
-                                                                  <label className="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q4" value="Not Sure" />
-                                                                    <span className="custom-checkbox"></span>
-                                                                    <span className="checkbox-label">Not Sure</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td class="s-no">5</td>
-                                                              <td class="question">If we offered a job outside Odisha, would you be</td>
-                                                              <td>
-                                                                <div class="checkbox-group">
-                                                                  <label class="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q5" value="Yes" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Yes</span>
-                                                                  </label>
-                                                                  <label class="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q5" value="No" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">No</span>
-                                                                  </label>
-                                                                  <label class="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q5" value="Not Sure" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Not Sure</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td class="s-no">6</td>
-                                                              <td class="question">Parent Confirmation</td>
-                                                              <td>
-                                                                <div class="checkbox-group">
-                                                                  <label class="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q6" value="Yes" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Yes</span>
-                                                                  </label>
-                                                                  <label class="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q6" value="No" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">No</span>
-                                                                  </label>
-                                                                  <label class="checkbox-wrapper neutral">
-                                                                    <input type="radio" name="q6" value="Not Sure" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Not Sure</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                            <tr>
-                                                              <td class="s-no">7</td>
-                                                              <td class="question">Recommendation from Placement</td>
-                                                              <td>
-                                                                <div class="checkbox-group">
-                                                                  <label class="checkbox-wrapper positive">
-                                                                    <input type="radio" name="q7" value="Selected" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Selected</span>
-                                                                  </label>
-                                                                  <label class="checkbox-wrapper negative">
-                                                                    <input type="radio" name="q7" value="Rejected" />
-                                                                    <span class="custom-checkbox"></span>
-                                                                    <span class="checkbox-label">Rejected</span>
-                                                                  </label>
-                                                                </div>
-                                                              </td>
-                                                            </tr>
-                                                          </tbody>
-                                                        </table>
-                                                      </div>
+                                                    <div className="card-content">
+                                                      {isLoadingAnswers ? (
+                                                        <div className="text-center p-4">
+                                                          <div className="spinner-border text-primary" role="status">
+                                                            <span className="visually-hidden">Loading...</span>
+                                                          </div>
+                                                          <p className="mt-2">Loading verification data...</p>
+                                                        </div>
+                                                      ) : questionAnswers.length > 0 ? (
+                                                        // Show existing data
+                                                        <div className="table-responsive">
+                                                          <table className="verification-table">
+                                                            <thead>
+                                                              <tr>
+                                                                <th>S.NO</th>
+                                                                <th>Questions</th>
+                                                                <th>Answer</th>
+                                                              </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                              {questionAnswers.map((item, index) => (
+                                                                <tr key={index}>
+                                                                  <td className="s-no">{index + 1}</td>
+                                                                  <td className="question">{item.question}</td>
+                                                                  <td>
+                                                                    <div className="answer-display">
+                                                                      <span className={`badge ${item.answer === 'Yes' || item.answer === 'Selected' ? 'bg-success' :
+                                                                        item.answer === 'No' || item.answer === 'Rejected' ? 'bg-danger' :
+                                                                          'bg-warning'
+                                                                        }`}>
+                                                                        {item.answer}
+                                                                      </span>
+                                                                    </div>
+                                                                  </td>
+                                                                </tr>
+                                                              ))}
+                                                            </tbody>
+                                                          </table>
+                                                        </div>
+                                                      ) : (
+                                                        // Show message when no data
+                                                        <div className="text-center p-4">
+                                                          <div className="text-muted">
+                                                            <i className="fas fa-info-circle fa-3x mb-3"></i>
+                                                            <h5>No Pre-Verification Data Found</h5>
+                                                            <p>Pre-verification questions have not been answered yet.</p>
+                                                            
+                                                          </div>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   </div>
                                                 </div>
                                               </div>
                                             </div>
-
                                           )}
 
-                                      </div>)
+                                        </div>)
                                     )}
                                   </div>
                                 </div>
@@ -4733,207 +4687,207 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       </div>
 
       {setPreVerification && (
-          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
-              <div className="modal-content p-0 w-100">
-                <div className="modal-header">
-                  <h1 className="modal-title fs-5">Pre Verification</h1>
-                  <button type="button" className="btn-close" onClick={() => { 
-                    showSetPreVerification(false);
-                    setQuestionFormData({}); // Reset form when modal is closed
-                  }}></button>
-                </div>
-                <div className="modal-body">
-
-                  {isLoadingQuestionAnswers && (
-                    <div className="text-center mb-3">
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading existing answers...</span>
-                      </div>
-                      <p className="mt-2 text-muted">Loading existing answers...</p>
-                    </div>
-                  )}
-
-                  <div className="table-responsive">
-
-                    <table className="verification-table">
-                      <thead>
-                        <tr>
-                          <th>S.NO</th>
-                          <th>Questions</th>
-                          <th>Answer</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="s-no">1</td>
-                          <td className="question">Is the Candidate Aware of the Course</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q1_select" 
-                                  className="form-select"
-                                  value={questionFormData.q1}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q1: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">2</td>
-                          <td className="question">Is the Candidate Aware from the Course Curriculum</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q2_select" 
-                                  className="form-select"
-                                  value={questionFormData.q2}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q2: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">3</td>
-                          <td className="question">Currently Work Status</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q3_select" 
-                                  className="form-select"
-                                  value={questionFormData.q3}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q3: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Working">Working</option>
-                                  <option value="Not Working">Not Working</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">4</td>
-                          <td className="question">Is Candidate Interested for Course</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q4_select" 
-                                  className="form-select"
-                                  value={questionFormData.q4}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q4: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">5</td>
-                          <td className="question">If we offered a job outside Odisha, would you be</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q5_select" 
-                                  className="form-select"
-                                  value={questionFormData.q5}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q5: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">6</td>
-                          <td className="question">Parent Confirmation</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q6_select" 
-                                  className="form-select"
-                                  value={questionFormData.q6}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q6: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="Not sure">Not Sure</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">7</td>
-                          <td className="question">Recommendation from Placement</td>
-                          <td>
-                            <div className="checkbox-group">
-                              <div className="select-option">
-                                <select 
-                                  name="q7_select" 
-                                  className="form-select"
-                                  value={questionFormData.q7}
-                                  onChange={(e) => setQuestionFormData({...questionFormData, q7: e.target.value})}
-                                >
-                                  <option value="">Select Option</option>
-                                  <option value="Selected">Selected</option>
-                                  <option value="Rejected">Rejected</option>
-                                </select>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                      <button 
-                        onClick={QuestionAnswer} 
-                        className="btn btn-primary"
-                        disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
-                      >
-                        {isSubmittingAnswers ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Submitting...
-                          </>
-                        ) : (
-                          'Submit'
-                        )}
-                      </button>
-                    </table>
-                  </div>
-                </div>
-
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
+            <div className="modal-content p-0 w-100">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Pre Verification</h1>
+                <button type="button" className="btn-close" onClick={() => {
+                  showSetPreVerification(false);
+                  setQuestionFormData({}); // Reset form when modal is closed
+                }}></button>
               </div>
+              <div className="modal-body">
+
+                {isLoadingQuestionAnswers && (
+                  <div className="text-center mb-3">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading existing answers...</span>
+                    </div>
+                    <p className="mt-2 text-muted">Loading existing answers...</p>
+                  </div>
+                )}
+
+                <div className="table-responsive">
+
+                  <table className="verification-table">
+                    <thead>
+                      <tr>
+                        <th>S.NO</th>
+                        <th>Questions</th>
+                        <th>Answer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="s-no">1</td>
+                        <td className="question">Is the Candidate Aware of the Course</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q1_select"
+                                className="form-select"
+                                value={questionFormData.q1}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q1: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">2</td>
+                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q2_select"
+                                className="form-select"
+                                value={questionFormData.q2}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q2: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">3</td>
+                        <td className="question">Currently Work Status</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q3_select"
+                                className="form-select"
+                                value={questionFormData.q3}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q3: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Working">Working</option>
+                                <option value="Not Working">Not Working</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">4</td>
+                        <td className="question">Is Candidate Interested for Course</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q4_select"
+                                className="form-select"
+                                value={questionFormData.q4}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q4: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">5</td>
+                        <td className="question">If we offered a job outside Odisha, would you be</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q5_select"
+                                className="form-select"
+                                value={questionFormData.q5}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q5: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">6</td>
+                        <td className="question">Parent Confirmation</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q6_select"
+                                className="form-select"
+                                value={questionFormData.q6}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q6: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">7</td>
+                        <td className="question">Recommendation from Placement</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q7_select"
+                                className="form-select"
+                                value={questionFormData.q7}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Selected">Selected</option>
+                                <option value="Rejected">Rejected</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                    <button
+                      onClick={QuestionAnswer}
+                      className="btn btn-primary"
+                      disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
+                    >
+                      {isSubmittingAnswers ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit'
+                      )}
+                    </button>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       <style>
         {`
@@ -6290,12 +6244,6 @@ background: #fd2b5a;
     align-items: center;
     z-index: 9999;
     backdrop-filter: blur(5px);
-    /* Prevent zoom and scroll on modal */
-    touch-action: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
 }
 
 .upload-modal-overlay {
@@ -6310,12 +6258,6 @@ background: #fd2b5a;
     align-items: center;
     z-index: 9999;
     backdrop-filter: blur(5px);
-    /* Prevent zoom and scroll on modal */
-    touch-action: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
 }
 
 .document-modal-content {

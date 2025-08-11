@@ -2750,12 +2750,6 @@ const LeadAnalyticsDashboard = () => {
                         <th style={{ minWidth: '150px', width: '150px' }}>Center</th>
                         <th style={{ minWidth: '150px', width: '150px' }}>Counsellor Name</th>
                         <th style={{ minWidth: '120px', width: '120px' }}>Total Leads</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Not Intrested</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Not Eligible</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Call Connected</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Lead For Future</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Hot</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Warm</th>
                         <th style={{ minWidth: '140px', width: '140px' }}>Pending for KYC</th>
                         <th style={{ minWidth: '120px', width: '120px' }}>KYC Done</th>
                         <th style={{ minWidth: '140px', width: '140px' }}>Admission Done</th>
@@ -2794,12 +2788,6 @@ const LeadAnalyticsDashboard = () => {
                                   )}
                                   <td>{row.counsellorName}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.notIntrestedIds, 'Not Intrested')}>{row.notIntrested}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.notEligibleIds, 'Not Eligible')}>{row.notEligible}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.callConnectedIds, 'Call Connected')}>{row.callConnected}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.leadForFutureIds, 'Lead For Future')}>{row.leadForFuture}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.hotIds, 'Hot')}>{row.hot}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.warmIds, 'Warm')}>{row.warm}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>

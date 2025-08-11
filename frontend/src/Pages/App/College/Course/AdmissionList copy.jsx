@@ -287,6 +287,31 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   //   }
   // };
 
+  // useEffect(() => {
+  //   const handleClickOutside = (event) => {
+  //     // Check if click is outside any multi-select dropdown
+  //     const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+
+  //     if (!isMultiSelectClick) {
+  //       // Close all dropdowns
+  //       setDropdownStates(prev =>
+  //         Object.keys(prev).reduce((acc, key) => {
+  //           acc[key] = false;
+  //           return acc;
+  //         }, {})
+  //       );
+  //     }
+  //   };
+
+  //   // Add event listener
+  //   document.addEventListener('mousedown', handleClickOutside);
+
+  //   // Cleanup
+  //   return () => {
+  //     document.removeEventListener('mousedown', handleClickOutside);
+  //   };
+  // }, []);
+
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
@@ -451,32 +476,6 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       return newState;
     });
   };
-
-  // Add this useEffect to handle clicking outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
 
   // Static document data for demonstration
@@ -2214,7 +2213,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
-console.log("upload modal render....")
+// console.log("upload modal render....")
     return (
       <div className="upload-modal-overlay" onClick={closeUploadModal}>
         <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
