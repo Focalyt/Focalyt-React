@@ -54,8 +54,8 @@ frontend/.env
 /frontend/src/Pages/Front/HomePage/HomePage copy.css
 /frontend/package.json
 /frontend/package-lock.json
-/frontend/src/Component/Layouts/Front
-/frontend/src/Pages/Front
+# /frontend/src/Component/Layouts/Front
+# /frontend/src/Pages/Front
 
 
 /frontend/src/Pages/App/College/Course/text.jsx
