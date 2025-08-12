@@ -6583,12 +6583,45 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		await profile.save();
 
+		// Check if all mandatory documents are verified after saving
+		let allMandatoryDocsVerified = true;
+		
+		// Get the updated profile to check current status
+		const updatedProfile = await AppliedCourses.findById(validProfileId).populate('_course');
+		const updatedRequiredDocs = updatedProfile._course?.docsRequired || [];
+		const updatedUploadedDocs = updatedProfile.uploadedDocs || [];
+		
+		// Create map of uploaded docs by docsId
+		const updatedUploadedDocsMap = {};
+		updatedUploadedDocs.forEach(d => {
+			if (d.docsId) updatedUploadedDocsMap[d.docsId.toString()] = d;
+		});
+		
+		// Check each mandatory document
+		for (const reqDoc of updatedRequiredDocs) {
+			if (reqDoc.mandatory) {
+				const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
+				// If mandatory doc is not uploaded or not verified, set flag to false
+				if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
+					allMandatoryDocsVerified = false;
+					break;
+				}
+			}
+		}
+
+		// If all mandatory docs are verified, update KYC status to true
+		if (allMandatoryDocsVerified && !updatedProfile.kyc) {
+			updatedProfile.kyc = true;
+			await updatedProfile.save();
+		}
+
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
 			kycUpdated: profile.kyc === true,
 			verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
-			requiredCount
+			requiredCount,
+			allMandatoryDocsVerified: allMandatoryDocsVerified
 		});
 
 	} catch (err) {
