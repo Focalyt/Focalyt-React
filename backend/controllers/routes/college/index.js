@@ -1579,7 +1579,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		// Get team members
 		let teamMembers = [req.user._id];
-		console.log('teamMembers', teamMembers)
 
 		if (projectsArray.length > 0) {
 			teamMembers = [];
@@ -1596,9 +1595,14 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
+		
+
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
 			teamMemberIds = teamMembers.map(member =>
@@ -1721,7 +1725,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	}
 
 
-	console.log('baseMatch', JSON.stringify(baseMatch))
 
 
 
@@ -1772,10 +1775,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	}
 
-	console.log('filters', filters)
-
-	console.log('filters:', filters);
-console.log('filters.leadStatus:', filters.leadStatus);
 
 if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
     // Only set _leadStatus if it's a valid ObjectId string
@@ -2026,6 +2025,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			teamMembers = [];
 		}
 		if (appliedFilters.centerArray?.length > 0) {
+			teamMembers = [];
+		}
+
+		if(name && name.trim() !== ''){
 			teamMembers = [];
 		}
 
@@ -5310,6 +5313,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
+
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
@@ -6656,6 +6664,13 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
+		
+
+
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
