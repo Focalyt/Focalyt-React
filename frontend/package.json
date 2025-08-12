@@ -23,6 +23,7 @@
     "feather-icons": "^4.29.2",
     "file-saver": "^2.0.5",
     "formik": "^2.4.6",
+    "gsap": "^3.13.0",
     "html2pdf.js": "^0.10.3",
     "jquery": "^3.7.1",
     "jszip": "^3.10.1",

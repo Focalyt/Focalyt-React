@@ -2788,7 +2788,6 @@ const LeadAnalyticsDashboard = () => {
                                   )}
                                   <td>{row.counsellorName}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
-
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>

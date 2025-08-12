@@ -58,7 +58,8 @@ const {
 	College,
 	SubQualification,
 	Courses,
-	AppliedCourses
+	AppliedCourses,
+	QuestionAnswer
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 
@@ -1845,7 +1846,103 @@ router.get('/zero-period-students/:batchId', [isCollege], async (req, res) => {
 	}
 });
 
+router.post('/questionAnswer', [isCollege], async (req, res) => {
+	try {
+		console.log("questions", req.body)
+		const { appliedcourse, responses } = req.body;
+		console.log("questions", req.body)
 
+		if (!appliedcourse || !responses || !Array.isArray(responses) || responses.length === 0) {
+			return res.status(400).json({
+				status: false,
+				message: 'Applied course ID and a non-empty responses array are required'
+			});
+		}
+
+		const courseExists = await AppliedCourses.findById(appliedcourse);
+		if (!courseExists) {
+			return res.status(404).json({
+				status: false,
+				message: 'Applied course not found'
+			});
+		}
+
+		// Check if question answer already exists for this applied course
+		const existingQuestionAnswer = await QuestionAnswer.findOne({ appliedcourse });
+		if (existingQuestionAnswer) {
+			// Update existing record
+			existingQuestionAnswer.responses = responses;
+			await existingQuestionAnswer.save();
+			
+			return res.status(200).json({
+				status: true,
+				message: 'Question answer updated successfully',
+				data: existingQuestionAnswer
+			});
+		}
+
+		console.log("existingQuestionAnswer", existingQuestionAnswer)
+
+		// Create new question answer entry
+		const questionAnswer = new QuestionAnswer({
+			appliedcourse,
+			responses
+		});
+		console.log("questionAnswer", questionAnswer)
+
+		await questionAnswer.save();
+
+		return res.status(201).json({
+			status: true,
+			message: 'Question answer created successfully',
+			data: questionAnswer
+		});
+	} catch (error) {
+		console.error('Error creating question answer:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error creating question answer'
+		});
+	}
+});
+
+
+// Get question answers for an applied course
+
+router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => {
+	try {
+		const { appliedcourseId } = req.params;
+		console.log("appliedcourseId", appliedcourseId)
+
+		if (!appliedcourseId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Applied course ID is required'
+			});
+		}
+
+		const questionAnswer = await QuestionAnswer.findOne({ appliedcourse: appliedcourseId });
+		
+		if (!questionAnswer) {
+			return res.status(404).json({
+				status: false,
+				message: 'No question answers found for this applied course'
+			});
+		}
+
+		return res.status(200).json({
+			status: true,
+			message: 'Question answers retrieved successfully',
+			data: questionAnswer
+		});
+	} catch (error) {
+		console.error('Error fetching question answers:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error fetching question answers'
+		});
+	}
+});
 
 
 module.exports = router;

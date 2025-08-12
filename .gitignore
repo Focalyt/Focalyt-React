@@ -52,6 +52,14 @@ frontend/.env
 /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader copy.jsx
 /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader copy.css
 /frontend/src/Pages/Front/HomePage/HomePage copy.css
+/frontend/package.json
+/frontend/package-lock.json
+# /frontend/src/Component/Layouts/Front
+# /frontend/src/Pages/Front
+
+
+/frontend/src/Pages/App/College/Course/text.jsx
 # /frontend/src/Pages/App/College/Course/AdmissionPost.jsx
 # /frontend/src/Pages/App/College/Course/kycManagement.jsx
 # /frontend/src/Pages/App/College
+/frontend/src/Pages/App/College/Course/AdmissionList copy.jsx
