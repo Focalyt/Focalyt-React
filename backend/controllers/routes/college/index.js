@@ -5294,6 +5294,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		}
 
 		if (projectsArray.length > 0) {
+
+			console.log(projectsArray, 'projectsArray');
 			teamMembers = [];
 		}
 
@@ -5608,7 +5610,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		// Sector filter (multi-select - using projects array)
 		if (projectsArray.length > 0) {
-			additionalMatches['_course.sectors._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			additionalMatches['_course.project._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
 		// Verticals filter (multi-select)
@@ -5962,7 +5964,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		}
 
 		if (appliedFilters.projectsArray && appliedFilters.projectsArray.length > 0) {
-			additionalMatches['_course.sectors._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			additionalMatches['_course.project._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
 		if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
