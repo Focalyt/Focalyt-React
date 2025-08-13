@@ -8241,8 +8241,8 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 		let counselors = []
 		college._concernPerson.forEach(person => {
 			let data = {
-				_id: person._id._id,
-				name: person._id.name
+				_id: person?._id?._id || '',
+				name: person?._id?.name || ''
 			}
 			counselors.push(data)
 

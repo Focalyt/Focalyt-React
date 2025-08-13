@@ -39,29 +39,29 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
   // }, [editUser]);
 
   const fetchUserDetails = async () => {
-    try{
-    const response = await axios.get(`${backendUrl}/college/users/users-details/${editUser.user_id}`, {
-      headers: {
-        'x-auth': token
-      }
-    })
-    setUserDetails(response.data.data);
-    setUserForm({
-      name: response.data.data.name,
-      email: response.data.data.email,
-      mobile: response.data.data.mobile,
-      role_designation: response.data.data.designation,
-      description: response.data.data.description,
-      reporting_managers: response.data.data.reporting_managers,
-      my_team: response.data.data.my_team,
-      centers_access: response.data.data.centers_access,
-      permissions: response.data.data.permissions.custom_permissions,
-      access_level: response.data.data.permissions.permission_type === 'Admin' ? 'admin' : response.data.data.permissions.permission_type === 'View Only' ? 'view_only' : 'custom',
-    });
-    console.log(response.data.data, 'user details');
-  } catch (error) {
-    console.error('Error fetching user details:', error);
-  }
+    try {
+      const response = await axios.get(`${backendUrl}/college/users/users-details/${editUser.user_id}`, {
+        headers: {
+          'x-auth': token
+        }
+      })
+      setUserDetails(response.data.data);
+      setUserForm({
+        name: response.data.data.name,
+        email: response.data.data.email,
+        mobile: response.data.data.mobile,
+        role_designation: response.data.data.designation,
+        description: response.data.data.description,
+        reporting_managers: response.data.data.reporting_managers,
+        my_team: response.data.data.my_team,
+        centers_access: response.data.data.centers_access,
+        permissions: response.data.data.permissions.custom_permissions,
+        access_level: response.data.data.permissions.permission_type === 'Admin' ? 'admin' : response.data.data.permissions.permission_type === 'View Only' ? 'view_only' : 'custom',
+      });
+      console.log(response.data.data, 'user details');
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+    }
   }
 
 
@@ -72,16 +72,23 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
   }, [editUser]);
 
   const [userForm, setUserForm] = useState({
-    name:  '',
-    email:  '',
-    mobile:  '',
-    role_designation:  '',
-    description:  '',
+    name: '',
+    email: '',
+    mobile: '',
+    role_designation: '',
+    description: '',
     my_team: [],
-    reporting_managers:  [],
+    reporting_managers: [],
     access_level: '', // New field for access level selection
     centers_access: '',
     permissions: {
+      // Lead Management (B2B)
+      can_view_leads_b2b: false,
+      can_add_leads_b2b: false,
+      can_edit_leads_b2b: false,
+      can_assign_leads_b2b: false,
+      can_delete_leads_b2b: false,
+
       // Lead Management
       can_view_leads: false,
       can_add_leads: false,
@@ -123,7 +130,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
     console.log(userForm, 'userForm');
   }, [userForm]);
 
- 
+
 
 
 
@@ -133,6 +140,12 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       label: '👑 Admin Access (Full Control)',
       description: 'Complete access to all features and permissions',
       permissions: {
+        can_view_leads_b2b: true,
+        can_add_leads_b2b: true,
+        can_edit_leads_b2b: true,
+        can_assign_leads_b2b: true,
+        can_delete_leads_b2b: true,
+
         can_view_leads: true,
         can_add_leads: true,
         can_edit_leads: true,
@@ -164,6 +177,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       label: '👀 View Only Access',
       description: 'Read-only access to view information without modification rights',
       permissions: {
+        can_view_leads_b2b: true,
         can_view_leads: true,
         can_add_leads: false,
         can_edit_leads: false,
@@ -300,7 +314,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       alert(`Please enter a valid 10-digit mobile number: ${userForm.mobile}`);
       return;
     }
-    
+
 
     try {
       console.log(userForm, 'userForm')
@@ -428,7 +442,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                         setUserForm(prev => ({
                           ...prev,
                           reporting_managers: users
-                            .filter(user => 
+                            .filter(user =>
                               user.status === true || user.status === 'true' || user.status === "active" &&
                               user.user_id !== editUser?.user_id &&
                               !(editUser.my_team || []).includes(user.user_id.toString())
@@ -452,7 +466,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                 </div>
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
                   {users
-                    .filter(user => 
+                    .filter(user =>
                       user.status === true || user.status === 'true' || user.status === "active" &&
                       user.user_id !== editUser?.user_id &&
                       !(editUser.my_team || []).includes(user.user_id.toString())
@@ -566,6 +580,39 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
               <h5 className="text-danger mb-3">⚙️ Custom Permissions Configuration</h5>
               <div className="alert alert-warning py-2 mb-3">
                 <small>⚠️ <strong>Custom Mode:</strong> Configure individual permissions as needed. Dependencies will be automatically handled.</small>
+              </div>
+
+              {/* Lead Management B2B */}
+              <div className="card mb-3">
+                <div className="card-header bg-primary text-white">
+                  <h6 className="mb-0">🎯 Lead Management (B2B)</h6>
+                </div>
+                <div className="card-body">
+                  <div className="row g-2">
+                    {Object.entries({
+                      can_view_leads_b2b: '👀 View Leads',
+                      can_add_leads_b2b: '➕ Add New Leads',
+                      can_edit_leads_b2b: '✏️ Edit Leads',
+                      can_assign_leads_b2b: '🔄 Assign Leads',
+                      can_delete_leads_b2b: '🗑️ Delete Leads'
+                    }).map(([permission, label]) => (
+                      <div key={permission} className="col-md-6">
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={userForm.permissions[permission]}
+                            onChange={(e) => handlePermissionChange(permission, e.target.checked)}
+                            id={`perm_${permission}`}
+                          />
+                          <label className="form-check-label" htmlFor={`perm_${permission}`}>
+                            {label}
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Lead Management */}

@@ -104,6 +104,7 @@ const FrontHeader = () => {
   //   }
   // };
 
+  // Chatbot functionality
   useEffect(() => {
     // Add external CSS and script dynamically
     const cssLink = document.createElement("link");
@@ -116,16 +117,25 @@ const FrontHeader = () => {
     script.async = true;
     document.body.appendChild(script);
 
-    // Drag functionality
-    // const botContainer = botContainerRef.current;
-    // if (botContainer) {
-    //   dragElement(botContainer); // Apply drag to the container div
-    // }
+    // Wait for the script to load and then apply drag functionality
+    script.onload = () => {
+      // Wait a bit for the chatbot element to be created
+      setTimeout(() => {
+        const botContainer = document.getElementsByClassName("chat-start")[0];
+        if (botContainer && window.dragElement) {
+          window.dragElement(botContainer); // Apply drag to the container div
+        }
+      }, 1000); // Give time for the chatbot to initialize
+    };
 
     return () => {
       // Cleanup CSS and script when component unmounts
-      document.head.removeChild(cssLink);
-      document.body.removeChild(script);
+      if (cssLink.parentNode) {
+        document.head.removeChild(cssLink);
+      }
+      if (script.parentNode) {
+        document.body.removeChild(script);
+      }
     };
   }, []);
 
@@ -287,6 +297,11 @@ const FrontHeader = () => {
                           <li>
                             <Link to="/candidate/login" className="dropdown-item">
                               Login as Student
+                            </Link>
+                          </li>
+                          <li>
+                            <Link to="/institute/login" className="dropdown-item">
+                              Login as Institute
                             </Link>
                           </li>
                         </ul>
