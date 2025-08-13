@@ -299,6 +299,11 @@ const FrontHeader = () => {
                               Login as Student
                             </Link>
                           </li>
+                          <li>
+                            <Link to="/institute/login" className="dropdown-item">
+                              Login as Institute
+                            </Link>
+                          </li>
                         </ul>
                       </div>
                     </li>

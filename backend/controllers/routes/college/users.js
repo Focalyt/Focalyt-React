@@ -92,7 +92,7 @@ router.get('/', isCollege, async (req, res) => {
    let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
 
    for (let user of users) {
-    user.my_team = await getAllTeamMembers(user._id)
+    user.my_team = await getAllTeamMembers(user?._id)
    }
 
    totalCount = users.length

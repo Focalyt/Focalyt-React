@@ -311,10 +311,10 @@ const B2BDashboard = () => {
                 Lead Categories
               </h3>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={categoriesChartData}>
+                <BarChart data={categoriesChartData} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={80} />
                   <Tooltip />
                   <Bar dataKey="value" fill="#8b5cf6" />
                 </BarChart>

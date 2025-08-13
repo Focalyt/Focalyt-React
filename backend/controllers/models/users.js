@@ -35,47 +35,54 @@ const userSchema = new Schema(
 		authTokens: [String],
 		permissions: {
 			permission_type: { type: String, default: 'Admin' },
-			custom_permissions: { 
-			can_view_leads: { type: Boolean, default: false },
-			can_add_leads: { type: Boolean, default: false },
-			can_edit_leads: { type: Boolean, default: false },
-			can_assign_leads: { type: Boolean, default: false },
-			can_delete_leads: { type: Boolean, default: false },
-			
-			// KYC Verification
-			can_view_kyc: { type: Boolean, default: false },
-			can_verify_reject_kyc: { type: Boolean, default: false },
-			can_request_kyc: { type: Boolean, default: false },
-			
-			// Training Management
-			can_view_training: { type: Boolean, default: false },
-			can_add_vertical: { type: Boolean, default: false },
-			can_add_project: { type: Boolean, default: false },
-			can_add_center: { type: Boolean, default: false },
-			can_add_course: { type: Boolean, default: false },
-			can_add_batch: { type: Boolean, default: false },
-			can_assign_batch: { type: Boolean, default: false },
-			
-			// User Management
-			can_view_users: { type: Boolean, default: false },
-			can_add_users: { type: Boolean, default: false },
-			can_edit_users: { type: Boolean, default: false },
-			can_delete_users: { type: Boolean, default: false },
-			can_manage_roles: { type: Boolean, default: false },
-			
-			// Bulk Actions
-			can_bulk_import: { type: Boolean, default: false },
-			can_bulk_export: { type: Boolean, default: false },
-			can_bulk_update: { type: Boolean, default: false },
-			can_bulk_delete: { type: Boolean, default: false },
-			can_bulk_communication: { type: Boolean, default: false }
+			custom_permissions: {
+				// Lead Management (B2B)
+				can_view_leads_b2b: { type: Boolean, default: false },
+				can_add_leads_b2b: { type: Boolean, default: false },
+				can_edit_leads_b2b: { type: Boolean, default: false },
+				can_assign_leads_b2b: { type: Boolean, default: false },
+				can_delete_leads_b2b: { type: Boolean, default: false },
+
+				can_view_leads: { type: Boolean, default: false },
+				can_add_leads: { type: Boolean, default: false },
+				can_edit_leads: { type: Boolean, default: false },
+				can_assign_leads: { type: Boolean, default: false },
+				can_delete_leads: { type: Boolean, default: false },
+
+				// KYC Verification
+				can_view_kyc: { type: Boolean, default: false },
+				can_verify_reject_kyc: { type: Boolean, default: false },
+				can_request_kyc: { type: Boolean, default: false },
+
+				// Training Management
+				can_view_training: { type: Boolean, default: false },
+				can_add_vertical: { type: Boolean, default: false },
+				can_add_project: { type: Boolean, default: false },
+				can_add_center: { type: Boolean, default: false },
+				can_add_course: { type: Boolean, default: false },
+				can_add_batch: { type: Boolean, default: false },
+				can_assign_batch: { type: Boolean, default: false },
+
+				// User Management
+				can_view_users: { type: Boolean, default: false },
+				can_add_users: { type: Boolean, default: false },
+				can_edit_users: { type: Boolean, default: false },
+				can_delete_users: { type: Boolean, default: false },
+				can_manage_roles: { type: Boolean, default: false },
+
+				// Bulk Actions
+				can_bulk_import: { type: Boolean, default: false },
+				can_bulk_export: { type: Boolean, default: false },
+				can_bulk_update: { type: Boolean, default: false },
+				can_bulk_delete: { type: Boolean, default: false },
+				can_bulk_communication: { type: Boolean, default: false }
 			}
 		},
 		password: {
 			type: String,
 			required: false,
 		},
-		
+
 		passReset: {
 			type: Boolean,
 			default: false,
@@ -93,11 +100,11 @@ const userSchema = new Schema(
 			type: Boolean,
 			default: false,
 		},
-		userAddedby:{
-			type: ObjectId, ref:'User'
+		userAddedby: {
+			type: ObjectId, ref: 'User'
 		},
-		userUpdatedby:{
-			type: ObjectId, ref:'User'
+		userUpdatedby: {
+			type: ObjectId, ref: 'User'
 		},
 		source: {
 			type: String,
@@ -106,47 +113,47 @@ const userSchema = new Schema(
 		googleAuthToken: {
 			// Access token (better naming)
 			accessToken: {
-			  type: String,
-			  default: ''
+				type: String,
+				default: ''
 			},
-			
+
 			// Token expiry time (better naming)
 			expiresAt: {
-			  type: Date,
-			  index: true // Index for efficient expiry checks
+				type: Date,
+				index: true // Index for efficient expiry checks
 			},
-			
+
 			// Refresh token
 			refreshToken: {
-			  type: String,
-			  default: ''
+				type: String,
+				default: ''
 			},
-			
+
 			// Scopes as array (more flexible)
 			scopes: {
-			  type: [String], // Array of strings
-			  default: []
+				type: [String], // Array of strings
+				default: []
 			},
-			
+
 			// Additional useful fields
 			tokenType: {
-			  type: String,
-			  default: 'Bearer'
+				type: String,
+				default: 'Bearer'
 			},
-			
+
 			// When tokens were last updated
 			lastUpdated: {
-			  type: Date,
-			  default: Date.now
+				type: Date,
+				default: Date.now
 			},
-			
+
 			// ID token (for user profile info)
 			idToken: {
-			  type: String,
-			  default: ''
+				type: String,
+				default: ''
 			}
-		  }
-		
+		}
+
 	},
 	{ timestamps: true }
 );

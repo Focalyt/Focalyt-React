@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const moment = require("moment");
-const { Courses, College, Country, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
+const { Courses, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
@@ -60,7 +60,7 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 
 	const promises = filesArray.map((file) => {
 		const ext = file.name.split('.').pop().trim().toLowerCase();
-		
+
 		if (!allowedExtensions.includes(ext)) {
 			throw new Error(`Unsupported file format: ${ext}`);
 		}
@@ -98,7 +98,7 @@ router.route("/").get(async (req, res) => {
 		let view = false
 		let canEdit = false
 		const user = req.user
-		if(!user){
+		if (!user) {
 			return res.json({
 				status: false,
 				message: "You are not authorized to access this page"
@@ -109,7 +109,7 @@ router.route("/").get(async (req, res) => {
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		if(!college){
+		if (!college) {
 			return res.json({
 				status: false,
 				message: "College not found"
@@ -144,7 +144,7 @@ router.route("/").get(async (req, res) => {
 		}
 		fields["status"] = status;
 		let courses;
-		
+
 		courses = await Courses.find({
 			...fields,
 			college: college._id
@@ -193,7 +193,7 @@ router
 			const courseName = body.name || 'unnamed';
 			const bucketName = process.env.AWS_BUCKET_NAME;
 
-			if(body.trainingCenter?.length > 0){
+			if (body.trainingCenter?.length > 0) {
 				body.center = JSON.parse(body.trainingCenter);
 			}
 
@@ -309,17 +309,17 @@ router
 			const { id } = req.params;
 			let course = await Courses.findById(id);
 			if (!course) throw req.ykError("course not found!");
-			
-			
+
+
 			course = await Courses.findById(id).populate('sectors').populate('center');
 			course.docsRequired = course.docsRequired.filter(doc => doc.status === true);
 			const highestQualification = await Qualification.find({ status: true })
 
-			
+
 			return res.status(200).json({
 				status: true,
 				course,
-								
+
 				highestQualification,
 				menu: 'course'
 			})
@@ -331,28 +331,28 @@ router
 	})
 
 router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
-		const { courseId, docId } = req.params;
-	
-		console.log("courseId", courseId, "docId", docId)
-	
-		try {
-			const course = await Courses.findOneAndUpdate(
-				{ _id: courseId, 'docsRequired._id': docId },
-				{ $set: { 'docsRequired.$.status': false } },
-				{ new: true }
-			);
-	
-			if (!course) {
-				return res.status(404).json({ status: false, message: "Document or Course not found" });
-			}
-	
-			res.status(200).json({ status: true, message: "Document disabled successfully", data: course });
-		} catch (error) {
-			console.error(error);
-			res.status(500).json({ status: false, message: "Server Error" });
+	const { courseId, docId } = req.params;
+
+	console.log("courseId", courseId, "docId", docId)
+
+	try {
+		const course = await Courses.findOneAndUpdate(
+			{ _id: courseId, 'docsRequired._id': docId },
+			{ $set: { 'docsRequired.$.status': false } },
+			{ new: true }
+		);
+
+		if (!course) {
+			return res.status(404).json({ status: false, message: "Document or Course not found" });
 		}
-	});
-	
+
+		res.status(200).json({ status: true, message: "Document disabled successfully", data: course });
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ status: false, message: "Server Error" });
+	}
+});
+
 
 router
 	.route("/edit/:id")
@@ -504,7 +504,7 @@ router
 				body.brochure = existingCourse.brochure;
 			}
 
-			console.log(body,'body2');
+			console.log(body, 'body2');
 
 			// Update the course
 			const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true });
@@ -518,29 +518,29 @@ router
 router.put('/remove_course_media/:courseId', async (req, res) => {
 	try {
 		const { courseId } = req.params;
-		const {fileType, fileUrl} = req.body;
+		const { fileType, fileUrl } = req.body;
 		const course = await Courses.findById(courseId);
 		console.log(course, 'course');
-		if(!course){
+		if (!course) {
 			console.log('course not found');
 			return res.status(404).json({ status: false, message: "Course not found" });
 		}
-		if(fileType === 'photo'){
+		if (fileType === 'photo') {
 			course.photos = course.photos.filter(photo => photo !== fileUrl);
 		}
-		if(fileType === 'video'){
+		if (fileType === 'video') {
 			course.videos = course.videos.filter(video => video !== fileUrl);
 		}
-		if(fileType === 'testimonialvideo'){
+		if (fileType === 'testimonialvideo') {
 			course.testimonialvideos = course.testimonialvideos.filter(testimonialvideo => testimonialvideo !== fileUrl);
 		}
-		if(fileType === 'brochure'){
+		if (fileType === 'brochure') {
 			course.brochure = '';
 		}
-		if(fileType === 'thumbnail'){
+		if (fileType === 'thumbnail') {
 			course.thumbnail = '';
 		}
-		if(fileType === 'testimonial'){
+		if (fileType === 'testimonial') {
 			course.testimonialvideos = course.testimonialvideos.filter(testimonial => testimonial !== fileUrl);
 		}
 		await course.save();
@@ -608,17 +608,17 @@ router.route('/:courseId/candidate/upload-docs')
 	.post(isCollege, async (req, res) => {
 		try {
 			let { docsName, courseId, docsId } = req.body;
-			
 
-			if(typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)){
+
+			if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
 				courseId = new mongoose.Types.ObjectId(courseId);
-			}	
+			}
 
-			if(typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)){
+			if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
 				docsId = new mongoose.Types.ObjectId(docsId);
 			}
 
-			
+
 
 			if (!mongoose.Types.ObjectId.isValid(docsId)) {
 				return res.status(400).json({ error: "Invalid document ID format." });
@@ -793,7 +793,7 @@ router.route('/leadStatus')
 	});
 
 
-	router.route('/get-branches')
+router.route('/get-branches')
 	.get(async (req, res) => {
 		try {
 			const { profileId } = req.query;
@@ -808,31 +808,105 @@ router.route('/leadStatus')
 	});
 
 
-	router.put('/update-branch/:profileId', async (req, res) => {
-		console.log("api hitting....")
-		try {
-			const { profileId } = req.params;
-			const { centerId } = req.body;
-			console.log("profileId" , profileId)
-			console.log(req.body, 'req.body')
-			// Find the course
-			const appliedCourse = await AppliedCourses.findById(profileId);
-			if(!appliedCourse){
-				return res.status(404).json({ success: false, message: 'Applied course not found' });
-			}
-			appliedCourse._center = centerId;
-		const updatedAppliedCourse =	await appliedCourse.save();
-			
-	console.log("updatedAppliedCourse" , updatedAppliedCourse)
-			
-			res.json({ success: true, data: updatedAppliedCourse});
-		} catch (error) {
-			console.error('Error updating center:', error);
-			res.status(500).json({ success: false, message: 'Server error' });
+router.put('/update-branch/:profileId', async (req, res) => {
+	console.log("api hitting....")
+	try {
+		const { profileId } = req.params;
+		const { centerId } = req.body;
+		console.log("profileId", profileId)
+		console.log(req.body, 'req.body')
+		// Find the course
+		const appliedCourse = await AppliedCourses.findById(profileId);
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: 'Applied course not found' });
 		}
-	});
+		appliedCourse._center = centerId;
+		const updatedAppliedCourse = await appliedCourse.save();
+
+		console.log("updatedAppliedCourse", updatedAppliedCourse)
+
+		res.json({ success: true, data: updatedAppliedCourse });
+	} catch (error) {
+		console.error('Error updating center:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
 
 
+router.post('/addleadsb2c', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		console.log("API hitting....");
+		const { courseId, candidateData, centerId, counselorId } = req.body;
 
+
+		console.log("centerId from req.body", req.body)
+		const candidate = await Candidate.create(candidateData);
+		console.log("candidate", candidate)
+
+		const counselor = await User.findById(counselorId);
+
+		const appliedCourse = await AppliedCourses.create({
+			_candidate: candidate._id,
+			_course: courseId,
+			_center: centerId,
+			counsellor: counselorId,
+			leadAssignment: [{
+				_counsellor: counselorId,
+				counsellorName: counselor.name,
+				assignDate: new Date(),
+				assignedBy: user._id
+			}]
+		});
+
+		candidate.appliedCourses.push(appliedCourse._id);
+		await candidate.save();
+
+		res.status(200).json({
+			status: true,
+			message: "Lead added successfully",
+			data: appliedCourse
+		});
+
+
+	} catch (err) {
+		console.log("Error adding lead:", err);
+		res.status(500).json({
+			status: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
+router.get('/course_centers', async (req, res) => {
+	try {
+		const { courseId } = req.query;
+
+		if (!courseId) {
+			return res.status(400).json({
+				status: false,
+				message: "Course ID is required"
+			});
+		}
+
+		const course = await Courses.findById(courseId).populate('center').select('center');
+
+		if (!course) {
+			return res.status(404).json({
+				status: false,
+				message: "Course not found"
+			});
+		}
+
+		console.log("course.center", course.center);
+		res.status(200).json({
+			status: true,
+			data: course.center || []
+		});
+	} catch (err) {
+		console.log("Error adding lead:", err);
+	}
+});
 
 module.exports = router;

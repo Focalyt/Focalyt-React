@@ -16,7 +16,14 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
     reporting_managers: [],
     access_level: '', // New field for access level selection
     centers_access: [],
-    permissions: {      
+    permissions: {
+      // Lead Management (B2B)
+      can_view_leads_b2b: false,
+      can_add_leads_b2b: false,
+      can_edit_leads_b2b: false,
+      can_assign_leads_b2b: false,
+      can_delete_leads_b2b: false,
+
       // Lead Management
       can_view_leads: false,
       can_add_leads: false,
@@ -60,6 +67,12 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       label: '👑 Admin Access (Full Control)',
       description: 'Complete access to all features and permissions',
       permissions: {
+        can_view_leads_b2b: true,
+        can_add_leads_b2b: true,
+        can_edit_leads_b2b: true,
+        can_assign_leads_b2b: true,
+        can_delete_leads_b2b: true,
+
         can_view_leads: true,
         can_add_leads: true,
         can_edit_leads: true,
@@ -91,6 +104,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       label: '👀 View Only Access',
       description: 'Read-only access to view information without modification rights',
       permissions: {
+
+        can_view_leads_b2b: true,
         can_view_leads: true,
         can_add_leads: false,
         can_edit_leads: false,
@@ -137,7 +152,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
     const updatedManagers = isChecked
       ? [...userForm.reporting_managers, userId]
       : userForm.reporting_managers.filter(id => id !== userId);
-    
+
     setUserForm(prevForm => ({
       ...prevForm,
       reporting_managers: updatedManagers
@@ -149,6 +164,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       ...userForm.permissions,
       [permission]: value
     };
+
 
     // KYC Dependencies
     if (permission === 'can_verify_reject_kyc' && value === true) {
@@ -237,11 +253,11 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         }
       })
       console.log(reponse, 'reponse')
-      if(reponse.status){
+      if (reponse.status) {
         alert('User added successfully')
         onAddUser()
       }
-      else{
+      else {
         alert('Error adding user: ' + reponse.data.error)
       }
 
@@ -331,7 +347,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
           {/* Reporting Managers Section */}
           <div className="mb-4">
             <h5 className="text-info mb-3">👨‍💼 Reporting Managers</h5>
-            
+
             {users.length === 0 ? (
               <div className="card">
                 <div className="card-body text-center py-4">
@@ -353,7 +369,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       onClick={() => {
                         setUserForm(prev => ({
                           ...prev,
-                          reporting_managers: users.filter(user => 
+                          reporting_managers: users.filter(user =>
                             user.status === true || user.status === 'true' || user.status === "active"
                           ).map(u => u.user_id)
                         }));
@@ -373,9 +389,9 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                   </div>
                 </div>
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                  {users.filter(u => ( u.status === true || u.status === 'true' || u.status === "active")).map(user => {
+                  {users.filter(u => (u.status === true || u.status === 'true' || u.status === "active")).map(user => {
                     const isSelected = userForm.reporting_managers.includes(user.user_id);
-                    
+
                     return (
                       <div key={user.user_id} className="form-check mb-3 p-2 border-bottom">
                         <input
@@ -402,7 +418,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                     );
                   })}
                 </div>
-                
+
                 {userForm.reporting_managers.length > 0 && (
                   <div className="card-footer bg-light">
                     <div className="small">
@@ -434,7 +450,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
             <div className="alert alert-info py-2 mb-3">
               <small>💡 <strong>Important:</strong> Select the appropriate access level. You can choose predefined levels or customize permissions manually.</small>
             </div>
-            
+
             <div className="row g-3">
               {Object.entries(accessLevels).map(([key, level]) => (
                 <div key={key} className="col-12">
@@ -482,6 +498,40 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
               <div className="alert alert-warning py-2 mb-3">
                 <small>⚠️ <strong>Custom Mode:</strong> Configure individual permissions as needed. Dependencies will be automatically handled.</small>
               </div>
+
+              {/* Lead Management (B2B) */}
+              <div className="card mb-3">
+                <div className="card-header bg-primary text-white">
+                  <h6 className="mb-0">🎯 Lead Management (B2B)</h6>
+                </div>
+                <div className="card-body">
+                  <div className="row g-2">
+                    {Object.entries({
+                      can_view_leads_b2b: '👀 View Leads',
+                      can_add_leads_b2b: '➕ Add New Leads',
+                      can_edit_leads_b2b: '✏️ Edit Leads',
+                      can_assign_leads_b2b: '🔄 Assign Leads',
+                      can_delete_leads_b2b: '🗑️ Delete Leads'
+                    }).map(([permission, label]) => (
+                      <div key={permission} className="col-md-6">
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={userForm.permissions[permission]}
+                            onChange={(e) => handlePermissionChange(permission, e.target.checked)}
+                            id={`perm_${permission}`}
+                          />
+                          <label className="form-check-label" htmlFor={`perm_${permission}`}>
+                            {label}
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
 
               {/* Lead Management */}
               <div className="card mb-3">
