@@ -1974,7 +1974,7 @@ const Student = ({
 
 
       const response = await axios.get(
-        `${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}?${queryParams.toString()}`,
+        `${backendUrl}/college/admission-list/${selectedBatch?._id}?${queryParams.toString()}`,
         {
           headers: {
             "x-auth": token,
