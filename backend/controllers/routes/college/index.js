@@ -1579,7 +1579,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		// Get team members
 		let teamMembers = [req.user._id];
-		console.log('teamMembers', teamMembers)
 
 		if (projectsArray.length > 0) {
 			teamMembers = [];
@@ -1596,9 +1595,14 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
+		
+
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
 			teamMemberIds = teamMembers.map(member =>
@@ -1721,7 +1725,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	}
 
 
-	console.log('baseMatch', JSON.stringify(baseMatch))
 
 
 
@@ -1772,10 +1775,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	}
 
-	console.log('filters', filters)
-
-	console.log('filters:', filters);
-console.log('filters.leadStatus:', filters.leadStatus);
 
 if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
     // Only set _leadStatus if it's a valid ObjectId string
@@ -2026,6 +2025,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			teamMembers = [];
 		}
 		if (appliedFilters.centerArray?.length > 0) {
+			teamMembers = [];
+		}
+
+		if(name && name.trim() !== ''){
 			teamMembers = [];
 		}
 
@@ -5294,6 +5297,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		}
 
 		if (projectsArray.length > 0) {
+
+			console.log(projectsArray, 'projectsArray');
 			teamMembers = [];
 		}
 
@@ -5308,6 +5313,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
+
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
@@ -5608,7 +5618,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		// Sector filter (multi-select - using projects array)
 		if (projectsArray.length > 0) {
-			additionalMatches['_course.sectors._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			additionalMatches['_course.project._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
 		// Verticals filter (multi-select)
@@ -5962,7 +5972,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		}
 
 		if (appliedFilters.projectsArray && appliedFilters.projectsArray.length > 0) {
-			additionalMatches['_course.sectors._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			additionalMatches['_course.project._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
 		if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
@@ -6573,12 +6583,45 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		await profile.save();
 
+		// Check if all mandatory documents are verified after saving
+		let allMandatoryDocsVerified = true;
+		
+		// Get the updated profile to check current status
+		const updatedProfile = await AppliedCourses.findById(validProfileId).populate('_course');
+		const updatedRequiredDocs = updatedProfile._course?.docsRequired || [];
+		const updatedUploadedDocs = updatedProfile.uploadedDocs || [];
+		
+		// Create map of uploaded docs by docsId
+		const updatedUploadedDocsMap = {};
+		updatedUploadedDocs.forEach(d => {
+			if (d.docsId) updatedUploadedDocsMap[d.docsId.toString()] = d;
+		});
+		
+		// Check each mandatory document
+		for (const reqDoc of updatedRequiredDocs) {
+			if (reqDoc.mandatory) {
+				const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
+				// If mandatory doc is not uploaded or not verified, set flag to false
+				if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
+					allMandatoryDocsVerified = false;
+					break;
+				}
+			}
+		}
+
+		// If all mandatory docs are verified, update KYC status to true
+		if (allMandatoryDocsVerified && !updatedProfile.kyc) {
+			updatedProfile.kyc = true;
+			await updatedProfile.save();
+		}
+
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
 			kycUpdated: profile.kyc === true,
 			verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
-			requiredCount
+			requiredCount,
+			allMandatoryDocsVerified: allMandatoryDocsVerified
 		});
 
 	} catch (err) {
@@ -6654,6 +6697,13 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+
+		if(name && name.trim() !== ''){
+			teamMembers = [];
+		}
+		
+
+
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
