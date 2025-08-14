@@ -59,6 +59,7 @@ const {
 	SubQualification,
 	Courses,
 	AppliedCourses,
+	AppliedJobs,
 	QuestionAnswer
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
@@ -1337,7 +1338,9 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 
 router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
+		console.log('assign batch api hiting...')
 		const { batchId, appliedCourseId } = req.body
+		console.log('batchId', batchId)
 		if (!batchId || !appliedCourseId) {
 			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
 		}
@@ -1690,7 +1693,7 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 
 
-		} else if (status === 'Dropout') {	
+		} else if (status === 'Dropout') {
 			// Check if student is already in dropout
 			if (appliedCourse.dropout) {
 				return res.status(400).json({
@@ -1873,7 +1876,7 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 			// Update existing record
 			existingQuestionAnswer.responses = responses;
 			await existingQuestionAnswer.save();
-			
+
 			return res.status(200).json({
 				status: true,
 				message: 'Question answer updated successfully',
@@ -1912,7 +1915,7 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => {
 	try {
 		const { appliedcourseId } = req.params;
-		console.log("appliedcourseId", appliedcourseId)
+		// console.log("appliedcourseId", appliedcourseId)
 
 		if (!appliedcourseId) {
 			return res.status(400).json({
@@ -1922,7 +1925,7 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 		}
 
 		const questionAnswer = await QuestionAnswer.findOne({ appliedcourse: appliedcourseId });
-		
+
 		if (!questionAnswer) {
 			return res.status(404).json({
 				status: false,
@@ -1944,5 +1947,164 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 	}
 });
 
+router.get("/appliedCourses/:candidateId", async (req, res) => {
+	try {
+		console.log("API hitting");
+		const { candidateId } = req.params;
+		// console.log("candidateId", candidateId)
+
+		// Find candidate
+		const candidate = await Candidate.findOne({
+			_id: candidateId,
+			isDeleted: false,
+			status: true
+		});
+
+		if (!candidate || !candidate?.appliedCourses?.length) {
+			return res.json({
+				courses: [],
+			});
+		}
+		// console.log("candidate1", candidate)
+
+		//   // Get paginated applied course entries
+		const courses = await AppliedCourses.find({ _candidate: candidate._id })
+			.populate({ path: '_course', populate: { path: 'sectors' } })
+			.sort({ createdAt: -1 })
+		// .skip((page - 1) * perPage)
+		// .limit(perPage);
+
+		//   const count = await AppliedCourses.countDocuments({ _candidate: candidate._id });
+
+		//   const totalPages = Math.ceil(count / perPage);
+
+		// console.log('courses', courses)
+
+		return res.json({
+			courses,
+		});
+
+	} catch (err) {
+		console.log("Caught error:", err);
+		return res.status(500).json({ status: "failure", message: "Internal Server Error" });
+	}
+});
+
+router.get("/appliedJobs/:candidateId", async (req, res) => {
+	try {
+  
+	  console.log('applied jobs...')
+	  const { candidateId } = req.params;
+		console.log("candidateId", candidateId)
+  
+	const jobHistory = await AppliedJobs.find({_candidate: candidateId}).populate({path: '_job'})
+	console.log('jobHistory' , jobHistory)
+// 	  if(!candidate || !candidate?.appliedJobs?.length){
+// 		return res.json({
+// 			jobs: []
+// 		});
+// 	  }
+// 	  console.log('candidate_new' , candidate)
+  
+// 	  const agg = [
+// 		{ $match: { _candidate: candidate._id } },
+// 		{
+// 		  $lookup: {
+// 			from: "companies",
+// 			localField: "_company",
+// 			foreignField: "_id",
+// 			as: "_company"
+// 		  }
+// 		},
+// 		{ $unwind: "$_company" },
+// 		{
+// 		  $match: {
+// 			"_company.isDeleted": false,
+// 			"_company.status": true
+// 		  }
+// 		},
+// 		{
+// 		  $lookup: {
+// 			from: "vacancies",
+// 			localField: "_job",
+// 			foreignField: "_id",
+// 			as: "vacancy"
+// 		  }
+// 		},
+// 		{ $unwind: "$vacancy" },
+// 		{
+// 		  $match: {
+// 			"vacancy.status": true,
+// 			"vacancy.validity": { $gte: new Date() }
+// 		  }
+// 		},
+// 		{
+// 		  $lookup: {
+// 			from: "qualifications",
+// 			localField: "vacancy._qualification",
+// 			foreignField: "_id",
+// 			as: "qualifications"
+// 		  }
+// 		},
+// 		{
+// 		  $lookup: {
+// 			from: "industries",
+// 			localField: "vacancy._industry",
+// 			foreignField: "_id",
+// 			as: "industry"
+// 		  }
+// 		},
+// 		{
+// 		  $lookup: {
+// 			from: "cities",
+// 			localField: "vacancy.city",
+// 			foreignField: "_id",
+// 			as: "city"
+// 		  }
+// 		},
+// 		{
+// 		  $lookup: {
+// 			from: "states",
+// 			localField: "vacancy.state",
+// 			foreignField: "_id",
+// 			as: "state"
+// 		  }
+// 		},
+// 		{
+// 		  $sort: {
+// 			"vacancy.sequence": 1,
+// 			"vacancy.createdAt": -1
+// 		  }
+// 		},
+// 		// {
+// 		//   $facet: {
+// 		// 	metadata: [{ $count: "total" }],
+// 		// 	data: [
+// 		// 	  { $skip: (parseInt(page) - 1) * parseInt(perPage) },
+// 		// 	  { $limit: parseInt(perPage) }
+// 		// 	]
+// 		//   }
+// 		// }
+// 	  ];
+//   console.log('agg' , agg)
+// 	  const appliedJobs = await AppliedJobs.aggregate(agg);
+// 	//   const count = appliedJobs[0].metadata[0]?.total || 0;
+// 	//   const jobs = appliedJobs[0].data || [];
+// 	//   const totalPages = Math.ceil(count / parseInt(perPage));
+  
+// console.log('appliedJobs' , appliedJobs)
+
+// 	  return res.json({
+// 		jobs
+// 	  });
+	return res.json({
+		jobs: jobHistory
+	  });
+
+	} catch (err) {
+		console.log("Caught error:", err);
+		return res.status(500).json({ status: "failure", message: "Internal Server Error" });
+	}
+  });
 
 module.exports = router;

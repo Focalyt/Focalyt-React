@@ -3,7 +3,8 @@ const { ObjectId } = Schema.Types;
 
 const answerSchema = new Schema({
   question: { type: String, required: true },  
-  answer: { type: String, required: true }
+  answer: { type: String, required: true },
+  rejectionReason: { type: String, default: null } // Optional rejection reason
 });
 
 const preQVSchema = new Schema({

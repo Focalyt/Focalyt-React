@@ -144,7 +144,7 @@ const useScrollBlur = (navbarHeight = 140) => {
     return { isScrolled, scrollY, contentRef };
 };
 
-const CRMDashboard = () => {
+const CRMDashboard = (profile) => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -218,6 +218,87 @@ const CRMDashboard = () => {
     const [showAssignBatchPanel, setShowAssignBatchPanel] = useState(false);
     const [batches, setBatches] = useState([]);
     const [error, setError] = useState('');
+    const [selectedBatch, setSelectedBatch] = useState(null);
+    const [branches, setBranches] = useState([]);
+    const [selectedBranch, setSelectedBranch] = useState('');
+    const [showBranchModal, setShowBranchModal] = useState(false);
+
+    const getBranches = async (profile) => {
+        // Check if profile and course exist
+        if (!profile || !profile._course || !profile._course._id) {
+          alert('Profile or course information is missing. Cannot fetch branches.');
+          return;
+        }
+        
+        const courseId = profile._course._id;
+        const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'multipart/form-data',
+          }
+        });
+        console.log('res..', response)
+        if (response.data.status) {
+          setBranches(response.data);
+          setSelectedBranch('');
+        } else {
+          alert('Failed to fetch branches');
+        }
+      }
+    
+      const updateBranch = async (profile, selectedBranchId) => {
+        console.log("updateBranch")
+        if (!selectedBranchId) {
+          alert('Please select a branch first');
+          return;
+        }
+    
+        const profileId = profile._id;
+        console.log("profile", profileId)
+        console.log("profileId", profileId)
+        console.log("selectedBranchId", selectedBranchId)
+    
+        try {
+          const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+            centerId: selectedBranchId
+          }, {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json',
+            }
+          });
+          console.log('response', response)
+          if (response.data.success) {
+            alert('Branch updated successfully!');
+            // Optionally refresh the data or close modal
+            setShowBranchModal(false);
+    
+            // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+            // setAllProfiles(prevProfiles => 
+            //   prevProfiles.map(p => 
+            //     p._id === profile._id 
+            //       ? {
+            //           ...p,
+            //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+            //         }
+            //       : p
+            //   )
+            // );
+    
+            setSelectedBranch('');
+    
+    
+    
+            await fetchProfileData();
+          } else {
+            alert('Failed to update branch');
+          }
+        } catch (error) {
+          console.error('Error updating branch:', error);
+          alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+        }
+      }
+
     //filte stats
 
     const [formData, setFormData] = useState({
@@ -326,52 +407,94 @@ const CRMDashboard = () => {
 
     const fetchBatches = async (profile) => {
         setError('');
-    
+
         console.log(profile, 'profile');
-    
+
         const courseId = profile?._course?._id;
         const centerId = profile?._center?._id;
         if (!courseId || !centerId) {
-          alert(`No ${courseId ? 'course' : 'center'} selected`);
-          return;
+            alert(`No ${courseId ? 'course' : 'center'} selected`);
+            return;
         }
-    
+
         try {
-          const response = await axios.get(`${backendUrl}/college/get_batches`, {
-            params: {
-              courseId: courseId,
-              centerId: centerId
-            },
-            headers: {
-              'x-auth': token  // Pass the token in the headers for authentication
+            const response = await axios.get(`${backendUrl}/college/get_batches`, {
+                params: {
+                    courseId: courseId,
+                    centerId: centerId
+                },
+                headers: {
+                    'x-auth': token  // Pass the token in the headers for authentication
+                }
+            });
+
+            if (response.data.success) {
+                setBatches(response.data.data);
+            } else {
+                setError('Failed to fetch batches');
             }
-          });
-    
-          if (response.data.success) {
-            setBatches(response.data.data);
-          } else {
-            setError('Failed to fetch batches');
-          }
         } catch (err) {
-          console.error('Error fetching batches:', err);
-          setError('Server error');
+            console.error('Error fetching batches:', err);
+            setError('Server error');
         }
-      };
+    };
+
+
+
+    const handleBatchAssign = async (e) => {
+        if (!selectedBatch) {
+            alert('Please select a batch');
+            return;
+        }
+        e?.preventDefault(); // Prevent form submission
+        e?.stopPropagation(); // Stop event bubbling
+
+        console.log(selectedBatch, 'selectedBatch');
+        console.log(selectedProfile, 'selectedProfile');
+        try {
+            const response = await axios.post(`${backendUrl}/college/candidate/assign-batch`, {
+                batchId: selectedBatch,
+                appliedCourseId: selectedProfile._id
+            }, {
+                headers: {
+                    'x-auth': token,
+                },
+            });
+
+            if (response.data.status) {
+                const message = alert('Batch assigned successfully!');
+                if (message) {
+
+
+                }
+            } else {
+                alert(response.data.message || 'Failed to assign batch');
+            }
+        } catch (error) {
+            console.error('Error assigning batch:', error);
+            alert('Failed to assign batch');
+        }
+        await fetchProfileData();
+        setShowAssignBatchPanel(false);
+    }
+
+
+
 
     const openAssignBatchPanel = async (profile = null) => {
         await fetchBatches(profile);
         if (profile) {
-          setSelectedProfile(profile);
-        }   
-    
+            setSelectedProfile(profile);
+        }
+
         setShowPopup(null)
         setShowAssignBatchPanel(true)
         setShowWhatsappPanel(false);
         setShowEditPanel(false);
         if (!isMobile) {
-          setMainContentClass('col-8');
+            setMainContentClass('col-8');
         }
-      };
+    };
 
     const handleFilterChange = (e) => {
         try {
@@ -515,8 +638,8 @@ const CRMDashboard = () => {
         console.log('Function called');
 
         try {
-           
-            if (showPanel =='SetFollowup') {
+
+            if (showPanel == 'SetFollowup') {
 
 
                 // Combine date and time into a single Date object (if both are set)
@@ -577,7 +700,7 @@ const CRMDashboard = () => {
                     setSelectedSubStatus(null);
                     setFollowupDate('');
                     setFollowupTime('');
-                    
+
                     setRemarks('');
 
                 } else {
@@ -606,8 +729,8 @@ const CRMDashboard = () => {
                 alert(`Error: ${error.message}`);
             }
         }
-        finally{
-           closePanel();
+        finally {
+            closePanel();
         }
     };
 
@@ -653,9 +776,9 @@ const CRMDashboard = () => {
     const renderMainTabContent = () => {
         switch (mainTab) {
             case 'kyc':
-                return <KYCManagement openPanel={openPanel} closePanel={closePanel}  isPanelOpen={isPanelOpen} />;
+                return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             case 'AllAdmission':
-                return <AdmissionList openPanel={openPanel} closePanel={closePanel}  isPanelOpen={isPanelOpen}/>;
+                return <AdmissionList openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             default:
                 return null;
         }
@@ -692,7 +815,7 @@ const CRMDashboard = () => {
 
 
     const openPanel = (panelName, profile = null) => {
-        console.log('Opening panel:', panelName);       
+        console.log('Opening panel:', panelName);
         setShowPanel(panelName)
         setMainContentClass('col-8')
         setIsPanelOpen(true)
@@ -880,7 +1003,7 @@ const CRMDashboard = () => {
 
                 <div className="card-body">
                     <form>
-                        
+
 
                         {(showPanel === 'SetFollowup') && (
                             <div className="row mb-1">
@@ -917,7 +1040,7 @@ const CRMDashboard = () => {
                             </div>
                         )}
 
-                        {( showPanel === 'SetFollowup') && (
+                        {(showPanel === 'SetFollowup') && (
                             <div className="mb-1">
                                 <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
                                 <textarea
@@ -1124,110 +1247,125 @@ const CRMDashboard = () => {
 
     const renderAssignBatchPanel = () => {
         if (showPanel !== 'AssignBatch') return null;
-    
+
         const panelContent = (
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-              <div className="d-flex align-items-center">
-                <div className="me-2">
-                  <i className="fas fa-users text-primary"></i>
-                </div>
-                <h6 className="mb-0 fw-medium">Assign Batch</h6>
-              </div>
-              <button className="btn-close" type="button" onClick={closePanel}>
-              </button>
-            </div>
-    
-            <div className="card-body p-0 d-flex flex-column h-100">
-              {/* Scrollable Content Area */}
-              <div
-                className="flex-grow-1 overflow-auto px-3 py-2"
-                style={{
-                  maxHeight: isMobile ? '30vh' : '34vh',
-                  minHeight: '200px'
-                }}
-              >
-                {selectedProfile ? (
-                  <div className="p-3">
-    
-                    <div className="mb-4">
-                      <div className="mb-3">
-                        <label className="form-label">Select Batch</label>
-                        <select className="form-select" defaultValue="">
-                          <option value="">Choose a Batch...</option>
-                          {batches.map((batch) => (
-                            <option key={batch._id} value={batch._id}>{batch.name}</option>
-                          ))}
-                        </select>
-                      </div>
-    
+            <div className="card border-0 shadow-sm h-100">
+                <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+                    <div className="d-flex align-items-center">
+                        <div className="me-2">
+                            <i className="fas fa-users text-primary"></i>
+                        </div>
+                        <h6 className="mb-0 fw-medium">Assign Batch</h6>
                     </div>
-                  </div>
-                ) : (
-                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                    <div className="mb-3">
-                      <i className="fas fa-users text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                    </div>
-                    <h6 className="text-muted mb-2">No Student Selected</h6>
-                    <p className="text-muted small mb-0">Please select a student to assign batch.</p>
-                  </div>
-                )}
-              </div>
-    
-              {/* Fixed Footer */}
-              <div className="border-top px-3 py-3 bg-light">
-                <div className="d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={closePanel}
-                  >
-                    <i className="fas fa-times me-1"></i>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      // Handle batch assignment logic here
-                      console.log('Assigning batch to:', selectedProfile);
-                      openAssignBatchPanel()
-                    }}
-                  >
-                    <i className="fas fa-check me-1"></i>
-                    Assign Batch
-                  </button>
+                    <button className="btn-close" type="button" onClick={closePanel}>
+                    </button>
                 </div>
-              </div>
+
+                <div className="card-body p-0 d-flex flex-column h-100">
+                    {/* Scrollable Content Area */}
+                    <div
+                        className="flex-grow-1 overflow-auto px-3 py-2"
+                        style={{
+                            maxHeight: isMobile ? '30vh' : '34vh',
+                            minHeight: '200px'
+                        }}
+                    >
+                        {selectedProfile ? (
+                            <div className="p-3">
+
+                                <div className="mb-4">
+                                    <div className="mb-3">
+                                        <label className="form-label">Select Branch</label>
+                                        <select
+                                            className="form-select border-0 shadow-sm"
+                                            id="course"
+                                            value={selectedBranch}
+                                            onChange={(e) => setSelectedBranch(e.target.value)}
+                                            style={{
+                                                height: '48px',
+                                                padding: '12px 16px',
+                                                backgroundColor: '#f8f9fa',
+                                                borderRadius: '8px',
+                                                fontSize: '14px',
+                                                transition: 'all 0.3s ease',
+                                                border: '1px solid #e9ecef',
+
+                                            }}
+
+                                        >
+                                            <option value="">Select Branch</option>
+                                            {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                                <option key={branch._id || index} value={branch._id}>
+                                                    {branch.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                                <div className="mb-3">
+                                    <i className="fas fa-users text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                                </div>
+                                <h6 className="text-muted mb-2">No Student Selected</h6>
+                                <p className="text-muted small mb-0">Please select a student to assign batch.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Fixed Footer */}
+                    <div className="border-top px-3 py-3 bg-light">
+                        <div className="d-flex justify-content-end gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary"
+                                onClick={closePanel}
+                            >
+                                <i className="fas fa-times me-1"></i>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => updateBranch(selectedBranch)}
+                            >
+                                <i className="fas fa-check me-1"></i>
+                                Assign Batch
+                            </button>
+                            
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
         );
-    
+
         if (isMobile) {
-          return (
-            <div
-              className={`modal ${showPanel === 'AssignBatch' ? 'show d-block' : 'd-none'}`}
-              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-              onClick={(e) => {
-                if (e.target === e.currentTarget) closePanel();
-              }}
-            >
-              <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-                <div className="modal-content" style={{ height: '85vh' }}>
-                  {panelContent}
+            return (
+                <div
+                    className={`modal ${showPanel === 'AssignBatch' ? 'show d-block' : 'd-none'}`}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closePanel();
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+                        <div className="modal-content" style={{ height: '85vh' }}>
+                            {panelContent}
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
-          );
+            );
         }
-    
+
         return (
-          <div className="col-12 transition-col" id="assignBatchPanel" style={{ height: '80vh' }}>
-            {panelContent}
-          </div>
+            <div className="col-12 transition-col" id="assignBatchPanel" style={{ height: '80vh' }}>
+                {panelContent}
+            </div>
         );
-      };
-    
+    };
+
 
     return (
         <div className="container-fluid admissionMobileResponsive">
@@ -2373,15 +2511,6 @@ const CRMDashboard = () => {
 
           .no-scroll {
               overflow: hidden;
-          }
-
-          .modal-content {
-              background-color: #fff;
-              max-height: 90vh;
-              width: 80%;
-              overflow-y: auto;
-              padding: 20px;
-              border-radius: 8px;
           }
 
           .doc-iframe {
@@ -3891,9 +4020,9 @@ const CRMDashboard = () => {
 
             </style>
 
-<style>
-    {
-`
+            <style>
+                {
+                    `
 
         /* Existing styles */
         html body .content .content-wrapper {
@@ -7014,8 +7143,8 @@ background: #fd2b5a;
 
 `
 
-    }
-</style>
+                }
+            </style>
 
         </div>
     );

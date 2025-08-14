@@ -1631,6 +1631,15 @@ const RegistrationCards = () => {
       try {
   
         console.log('Function in try');
+        
+        
+        if(profile?._course?.center || profile?._course?.center?.length > 0){
+          if (!profile._center || !profile._center._id) {
+            alert('Please assign a branch/center first before moving to KYC!');
+            return;
+          }
+        }
+        
         // Prepare the request body
         const updatedData = {
           kycStage: true

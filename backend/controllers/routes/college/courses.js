@@ -796,10 +796,11 @@ router.route('/leadStatus')
 router.route('/get-branches')
 	.get(async (req, res) => {
 		try {
-			const { profileId } = req.query;
-			const appliedCourse = await AppliedCourses.findById(profileId);
-			const courseId = appliedCourse._course;
+			const { courseId } = req.query;
 			const branches = await Courses.findById(courseId).populate('center').select('center');
+
+			console.log("branches", branches)
+
 			res.status(200).json({ status: true, data: branches.center });
 		} catch (err) {
 			console.log("Error rendering addleads page:", err);

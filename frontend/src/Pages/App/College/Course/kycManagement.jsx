@@ -323,6 +323,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
 
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
   // Static document data for demonstration
   useEffect(() => {
     // Initialize circular progress
@@ -457,7 +460,52 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [questionAnswers, setQuestionAnswers] = useState([]);
   const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
   const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
+  
+  // Question rejection reason modal state
+  const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
+  const [questionRejectionReason, setQuestionRejectionReason] = useState('');
+  const [pendingQuestionRejection, setPendingQuestionRejection] = useState(null);
   // Function to fetch existing question answers
+  const openPreVerificationModal = async (profile) => {
+    setSelectedProfile(profile);
+    showSetPreVerification(true);
+    // Fetch existing question answers if any
+    await fetchQuestionAnswers(profile._id);
+  };
+
+  // Handle question rejection with reason
+  const handleQuestionRejection = (questionNumber, questionText) => {
+    setPendingQuestionRejection({ questionNumber, questionText });
+    setShowQuestionRejectionModal(true);
+  };
+
+  // Confirm question rejection with reason
+  const confirmQuestionRejection = () => {
+    if (!questionRejectionReason.trim()) {
+      alert('Please enter a rejection reason');
+      return;
+    }
+    
+    // Update the form data with rejection and reason
+    setQuestionFormData(prev => ({
+      ...prev,
+      [`q${pendingQuestionRejection.questionNumber}`]: 'Rejected',
+      [`q${pendingQuestionRejection.questionNumber}_reason`]: questionRejectionReason
+    }));
+    
+    // Close modal and reset
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
+  // Cancel question rejection
+  const cancelQuestionRejection = () => {
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
   const fetchQuestionAnswers = async (appliedcourseId) => {
     try {
 
@@ -475,10 +523,35 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       if (response.data.status && response.data.data) {
         const existingData = response.data.data.responses;
 
-          console.log('existingData', existingData)
+        console.log('existingData', existingData)
 
         setQuestionAnswers(existingData);
-    
+        
+        // Populate form with existing data
+        const formData = {};
+        const questions = [
+          "Is the Candidate Aware of the Course",
+          "Is the Candidate Aware from the Course Curriculum",
+          "Currently Work Status",
+          "Is Candidate Interested for Course",
+          "If we offered a job outside Odisha, would you be",
+          "Parent Confirmation",
+          "Recommendation from Placement",
+          "Confirm DOB"
+        ];
+        
+        existingData.forEach((qa, index) => {
+          if (qa.question === questions[index]) {
+            formData[`q${index + 1}`] = qa.answer;
+            // If there's a rejection reason, also load it
+            // if (qa.rejectionReason) {
+            //   formData[`q${index + 1}_reason`] = qa.rejectionReason;
+            // }
+          }
+        });
+        
+        setQuestionFormData(formData);
+
       } else {
         setQuestionFormData({});
         setQuestionAnswers([]);
@@ -504,6 +577,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         alert("Authentication token not found. Please login again.");
         return;
       }
+      
       // Transform questionFormData into responses array format
       const responses = [];
       const questions = [
@@ -511,18 +585,42 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         "Is the Candidate Aware from the Course Curriculum",
         "Currently Work Status",
         "Is Candidate Interested for Course",
-        "Is Candidate Ready for Course",
-        "Is Candidate Ready for Course Fee",
-        "Is Candidate Ready for Course Duration"
+          "If we offered a job outside Odisha, would you be",
+          "Parent Confirmation",
+          "Recommendation from Placement",
+          "Confirm DOB"
       ];
 
+      // Create a map of existing answers for easy lookup
+      const existingAnswersMap = {};
+      questionAnswers.forEach(qa => {
+        existingAnswersMap[qa.question] = qa.answer;
+      });
+
       questions.forEach((question, index) => {
-        const answer = questionFormData[`q${index + 1}`];
+        // Check if there's a new answer in the form
+        const newAnswer = questionFormData[`q${index + 1}`];
+        // Check if there's an existing answer
+        const existingAnswer = existingAnswersMap[question];
+        
+        // Use new answer if available, otherwise use existing answer
+        const answer = newAnswer || existingAnswer;
+        
         if (answer) {
-          responses.push({
+          const responseObj = {
             question: question,
             answer: answer
-          });
+          };
+          
+          // If answer is "Rejected", include the rejection reason
+          if (answer === 'Rejected') {
+            const rejectionReason = questionFormData[`q${index + 1}_reason`];
+            if (rejectionReason) {
+              responseObj.rejectionReason = rejectionReason;
+            }
+          }
+          
+          responses.push(responseObj);
         }
       });
 
@@ -547,6 +645,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         alert("Pre-verification questions submitted successfully!");
         showSetPreVerification(false);
         setQuestionFormData({}); // Reset form
+        // Update the questionAnswers state with the new responses
+        setQuestionAnswers(responses);
       } else {
         alert("Error: " + response.data.message);
       }
@@ -556,6 +656,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       console.log(error, 'error');
       alert("Error submitting pre-verification questions. Please try again.");
     } finally {
+      fetchQuestionAnswers(selectedProfile._id);
       setIsSubmittingAnswers(false);
     }
   }
@@ -711,6 +812,51 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  useEffect(() => {
+    fetchCourseHistory();
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
 
   // Simulate file upload with progress
   const handleFileUpload = async () => {
@@ -1561,12 +1707,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setShowPopup(prev => prev === profileIndex ? null : profileIndex);
   };
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
-    
+
     // If Pre Verification tab is clicked (index 5), fetch the data for this specific candidate
     if (tabIndex === 5) {
       const currentProfile = allProfiles[profileIndex];
@@ -2446,11 +2593,11 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     const handleClickOutside = (event) => {
       const isMultiSelectClick = event.target.closest('.multi-select-container-new');
       const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
-      
+
       if (isAnyModalOpen) {
         return; // Do nothing if any modal is open
       }
-      
+
       if (!isMultiSelectClick) {
         setDropdownStates(prev =>
           Object.keys(prev).reduce((acc, key) => {
@@ -3149,7 +3296,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                             {profile.batch && (
                                               <div style={{ marginLeft: '15px', backgroundColor: 'green', padding: '5px', borderRadius: '5px' }}>
 
-                                                <h5 style={{ fontWeight: 'bold', color: 'white' }}>Batch Assigned</h5>
+                                                <h5 style={{ fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap' }}>Batch Assigned</h5>
 
                                               </div>
                                             )}
@@ -3311,12 +3458,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     fontWeight: "600",
                                                     textWrap: "auto"
                                                   }}
-                                                  onClick={() => {
-                                                    setSelectedProfile(profile)
-                                                    showSetPreVerification(true)
-                                                    // Fetch existing question answers if any
-
-                                                  }}
+                                                  onClick={() => openPreVerificationModal(profile)}
                                                 >
                                                   Add Pre Verification
                                                 </button>
@@ -3492,12 +3634,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     fontWeight: "600",
                                                     textWrap: "auto"
                                                   }}
-                                                  onClick={() => {
-                                                    setSelectedProfile(profile)
-                                                    showSetPreVerification(true)
-                                                    // Fetch existing question answers if any
-
-                                                  }}
+                                                  onClick={() => openPreVerificationModal(profile)}
                                                 >
                                                   Add Pre Verification
                                                 </button>
@@ -3531,7 +3668,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                           <li className="nav-item" key={tabIndex}>
                                             <button
                                               className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                              onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                              onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
                                             >
                                               {tab}
                                             </button>
@@ -4102,25 +4239,31 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         <th>S.No</th>
                                                         <th>Company Name</th>
                                                         <th>Position</th>
-                                                        <th>Duration</th>
+                                                        {/* <th>Duration</th>
                                                         <th>Location</th>
-                                                        <th>Status</th>
+                                                        <th>Status</th> */}
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                      {experiences.map((job, index) => (
-                                                        <tr key={index}>
+                                                    {jobHistory?.length > 0 ? (
+                                                        jobHistory?.map((job, index) => (
+                                                          <tr key={index}>
                                                           <td>{index + 1}</td>
-                                                          <td>{job.companyName}</td>
-                                                          <td>{job.jobTitle}</td>
-                                                          <td>
-                                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                          </td>
-                                                          <td>Remote</td>
-                                                          <td><span className="text-success">Completed</span></td>
+                                                          <td>{job._job.displayCompanyName}</td>
+                                                          <td>{job._job.title}</td>
+                                                          {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
                                                         </tr>
-                                                      ))}
+                                                        ))
+                                                      ) : (
+                                                        <tr>
+                                                          <td colSpan={6} className="text-center">No job history available</td>
+                                                        </tr>
+                                                      )}
                                                     </tbody>
                                                   </table>
                                                 </div>
@@ -4130,6 +4273,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                           {/* Course History Tab */}
                                           {(activeTab[profileIndex] || 0) === 3 && (
+
                                             <div className="tab-pane active" id="course-history">
                                               <div className="section-card">
                                                 <div className="table-responsive">
@@ -4145,8 +4289,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                      {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                        profile._candidate._appliedCourses.map((course, index) => (
+                                                      {courseHistory?.length > 0 ? (
+                                                        courseHistory?.map((course, index) => (
                                                           <tr key={index}>
                                                             <td>{index + 1}</td>
                                                             <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
@@ -4518,7 +4662,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto">
                                                           <h4 className="card-title mb-0" id="wrapping-bottom">Pre Verification</h4>
                                                         </div>
-                                                       
+
                                                       </div>
                                                     </div>
 
@@ -4568,7 +4712,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                             <i className="fas fa-info-circle fa-3x mb-3"></i>
                                                             <h5>No Pre-Verification Data Found</h5>
                                                             <p>Pre-verification questions have not been answered yet.</p>
-                                                            
+
                                                           </div>
                                                         </div>
                                                       )}
@@ -4856,10 +5000,44 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 className="form-select"
                                 value={questionFormData.q7}
                                 onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
+                                // onChange={(e) => {
+                                //   if (e.target.value === 'Rejected') {
+                                //     handleQuestionRejection(7, 'Recommendation from Placement');
+                                //   } else {
+                                //     setQuestionFormData({ ...questionFormData, q7: e.target.value });
+                                //   }
+                                // }}
                               >
                                 <option value="">Select Option</option>
                                 <option value="Selected">Selected</option>
                                 <option value="Rejected">Rejected</option>
+                              </select>
+                              {questionFormData.q7 === "Rejected" && questionFormData.q7_reason && (
+                                <div className="mt-2 p-2 bg-light border rounded">
+                                  <small className="text-danger fw-bold">Rejection Reason:</small>
+                                  <div className="mt-1 text-muted">{questionFormData.q7_reason}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">8</td>
+                        <td className="question">Confirm DOB</td>
+                        <td>
+                          <div className="checkbox-group">
+                          <div className="select-option">
+                              <select
+                                name="q8_select"
+                                className="form-select"
+                                value={questionFormData.q8}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q8: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
                               </select>
                             </div>
                           </div>
@@ -4884,6 +5062,44 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Question Rejection Reason Modal */}
+      {showQuestionRejectionModal && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Enter Rejection Reason</h5>
+                <button type="button" className="btn-close" onClick={cancelQuestionRejection}></button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">
+                  <strong>Question:</strong> {pendingQuestionRejection?.questionText}
+                </p>
+                <div className="mb-3">
+                  <label htmlFor="rejectionReason" className="form-label">Rejection Reason *</label>
+                  <textarea
+                    id="rejectionReason"
+                    className="form-control"
+                    rows="4"
+                    placeholder="Please provide a detailed reason for rejection..."
+                    value={questionRejectionReason}
+                    onChange={(e) => setQuestionRejectionReason(e.target.value)}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={cancelQuestionRejection}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-danger" onClick={confirmQuestionRejection}>
+                  Confirm Rejection
+                </button>
+              </div>
             </div>
           </div>
         </div>

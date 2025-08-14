@@ -4628,7 +4628,7 @@ router.put('/update/:id', isCollege, async (req, res) => {
 			return res.status(404).json({ success: false, message: "Applied course not found" });
 		}
 
-
+console.log("appliedCourses" , appliedCourse)
 
 		// Update fields
 		Object.keys(updateData).forEach(key => {
