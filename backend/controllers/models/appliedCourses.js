@@ -79,6 +79,7 @@ const appliedCoursesSchema = new Schema(
       default: 0,
     },
 
+    isPhysicalCounselling: { type: Boolean, default: false },
     kycStage: { type: Boolean, default: false },
     kyc: { type: Boolean, default: false },
 

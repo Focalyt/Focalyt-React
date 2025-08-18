@@ -280,6 +280,7 @@ const Student = ({
 
   // open model for upload documents
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showMarkAttendanceModal, setShowMarkAttendanceModal] = useState(false);
   const [selectedDocumentForUpload, setSelectedDocumentForUpload] =
     useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -3490,6 +3491,7 @@ const Student = ({
     setShowUploadModal(true);
     setSelectedFiles([]);
     setUploadPreview(null);
+    setShowMarkAttendanceModal(true)
     // setUploadProgress(0);
     setIsUploading(false);
   };
@@ -3499,6 +3501,7 @@ const Student = ({
     setSelectedDocumentForUpload(null);
     setSelectedFiles([]);
     setUploadPreview(null);
+    setShowMarkAttendanceModal(false)
     // setUploadProgress(0);
     setIsUploading(false);
   };
@@ -6532,7 +6535,7 @@ const Student = ({
           <div className="modal-dialog modal-lg d-flex justify-content-center w-100">
             <div className="modal-content p-0">
               <div className="modal-header">
-                <h5 className="modal-title">
+                <h5 className="modal-title text-white">
                   Upload Files
                 </h5>
                 <button
@@ -6629,6 +6632,91 @@ const Student = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Attendance Modal */}
+      {showMarkAttendanceModal && (
+      <div className="modal d-flex justify-content-center w-100" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+        <div className="modal-dialog modal-lg d-flex justify-content-center w-100">
+          <div className="modal-content p-0">
+            <div className="modal-header">
+              <h5 className="modal-title text-white">
+                Student List
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowAttendanceModal(false)}
+              ></button>
+            </div>
+
+            <div className="modal-body">
+              <table className="table table-sm table-striped">
+                <thead className="table-dark">
+                  <tr>
+                    <th>S.No</th>
+                    <th>Student Name</th>
+                    <th>Attendance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allProfiles.map((student, index) => (
+                    <tr key={student._id}>
+                      <td>{index + 1}</td>
+                      <td>{student._candidate?.name || 'N/A'}</td>
+                      <td>
+                        <div className="btn-group btn-group-sm" role="group">
+                          <button
+                            type="button"
+                            className="btn btn-outline-success"
+                            onClick={() => {
+                              // Mark as present logic here
+                              console.log('Marked present for:', student._candidate?.name);
+                            }}
+                          >
+                            Present
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline-danger"
+                            onClick={() => {
+                              // Mark as absent logic here
+                              console.log('Marked absent for:', student._candidate?.name);
+                            }}
+                          >
+                            Absent
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAttendanceModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  // Save attendance logic here
+                  console.log('Saving attendance for all students');
+                  setShowAttendanceModal(false);
+                }}
+              >
+                Mark Attendance
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       )}
 
       {/* Enhanced CSS for styling */}

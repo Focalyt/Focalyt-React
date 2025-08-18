@@ -9,6 +9,7 @@ const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const moment = require("moment");
 const { Courses, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
+const CandidateVisitCalender = require("../../models/candidateVisitCalender");
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
 const router = express.Router();
@@ -909,5 +910,78 @@ router.get('/course_centers', async (req, res) => {
 		console.log("Error adding lead:", err);
 	}
 });
+
+router.post('/candidate-visit-calendar', async (req, res) => {
+	try {
+		console.log('req.body123')
+	  const { visitDate, visitType, appliedCourseId } = req.body;
+  
+	  console.log('req.body123', req.body)
+	  
+	  if (!visitDate || !visitType || !appliedCourseId) {
+		return res.status(400).json({ error: 'Missing required fields' });
+	  }
+  
+	
+	  const newVisit = new CandidateVisitCalender({
+		appliedCourse: appliedCourseId,
+		visitDate: new Date(visitDate),
+		visitType: visitType,
+		createdBy: req.user._id,
+		status: 'pending'
+	  });
+  
+	  await newVisit.save();
+  
+	  res.status(201).json({ 
+		message: 'Visit scheduled successfully',
+		visitId: newVisit._id 
+	  });
+  
+	} catch (error) {
+	  console.error('Error:', error);
+	  res.status(500).json({ error: 'Internal server error' });
+	}
+  });
+  
+ 
+//   router.get('/candidate-visit-calendar', async (req, res) => {
+// 	try {
+// 	  const { appliedCourseId } = req.query;
+	  
+// 	  const visits = await CandidateVisitCalender.find({ 
+// 		appliedCourse: appliedCourseId 
+// 	  })
+// 	  .populate('appliedCourse')
+// 	  .populate('createdBy', 'name email')
+// 	  .sort({ visitDate: 1 });
+	  
+// 	  res.json({ status: true, data: visits });
+// 	} catch (error) {
+// 	  res.status(500).json({ error: 'Internal server error' });
+// 	}
+//   });
+
+//   router.put('/candidate-visit-calendar/:visitId', async (req, res) => {
+// 	try {
+// 	  const { visitId } = req.params;
+// 	  const { status, remarks } = req.body;
+	  
+// 	  const visit = await CandidateVisitCalender.findByIdAndUpdate(
+// 		visitId,
+// 		{
+// 		  status,
+// 		  remarks,
+// 		  updatedBy: req.user._id,
+// 		  statusUpdatedAt: new Date()
+// 		},
+// 		{ new: true }
+// 	  );
+	  
+// 	  res.json({ status: true, data: visit });
+// 	} catch (error) {
+// 	  res.status(500).json({ error: 'Internal server error' });
+// 	}
+//   });
 
 module.exports = router;

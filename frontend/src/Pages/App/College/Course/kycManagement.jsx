@@ -326,6 +326,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   //course history
   const [courseHistory, setCourseHistory] = useState([]);
   const [jobHistory, setJobHistory] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('');
   // Static document data for demonstration
   useEffect(() => {
     // Initialize circular progress
@@ -362,10 +363,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   // 🎯 eKYC Filters Configuration   {(activeTab[profileIndex] || 0) === 3 && (
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
-    { _id: 'pendingEkyc', name: 'kyc Pending', count: 0, milestone: '' },
+    { _id: 'pendingEkyc', name: 'Pending for Documents', count: 0, milestone: '' },
+    { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
     { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
-    { _id: 'doneEkyc', name: 'kyc Verified', count: 0, milestone: 'Ekyc Done' },
-    { _id: 'placementVerification', name: 'Placement Verification', count: 0, milestone: '' },
+    { _id: 'doneEkyc', name: 'Center Verified', count: 0, milestone: 'Ekyc Done' },
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
@@ -460,7 +461,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [questionAnswers, setQuestionAnswers] = useState([]);
   const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
   const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
-  
+  const [visitDates, setVisitDates] = useState([]);
+
   // Question rejection reason modal state
   const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
   const [questionRejectionReason, setQuestionRejectionReason] = useState('');
@@ -485,14 +487,14 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       alert('Please enter a rejection reason');
       return;
     }
-    
+
     // Update the form data with rejection and reason
     setQuestionFormData(prev => ({
       ...prev,
       [`q${pendingQuestionRejection.questionNumber}`]: 'Rejected',
       [`q${pendingQuestionRejection.questionNumber}_reason`]: questionRejectionReason
     }));
-    
+
     // Close modal and reset
     setShowQuestionRejectionModal(false);
     setQuestionRejectionReason('');
@@ -504,6 +506,80 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setShowQuestionRejectionModal(false);
     setQuestionRejectionReason('');
     setPendingQuestionRejection(null);
+  };
+
+  // Visit Calendar Functions
+  const saveVisitDate = async (appliedCourseId, visitDate, visitType) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.post(`${backendUrl}/college/candidate/visit-calendar`, {
+        appliedCourseId,
+        visitDate,
+        visitType
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit date saved successfully:', response.data);
+        return response.data;
+      } else {
+        console.error('Error saving visit date:', response.data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error saving visit date:', error);
+      return null;
+    }
+  };
+
+  const getVisitDates = async (appliedCourseId) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/candidate/visit-calendar/${appliedCourseId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit dates fetched successfully:', response.data.data);
+        return response.data.data;
+      } else {
+        console.error('Error fetching visit dates:', response.data.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching visit dates:', error);
+      return [];
+    }
+  };
+
+  const updateVisitStatus = async (visitId, status, remarks) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.put(`${backendUrl}/college/candidate/visit-calendar/${visitId}`, {
+        status,
+        remarks
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit status updated successfully:', response.data);
+        return response.data;
+      } else {
+        console.error('Error updating visit status:', response.data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error updating visit status:', error);
+      return null;
+    }
   };
 
   const fetchQuestionAnswers = async (appliedcourseId) => {
@@ -522,11 +598,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
       if (response.data.status && response.data.data) {
         const existingData = response.data.data.responses;
+        const visitDates = response.data.data.visitDates || [];
 
         console.log('existingData', existingData)
+        console.log('visitDates', visitDates)
 
         setQuestionAnswers(existingData);
-        
+
         // Populate form with existing data
         const formData = {};
         const questions = [
@@ -537,9 +615,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           "If we offered a job outside Odisha, would you be",
           "Parent Confirmation",
           "Recommendation from Placement",
-          "Confirm DOB"
+          "Confirm DOB",
+          "Are you Going to Attend Center for Physical Counselling"
         ];
-        
+
         existingData.forEach((qa, index) => {
           if (qa.question === questions[index]) {
             formData[`q${index + 1}`] = qa.answer;
@@ -549,17 +628,22 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             // }
           }
         });
-        
+
         setQuestionFormData(formData);
+
+        // Store visit dates in state for later use
+        setVisitDates(visitDates);
 
       } else {
         setQuestionFormData({});
         setQuestionAnswers([]);
+        setVisitDates([]);
       }
     } catch (error) {
       console.log('No existing question answers found or error:', error);
       setQuestionFormData({});
       setQuestionAnswers([]);
+      setVisitDates([]);
     } finally {
       setIsLoadingAnswers(false);
     }
@@ -569,57 +653,50 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     try {
       setIsSubmittingAnswers(true);
 
-      console.log(questionFormData, 'questionFormData')
-      console.log(selectedProfile, 'selectedProfile')
+      // -----------------
+      // Validation for visit date
+      if (questionFormData.q9 && !selectedDate) {
+        alert('Please select a date');
+        return;
+      }
+
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
       if (!token) {
         alert("Authentication token not found. Please login again.");
         return;
       }
-      
-      // Transform questionFormData into responses array format
+
+      // 1️⃣ Prepare data for first API
       const responses = [];
       const questions = [
         "Is the Candidate Aware of the Course",
         "Is the Candidate Aware from the Course Curriculum",
         "Currently Work Status",
         "Is Candidate Interested for Course",
-          "If we offered a job outside Odisha, would you be",
-          "Parent Confirmation",
-          "Recommendation from Placement",
-          "Confirm DOB"
+        "If we offered a job outside Odisha, would you be",
+        "Parent Confirmation",
+        "Recommendation from Placement",
+        "Confirm DOB",
+        "Are you Going to Attend Center for Physical Counselling"
       ];
 
-      // Create a map of existing answers for easy lookup
       const existingAnswersMap = {};
       questionAnswers.forEach(qa => {
         existingAnswersMap[qa.question] = qa.answer;
       });
 
       questions.forEach((question, index) => {
-        // Check if there's a new answer in the form
         const newAnswer = questionFormData[`q${index + 1}`];
-        // Check if there's an existing answer
         const existingAnswer = existingAnswersMap[question];
-        
-        // Use new answer if available, otherwise use existing answer
         const answer = newAnswer || existingAnswer;
-        
+
         if (answer) {
-          const responseObj = {
-            question: question,
-            answer: answer
-          };
-          
-          // If answer is "Rejected", include the rejection reason
+          const responseObj = { question, answer };
           if (answer === 'Rejected') {
             const rejectionReason = questionFormData[`q${index + 1}_reason`];
-            if (rejectionReason) {
-              responseObj.rejectionReason = rejectionReason;
-            }
+            if (rejectionReason) responseObj.rejectionReason = rejectionReason;
           }
-          
           responses.push(responseObj);
         }
       });
@@ -634,32 +711,153 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         return;
       }
 
-      const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
-        appliedcourse: selectedProfile._id,
-        responses: responses
-      }, {
-        headers: { 'x-auth': token }
-      });
-      console.log("responnse", response)
-      if (response.data.status) {
-        alert("Pre-verification questions submitted successfully!");
-        showSetPreVerification(false);
-        setQuestionFormData({}); // Reset form
-        // Update the questionAnswers state with the new responses
-        setQuestionAnswers(responses);
-      } else {
-        alert("Error: " + response.data.message);
+
+      const qaResponse = await axios.post(
+        `${backendUrl}/college/candidate/questionAnswer`,
+        {
+          appliedcourse: selectedProfile._id,
+          responses,
+          visitDate: selectedDate
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (!qaResponse.data.status) {
+        alert("Error: " + qaResponse.data.message);
+        return;
       }
 
-      console.log(response, 'response');
+
+      const formData = {
+        appliedCourseId: selectedProfile._id,
+        visitDate: selectedDate,
+        visitType: questionFormData.q9
+      };
+
+      // Call second API
+      const visitResponse = await axios.post(
+        `${backendUrl}/college/candidate/visit-calendar`,
+        formData,
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+
+      // 4️⃣ Handle responses
+      alert("Pre-verification & visit scheduled successfully!");
+      showSetPreVerification(false);
+      setQuestionFormData({});
+      setSelectedDate('');
+      setQuestionAnswers(responses);
+
     } catch (error) {
-      console.log(error, 'error');
-      alert("Error submitting pre-verification questions. Please try again.");
+      console.error(error);
+      alert("Error occurred while submitting data.");
     } finally {
-      fetchQuestionAnswers(selectedProfile._id);
+      if (selectedProfile?._id) {
+        fetchQuestionAnswers(selectedProfile._id);
+      }
       setIsSubmittingAnswers(false);
     }
-  }
+  };
+
+
+
+
+  // const QuestionAnswer = async () => {
+  //   try {
+  //     setIsSubmittingAnswers(true);
+
+  //     console.log(questionFormData, 'questionFormData')
+  //     console.log(selectedProfile, 'selectedProfile')
+  //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  //     const token = userData.token;
+  //     if (!token) {
+  //       alert("Authentication token not found. Please login again.");
+  //       return;
+  //     }
+
+  //     // Transform questionFormData into responses array format
+  //     const responses = [];
+  //     const questions = [
+  //       "Is the Candidate Aware of the Course",
+  //       "Is the Candidate Aware from the Course Curriculum",
+  //       "Currently Work Status",
+  //       "Is Candidate Interested for Course",
+  //       "If we offered a job outside Odisha, would you be",
+  //       "Parent Confirmation",
+  //       "Recommendation from Placement",
+  //       "Confirm DOB",
+  //       "Are you Going to Attend Center for Physical Counselling"
+  //     ];
+
+  //     // Create a map of existing answers for easy lookup
+  //     const existingAnswersMap = {};
+  //     questionAnswers.forEach(qa => {
+  //       existingAnswersMap[qa.question] = qa.answer;
+  //     });
+
+  //     questions.forEach((question, index) => {
+  //       // Check if there's a new answer in the form
+  //       const newAnswer = questionFormData[`q${index + 1}`];
+  //       // Check if there's an existing answer
+  //       const existingAnswer = existingAnswersMap[question];
+
+  //       // Use new answer if available, otherwise use existing answer
+  //       const answer = newAnswer || existingAnswer;
+
+  //       if (answer) {
+  //         const responseObj = {
+  //           question: question,
+  //           answer: answer
+  //         };
+
+  //         // If answer is "Rejected", include the rejection reason
+  //         if (answer === 'Rejected') {
+  //           const rejectionReason = questionFormData[`q${index + 1}_reason`];
+  //           if (rejectionReason) {
+  //             responseObj.rejectionReason = rejectionReason;
+  //           }
+  //         }
+
+  //         responses.push(responseObj);
+  //       }
+  //     });
+
+  //     if (!selectedProfile || !selectedProfile._id) {
+  //       alert("No profile selected. Please try again.");
+  //       return;
+  //     }
+
+  //     if (responses.length === 0) {
+  //       alert("Please answer at least one question before submitting.");
+  //       return;
+  //     }
+
+  //     const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
+  //       appliedcourse: selectedProfile._id,
+  //       responses: responses
+  //     }, {
+  //       headers: { 'x-auth': token }
+  //     });
+  //     console.log("responnse", response)
+  //     if (response.data.status) {
+  //       alert("Pre-verification questions submitted successfully!");
+  //       showSetPreVerification(false);
+  //       setQuestionFormData({}); // Reset form
+  //       // Update the questionAnswers state with the new responses
+  //       setQuestionAnswers(responses);
+  //     } else {
+  //       alert("Error: " + response.data.message);
+  //     }
+
+  //     console.log(response, 'response');
+  //   } catch (error) {
+  //     console.log(error, 'error');
+  //     alert("Error submitting pre-verification questions. Please try again.");
+  //   } finally {
+  //     fetchQuestionAnswers(selectedProfile._id);
+  //     setIsSubmittingAnswers(false);
+  //   }
+  // }
 
   useEffect(() => {
     if (selectedProfile) {
@@ -1669,10 +1867,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         const { crmFilterCounts } = response.data;
 
         const filter = [
-          { _id: 'pendingEkyc', name: 'kyc Pending', count: crmFilterCounts.pendingKyc, milestone: '' },
+          { _id: 'pendingEkyc', name: 'Pending for Documents', count: crmFilterCounts.pendingKyc, milestone: '' },
+          { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
           { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
-          { _id: 'doneEkyc', name: 'kyc Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
-          { _id: 'placementVerification', name: 'Placement Verification', count: crmFilterCounts.placementVerification, milestone: '' },
+          { _id: 'doneEkyc', name: 'Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
           { _id: 'All', name: 'All', count: crmFilterCounts.all, milestone: '' }
         ];
 
@@ -4245,19 +4443,19 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                    {jobHistory?.length > 0 ? (
+                                                      {jobHistory?.length > 0 ? (
                                                         jobHistory?.map((job, index) => (
                                                           <tr key={index}>
-                                                          <td>{index + 1}</td>
-                                                          <td>{job._job.displayCompanyName}</td>
-                                                          <td>{job._job.title}</td>
-                                                          {/* <td>
+                                                            <td>{index + 1}</td>
+                                                            <td>{job._job.displayCompanyName}</td>
+                                                            <td>{job._job.title}</td>
+                                                            {/* <td>
                                                                   {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
                                                                   {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
                                                                 </td>
                                                                 <td>Remote</td>
                                                                 <td><span className="text-success">Completed</span></td> */}
-                                                        </tr>
+                                                          </tr>
                                                         ))
                                                       ) : (
                                                         <tr>
@@ -4698,6 +4896,28 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                                         }`}>
                                                                         {item.answer}
                                                                       </span>
+                                                                      {(item.answer === 'Rejected') && item.rejectionReason && (
+                                                                        <div className="mt-2 p-2 bg-light border rounded">
+                                                                          <small className="text-danger fw-bold">Rejection Reason:</small>
+                                                                          <div className="mt-1 text-muted">{item.rejectionReason}</div>
+                                                                        </div>
+                                                                      )}
+                                                                      {item.question === "Are you Going to Attend Center for Physical Counselling" && visitDates && visitDates.length > 0 && (
+                                                                        <div className="mt-2 p-2 bg-light border rounded">
+                                                                          <small className="text-primary fw-bold">Visit Date:</small>
+                                                                          <div className="mt-1">
+                                                                            {visitDates.map((visit, visitIndex) => (
+                                                                              <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                                <i className="fas fa-calendar-alt text-primary"></i>
+                                                                                <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
+                                                                                <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
+                                                                                  {visit.visitType}
+                                                                                </span>
+                                                                              </div>
+                                                                            ))}
+                                                                          </div>
+                                                                        </div>
+                                                                      )}
                                                                     </div>
                                                                   </td>
                                                                 </tr>
@@ -4999,14 +5219,14 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 name="q7_select"
                                 className="form-select"
                                 value={questionFormData.q7}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                                // onChange={(e) => {
-                                //   if (e.target.value === 'Rejected') {
-                                //     handleQuestionRejection(7, 'Recommendation from Placement');
-                                //   } else {
-                                //     setQuestionFormData({ ...questionFormData, q7: e.target.value });
-                                //   }
-                                // }}
+                                // onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
+                                onChange={(e) => {
+                                  if (e.target.value === 'Rejected') {
+                                    handleQuestionRejection(7, 'Recommendation from Placement');
+                                  } else {
+                                    setQuestionFormData({ ...questionFormData, q7: e.target.value });
+                                  }
+                                }}
                               >
                                 <option value="">Select Option</option>
                                 <option value="Selected">Selected</option>
@@ -5027,7 +5247,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         <td className="question">Confirm DOB</td>
                         <td>
                           <div className="checkbox-group">
-                          <div className="select-option">
+                            <div className="select-option">
                               <select
                                 name="q8_select"
                                 className="form-select"
@@ -5040,6 +5260,39 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 <option value="Not sure">Not Sure</option>
                               </select>
                             </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">9</td>
+                        <td className="question">Are you Going to Attend Center for Physical Counselling</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q9_select"
+                                className="form-select"
+                                value={questionFormData.q9}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q9: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Visit">Visit</option>
+                                <option value="Joining">Joining</option>
+                                <option value="Both">Both</option>
+                              </select>
+                            </div>
+                            {questionFormData.q9 && (
+                              <div className="date-field mt-2">
+                                <label className="form-label">Select Date:</label>
+                                <input
+                                  type="date"
+                                  className="form-control"
+                                  value={selectedDate}
+                                  onChange={(e) => setSelectedDate(e.target.value)}
+                                  required
+                                />
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
