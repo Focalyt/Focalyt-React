@@ -1624,7 +1624,7 @@ const Student = ({
                                 {record.timeIn || "-"}
                               </span>
                             </td>
-                            <td>
+                            {/* <td>
                               <span className="fw-medium">
                                 {record.timeOut || "-"}
                               </span>
@@ -1680,7 +1680,7 @@ const Student = ({
                                   <i className="fas fa-save"></i>
                                 </button>
                               </div>
-                            </td>
+                            </td> */}
                           </tr>
                         ))
                     ) : (
@@ -4822,6 +4822,7 @@ const Student = ({
                                                         fontWeight: "500",
                                                         transition: "background-color 0.2s ease",
                                                         cursor: "pointer",
+                                                        color: "black"
                                                       }}
 
                                                       onClick={(e) => {
@@ -4846,6 +4847,7 @@ const Student = ({
                                                         fontWeight: "500",
                                                         transition: "background-color 0.2s ease",
                                                         cursor: "pointer",
+                                                        color: "black"
                                                       }}
 
                                                       onClick={(e) => {

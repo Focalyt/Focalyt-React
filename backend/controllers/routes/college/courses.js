@@ -917,9 +917,18 @@ router.post('/candidate-visit-calendar', async (req, res) => {
 	  const { visitDate, visitType, appliedCourseId } = req.body;
   
 	  console.log('req.body123', req.body)
+	  console.log('visitType received:', visitType);
 	  
 	  if (!visitDate || !visitType || !appliedCourseId) {
 		return res.status(400).json({ error: 'Missing required fields' });
+	  }
+
+	  // Validate visitType enum values
+	  const validVisitTypes = ['Visit', 'Joining', 'Both'];
+	  if (!validVisitTypes.includes(visitType)) {
+		return res.status(400).json({
+		  error: `Invalid visitType: "${visitType}". Must be one of: ${validVisitTypes.join(', ')}. If you're sending a question answer, please map it correctly to the visitType field.`
+		});
 	  }
   
 	

@@ -608,12 +608,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         // Populate form with existing data
         const formData = {};
         const questions = [
-          "Is the Candidate Aware of the Course",
-          "Is the Candidate Aware from the Course Curriculum",
-          "Currently Work Status",
-          "Is Candidate Interested for Course",
-          "If we offered a job outside Odisha, would you be",
+          "Is the Candidate Aware of the Course Duration and Placement Benefits?",
+          "Is the Candidate Aware of the Course and practicle Module ?",
+          "Currently Work Status / Not Working Status / Not Working Status",
+          "Is Candidate Interested Placement by us?",
+          "If we offered a job outside Odisha, would you be interested in the placement?",
           "Parent Confirmation",
+          "Is Candidate Interested for Course Completion?",
           "Recommendation from Placement",
           "Confirm DOB",
           "Are you Going to Attend Center for Physical Counselling"
@@ -655,7 +656,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
       // -----------------
       // Validation for visit date
-      if (questionFormData.q9 && !selectedDate) {
+      if (questionFormData.q10 && !selectedDate) {
         alert('Please select a date');
         return;
       }
@@ -670,12 +671,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       // 1️⃣ Prepare data for first API
       const responses = [];
       const questions = [
-        "Is the Candidate Aware of the Course",
-        "Is the Candidate Aware from the Course Curriculum",
-        "Currently Work Status",
-        "Is Candidate Interested for Course",
-        "If we offered a job outside Odisha, would you be",
+        "Is the Candidate Aware of the Course Duration and Placement Benefits?",
+        "Is the Candidate Aware of the Course and practicle Module ?",
+        "Currently Work Status / Not Working Status",        
+        "Is Candidate Interested Placement by us?",
+        "If we offered a job outside Odisha, would you be interested in the placement?",
         "Parent Confirmation",
+        "Is Candidate Interested for Course Completion?",
         "Recommendation from Placement",
         "Confirm DOB",
         "Are you Going to Attend Center for Physical Counselling"
@@ -731,7 +733,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       const formData = {
         appliedCourseId: selectedProfile._id,
         visitDate: selectedDate,
-        visitType: questionFormData.q9
+        visitType: questionFormData.q10
       };
 
       // Call second API
@@ -779,10 +781,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   //     const responses = [];
   //     const questions = [
   //       "Is the Candidate Aware of the Course",
-  //       "Is the Candidate Aware from the Course Curriculum",
-  //       "Currently Work Status",
-  //       "Is Candidate Interested for Course",
-  //       "If we offered a job outside Odisha, would you be",
+  //       "Is the Candidate Aware of the Course and practicle Module ?",
+  //       "Currently Work Status / Not Working Status",
+  //       "Is Candidate Interested for Course Completion?",
+  //       "If we offered a job outside Odisha, would you be interested in the placement?",
   //       "Parent Confirmation",
   //       "Recommendation from Placement",
   //       "Confirm DOB",
@@ -5085,7 +5087,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                     <tbody>
                       <tr>
                         <td className="s-no">1</td>
-                        <td className="question">Is the Candidate Aware of the Course</td>
+                        <td className="question">Is the Candidate Aware of the Course Duration and Placement Benefits?</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5106,7 +5108,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                       <tr>
                         <td className="s-no">2</td>
-                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
+                        <td className="question">Is the Candidate Aware of the Course and practicle Module ?</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5127,7 +5129,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                       <tr>
                         <td className="s-no">3</td>
-                        <td className="question">Currently Work Status</td>
+                        <td className="question">Currently Work Status / Not Working Status</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5148,7 +5150,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                       <tr>
                         <td className="s-no">4</td>
-                        <td className="question">Is Candidate Interested for Course</td>
+                        <td className="question">Is Candidate Interested Placement by us?</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5167,9 +5169,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           </div>
                         </td>
                       </tr>
+                      
                       <tr>
                         <td className="s-no">5</td>
-                        <td className="question">If we offered a job outside Odisha, would you be</td>
+                        <td className="question">If we offered a job outside Odisha, would you be interested in the placement?</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5211,7 +5214,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                       <tr>
                         <td className="s-no">7</td>
-                        <td className="question">Recommendation from Placement</td>
+                        <td className="question">Is Candidate Interested for Course Completion?</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5219,40 +5222,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 name="q7_select"
                                 className="form-select"
                                 value={questionFormData.q7}
-                                // onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                                onChange={(e) => {
-                                  if (e.target.value === 'Rejected') {
-                                    handleQuestionRejection(7, 'Recommendation from Placement');
-                                  } else {
-                                    setQuestionFormData({ ...questionFormData, q7: e.target.value });
-                                  }
-                                }}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Selected">Selected</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                              {questionFormData.q7 === "Rejected" && questionFormData.q7_reason && (
-                                <div className="mt-2 p-2 bg-light border rounded">
-                                  <small className="text-danger fw-bold">Rejection Reason:</small>
-                                  <div className="mt-1 text-muted">{questionFormData.q7_reason}</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">8</td>
-                        <td className="question">Confirm DOB</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q8_select"
-                                className="form-select"
-                                value={questionFormData.q8}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q8: e.target.value })}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
                               >
                                 <option value="">Select Option</option>
                                 <option value="Yes">Yes</option>
@@ -5264,8 +5234,41 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         </td>
                       </tr>
                       <tr>
+                        <td className="s-no">8</td>
+                        <td className="question">Recommendation from Placement</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q8_select"
+                                className="form-select"
+                                value={questionFormData.q8}
+                                // onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
+                                onChange={(e) => {
+                                  if (e.target.value === 'Rejected') {
+                                    handleQuestionRejection(7, 'Recommendation from Placement');
+                                  } else {
+                                    setQuestionFormData({ ...questionFormData, q8: e.target.value });
+                                  }
+                                }}
+                              >
+                                <option value="">Select Option</option>
+                                <option value="Selected">Selected</option>
+                                <option value="Rejected">Rejected</option>
+                              </select>
+                              {questionFormData.q8 === "Rejected" && questionFormData.q8_reason && (
+                                <div className="mt-2 p-2 bg-light border rounded">
+                                  <small className="text-danger fw-bold">Rejection Reason:</small>
+                                  <div className="mt-1 text-muted">{questionFormData.q8_reason}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
                         <td className="s-no">9</td>
-                        <td className="question">Are you Going to Attend Center for Physical Counselling</td>
+                        <td className="question">Confirm DOB</td>
                         <td>
                           <div className="checkbox-group">
                             <div className="select-option">
@@ -5276,12 +5279,33 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 onChange={(e) => setQuestionFormData({ ...questionFormData, q9: e.target.value })}
                               >
                                 <option value="">Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Not sure">Not Sure</option>
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">10</td>
+                        <td className="question">Are you Going to Attend Center for Physical Counselling</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <div className="select-option">
+                              <select
+                                name="q10_select"
+                                className="form-select"
+                                value={questionFormData.q10}
+                                onChange={(e) => setQuestionFormData({ ...questionFormData, q10: e.target.value })}
+                              >
+                                <option value="">Select Option</option>
                                 <option value="Visit">Visit</option>
                                 <option value="Joining">Joining</option>
                                 <option value="Both">Both</option>
                               </select>
                             </div>
-                            {questionFormData.q9 && (
+                            {questionFormData.q10 && (
                               <div className="date-field mt-2">
                                 <label className="form-label">Select Date:</label>
                                 <input

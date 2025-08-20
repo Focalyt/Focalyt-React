@@ -1871,8 +1871,8 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 			});
 		}
 
-		
-		const res = responses.map(response => {
+
+		const response = responses.map(response => {
 			if (response.question === 'Are you Going to Attend Center for Physical Counselling' && visitDate) {
 				return {
 					...response,
@@ -1901,7 +1901,7 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 		// Create new question answer entry
 		const questionAnswer = new QuestionAnswer({
 			appliedcourse,
-			responses: res
+			responses: response
 		});
 		console.log("questionAnswer", questionAnswer)
 
@@ -1946,8 +1946,8 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 		}
 
 		// Get visit dates for this applied course
-		const visitDates = await CandidateVisitCalender.find({ 
-			appliedCourse: appliedcourseId 
+		const visitDates = await CandidateVisitCalender.find({
+			appliedCourse: appliedcourseId
 		}).sort({ visitDate: 1 });
 
 		return res.status(200).json({
@@ -1970,12 +1970,12 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 // Visit Calendar APIs
 router.post('/visit-calendar', [isCollege], async (req, res) => {
 	try {
-		const { visitDate, visitType, appliedCourseId ,includeQuestionAnswers } = req.body;
-		
+		const { visitDate, visitType, appliedCourseId, includeQuestionAnswers } = req.body;
+
 		if (!visitDate || !visitType || !appliedCourseId) {
-			return res.status(400).json({ 
+			return res.status(400).json({
 				status: false,
-				message: 'Missing required fields: visitDate, visitType, appliedCourseId' 
+				message: 'Missing required fields: visitDate, visitType, appliedCourseId'
 			});
 		}
 
@@ -1989,7 +1989,7 @@ router.post('/visit-calendar', [isCollege], async (req, res) => {
 
 		await newVisit.save();
 
-		res.status(201).json({ 
+		res.status(201).json({
 			status: true,
 			message: 'Visit scheduled successfully',
 			data: newVisit
@@ -1997,9 +1997,9 @@ router.post('/visit-calendar', [isCollege], async (req, res) => {
 
 	} catch (error) {
 		console.error('Error creating visit calendar:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
-			message: 'Internal server error' 
+			message: 'Internal server error'
 		});
 	}
 });
@@ -2007,30 +2007,30 @@ router.post('/visit-calendar', [isCollege], async (req, res) => {
 router.get('/visit-calendar/:appliedCourseId', [isCollege], async (req, res) => {
 	try {
 		const { appliedCourseId } = req.params;
-		
+
 		if (!appliedCourseId) {
-			return res.status(400).json({ 
+			return res.status(400).json({
 				status: false,
-				message: 'Applied course ID is required' 
+				message: 'Applied course ID is required'
 			});
 		}
 
-		const visits = await CandidateVisitCalender.find({ 
-			appliedCourse: appliedCourseId 
+		const visits = await CandidateVisitCalender.find({
+			appliedCourse: appliedCourseId
 		})
-		.populate('appliedCourse')
-		.populate('createdBy', 'name email')
-		.sort({ visitDate: 1 });
-		
-		res.json({ 
+			.populate('appliedCourse')
+			.populate('createdBy', 'name email')
+			.sort({ visitDate: 1 });
+
+		res.json({
 			status: true,
-			data: visits 
+			data: visits
 		});
 	} catch (error) {
 		console.error('Error fetching visit calendar:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
-			message: 'Internal server error' 
+			message: 'Internal server error'
 		});
 	}
 });
@@ -2039,11 +2039,11 @@ router.put('/visit-calendar/:visitId', [isCollege], async (req, res) => {
 	try {
 		const { visitId } = req.params;
 		const { status, remarks } = req.body;
-		
+
 		if (!visitId) {
-			return res.status(400).json({ 
+			return res.status(400).json({
 				status: false,
-				message: 'Visit ID is required' 
+				message: 'Visit ID is required'
 			});
 		}
 
@@ -2057,26 +2057,26 @@ router.put('/visit-calendar/:visitId', [isCollege], async (req, res) => {
 			},
 			{ new: true }
 		).populate('appliedCourse')
-		.populate('createdBy', 'name email')
-		.populate('updatedBy', 'name email');
-		
+			.populate('createdBy', 'name email')
+			.populate('updatedBy', 'name email');
+
 		if (!visit) {
-			return res.status(404).json({ 
+			return res.status(404).json({
 				status: false,
-				message: 'Visit not found' 
+				message: 'Visit not found'
 			});
 		}
 
-		res.json({ 
+		res.json({
 			status: true,
 			message: 'Visit status updated successfully',
-			data: visit 
+			data: visit
 		});
 	} catch (error) {
 		console.error('Error updating visit calendar:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
-			message: 'Internal server error' 
+			message: 'Internal server error'
 		});
 	}
 });
@@ -2126,185 +2126,237 @@ router.get("/appliedCourses/:candidateId", async (req, res) => {
 
 router.get("/appliedJobs/:candidateId", async (req, res) => {
 	try {
-  
-	  console.log('applied jobs...')
-	  const { candidateId } = req.params;
-		console.log("candidateId", candidateId)
-  
-	const jobHistory = await AppliedJobs.find({_candidate: candidateId}).populate({path: '_job'})
-	console.log('jobHistory' , jobHistory)
-// 	  if(!candidate || !candidate?.appliedJobs?.length){
-// 		return res.json({
-// 			jobs: []
-// 		});
-// 	  }
-// 	  console.log('candidate_new' , candidate)
-  
-// 	  const agg = [
-// 		{ $match: { _candidate: candidate._id } },
-// 		{
-// 		  $lookup: {
-// 			from: "companies",
-// 			localField: "_company",
-// 			foreignField: "_id",
-// 			as: "_company"
-// 		  }
-// 		},
-// 		{ $unwind: "$_company" },
-// 		{
-// 		  $match: {
-// 			"_company.isDeleted": false,
-// 			"_company.status": true
-// 		  }
-// 		},
-// 		{
-// 		  $lookup: {
-// 			from: "vacancies",
-// 			localField: "_job",
-// 			foreignField: "_id",
-// 			as: "vacancy"
-// 		  }
-// 		},
-// 		{ $unwind: "$vacancy" },
-// 		{
-// 		  $match: {
-// 			"vacancy.status": true,
-// 			"vacancy.validity": { $gte: new Date() }
-// 		  }
-// 		},
-// 		{
-// 		  $lookup: {
-// 			from: "qualifications",
-// 			localField: "vacancy._qualification",
-// 			foreignField: "_id",
-// 			as: "qualifications"
-// 		  }
-// 		},
-// 		{
-// 		  $lookup: {
-// 			from: "industries",
-// 			localField: "vacancy._industry",
-// 			foreignField: "_id",
-// 			as: "industry"
-// 		  }
-// 		},
-// 		{
-// 		  $lookup: {
-// 			from: "cities",
-// 			localField: "vacancy.city",
-// 			foreignField: "_id",
-// 			as: "city"
-// 		  }
-// 		},
-// 		{
-// 		  $lookup: {
-// 			from: "states",
-// 			localField: "vacancy.state",
-// 			foreignField: "_id",
-// 			as: "state"
-// 		  }
-// 		},
-// 		{
-// 		  $sort: {
-// 			"vacancy.sequence": 1,
-// 			"vacancy.createdAt": -1
-// 		  }
-// 		},
-// 		// {
-// 		//   $facet: {
-// 		// 	metadata: [{ $count: "total" }],
-// 		// 	data: [
-// 		// 	  { $skip: (parseInt(page) - 1) * parseInt(perPage) },
-// 		// 	  { $limit: parseInt(perPage) }
-// 		// 	]
-// 		//   }
-// 		// }
-// 	  ];
-//   console.log('agg' , agg)
-// 	  const appliedJobs = await AppliedJobs.aggregate(agg);
-// 	//   const count = appliedJobs[0].metadata[0]?.total || 0;
-// 	//   const jobs = appliedJobs[0].data || [];
-// 	//   const totalPages = Math.ceil(count / parseInt(perPage));
-  
-// console.log('appliedJobs' , appliedJobs)
 
-// 	  return res.json({
-// 		jobs
-// 	  });
-	return res.json({
-		jobs: jobHistory
-	  });
+		console.log('applied jobs...')
+		const { candidateId } = req.params;
+		console.log("candidateId", candidateId)
+
+		const jobHistory = await AppliedJobs.find({ _candidate: candidateId }).populate({ path: '_job' })
+		console.log('jobHistory', jobHistory)
+		// 	  if(!candidate || !candidate?.appliedJobs?.length){
+		// 		return res.json({
+		// 			jobs: []
+		// 		});
+		// 	  }
+		// 	  console.log('candidate_new' , candidate)
+
+		// 	  const agg = [
+		// 		{ $match: { _candidate: candidate._id } },
+		// 		{
+		// 		  $lookup: {
+		// 			from: "companies",
+		// 			localField: "_company",
+		// 			foreignField: "_id",
+		// 			as: "_company"
+		// 		  }
+		// 		},
+		// 		{ $unwind: "$_company" },
+		// 		{
+		// 		  $match: {
+		// 			"_company.isDeleted": false,
+		// 			"_company.status": true
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "vacancies",
+		// 			localField: "_job",
+		// 			foreignField: "_id",
+		// 			as: "vacancy"
+		// 		  }
+		// 		},
+		// 		{ $unwind: "$vacancy" },
+		// 		{
+		// 		  $match: {
+		// 			"vacancy.status": true,
+		// 			"vacancy.validity": { $gte: new Date() }
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "qualifications",
+		// 			localField: "vacancy._qualification",
+		// 			foreignField: "_id",
+		// 			as: "qualifications"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "industries",
+		// 			localField: "vacancy._industry",
+		// 			foreignField: "_id",
+		// 			as: "industry"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "cities",
+		// 			localField: "vacancy.city",
+		// 			foreignField: "_id",
+		// 			as: "city"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "states",
+		// 			localField: "vacancy.state",
+		// 			foreignField: "_id",
+		// 			as: "state"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $sort: {
+		// 			"vacancy.sequence": 1,
+		// 			"vacancy.createdAt": -1
+		// 		  }
+		// 		},
+		// 		// {
+		// 		//   $facet: {
+		// 		// 	metadata: [{ $count: "total" }],
+		// 		// 	data: [
+		// 		// 	  { $skip: (parseInt(page) - 1) * parseInt(perPage) },
+		// 		// 	  { $limit: parseInt(perPage) }
+		// 		// 	]
+		// 		//   }
+		// 		// }
+		// 	  ];
+		//   console.log('agg' , agg)
+		// 	  const appliedJobs = await AppliedJobs.aggregate(agg);
+		// 	//   const count = appliedJobs[0].metadata[0]?.total || 0;
+		// 	//   const jobs = appliedJobs[0].data || [];
+		// 	//   const totalPages = Math.ceil(count / parseInt(perPage));
+
+		// console.log('appliedJobs' , appliedJobs)
+
+		// 	  return res.json({
+		// 		jobs
+		// 	  });
+		return res.json({
+			jobs: jobHistory
+		});
 
 	} catch (err) {
 		console.log("Caught error:", err);
 		return res.status(500).json({ status: "failure", message: "Internal Server Error" });
 	}
-  });
+});
 
-  router.get('/calendar-visit-data', [isCollege], async (req, res) => {
+router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 	try {
-	  const { startDate, endDate } = req.query;
-	  
-	  // Find all applied courses with visit data
-	  const appliedCourses = await AppliedCourses.find({
-		_college: req.session.college._id
-	  })
-	  .populate('_candidate', 'name mobile email')
-	  .populate('_course', 'name')
-	  .populate('_center', 'name');
-	  
-	  const calendarData = [];
-	  
-	  for (const appliedCourse of appliedCourses) {
-		// Get visit dates for this applied course
-		const visitDates = await CandidateVisitCalender.find({
-		  appliedCourse: appliedCourse._id
-		}).sort({ visitDate: 1 });
+		const { startDate, endDate } = req.query;
+		console.log("Query params:", req.query);
 		
-		// Filter visits by date range if provided
-		let filteredVisits = visitDates;
-		if (startDate && endDate) {
-		  filteredVisits = visitDates.filter(visit => {
-			const visitDate = new Date(visit.visitDate);
-			const start = new Date(startDate);
-			const end = new Date(endDate);
-			return visitDate >= start && visitDate <= end;
-		  });
+		// Get college ID from session or user
+		let collegeId = null;
+		if (req.session.college && req.session.college._id) {
+			collegeId = req.session.college._id;
+		} else if (req.user && req.user._id) {
+			// Try multiple ways to find college
+			let college = await College.findOne({ _concernPerson: req.user._id });
+			
+			if (!college) {
+				// Try to find by user's email domain
+				const userEmail = req.user.email;
+				if (userEmail && userEmail.includes('@focalyt.com')) {
+					college = await College.findOne({ 
+						email: { $regex: /focalyt\.com$/i } 
+					});
+				}
+			}
+			
+			if (!college) {
+				// Try to find any college (for testing)
+				college = await College.findOne({});
+			}
+			
+			if (college) {
+				collegeId = college._id;
+			} else {
+				console.log("❌ No college found for user");
+				
+			}
+		} else {
+			console.log("❌ No session college or user found");
 		}
 		
-		// Add to calendar data if visits exist
-		if (filteredVisits.length > 0) {
-		  filteredVisits.forEach(visit => {
-			calendarData.push({
-			  id: visit._id,
-			  title: `${appliedCourse._candidate.name} - ${visit.visitType}`,
-			  start: visit.visitDate,
-			  end: visit.visitDate,
-			  visitType: visit.visitType,
-			  candidateName: appliedCourse._candidate.name,
-			  candidateMobile: appliedCourse._candidate.mobile,
-			  candidateEmail: appliedCourse._candidate.email,
-			  courseName: appliedCourse._course?.name,
-			  centerName: appliedCourse._center?.name,
-			  status: visit.status,
-			  appliedCourseId: appliedCourse._id
+		if (!collegeId) {
+			return res.status(400).json({
+				status: false,
+				message: 'College information not found'
 			});
-		  });
 		}
-	  }
-	  
-	  res.json({
-		status: true,
-		message: 'Calendar visit data fetched successfully',
-		data: calendarData
-	  });
-	  
+		
+		console.log("College ID:", collegeId);
+		
+		// Find all applied courses with visit data for this college
+		const appliedCourses = await AppliedCourses.find({
+			_college: collegeId
+		})
+			.populate('_candidate', 'name mobile email')
+			.populate('_course', 'name')
+			.populate('_center', 'name');
+console.log("appliedCourses" , appliedCourses)
+		const calendarData = [];
+
+		for (const appliedCourse of appliedCourses) {
+			// Get visit dates for this applied course
+			const visitDates = await CandidateVisitCalender.find({
+				appliedCourse: appliedCourse._id
+			}).sort({ visitDate: 1 });
+
+			// Filter visits by date range if provided
+			let filteredVisits = visitDates;
+			if (startDate && endDate) {
+				filteredVisits = visitDates.filter(visit => {
+					const visitDate = new Date(visit.visitDate);
+					const start = new Date(startDate);
+					const end = new Date(endDate);
+					return visitDate >= start && visitDate <= end;
+				});
+			}
+
+					// Add to calendar data if visits exist
+		if (filteredVisits.length > 0) {
+			filteredVisits.forEach(visit => {
+				console.log("Visit data:", {
+					id: visit._id,
+					visitDate: visit.visitDate,
+					visitType: visit.visitType,
+					status: visit.status,
+					candidateName: appliedCourse._candidate.name
+				});
+				
+				calendarData.push({
+					id: visit._id,
+					title: `${appliedCourse._candidate.name} - ${visit.visitType}`,
+					start: visit.visitDate,
+					end: visit.visitDate,
+					visitType: visit.visitType,
+					candidateName: appliedCourse._candidate.name,
+					candidateMobile: appliedCourse._candidate.mobile,
+					candidateEmail: appliedCourse._candidate.email,
+					courseName: appliedCourse._course?.name,
+					centerName: appliedCourse._center?.name,
+					status: visit.status,
+					appliedCourseId: appliedCourse._id,
+					
+				});
+			});
+		}
+		}
+console.log("calendarData1" , calendarData)
+		res.json({
+			status: true,
+			message: 'Calendar visit data fetched successfully',
+			data: calendarData
+		});
+
 	} catch (error) {
-	  console.error('Error fetching calendar visit data:', error);
-	  res.status(500).json({
-		status: false,
-		message: 'Error fetching calendar visit data'
-	  });
+		console.error('Error fetching calendar visit data:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Error fetching calendar visit data'
+		});
 	}
 });
 module.exports = router;
