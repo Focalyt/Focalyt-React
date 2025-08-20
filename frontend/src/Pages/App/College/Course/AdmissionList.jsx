@@ -260,7 +260,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
+const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -296,7 +296,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
-        setAllProfiles(prevProfiles => 
+        setAllProfiles(prevProfiles =>
           prevProfiles.map(profile => {
             if (profile._id === selectedProfile._id) {
               // Update the _candidate data with the updated profile from result
@@ -308,7 +308,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             return profile;
           })
         );
-        setOpenModalId(null); 
+        setOpenModalId(null);
         setSelectedProfile(null)
       }
     }
@@ -395,6 +395,92 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchModal, setShowBranchModal] = useState(false);
+
+
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
+
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    console.log('res..', response)
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    console.log("updateBranch")
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+    console.log("profile", profileId)
+    console.log("profileId", profileId)
+    console.log("selectedBranchId", selectedBranchId)
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      console.log('response', response)
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
+
   // Fetch filter options from backend API on mount
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -504,7 +590,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     showFollowupPanel,
     leadHistoryPanel,
     showWhatsappPanel,
-    mainContentClass , isPanelOpen]);
+    mainContentClass, isPanelOpen]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -589,13 +675,13 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     if (showDocumentModal || showUploadModal || showEditPanel || showWhatsappPanel || showAssignBatchPanel) {
       // Store the current scroll position
       const scrollY = window.scrollY;
-      
+
       // Add styles to prevent scrolling
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-      
+
       // Return function to restore scrolling when modal closes
       return () => {
         document.body.style.position = '';
@@ -1093,6 +1179,52 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   };
 
 
+  useEffect(() => {
+    fetchCourseHistory();
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
 
   const [user, setUser] = useState({
     image: '',
@@ -1477,7 +1609,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     setShowPopup(prev => prev === profileIndex ? null : profileIndex);
   };
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
@@ -1677,7 +1810,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom In"
         >
-          <i className="fas fa-search-plus"></i> 
+          <i className="fas fa-search-plus"></i>
         </button>
 
         <button
@@ -1697,7 +1830,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             style={{ whiteSpace: 'nowrap' }}
             title="Rotate 90°"
           >
-            <i className="fas fa-redo"></i> 
+            <i className="fas fa-redo"></i>
           </button>
         )}
 
@@ -1708,7 +1841,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Reset View"
         >
-          <i className="fas fa-sync-alt"></i> 
+          <i className="fas fa-sync-alt"></i>
         </button>
 
         {/* Download Button */}
@@ -2190,7 +2323,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
-// console.log("upload modal render....")
+    // console.log("upload modal render....")
     return (
       <div className="upload-modal-overlay" onClick={closeUploadModal}>
         <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -2313,11 +2446,11 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     const handleClickOutside = (event) => {
       const isMultiSelectClick = event.target.closest('.multi-select-container-new');
       const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
-      
+
       if (isAnyModalOpen) {
         return; // Do nothing if any modal is open
       }
-      
+
       if (!isMultiSelectClick) {
         setDropdownStates(prev =>
           Object.keys(prev).reduce((acc, key) => {
@@ -2354,7 +2487,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-;
+  ;
 
 
   const handleRejectionReasonChange = (e) => {
@@ -3000,7 +3133,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                       <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                         <div className="btn-group">
-                                           <div style={{ position: "relative", display: "inline-block" }}>
+                                          <div style={{ position: "relative", display: "inline-block" }}>
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
                                               onClick={() => togglePopup(profileIndex)}
@@ -3022,322 +3155,164 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                   zIndex: 8,
                                                 }}
                                               ></div>
-                                                                                      )}
+                                            )}
 
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openleadHistoryPanel(profile);
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('leadHistory', profile)
-                                              }}
-                                            >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openEditPanel(profile, 'SetFollowup');
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('SetFollowup', profile)
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                //  onClick={() => {
-                                                //   openAssignBatchPanel(profile);
-                                                //   console.log('selectedProfile', profile);
-                                                //  }}
-                                                onClick={() => {
-                                                  setShowPopup(null)
-                                                  openPanel('SetFollowup', profile)
-                                                }}
-                                            >
-                                              Assign Batch
-                                            </button>
-                                          </div>
-                                        </div> 
-
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => setLeadDetailsVisible(profileIndex)}
-                                        >
-                                          {leadDetailsVisible === profileIndex ? (
-                                            <i className="fas fa-chevron-up"></i>
-                                          ) : (
-                                            <i className="fas fa-chevron-down"></i>
-                                          )}
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                     <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                      <div className="btn-group">
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => togglePopup(profileIndex)}
-                                            aria-label="Options"
-                                          >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                          </button>
-
-                                          {showPopup === profileIndex && (
                                             <div
-                                              onClick={() => setShowPopup(null)}
                                               style={{
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                width: "100vw",
-                                                height: "100vh",
-                                                backgroundColor: "transparent",
+                                                position: "absolute",
+                                                top: "28px",
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
                                                 zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => openleadHistoryPanel(profile)}
-                                               onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('leadHistory', profile)
-                                                  }}
-                                            >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openEditPanel(profile, 'SetFollowup');
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('SetFollowup', profile)
+                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup ? "auto" : "none",
+                                                display: showPopup === profileIndex ? "block" : "none"
                                               }}
                                             >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleDownloadAdmissionForm(profile)}
+                                              >
+                                                Download Admission Form
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMarkDropout(profile)}
+                                              >
+                                                Mark Dropout
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
                                                 // onClick={() => {
-                                                //   openAssignBatchPanel(profile);
+                                                //   openleadHistoryPanel(profile);
                                                 //   console.log('selectedProfile', profile);
                                                 // }}
                                                 onClick={() => {
                                                   setShowPopup(null)
-                                                  openPanel('AssignBatch', profile)
+                                                  openPanel('leadHistory', profile)
                                                 }}
                                               >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                // onClick={() => {
+                                                //   openEditPanel(profile, 'SetFollowup');
+                                                //   console.log('selectedProfile', profile);
+                                                // }}
+                                                onClick={() => {
+                                                  setShowPopup(null)
+                                                  openPanel('SetFollowup', profile)
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Edit Profile
+                                              </button>
+                                              {/* <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                 onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                 }}
+                                                                                             
+                                              >
                                                 Assign Batch
+                                              </button> */}
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  setSelectedProfile(profile);
+                                                  getBranches(profile);
+                                                  setShowBranchModal(true);
+                                                  console.log('change Branch')
+
+                                                }}
+                                              >
+                                                Change Branch
                                               </button>
                                             </div>
                                           </div>
@@ -3353,7 +3328,203 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                             )}
                                           </button>
                                         </div>
-                                      </div> 
+                                      </div>
+
+                                      <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                        <div className="btn-group">
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={() => togglePopup(profileIndex)}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+
+                                            {showPopup === profileIndex && (
+                                              <div
+                                                onClick={() => setShowPopup(null)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 8,
+                                                }}
+                                              ></div>
+                                            )}
+
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: "28px",
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 8,
+                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                display: showPopup === profileIndex ? "block" : "none"
+                                              }}
+                                            >
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleDownloadAdmissionForm(profile)}
+                                              >
+                                                Download Admission Form
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMarkDropout(profile)}
+                                              >
+                                                Mark Dropout
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                // onClick={() => openleadHistoryPanel(profile)}
+                                                onClick={() => {
+                                                  setShowPopup(null)
+                                                  openPanel('leadHistory', profile)
+                                                }}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                // onClick={() => {
+                                                //   openEditPanel(profile, 'SetFollowup');
+                                                //   console.log('selectedProfile', profile);
+                                                // }}
+                                                onClick={() => {
+                                                  setShowPopup(null)
+                                                  openPanel('SetFollowup', profile)
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Edit Profile
+                                              </button>
+                                              {/* <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                               
+                                              >
+                                                Assign Batch
+                                              </button> */}
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  setSelectedProfile(profile);
+                                                  getBranches(profile);
+                                                  setShowBranchModal(true);
+                                                  console.log('change Branch')
+
+                                                }}
+                                              >
+                                                Change Branch
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => setLeadDetailsVisible(profileIndex)}
+                                          >
+                                            {leadDetailsVisible === profileIndex ? (
+                                              <i className="fas fa-chevron-up"></i>
+                                            ) : (
+                                              <i className="fas fa-chevron-down"></i>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
 
                                       {/* <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                         <div className="btn-group">
@@ -3531,7 +3702,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                         <li className="nav-item" key={tabIndex}>
                                           <button
                                             className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                            onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                            onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
                                           >
                                             {tab}
                                           </button>
@@ -4087,25 +4258,31 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     <th>S.No</th>
                                                     <th>Company Name</th>
                                                     <th>Position</th>
-                                                    <th>Duration</th>
+                                                    {/* <th>Duration</th>
                                                     <th>Location</th>
-                                                    <th>Status</th>
+                                                    <th>Status</th> */}
                                                   </tr>
                                                 </thead>
                                                 <tbody>
-                                                  {experiences.map((job, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{job.companyName}</td>
-                                                      <td>{job.jobTitle}</td>
-                                                      <td>
-                                                        {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                        {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                      </td>
-                                                      <td>Remote</td>
-                                                      <td><span className="text-success">Completed</span></td>
+                                                  {jobHistory?.length > 0 ? (
+                                                    jobHistory?.map((job, index) => (
+                                                      <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{job._job.displayCompanyName}</td>
+                                                        <td>{job._job.title}</td>
+                                                        {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                      </tr>
+                                                    ))
+                                                  ) : (
+                                                    <tr>
+                                                      <td colSpan={6} className="text-center">No job history available</td>
                                                     </tr>
-                                                  ))}
+                                                  )}
                                                 </tbody>
                                               </table>
                                             </div>
@@ -4130,8 +4307,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                   </tr>
                                                 </thead>
                                                 <tbody>
-                                                  {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                    profile._candidate._appliedCourses.map((course, index) => (
+                                                  {courseHistory?.length > 0 ? (
+                                                    courseHistory?.map((course, index) => (
                                                       <tr key={index}>
                                                         <td>{index + 1}</td>
                                                         <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
@@ -4427,7 +4604,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                                 {(!latestUpload) ? (
                                                                   <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                     setSelectedProfile(profile); // Set the current profile
-                                                                    openUploadModal(doc);   
+                                                                    openUploadModal(doc);
                                                                     console.log("opening modal")     // Open the upload modal
                                                                   }}>
                                                                     <i className="fas fa-cloud-upload-alt"></i>
@@ -4608,6 +4785,64 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         )}
 
       </div>
+
+
+        {showBranchModal && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{margin: 'auto'}}>
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Select Branch</h1>
+                <button type="button" className="btn-close" onClick={() => {
+                  setShowBranchModal(false);
+                  setSelectedProfile(null);
+                }}></button>
+              </div>
+              <div className="modal-body">
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="course"
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef',
+
+                    }}
+
+                  >
+                    <option value="">Select Branch</option>
+                    {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                      <option key={branch._id || index} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setShowBranchModal(false);
+                  setSelectedBranch('');
+                  setSelectedProfile(null);
+                }}>Close</button>
+                <button type="button" className="btn btn-primary" onClick={() => updateBranch(selectedProfile, selectedBranch)}>Save Branch</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+     
+
       <style>
         {
           `
@@ -5785,14 +6020,6 @@ background: #fd2b5a;
     overflow: hidden;
 }
 
-.modal-content {
-    background-color: #fff;
-    max-height: 90vh;
-    width: 80%;
-    overflow-y: auto;
-    padding: 20px;
-    border-radius: 8px;
-}
 
 .doc-iframe {
     transform-origin: top left;

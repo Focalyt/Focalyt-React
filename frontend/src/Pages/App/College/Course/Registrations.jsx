@@ -1288,7 +1288,7 @@ const CRMDashboard = () => {
       },
 
     },
-    
+
   });
 
   // Form validation state
@@ -1301,6 +1301,11 @@ const CRMDashboard = () => {
   const [centers, setCenters] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
+
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+
   // Fetch courses, centers, and qualifications on component mount
   useEffect(() => {
     fetchFormData();
@@ -1345,13 +1350,13 @@ const CRMDashboard = () => {
       setLoadingData(false);
     }
   };
-  
- //fetch centers
-useEffect(() => {
-  fetchCentersByCourse(courseId);
-}, [courseId]);
 
- 
+  //fetch centers
+  useEffect(() => {
+    fetchCentersByCourse(courseId);
+  }, [courseId]);
+
+
   const fetchCentersByCourse = async (courseId) => {
     try {
       if (!courseId) {
@@ -1432,7 +1437,7 @@ useEffect(() => {
       console.log('API Response:', response);
       if (response.data.status) {
         alert("Lead added successfully");
-        
+
         // Reset all form fields
         setCandidateFormData({
           name: '',
@@ -1454,11 +1459,11 @@ useEffect(() => {
             }
 
           },
-        
+
           highestQualification: '',
-          
+
         });
-        
+
         // Reset form selection fields
         setCourseId('');
         setCenterId('');
@@ -1581,6 +1586,54 @@ useEffect(() => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    fetchCourseHistory();
+    console.log("courseHistory", courseHistory)
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
 
   // Calculate total selected filters
   const totalSelected = Object.values(formData).reduce((total, filter) => total + (filter.values.length || 0), 0);
@@ -1997,6 +2050,15 @@ useEffect(() => {
     try {
 
       console.log('Function in try');
+      
+      if(profile?._course?.center || profile?._course?.center?.length > 0){
+        if (!profile._center || !profile._center._id) {
+          alert('Please assign a branch/center first before moving to KYC!');
+          return;
+        }
+      }
+      
+
       // Prepare the request body
       const updatedData = {
         kycStage: true
@@ -2294,6 +2356,12 @@ useEffect(() => {
   };
 
   const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
+    
     const courseId = profile._course._id;
     const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
       headers: {
@@ -2620,7 +2688,8 @@ useEffect(() => {
 
 
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
@@ -4953,7 +5022,7 @@ useEffect(() => {
                                             Profile Edit
                                           </button>
 
-                                          <button
+                                          {/* <button
                                             className="btn btn-primary border-0 text-black"
                                             style={{
                                               width: "100%",
@@ -4972,7 +5041,7 @@ useEffect(() => {
                                             }}
                                           >
                                             Change Center
-                                          </button>
+                                          </button> */}
 
                                           <button
                                             className="btn btn-primary border-0 text-black"
@@ -5165,7 +5234,7 @@ useEffect(() => {
                                           >
                                             Profile Edit
                                           </button>
-                                          <button
+                                          {/* <button
                                             className="btn btn-primary border-0 text-black"
                                             style={{
                                               width: "100%",
@@ -5184,8 +5253,8 @@ useEffect(() => {
                                             }}
                                           >
                                             Change Center
-                                          </button>
-                                          <button
+                                          </button>*/}
+                                          <button 
                                             className="btn btn-primary border-0 text-black"
                                             style={{
                                               width: "100%",
@@ -5235,7 +5304,7 @@ useEffect(() => {
                                     <li className="nav-item" key={tabIndex}>
                                       <button
                                         className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                        onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
                                       >
                                         {tab}
                                       </button>
@@ -5881,25 +5950,32 @@ useEffect(() => {
                                                   <th>S.No</th>
                                                   <th>Company Name</th>
                                                   <th>Position</th>
-                                                  <th>Duration</th>
+                                                  {/* <th>Duration</th>
                                                   <th>Location</th>
-                                                  <th>Status</th>
+                                                  <th>Status</th> */}
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {profile._candidate?.experiences?.map((job, index) => (
-                                                  <tr key={index}>
-                                                    <td>{index + 1}</td>
-                                                    <td>{job.companyName}</td>
-                                                    <td>{job.jobTitle}</td>
-                                                    <td>
-                                                      {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                      {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                    </td>
-                                                    <td>Remote</td>
-                                                    <td><span className="text-success">Completed</span></td>
-                                                  </tr>
-                                                ))}
+                                               
+                                                {jobHistory?.length > 0 ? (
+                                                        jobHistory?.map((job, index) => (
+                                                          <tr key={index}>
+                                                          <td>{index + 1}</td>
+                                                          <td>{job._job.displayCompanyName}</td>
+                                                          <td>{job._job.title}</td>
+                                                          {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                        </tr>
+                                                        ))
+                                                      ) : (
+                                                        <tr>
+                                                          <td colSpan={6} className="text-center">No job history available</td>
+                                                        </tr>
+                                                      )}
                                               </tbody>
                                             </table>
                                           </div>
@@ -5910,6 +5986,7 @@ useEffect(() => {
                                     {/* Course History Tab */}
                                     {/* {activeTab === 3 && ( */}
                                     {(activeTab[profileIndex] || 0) === 3 && (
+
                                       <div className="tab-pane active" id="course-history">
                                         <div className="section-card">
                                           <div className="table-responsive">
@@ -5925,8 +6002,8 @@ useEffect(() => {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                  profile._candidate._appliedCourses.map((course, index) => (
+                                                {courseHistory?.length > 0 ? (
+                                                  courseHistory?.map((course, index) => (
                                                     <tr key={index}>
                                                       <td>{index + 1}</td>
                                                       <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
@@ -5941,7 +6018,6 @@ useEffect(() => {
                                                     <td colSpan={6} className="text-center">No course history available</td>
                                                   </tr>
                                                 )}
-
                                               </tbody>
                                             </table>
                                           </div>

@@ -378,6 +378,12 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Admission Cycle Post</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
+                    <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faCalendarAlt} />
+                      <span className="menu-title">Calendar Follow-up B2C</span>
+                    </Link>
+                  </li>
                   <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
                     <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faBell} />

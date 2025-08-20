@@ -59,7 +59,9 @@ const {
 	SubQualification,
 	Courses,
 	AppliedCourses,
-	QuestionAnswer
+	AppliedJobs,
+	QuestionAnswer,
+	CandidateVisitCalender
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 
@@ -1337,7 +1339,9 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 
 router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
+		console.log('assign batch api hiting...')
 		const { batchId, appliedCourseId } = req.body
+		console.log('batchId', batchId)
 		if (!batchId || !appliedCourseId) {
 			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
 		}
@@ -1690,7 +1694,7 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 
 
-		} else if (status === 'Dropout') {	
+		} else if (status === 'Dropout') {
 			// Check if student is already in dropout
 			if (appliedCourse.dropout) {
 				return res.status(400).json({
@@ -1849,7 +1853,7 @@ router.get('/zero-period-students/:batchId', [isCollege], async (req, res) => {
 router.post('/questionAnswer', [isCollege], async (req, res) => {
 	try {
 		console.log("questions", req.body)
-		const { appliedcourse, responses } = req.body;
+		const { appliedcourse, responses, visitDate } = req.body;
 		console.log("questions", req.body)
 
 		if (!appliedcourse || !responses || !Array.isArray(responses) || responses.length === 0) {
@@ -1867,13 +1871,24 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 			});
 		}
 
+
+		const response = responses.map(response => {
+			if (response.question === 'Are you Going to Attend Center for Physical Counselling' && visitDate) {
+				return {
+					...response,
+					visitDate: visitDate
+				};
+			}
+			return response;
+		});
+
 		// Check if question answer already exists for this applied course
 		const existingQuestionAnswer = await QuestionAnswer.findOne({ appliedcourse });
 		if (existingQuestionAnswer) {
 			// Update existing record
 			existingQuestionAnswer.responses = responses;
 			await existingQuestionAnswer.save();
-			
+
 			return res.status(200).json({
 				status: true,
 				message: 'Question answer updated successfully',
@@ -1886,7 +1901,7 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 		// Create new question answer entry
 		const questionAnswer = new QuestionAnswer({
 			appliedcourse,
-			responses
+			responses: response
 		});
 		console.log("questionAnswer", questionAnswer)
 
@@ -1912,7 +1927,7 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => {
 	try {
 		const { appliedcourseId } = req.params;
-		console.log("appliedcourseId", appliedcourseId)
+		// console.log("appliedcourseId", appliedcourseId)
 
 		if (!appliedcourseId) {
 			return res.status(400).json({
@@ -1922,7 +1937,7 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 		}
 
 		const questionAnswer = await QuestionAnswer.findOne({ appliedcourse: appliedcourseId });
-		
+
 		if (!questionAnswer) {
 			return res.status(404).json({
 				status: false,
@@ -1930,10 +1945,18 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 			});
 		}
 
+		// Get visit dates for this applied course
+		const visitDates = await CandidateVisitCalender.find({
+			appliedCourse: appliedcourseId
+		}).sort({ visitDate: 1 });
+
 		return res.status(200).json({
 			status: true,
 			message: 'Question answers retrieved successfully',
-			data: questionAnswer
+			data: {
+				...questionAnswer.toObject(),
+				visitDates: visitDates
+			}
 		});
 	} catch (error) {
 		console.error('Error fetching question answers:', error);
@@ -1944,5 +1967,396 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 	}
 });
 
+// Visit Calendar APIs
+router.post('/visit-calendar', [isCollege], async (req, res) => {
+	try {
+		const { visitDate, visitType, appliedCourseId, includeQuestionAnswers } = req.body;
 
+		if (!visitDate || !visitType || !appliedCourseId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required fields: visitDate, visitType, appliedCourseId'
+			});
+		}
+
+		const newVisit = new CandidateVisitCalender({
+			appliedCourse: appliedCourseId,
+			visitDate: new Date(visitDate),
+			visitType: visitType,
+			createdBy: req.user._id,
+			status: 'pending'
+		});
+
+		await newVisit.save();
+
+		res.status(201).json({
+			status: true,
+			message: 'Visit scheduled successfully',
+			data: newVisit
+		});
+
+	} catch (error) {
+		console.error('Error creating visit calendar:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Internal server error'
+		});
+	}
+});
+
+router.get('/visit-calendar/:appliedCourseId', [isCollege], async (req, res) => {
+	try {
+		const { appliedCourseId } = req.params;
+
+		if (!appliedCourseId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Applied course ID is required'
+			});
+		}
+
+		const visits = await CandidateVisitCalender.find({
+			appliedCourse: appliedCourseId
+		})
+			.populate('appliedCourse')
+			.populate('createdBy', 'name email')
+			.sort({ visitDate: 1 });
+
+		res.json({
+			status: true,
+			data: visits
+		});
+	} catch (error) {
+		console.error('Error fetching visit calendar:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Internal server error'
+		});
+	}
+});
+
+router.put('/visit-calendar/:visitId', [isCollege], async (req, res) => {
+	try {
+		const { visitId } = req.params;
+		const { status, remarks } = req.body;
+
+		if (!visitId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Visit ID is required'
+			});
+		}
+
+		const visit = await CandidateVisitCalender.findByIdAndUpdate(
+			visitId,
+			{
+				status,
+				remarks,
+				updatedBy: req.user._id,
+				statusUpdatedAt: new Date()
+			},
+			{ new: true }
+		).populate('appliedCourse')
+			.populate('createdBy', 'name email')
+			.populate('updatedBy', 'name email');
+
+		if (!visit) {
+			return res.status(404).json({
+				status: false,
+				message: 'Visit not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			message: 'Visit status updated successfully',
+			data: visit
+		});
+	} catch (error) {
+		console.error('Error updating visit calendar:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Internal server error'
+		});
+	}
+});
+
+router.get("/appliedCourses/:candidateId", async (req, res) => {
+	try {
+		console.log("API hitting");
+		const { candidateId } = req.params;
+		// console.log("candidateId", candidateId)
+
+		// Find candidate
+		const candidate = await Candidate.findOne({
+			_id: candidateId,
+			isDeleted: false,
+			status: true
+		});
+
+		if (!candidate || !candidate?.appliedCourses?.length) {
+			return res.json({
+				courses: [],
+			});
+		}
+		// console.log("candidate1", candidate)
+
+		//   // Get paginated applied course entries
+		const courses = await AppliedCourses.find({ _candidate: candidate._id })
+			.populate({ path: '_course', populate: { path: 'sectors' } })
+			.sort({ createdAt: -1 })
+		// .skip((page - 1) * perPage)
+		// .limit(perPage);
+
+		//   const count = await AppliedCourses.countDocuments({ _candidate: candidate._id });
+
+		//   const totalPages = Math.ceil(count / perPage);
+
+		// console.log('courses', courses)
+
+		return res.json({
+			courses,
+		});
+
+	} catch (err) {
+		console.log("Caught error:", err);
+		return res.status(500).json({ status: "failure", message: "Internal Server Error" });
+	}
+});
+
+router.get("/appliedJobs/:candidateId", async (req, res) => {
+	try {
+
+		console.log('applied jobs...')
+		const { candidateId } = req.params;
+		console.log("candidateId", candidateId)
+
+		const jobHistory = await AppliedJobs.find({ _candidate: candidateId }).populate({ path: '_job' })
+		console.log('jobHistory', jobHistory)
+		// 	  if(!candidate || !candidate?.appliedJobs?.length){
+		// 		return res.json({
+		// 			jobs: []
+		// 		});
+		// 	  }
+		// 	  console.log('candidate_new' , candidate)
+
+		// 	  const agg = [
+		// 		{ $match: { _candidate: candidate._id } },
+		// 		{
+		// 		  $lookup: {
+		// 			from: "companies",
+		// 			localField: "_company",
+		// 			foreignField: "_id",
+		// 			as: "_company"
+		// 		  }
+		// 		},
+		// 		{ $unwind: "$_company" },
+		// 		{
+		// 		  $match: {
+		// 			"_company.isDeleted": false,
+		// 			"_company.status": true
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "vacancies",
+		// 			localField: "_job",
+		// 			foreignField: "_id",
+		// 			as: "vacancy"
+		// 		  }
+		// 		},
+		// 		{ $unwind: "$vacancy" },
+		// 		{
+		// 		  $match: {
+		// 			"vacancy.status": true,
+		// 			"vacancy.validity": { $gte: new Date() }
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "qualifications",
+		// 			localField: "vacancy._qualification",
+		// 			foreignField: "_id",
+		// 			as: "qualifications"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "industries",
+		// 			localField: "vacancy._industry",
+		// 			foreignField: "_id",
+		// 			as: "industry"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "cities",
+		// 			localField: "vacancy.city",
+		// 			foreignField: "_id",
+		// 			as: "city"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $lookup: {
+		// 			from: "states",
+		// 			localField: "vacancy.state",
+		// 			foreignField: "_id",
+		// 			as: "state"
+		// 		  }
+		// 		},
+		// 		{
+		// 		  $sort: {
+		// 			"vacancy.sequence": 1,
+		// 			"vacancy.createdAt": -1
+		// 		  }
+		// 		},
+		// 		// {
+		// 		//   $facet: {
+		// 		// 	metadata: [{ $count: "total" }],
+		// 		// 	data: [
+		// 		// 	  { $skip: (parseInt(page) - 1) * parseInt(perPage) },
+		// 		// 	  { $limit: parseInt(perPage) }
+		// 		// 	]
+		// 		//   }
+		// 		// }
+		// 	  ];
+		//   console.log('agg' , agg)
+		// 	  const appliedJobs = await AppliedJobs.aggregate(agg);
+		// 	//   const count = appliedJobs[0].metadata[0]?.total || 0;
+		// 	//   const jobs = appliedJobs[0].data || [];
+		// 	//   const totalPages = Math.ceil(count / parseInt(perPage));
+
+		// console.log('appliedJobs' , appliedJobs)
+
+		// 	  return res.json({
+		// 		jobs
+		// 	  });
+		return res.json({
+			jobs: jobHistory
+		});
+
+	} catch (err) {
+		console.log("Caught error:", err);
+		return res.status(500).json({ status: "failure", message: "Internal Server Error" });
+	}
+});
+
+router.get('/calendar-visit-data', [isCollege], async (req, res) => {
+	try {
+		const { startDate, endDate } = req.query;
+		console.log("Query params:", req.query);
+		
+		// Get college ID from session or user
+		let collegeId = null;
+		if (req.session.college && req.session.college._id) {
+			collegeId = req.session.college._id;
+		} else if (req.user && req.user._id) {
+			// Try multiple ways to find college
+			let college = await College.findOne({ _concernPerson: req.user._id });
+			
+			if (!college) {
+				// Try to find by user's email domain
+				const userEmail = req.user.email;
+				if (userEmail && userEmail.includes('@focalyt.com')) {
+					college = await College.findOne({ 
+						email: { $regex: /focalyt\.com$/i } 
+					});
+				}
+			}
+			
+			if (!college) {
+				// Try to find any college (for testing)
+				college = await College.findOne({});
+			}
+			
+			if (college) {
+				collegeId = college._id;
+			} else {
+				console.log("❌ No college found for user");
+				
+			}
+		} else {
+			console.log("❌ No session college or user found");
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				status: false,
+				message: 'College information not found'
+			});
+		}
+		
+		console.log("College ID:", collegeId);
+		
+		// Find all applied courses with visit data for this college
+		const appliedCourses = await AppliedCourses.find({
+			_college: collegeId
+		})
+			.populate('_candidate', 'name mobile email')
+			.populate('_course', 'name')
+			.populate('_center', 'name');
+console.log("appliedCourses" , appliedCourses)
+		const calendarData = [];
+
+		for (const appliedCourse of appliedCourses) {
+			// Get visit dates for this applied course
+			const visitDates = await CandidateVisitCalender.find({
+				appliedCourse: appliedCourse._id
+			}).sort({ visitDate: 1 });
+
+			// Filter visits by date range if provided
+			let filteredVisits = visitDates;
+			if (startDate && endDate) {
+				filteredVisits = visitDates.filter(visit => {
+					const visitDate = new Date(visit.visitDate);
+					const start = new Date(startDate);
+					const end = new Date(endDate);
+					return visitDate >= start && visitDate <= end;
+				});
+			}
+
+					// Add to calendar data if visits exist
+		if (filteredVisits.length > 0) {
+			filteredVisits.forEach(visit => {
+				console.log("Visit data:", {
+					id: visit._id,
+					visitDate: visit.visitDate,
+					visitType: visit.visitType,
+					status: visit.status,
+					candidateName: appliedCourse._candidate.name
+				});
+				
+				calendarData.push({
+					id: visit._id,
+					title: `${appliedCourse._candidate.name} - ${visit.visitType}`,
+					start: visit.visitDate,
+					end: visit.visitDate,
+					visitType: visit.visitType,
+					candidateName: appliedCourse._candidate.name,
+					candidateMobile: appliedCourse._candidate.mobile,
+					candidateEmail: appliedCourse._candidate.email,
+					courseName: appliedCourse._course?.name,
+					centerName: appliedCourse._center?.name,
+					status: visit.status,
+					appliedCourseId: appliedCourse._id,
+					
+				});
+			});
+		}
+		}
+console.log("calendarData1" , calendarData)
+		res.json({
+			status: true,
+			message: 'Calendar visit data fetched successfully',
+			data: calendarData
+		});
+
+	} catch (error) {
+		console.error('Error fetching calendar visit data:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Error fetching calendar visit data'
+		});
+	}
+});
 module.exports = router;

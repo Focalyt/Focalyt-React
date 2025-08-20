@@ -245,27 +245,18 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         }
     }, [centers, selectedProject, selectedVertical]); // Depend on centers, selectedProject, and selectedVertical
 
-    
+    // Removed duplicate useEffect that was conflicting with URL restoration
+
     useEffect(() => {
-        const urlParams = getURLParams();
-        if (urlParams.stage === 'course' && urlParams.centerId) {
-            // If the URL shows 'course' stage and a centerId, go to courses
-            const center = centers.find(c => c._id === urlParams.centerId);
-            if (center) {
-                setSelectedCenterForCourses(center);
-                setShowCourses(true);
-            }
+        // Get projectId from selectedProject prop or URL
+        const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
+        
+        if (projectId && token) {
+            fetchCenters();
         } else {
-            // Default to 'center' stage
-            setShowCourses(false);
+            console.log('No projectId or token available, not fetching centers');
         }
-    }, [centers]);
-
-    useEffect(() => {
-
-        fetchCenters();
-
-    }, []);
+    }, [selectedProject?._id, token]);
 
     useEffect(() => {
 
@@ -275,10 +266,20 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     }, [alignCenter]);
 
     const fetchCenters = async () => {
+        // Get projectId from selectedProject prop or URL (for refresh cases)
+        const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
+        
+        if (!projectId) {
+            console.warn('No projectId available from selectedProject or URL');
+            setCenters([]);
+            setError('No project context available');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${backendUrl}/college/list-centers?projectId=${selectedProject._id}`, {
+            const response = await fetch(`${backendUrl}/college/list-centers?projectId=${projectId}`, {
                 headers: {
                     'x-auth': token,
                 },
@@ -745,7 +746,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                 <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-dialog-centered modal-lg">
                         <div className="modal-content">
-                            <div className="modal-header text-success text-white">
+                            <div className="modal-header text-success text-white" style={{ backgroundColor: '#fc2b5a' }}>
                                 <h5 className="modal-title">
                                     {alignCenter
                                         ? 'Align Existing Center'
