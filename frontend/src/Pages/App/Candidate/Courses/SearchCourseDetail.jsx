@@ -588,7 +588,7 @@ const CourseDetails = () => {
                             >
                               <img
                                 id="videoPlay"
-                                src={course.thumbnail ? getFileUrl(course.thumbnail) : '/images/pages/video_thum1.png'}
+                                src={course.thumbnail ? getFileUrl(course.thumbnail) : '/Assets/images/pages/video_thum1.png'}
                                 className="video_thum img-fluid"
                                 alt="Video thumbnail"
                               />

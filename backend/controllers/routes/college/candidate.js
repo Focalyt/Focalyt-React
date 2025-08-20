@@ -61,7 +61,8 @@ const {
 	AppliedCourses,
 	AppliedJobs,
 	QuestionAnswer,
-	CandidateVisitCalender
+	CandidateVisitCalender,
+	Center
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 
@@ -2246,109 +2247,102 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 		const { startDate, endDate } = req.query;
 		console.log("Query params:", req.query);
 		
-		// Get college ID from session or user
-		let collegeId = null;
-		if (req.session.college && req.session.college._id) {
-			collegeId = req.session.college._id;
-		} else if (req.user && req.user._id) {
-			// Try multiple ways to find college
-			let college = await College.findOne({ _concernPerson: req.user._id });
-			
-			if (!college) {
-				// Try to find by user's email domain
-				const userEmail = req.user.email;
-				if (userEmail && userEmail.includes('@focalyt.com')) {
-					college = await College.findOne({ 
-						email: { $regex: /focalyt\.com$/i } 
-					});
-				}
-			}
-			
-			if (!college) {
-				// Try to find any college (for testing)
-				college = await College.findOne({});
-			}
-			
-			if (college) {
-				collegeId = college._id;
-			} else {
-				console.log("❌ No college found for user");
-				
-			}
-		} else {
-			console.log("❌ No session college or user found");
-		}
-		
+		const collegeId = req.college?._id;
+		console.log("collegeId" , collegeId)
 		if (!collegeId) {
 			return res.status(400).json({
 				status: false,
 				message: 'College information not found'
 			});
 		}
-		
+
 		console.log("College ID:", collegeId);
 		
-		// Find all applied courses with visit data for this college
-		const appliedCourses = await AppliedCourses.find({
-			_college: collegeId
-		})
-			.populate('_candidate', 'name mobile email')
-			.populate('_course', 'name')
-			.populate('_center', 'name');
-console.log("appliedCourses" , appliedCourses)
-		const calendarData = [];
-
-		for (const appliedCourse of appliedCourses) {
-			// Get visit dates for this applied course
-			const visitDates = await CandidateVisitCalender.find({
-				appliedCourse: appliedCourse._id
-			}).sort({ visitDate: 1 });
-
-			// Filter visits by date range if provided
-			let filteredVisits = visitDates;
-			if (startDate && endDate) {
-				filteredVisits = visitDates.filter(visit => {
-					const visitDate = new Date(visit.visitDate);
-					const start = new Date(startDate);
-					const end = new Date(endDate);
-					return visitDate >= start && visitDate <= end;
-				});
-			}
-
-					// Add to calendar data if visits exist
-		if (filteredVisits.length > 0) {
-			filteredVisits.forEach(visit => {
-				console.log("Visit data:", {
-					id: visit._id,
-					visitDate: visit.visitDate,
-					visitType: visit.visitType,
-					status: visit.status,
-					candidateName: appliedCourse._candidate.name
-				});
-				
-				calendarData.push({
-					id: visit._id,
-					title: `${appliedCourse._candidate.name} - ${visit.visitType}`,
-					start: visit.visitDate,
-					end: visit.visitDate,
-					visitType: visit.visitType,
-					candidateName: appliedCourse._candidate.name,
-					candidateMobile: appliedCourse._candidate.mobile,
-					candidateEmail: appliedCourse._candidate.email,
-					courseName: appliedCourse._course?.name,
-					centerName: appliedCourse._center?.name,
-					status: visit.status,
-					appliedCourseId: appliedCourse._id,
-					
-				});
+		// Get ALL CandidateVisitCalender data (for debugging)
+		const allVisits = await CandidateVisitCalender.find({}).populate({
+			path: 'appliedCourse',
+			model: 'AppliedCourses',
+			populate: [
+				{
+					path: '_candidate',
+					model: 'CandidateProfile',
+					select: 'name mobile email'
+				},
+				{
+					path: '_course',
+					model: 'courses',
+					select: 'name'
+				},
+				{
+					path: '_center',
+					model: 'Center',
+					select: 'name'
+				},
+				{
+					path: 'batch',
+					model: 'Batch',
+					select: 'name'
+				}
+			]
+		});
+	
+		console.log("allVisits" , allVisits)
+		
+		// ✅ Apply date filtering if startDate and endDate are provided
+		let filteredVisits = allVisits;
+		if (startDate && endDate) {
+			console.log("🔍 Filtering by date range:", { startDate, endDate });
+			filteredVisits = allVisits.filter(visit => {
+				const visitDate = new Date(visit.visitDate);
+				const start = new Date(startDate);
+				const end = new Date(endDate);
+				const isInRange = visitDate >= start && visitDate <= end;
+				console.log(`Visit ${visit._id}: ${visit.visitDate} - In range: ${isInRange}`);
+				return isInRange;
 			});
+			console.log(`📊 Filtered visits: ${filteredVisits.length} out of ${allVisits.length}`);
 		}
-		}
-console.log("calendarData1" , calendarData)
-		res.json({
+		
+		// Format data for frontend calendar
+		const calendarData = filteredVisits.map(visit => {
+			const appliedCourse = visit.appliedCourse;
+			const candidate = appliedCourse._candidate;
+			const course = appliedCourse._course;
+			const center = appliedCourse._center;
+			const batch = appliedCourse.batch;
+			
+			return {
+				id: visit._id,
+				title: `${candidate?.name || 'Unknown'} - ${visit.visitType}`,
+				start: visit.visitDate,
+				end: visit.visitDate,
+				visitType: visit.visitType,
+				visitDate: visit.visitDate,
+				status: visit.status,
+				appliedCourseId: appliedCourse._id,
+				candidateId: appliedCourse._candidate,
+				candidateName: candidate?.name || 'Unknown',
+				candidateMobile: candidate?.mobile || 'Unknown',
+				candidateEmail: candidate?.email || 'Unknown',
+				courseId: appliedCourse._course,
+				courseName: course?.name || 'Unknown Course',
+				// centerId: appliedCourse._center,
+				centerName: center?.name || 'Unknown Center',
+				// batchId: appliedCourse.batch,
+				batchName: batch?.name || 'No Batch',
+				createdAt: visit.createdAt,
+				updatedAt: visit.updatedAt
+			};
+		});
+		
+		console.log("Formatted Calendar Data:", calendarData);
+		
+		
+		return res.json({
 			status: true,
 			message: 'Calendar visit data fetched successfully',
-			data: calendarData
+			data: calendarData,
+			totalVisits: calendarData.length
 		});
 
 	} catch (error) {
@@ -2359,4 +2353,8 @@ console.log("calendarData1" , calendarData)
 		});
 	}
 });
+// router.get('/calender-visit-data', [isCollege], async (req, res) => {
+// 	try{}
+// 	catch(err){}
+// })
 module.exports = router;
