@@ -273,10 +273,17 @@ const Student = ({
   const [registerCurrentMonth, setRegisterCurrentMonth] = useState(new Date().getMonth());
   const [registerCurrentYear, setRegisterCurrentYear] = useState(new Date().getFullYear());
   const [registerViewMode, setRegisterViewMode] = useState('month'); // 'month', 'week', 'custom'
-  const [registerDateRange, setRegisterDateRange] = useState({
-    startDate: '',
-    endDate: ''
+  const [registerDateRange, setRegisterDateRange] = useState(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: endOfMonth.toISOString().split('T')[0]
+    };
   });
+  const [registerTab, setRegisterTab] = useState("zeroPeriod");
 
   // open model for upload documents
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -2186,11 +2193,27 @@ const Student = ({
   const getRegisterDates = () => {
     let dates = [];
 
-    // Get start and end dates
-    const startDate = new Date(registerDateRange.startDate);
-    const endDate = new Date(registerDateRange.endDate);
+    // Get start and end dates with fallback to current month
+    let startDate, endDate;
+    
+    if (registerDateRange.startDate && registerDateRange.endDate) {
+      startDate = new Date(registerDateRange.startDate);
+      endDate = new Date(registerDateRange.endDate);
+    } else {
+      // Fallback to current month
+      const now = new Date();
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
 
-    // No need to convert to IST here as the dates are already in correct format
+    // Validate dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      // If dates are invalid, use current month
+      const now = new Date();
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+
     const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
@@ -2210,24 +2233,33 @@ const Student = ({
     return dates;
   };
 
-  const getAttendanceStatus = (profile, date) => {
-    const allSessions = [
-      ...(profile.attendance?.zeroPeriod?.sessions || []),
-      ...(profile.attendance?.regularPeriod?.sessions || [])
-    ];
+  const getAttendanceStatus = (profile, date, period = 'all') => {
+    let sessions = [];
+    
+    // Filter sessions based on period
+    if (period === 'zeroPeriod') {
+      sessions = profile.attendance?.zeroPeriod?.sessions || [];
+    } else if (period === 'batchFreeze') {
+      sessions = profile.attendance?.regularPeriod?.sessions || [];
+    } else {
+      // Default: combine both periods
+      sessions = [
+        ...(profile.attendance?.zeroPeriod?.sessions || []),
+        ...(profile.attendance?.regularPeriod?.sessions || [])
+      ];
+    }
 
     // The input date is already in IST format (YYYY-MM-DD)
     const targetDate = date;
 
-
-    const attendanceRecord = allSessions.find(record => {
+    const attendanceRecord = sessions.find(record => {
       // Convert backend date to IST date string
       const recordDate = formatDateForIST(record.date);
       return recordDate === targetDate;
     });
 
     if (!attendanceRecord) {
-      return { status: 'not-marked', symbol: '-', class: 'not-marked' };
+      return { status: 'not-marked', symbol: '-', class: 'not-marked', title: 'Not Marked' };
     }
 
     const status = attendanceRecord.status?.toLowerCase() || 'absent';
@@ -2263,9 +2295,23 @@ const Student = ({
       };
     });
 
-    // ===== STEP 5: Attendance Register View Component =====
+    // ===== STEP 5: Enhanced Attendance Register View Component =====
     const renderAttendanceRegisterView = () => {
       const dates = getRegisterDates();
+
+      // Filter students based on tab
+      const getFilteredStudentsByTab = (tab) => {
+        switch (tab) {
+          case "zeroPeriod":
+            return allStudentsAttendanceData.filter(student => student.isZeroPeriodAssigned);
+          case "batchFreeze":
+            return allStudentsAttendanceData.filter(student => student.isBatchFreeze);
+          default:
+            return allStudentsAttendanceData;
+        }
+      };
+
+      const filteredStudents = getFilteredStudentsByTab(registerTab);
 
       const monthNames = [
         "January", "February", "March", "April", "May", "June",
@@ -2274,24 +2320,113 @@ const Student = ({
 
       return (
         <div className="attendance-register-container">
-
-
           {/* Register Title */}
           <div className="register-title text-center mb-4">
             <h4 className="fw-bold text-primary">
               <i className="fas fa-clipboard-list me-2"></i>
-              Attendance Register
+              Attendance Register - {registerTab === "zeroPeriod" ? "Zero Period" : "Batch Freeze"}
             </h4>
             <p className="text-muted mb-0 text-black">
-              Total Students: {allStudentsAttendanceData.length} |
+              Total Students: {filteredStudents.length} |
               Period: {dates.length > 0 ? `${dates[0]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''} to {dates.length > 0 ? `${dates[dates.length - 1]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''}
             </p>
+            <div className="period-badge mt-2">
+              <span className={`badge ${registerTab === "zeroPeriod" ? "bg-warning" : "bg-info"} fs-6`}>
+                <i className={`fas ${registerTab === "zeroPeriod" ? "fa-clock" : "fa-snowflake"} me-2`}></i>
+                {registerTab === "zeroPeriod" ? "Zero Period Students" : "Batch Freeze Students"}
+              </span>
+            </div>
+          </div>
+
+          {/* Tab Navigation and Date Controls */}
+          <div className="register-controls mb-4">
+            <div className="row align-items-center">
+              <div className="col-md-8">
+                <div className="register-tabs">
+                  <div className="btn-group w-100" role="group">
+                    <button
+                      type="button"
+                      className={`btn ${registerTab === "zeroPeriod" ? "btn-primary" : "btn-outline-primary"}`}
+                      onClick={() => setRegisterTab("zeroPeriod")}
+                    >
+                      <i className="fas fa-clock me-2"></i>
+                      Zero Period ({allStudentsAttendanceData.filter(s => s.isZeroPeriodAssigned).length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${registerTab === "batchFreeze" ? "btn-primary" : "btn-outline-primary"}`}
+                      onClick={() => setRegisterTab("batchFreeze")}
+                    >
+                      <i className="fas fa-snowflake me-2"></i>
+                      Batch Freeze ({allStudentsAttendanceData.filter(s => s.isBatchFreeze).length})
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="date-controls">
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <label className="form-label small fw-bold">From Date</label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm"
+                        value={registerDateRange.startDate}
+                        onChange={(e) => setRegisterDateRange(prev => ({...prev, startDate: e.target.value}))}
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small fw-bold">To Date</label>
+                      <input
+                        type="date"
+                        className="form-control form-control-sm"
+                        value={registerDateRange.endDate}
+                        onChange={(e) => setRegisterDateRange(prev => ({...prev, endDate: e.target.value}))}
+                      />
+                    </div>
+                  </div>
+                  <div className="row mt-2">
+                    <div className="col-12">
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm w-100"
+                        onClick={() => {
+                          const now = new Date();
+                          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                          setRegisterDateRange({
+                            startDate: startOfMonth.toISOString().split('T')[0],
+                            endDate: endOfMonth.toISOString().split('T')[0]
+                          });
+                        }}
+                      >
+                        <i className="fas fa-calendar-day me-1"></i>
+                        Current Month
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Attendance Register Table */}
           <div className="register-table-container">
-            <div className="table-responsive">
-              <table className="table table-bordered attendance-register-table">
+            {filteredStudents.length === 0 ? (
+              <div className="text-center py-5">
+                <div className="empty-state">
+                  <i className="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                  <h5 className="text-muted">No Students Found</h5>
+                  <p className="text-muted">
+                    {registerTab === "zeroPeriod" 
+                      ? "No students are currently in Zero Period." 
+                      : "No students are currently in Batch Freeze."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-bordered attendance-register-table">
                 <thead className="table-dark sticky-top">
                   <tr>
                     <th rowSpan="2" className="student-info-header">
@@ -2324,7 +2459,7 @@ const Student = ({
                 </thead>
 
                 <tbody>
-                  {allStudentsAttendanceData.map((student, studentIndex) => (
+                  {filteredStudents.map((student, studentIndex) => (
                     <tr key={student._id} className="student-row">
                       {/* Student Information Column */}
                       <td className="student-info-cell">
@@ -2357,7 +2492,7 @@ const Student = ({
 
                       {/* Attendance Cells for each date */}
                       {dates.map((dateInfo, dateIndex) => {
-                        const attendanceInfo = getAttendanceStatus(student, dateInfo.date);
+                        const attendanceInfo = getAttendanceStatus(student, dateInfo.date, registerTab);
                         return (
                           <td
                             key={dateIndex}
@@ -2422,13 +2557,13 @@ const Student = ({
                       </strong>
                     </td>
                     {dates.map((dateInfo, dateIndex) => {
-                      const dayStats = allStudentsAttendanceData.reduce((acc, student) => {
-                        const status = getAttendanceStatus(student, dateInfo.date);
+                      const dayStats = filteredStudents.reduce((acc, student) => {
+                        const status = getAttendanceStatus(student, dateInfo.date, registerTab);
                         acc[status.class] = (acc[status.class] || 0) + 1;
                         return acc;
                       }, {});
 
-                      const totalStudents = allStudentsAttendanceData.length;
+                      const totalStudents = filteredStudents.length;
                       const presentCount = (dayStats.present || 0) + (dayStats.late || 0);
                       const attendancePercentage = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(1) : 0;
 
@@ -2451,8 +2586,8 @@ const Student = ({
                       <div className="overall-stats">
                         <strong>Overall Average</strong>
                         <div className="overall-percentage">
-                          {allStudentsAttendanceData.length > 0
-                            ? (allStudentsAttendanceData.reduce((sum, s) => sum + s.filteredStats.attendancePercentage, 0) / allStudentsAttendanceData.length).toFixed(1)
+                          {filteredStudents.length > 0
+                            ? (filteredStudents.reduce((sum, s) => sum + s.filteredStats.attendancePercentage, 0) / filteredStudents.length).toFixed(1)
                             : 0}%
                         </div>
                       </div>
@@ -2461,6 +2596,7 @@ const Student = ({
                 </tfoot>
               </table>
             </div>
+            )}
           </div>
 
           {/* Legend */}
@@ -11279,6 +11415,112 @@ html body .content .content-wrapper {
 
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
+}
+
+/* Register Tab Navigation Styles */
+.register-tabs {
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+}
+
+.register-tabs .btn-group {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.register-tabs .btn {
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.register-tabs .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.register-tabs .btn-primary {
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  border: none;
+  box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+}
+
+.register-tabs .btn-outline-primary {
+  border: 2px solid #0d6efd;
+  color: #0d6efd;
+  background: white;
+}
+
+.register-tabs .btn-outline-primary:hover {
+  background: #0d6efd;
+  color: white;
+  border-color: #0d6efd;
+}
+
+/* Empty State Styles */
+.empty-state {
+  padding: 3rem 1rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 2px dashed #dee2e6;
+}
+
+.empty-state i {
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.empty-state h5 {
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+/* Period Badge Styles */
+.period-badge .badge {
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.period-badge .badge.bg-warning {
+  background: linear-gradient(135deg, #ffc107, #e0a800) !important;
+  color: #000 !important;
+}
+
+.period-badge .badge.bg-info {
+  background: linear-gradient(135deg, #0dcaf0, #0aa2c0) !important;
+  color: #fff !important;
+}
+
+/* Register Controls Styles */
+.register-controls {
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+}
+
+.date-controls .form-label {
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+
+.date-controls .form-control {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.date-controls .form-control:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 
