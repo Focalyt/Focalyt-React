@@ -108,6 +108,8 @@ import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
 import CalenderFolowupB2C from './Pages/App/College/Course/CalenderFolowupB2C';
+import Source from './Pages/App/College/Settings/Source/Source';
+
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -237,6 +239,7 @@ const Layout = () => {
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
+          <Route path='source' element={<Source/>}/>
         </Route>
 
         {/* company  */}

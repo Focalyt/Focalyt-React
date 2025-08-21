@@ -2426,9 +2426,10 @@ const Student = ({
                 </div>
               </div>
             ) : (
-              <div className="table-responsive">
+              <div className="table-responsive" style={{ maxHeight: '600px', overflow: 'auto' }}>
                 <table className="table table-bordered attendance-register-table">
-                <thead className="table-dark sticky-top">
+                
+                <thead className="table-dark sticky-header">
                   <tr>
                     <th rowSpan="2" className="student-info-header">
                       <div className="student-header-content">
@@ -2639,8 +2640,8 @@ const Student = ({
       return (
         <div className="daily-attendance-management">
           <div className="table-responsive" style={{ maxHeight: '600px', overflow: 'auto' }}>
-            <table className="table table-striped table-hover table-fixed">
-              <thead className="table-dark sticky-header">
+            <table className="table table-striped table-hover">
+              <thead className="table-dark sticky-header" style={{ position: "sticky", top: "0px", zIndex: 10 }}>
                 <tr>
                   <th rowSpan={2} style={{ minWidth: "200px" }}>Student Details</th>
                   <th colSpan={5} className="text-center">Zero Period Attendance</th>
@@ -6860,18 +6861,18 @@ const Student = ({
       {/* Enhanced CSS for styling */}
       <style jsx>
         {`
-          .site-header--sticky--register {
-            position: fixed;
-            top: 104px;
-             {
-              /* left: 15.9%;
-          right: 33px; */
-            }
-            background: white;
-            z-index: 10;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 15px 0;
-          }
+          // .site-header--sticky--register {
+          //   position: fixed;
+          //   top: 104px;
+          //    {
+          //     /* left: 15.9%;
+          // right: 33px; */
+          //   }
+          //   background: white;
+          //   z-index: 10;
+          //   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          //   padding: 15px 0;
+          // }
 
           .attendance-controls {
             border: 1px solid #e3f2fd;
@@ -7014,11 +7015,11 @@ const Student = ({
           }
 
           @media (max-width: 768px) {
-            .site-header--sticky--register {
-              left: 0;
-              right: 0;
-              padding: 10px;
-            }
+            // .site-header--sticky--register {
+            //   left: 0;
+            //   right: 0;
+            //   padding: 10px;
+            // }
 
             .btn-group-sm .btn {
               font-size: 0.65rem;
@@ -7536,7 +7537,7 @@ const Student = ({
 
           .attendance-content .table {
             border-radius: 15px;
-            overflow: hidden;
+            // overflow: hidden;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
           }
 
@@ -10679,27 +10680,27 @@ width:100%;
   }
 
 /* Sticky Header Container */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
+// .sticky-header-container {
+//     position: sticky !important;
+//     top: 0 !important;
+//     z-index: 1020 !important;
+//     background-color: white !important;
+//     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+//     width: 100% !important;
+//     margin-bottom: 1rem !important;
+// }
 
-/* Header Content Styling */
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
+// /* Header Content Styling */
+// .sticky-header-container .container-fluid {
+//     padding: 0.5rem 1.2rem !important;
+// }
 
-/* Secondary Sticky Elements (Side Panels) */
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
-}
+// /* Secondary Sticky Elements (Side Panels) */
+// .stickyBreakpoints {
+//     position: sticky !important;
+//     top: 120px !important;
+//     z-index: 11 !important;
+// }
 
 /* Date Picker Styles */
 .react-date-picker__wrapper {
@@ -10881,38 +10882,38 @@ width:100%;
     width: 300px !important;
 }
 /* Responsive Design */
-@media (max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
+// @media (max-width: 1920px) {
+//     .stickyBreakpoints {
+//         top: 120px !important;
+//     }
+// }
 
-@media (max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
+// @media (max-width: 1400px) {
+//     .stickyBreakpoints {
+//         top: 110px !important;
+//     }
+// }
 
-@media (max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
+// @media (max-width: 768px) {
+//     .sticky-header-container {
+//         position: sticky !important;
+//         top: 0 !important;
+//     }
     
-    .stickyBreakpoints {
-        position: relative !important;
-    }
+//     .stickyBreakpoints {
+//         position: relative !important;
+//     }
     
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
+//     .sticky-header-container .container-fluid {
+//         padding: 0.5rem 1rem !important;
+//     }
+// }
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
+// @media (max-width: 576px) {
+//     .sticky-header-container .container-fluid {
+//         padding: 0.25rem 0.5rem !important;
+//     }
+// }
 
     /* Final Complete CSS - Replace entire <style> section with this */
 
@@ -10923,62 +10924,62 @@ html body .content .content-wrapper {
 
 
 /* ========== STICKY HEADER STYLES ========== */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
+// .sticky-header-container {
+//     position: sticky !important;
+//     top: 0 !important;
+//     z-index: 1020 !important;
+//     background-color: white !important;
+//     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+//     width: 100% !important;
+//     margin-bottom: 1rem !important;
+// }
 
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
-.site-header--sticky--register:not(.mobile-sticky-enable) {
-    /* position: absolute !important; */
-    top: 97px;
-    z-index: 10;
-}
-    .site-header--sticky--register--panels{
-     top: 258px;
-    z-index: 10;
-    }
+// .sticky-header-container .container-fluid {
+//     padding: 0.5rem 1.2rem !important;
+// }
+// .site-header--sticky--register:not(.mobile-sticky-enable) {
+//     /* position: absolute !important; */
+//     top: 97px;
+//     z-index: 10;
+// }
+//     .site-header--sticky--register--panels{
+//      top: 258px;
+//     z-index: 10;
+//     }
 
-@media (min-width: 992px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-}
-    @media (max-width: 767px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
+// @media (min-width: 992px) {
+//     .site-header--sticky--register:not(.mobile-sticky-enable) {
+//         position: fixed !important;
+//         transition: 0.4s;
+//         /* position: absolute !important; */
+//         /* min-height: 200px; */
+//         background: white;
+//     }
+//     .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+//         position: fixed !important;
+//         transition: 0.4s;
+//         /* position: absolute !important; */
+//         /* min-height: 200px; */
+//         background: white;
+//     }
+// }
+//     @media (max-width: 767px) {
+//     .site-header--sticky--register:not(.mobile-sticky-enable) {
+//         position: fixed !important;
+//         transition: 0.4s;
+//         background: white;
+//         width: 100%;
+//         left: 0;
+//         right: 0;
+//     }
+//     .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+//         position: fixed !important;
+//         transition: 0.4s;
+//         background: white;
+//         width: 100%;
+//         left: 0;
+//         right: 0;
+//     }
     
     /* Adjust content margin to avoid overlap */
     .content-body {
@@ -10986,11 +10987,11 @@ html body .content .content-wrapper {
     }
 }
 
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
-}
+// .stickyBreakpoints {
+//     position: sticky !important;
+//     top: 120px !important;
+//     z-index: 11 !important;
+// }
 
 /* ========== DATE PICKER STYLES ========== */
 .react-date-picker__wrapper {
@@ -11176,38 +11177,38 @@ html body .content .content-wrapper {
 }
 
 /* ========== RESPONSIVE DESIGN ========== */
-@media (max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
+// @media (max-width: 1920px) {
+//     .stickyBreakpoints {
+//         top: 120px !important;
+//     }
+// }
 
-@media (max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
+// @media (max-width: 1400px) {
+//     .stickyBreakpoints {
+//         top: 110px !important;
+//     }
+// }
 
-@media (max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
+// @media (max-width: 768px) {
+//     .sticky-header-container {
+//         position: sticky !important;
+//         top: 0 !important;
+//     }
     
-    .stickyBreakpoints {
-        position: relative !important;
-    }
+//     .stickyBreakpoints {
+//         position: relative !important;
+//     }
     
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
+//     .sticky-header-container .container-fluid {
+//         padding: 0.5rem 1rem !important;
+//     }
+// }
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
+// @media (max-width: 576px) {
+//     .sticky-header-container .container-fluid {
+//         padding: 0.25rem 0.5rem !important;
+//     }
+// }
     
     `
         }
@@ -11689,50 +11690,7 @@ html body .content .content-wrapper {
   .model-header{
   background: #fc2b5a!important;
   }
-  .table-fixed {
-          table-layout: fixed;
-          width: 100%;
-        }
-        
-        .table-fixed th,
-        .table-fixed td {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          padding: 8px;
-          vertical-align: middle;
-          border: 1px solid #dee2e6;
-        }
-        
-   .sticky-header {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          background-color: #f8f9fa;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .sticky-header th {
-          background-color: #f8f9fa;
-          border-bottom: 2px solid #dee2e6;
-          font-weight: 600;
-          color: #495057;
-          white-space: nowrap;
-          padding: 12px 8px;
-          position: sticky;
-          top: 0;
-          z-index: 10;
-        }
-         .sticky-header::after {
-          content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: linear-gradient(to bottom, rgba(0,0,0,0.1), transparent);
-          pointer-events: none;
-        }
+
   `}
       </style>
     </div>

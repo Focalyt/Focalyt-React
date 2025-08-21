@@ -20,7 +20,7 @@ const Project = require('../../models/Project');
 const University = require('../../models/university');
 const Qualification = require('../../models/qualification');
 const AppliedCourses = require('../../models/appliedCourses');
-
+const Source = require('../../models/source');
 
 // Permission Checker Utility Function
 const hasPermission = (user, permission) => {
@@ -833,5 +833,50 @@ router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users
   }
 });
 
+
+router.post("/addSource", isCollege, async (req, res) => {
+	try {
+		console.log("source api called....")
+    const { name, mobile } = req.body;
+    console.log("source data" , req.body)
+		const source = new Source({ name, mobile });
+		console.log("source" , source)
+		await source.save();
+		res.status(200).json({
+			success: true,
+			message: 'Source added successfully',
+			data: source
+		});
+	} catch (error) {
+		console.log(error);
+	}
+});
+
+router.get('/sources', isCollege, async (req, res) => {
+	try {
+		const sources = await Source.find({});
+		res.status(200).json({
+			success: true,
+			data: sources
+		});
+	} catch (error) {
+		console.log(error);
+	}
+});
+
+router.put('/updateSource/:sourceId', isCollege, async (req, res) => {
+  try {
+    const { sourceId } = req.params;
+    const { name, mobile } = req.body;
+    const source = await Source.findByIdAndUpdate(sourceId, { name, mobile }, { new: true });
+    res.status(200).json({
+      success: true,
+      message: 'Source updated successfully',
+      data: source
+    });
+  } catch (error) {
+    console.log(error);
+  }
+});
 
 module.exports = router;

@@ -13,6 +13,8 @@ const AddLeads = () => {
 
   // const courseId = '';
   const [highestQualification, setHighestQualification] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [counselors, setCounselors] = useState([]);
 
   // State management
   const [candidateNumber, setCandidateNumber] = useState('');
@@ -42,7 +44,10 @@ const AddLeads = () => {
     sex: '',
     dob: '',
     whatsapp: '',
-    highestQualification: ''
+    highestQualification: '',
+    sourceType: '',
+    source: '',
+    sourceName: '',
   });
 
   // File upload states
@@ -79,6 +84,60 @@ const AddLeads = () => {
       //
     };
     fetchCourseDetails();
+  }, []);
+
+  // Fetch sources from API
+  useEffect(() => {
+    const fetchSources = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/college/users/sources`, {
+          method: 'GET',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.status || data.success) {
+          setSources(data.data || []);
+        } else {
+          console.error('Failed to fetch sources:', data.message);
+        }
+      } catch (error) {
+        console.error('Error fetching sources:', error);
+      }
+    };
+
+    fetchSources();
+  }, []);
+
+  // Fetch counselors from API
+  useEffect(() => {
+    const fetchCounselors = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/college/filters-data`, {
+          method: 'GET',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.status || data.success) {
+          setCounselors(data.counselors || []);
+        } else {
+          console.error('Failed to fetch counselors:', data.message);
+        }
+      } catch (error) {
+        console.error('Error fetching counselors:', error);
+      }
+    };
+
+    fetchCounselors();
   }, []);
 
   // Google Maps initialization
@@ -827,6 +886,80 @@ const AddLeads = () => {
                               ))}
                             </select>
                           </div>
+
+                                                                                                           <div className="col-xl-3 mb-1" id="highestQuali">
+                              <label>
+                               Source Type <span className="mandatory">*</span>
+                              </label>
+                              <select
+                                className="form-control single-field"
+                                value={formData.sourceType}
+                                name="sourceType"
+                                id="sourceType"
+                                onChange={(e) => handleFormDataChange('sourceType', e.target.value)}
+                              >
+                                <option value="">Select Source Type</option>
+                                <option value="Self/HO">Self/HO</option>
+                                <option value="Third Party">Third Party</option>
+                              </select>
+                            </div>
+
+                                                         {/* Second dropdown for Third Party sources */}
+                             {formData.sourceType === "Third Party" && (
+                               <div className="col-xl-3 mb-1" id="thirdPartySource">
+                                 <label>
+                                  Third Party Source <span className="mandatory">*</span>
+                                 </label>
+                                                                   <select
+                                    className="form-control single-field"
+                                    value={formData.source}
+                                    name="source"
+                                    id="thirdPartySourceSelect"
+                                    onChange={(e) => {
+                                      const selectedSource = sources.find(s => s._id === e.target.value);
+                                      handleFormDataChange('source', e.target.value);
+                                      handleFormDataChange('sourceName', selectedSource ? selectedSource.name : '');
+                                    }}
+                                  >
+                                   <option value="">Select Third Party Source</option>
+                                   {sources.map((source) => (
+                                     <option key={source._id} value={source._id} className="text-capitalize">
+                                       {source.name}
+                                     </option>
+                                   ))}
+                                 </select>
+                               </div>
+                             )}
+
+                                                          
+                             {formData.sourceType === "Self/HO" && (
+                               <div className="col-xl-3 mb-1" id="selfHoSource">
+                                 <label>
+                                  Self/HO Counselor <span className="mandatory">*</span>
+                                 </label>
+                                                                   <select
+                                    className="form-control single-field"
+                                    value={formData.source}
+                                    name="source"
+                                    id="selfHoSourceSelect"
+                                    onChange={(e) => {
+                                      const selectedCounselor = counselors.find(c => c._id === e.target.value);
+                                      handleFormDataChange('source', e.target.value);
+                                      handleFormDataChange('sourceName', selectedCounselor ? selectedCounselor.name : '');
+                                    }}
+                                  >
+                                   <option value="">Select Self/HO Counselor</option>
+                                   {counselors.map((counselor) => (
+                                     <option key={counselor._id} value={counselor._id} className="text-capitalize">
+                                       {counselor.name}
+                                     </option>
+                                   ))}
+                                 </select>
+                               </div>
+                             )}
+
+                             
+                                                     
                         </div>
                       </div>
 

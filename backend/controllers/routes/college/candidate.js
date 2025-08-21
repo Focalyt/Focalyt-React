@@ -866,8 +866,8 @@ router.route("/addleaddandcourseapply")
 		try {
 			console.log("Incoming body:", req.body);
 
-			let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude } = req.body;
-
+			let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude, sourceType, source, sourceName, sourceContactName, sourceContactMobile } = req.body;
+			// let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude } = req.body;
 			if (mongoose.Types.ObjectId.isValid(highestQualification)) highestQualification = new mongoose.Types.ObjectId(highestQualification);
 			if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
 			if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
@@ -909,6 +909,12 @@ router.route("/addleaddandcourseapply")
 						centerId: selectedCenter
 					}
 				],
+				sourceInfo: {
+					sourceType: sourceType || "",
+					source: source || "",
+					sourceName: sourceName || "",
+					sourceContactName: sourceContactName || "",
+				},
 				verified: true
 			};
 
