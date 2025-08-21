@@ -154,12 +154,20 @@ class WebSocketServer {
           this.handleLocationUpdate(ws, message);
           break;
           
+        case 'attendance_update':
+          this.handleAttendanceUpdate(ws, message);
+          break;
+          
         case 'join_room':
           this.handleJoinRoom(ws, message);
           break;
           
         case 'leave_room':
           this.handleLeaveRoom(ws, message);
+          break;
+          
+        case 'join_college_room':
+          this.handleJoinCollegeRoom(ws, message);
           break;
           
         case 'ping':
@@ -276,6 +284,46 @@ class WebSocketServer {
     console.log(`Client left room: ${roomId}`);
   }
 
+  handleAttendanceUpdate(ws, message) {
+    const client = this.clients.get(ws);
+    console.log(`Attendance update from ${client?.userId}:`, message.data);
+
+    // Broadcast attendance update to college room
+    if (client?.collegeId) {
+      this.broadcastToCollege(client.collegeId, {
+        type: 'attendance_update',
+        data: message.data,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  handleJoinCollegeRoom(ws, message) {
+    const client = this.clients.get(ws);
+    if (!client || !client.collegeId) {
+      this.sendToClient(ws, {
+        type: 'error',
+        message: 'Cannot join college room: no college ID',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const roomId = `college_${client.collegeId}`;
+    if (!this.rooms.has(roomId)) {
+      this.rooms.set(roomId, new Set());
+    }
+    
+    this.rooms.get(roomId).add(ws);
+    console.log(`Client joined college room: ${roomId}`);
+    
+    this.sendToClient(ws, {
+      type: 'room_joined',
+      roomId: roomId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   handleDisconnection(ws) {
     const client = this.clients.get(ws);
     if (client) {
@@ -302,6 +350,17 @@ class WebSocketServer {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
+    room.forEach(client => {
+      this.sendToClient(client, message);
+    });
+  }
+
+  broadcastToCollege(collegeId, message) {
+    const roomId = `college_${collegeId}`;
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    console.log(`Broadcasting to college ${collegeId}:`, message.type);
     room.forEach(client => {
       this.sendToClient(client, message);
     });

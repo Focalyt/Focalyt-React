@@ -1,0 +1,44 @@
+{
+  "name": "focalytportal",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/geolocation": "^3.4.0",
+    "@react-native-community/netinfo": "^11.4.1",
+    "@react-navigation/bottom-tabs": "^7.4.6",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.7",
+    "expo": "53.0.20",
+    "expo-background-fetch": "^13.1.6",
+    "expo-battery": "~9.1.4",
+    "expo-camera": "~16.1.11",
+    "expo-dev-client": "~5.2.4",
+    "expo-location": "^18.1.6",
+    "expo-sensors": "^14.1.4",
+    "expo-sms": "~13.1.4",
+    "expo-status-bar": "~2.2.3",
+    "expo-task-manager": "^13.1.6",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-background-geolocation": "^4.18.9",
+    "react-native-gesture-handler": "^2.27.2",
+    "react-native-maps": "^1.20.1",
+    "react-native-safe-area-context": "^5.6.0",
+    "react-native-screens": "^4.13.1",
+    "react-native-sms-retriever": "^1.1.1",
+    "react-native-webview": "^13.15.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}

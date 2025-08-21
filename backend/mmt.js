@@ -40,6 +40,7 @@ const wsServer = new WebSocketServer(server);
 
 // Make WebSocket server globally available
 global.wsServer = wsServer;
+global.websocketServer = wsServer;
 const sess = {
 	maxAge: 1000 * 60 * 60 * 24 * 30,
 	keys: [cookieSecret]
