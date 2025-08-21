@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
-const API_BASE_URL = 'http://192.168.1.35:8080/college/androidApp/attendance-tracking';
-const LOGIN_URL = 'http://192.168.1.35:8080/college/androidApp/login';
+// const API_BASE_URL = 'http://192.168.1.35:8080/college/androidApp/attendance-tracking';
+// const LOGIN_URL = 'http://192.168.1.35:8080/college/androidApp/login';
+
+const API_BASE_URL = 'https://focalyt.com/api/college/androidApp/attendance-tracking';
+const LOGIN_URL = 'https://focalyt.com/api/college/androidApp/login';
 
 class ApiService {
   constructor() {
