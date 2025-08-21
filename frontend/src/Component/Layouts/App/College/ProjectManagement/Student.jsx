@@ -2638,9 +2638,9 @@ const Student = ({
 
       return (
         <div className="daily-attendance-management">
-          <div className="table-responsive">
-            <table className="table table-striped table-hover">
-              <thead className="table-dark">
+          <div className="table-responsive" style={{ maxHeight: '600px', overflow: 'auto' }}>
+            <table className="table table-striped table-hover table-fixed">
+              <thead className="table-dark sticky-header">
                 <tr>
                   <th rowSpan={2} style={{ minWidth: "200px" }}>Student Details</th>
                   <th colSpan={5} className="text-center">Zero Period Attendance</th>
@@ -11689,6 +11689,50 @@ html body .content .content-wrapper {
   .model-header{
   background: #fc2b5a!important;
   }
+  .table-fixed {
+          table-layout: fixed;
+          width: 100%;
+        }
+        
+        .table-fixed th,
+        .table-fixed td {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding: 8px;
+          vertical-align: middle;
+          border: 1px solid #dee2e6;
+        }
+        
+   .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background-color: #f8f9fa;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .sticky-header th {
+          background-color: #f8f9fa;
+          border-bottom: 2px solid #dee2e6;
+          font-weight: 600;
+          color: #495057;
+          white-space: nowrap;
+          padding: 12px 8px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+         .sticky-header::after {
+          content: '';
+          position: absolute;
+          bottom: -2px;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(to bottom, rgba(0,0,0,0.1), transparent);
+          pointer-events: none;
+        }
   `}
       </style>
     </div>

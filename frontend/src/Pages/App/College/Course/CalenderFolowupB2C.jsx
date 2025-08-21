@@ -256,7 +256,11 @@ const CalenderFolowupB2C = () => {
         return (
           event.summary?.toLowerCase().includes(searchLower) ||
           event.description?.toLowerCase().includes(searchLower) ||
-          event.location?.toLowerCase().includes(searchLower)
+          event.location?.toLowerCase().includes(searchLower) ||
+          event.candidateName?.toLowerCase().includes(searchLower) ||
+          event.courseName?.toLowerCase().includes(searchLower) ||
+          event.centerName?.toLowerCase().includes(searchLower) ||
+          event.batchName?.toLowerCase().includes(searchLower)
         );
       });
     }
@@ -616,11 +620,14 @@ const CalenderFolowupB2C = () => {
                             minute: '2-digit'
                           })}
                         </div>
-                        {/* <div className="event-title">
-                          {event.summary?.length > 20 
-                            ? `${event.summary.substring(0, 20)}...` 
-                            : event.summary}
-                        </div> */}
+                        {/* Show candidate name for visit events */}
+                        {isVisitEvent && event.extendedProps.candidateName && (
+                          <div className="event-candidate-name">
+                            <small className="text-white fw-bold">
+                              {event.extendedProps.candidateName}
+                            </small>
+                          </div>
+                        )}
                         {isVisitEvent && (
                           <div className="event-visit-type">
                             <span className="badge bg-primary badge-sm">
@@ -741,7 +748,7 @@ const CalenderFolowupB2C = () => {
                   <input
                     type="text"
                     className="form-control ps-5"
-                    placeholder="Search events..."
+                                            placeholder="Search candidate names , course name , center name"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -1024,6 +1031,28 @@ const CalenderFolowupB2C = () => {
                                   </div>
                                 )}
 
+                                {/* Candidate Information */}
+                                {/* {event.candidateName && (
+                                  <div className="row g-2 mb-3">
+                                    <div className="col-md-6">
+                                      <div className="d-flex align-items-center text-muted small">
+                                        <User className="me-2" size={14} />
+                                        <span>Candidate: <strong>{event.candidateName}</strong></span>
+                                      </div>
+                                    </div>
+                                    {event.candidateMobile && (
+                                      <div className="col-md-6">
+                                        <div className="d-flex align-items-center text-muted small">
+                                          <Phone className="me-2" size={14} />
+                                          <a href={`tel:${event.candidateMobile}`} className="text-decoration-none">
+                                            <strong>{event.candidateMobile}</strong>
+                                          </a>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )} */}
+
                                 {/* {event.location && (
                                   <div className="d-flex align-items-center text-muted small mb-2">
                                     <MapPin className="me-2" size={14} />
@@ -1259,7 +1288,7 @@ const CalenderFolowupB2C = () => {
 
         .event-time {
           font-weight: 600;
-          color: #495057;
+          color: #fff;
           font-size: 0.7rem;
         }
 
@@ -1268,6 +1297,33 @@ const CalenderFolowupB2C = () => {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+
+        .event-candidate-name {
+          margin: 2px 0;
+          line-height: 1.2;
+        }
+
+        .event-candidate-name small {
+          background-color: rgba(255, 255, 255, 0.9);
+          color: #007bff !important;
+          padding: 1px 4px;
+          border-radius: 3px;
+          font-weight: 600;
+          display: inline-block;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .event-visit-type {
+          margin-top: 2px;
+        }
+
+        .event-visit-type .badge {
+          font-size: 0.6rem;
+          padding: 2px 4px;
         }
 
         .more-events {
