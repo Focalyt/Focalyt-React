@@ -62,7 +62,8 @@ const {
 	AppliedJobs,
 	QuestionAnswer,
 	CandidateVisitCalender,
-	Center
+	Center,
+	StatusLogs
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 
@@ -1347,6 +1348,20 @@ router.post('/assign-batch', [isCollege], async (req, res) => {
 			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
 		}
 		const appliedCourse = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, { $set: { batch: batchId, isBatchAssigned: true } }, { new: true })
+		const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
+		if (!existingStatusLogs) {
+			const newStatusLogs = new StatusLogs({
+				_appliedId: appliedCourseId,
+				_collegeId: req.user.college._id,
+				counsellor: appliedCourse.counsellor,
+				batchAssigned: true
+			});
+			await newStatusLogs.save();
+		}
+		else {
+			existingStatusLogs.batchAssigned = true;
+			await existingStatusLogs.save();
+		}
 		return res.send({ status: true, message: 'Batch assigned successfully', data: appliedCourse })
 	} catch (err) {
 		console.error('Error assigning batch:', err);
@@ -1664,6 +1679,21 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			await appliedCourse.save();
 
+			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
+			if (!existingStatusLogs) {
+				const newStatusLogs = new StatusLogs({
+					_appliedId: appliedCourseId,
+					_collegeId: req.user.college._id,
+					counsellor: appliedCourse.counsellor,
+					zeroPeriodAssigned: true
+				});
+				await newStatusLogs.save();
+			}
+			else {
+				existingStatusLogs.zeroPeriodAssigned = true;
+				await existingStatusLogs.save();
+			}
+
 			return res.status(200).json({
 				status: true,
 				message: 'Student moved to zero period successfully',
@@ -1686,6 +1716,21 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 
 			await appliedCourse.save();
+
+			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
+			if (!existingStatusLogs) {
+				const newStatusLogs = new StatusLogs({
+					_appliedId: appliedCourseId,
+					_collegeId: req.user.college._id,
+					counsellor: appliedCourse.counsellor,
+					batchFreezed: true
+				});
+				await newStatusLogs.save();
+			}
+			else {
+				existingStatusLogs.batchFreezed = true;
+				await existingStatusLogs.save();
+			}
 
 			return res.status(200).json({
 				status: true,
@@ -1712,15 +1757,26 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			await appliedCourse.save();
 
+			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
+			if (!existingStatusLogs) {
+				const newStatusLogs = new StatusLogs({
+					_appliedId: appliedCourseId,
+					_collegeId: req.user.college._id,
+					counsellor: appliedCourse.counsellor,
+					dropOut: true
+				});
+				await newStatusLogs.save();
+			}
+			else {
+				existingStatusLogs.dropOut = true;
+				await existingStatusLogs.save();
+			}
+
 			return res.status(200).json({
 				status: true,
 				message: 'Student moved to dropout successfully',
 
 			});
-
-
-
-
 		}
 
 	} catch (error) {
@@ -2353,6 +2409,227 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 		});
 	}
 });
+
+// API for Counselor Performance Matrix using statusLogs
+router.get('/counselor-performance-matrix',isCollege, async (req, res) => {
+	try {
+		const { startDate, endDate, centerId } = req.query;
+		
+		// Build date filter
+		let dateFilter = {};
+		if (startDate && endDate) {
+			dateFilter.createdAt = {
+				$gte: new Date(startDate),
+				$lte: new Date(endDate)
+			};
+		}
+
+		// Build center filter
+		let centerFilter = {};
+		if (centerId && centerId !== 'all') {
+			centerFilter._collegeId = centerId;
+		}
+
+		// Aggregate statusLogs data for counselor performance
+		const counselorMatrixData = await StatusLogs.aggregate([
+			{
+				$match: {
+					...dateFilter,
+					...centerFilter
+				}
+			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: '_appliedId',
+					foreignField: '_id',
+					as: 'appliedCourse'
+				}
+			},
+			{
+				$unwind: '$appliedCourse'
+			},
+			{
+				$lookup: {
+					from: 'counsellors',
+					localField: 'counsellor',
+					foreignField: '_id',
+					as: 'counselorInfo'
+				}
+			},
+			{
+				$unwind: '$counselorInfo'
+			},
+			{
+				$lookup: {
+					from: 'statuses',
+					localField: '_statusId',
+					foreignField: '_id',
+					as: 'statusInfo'
+				}
+			},
+			{
+				$lookup: {
+					from: 'substatuses',
+					localField: '_subStatusId',
+					foreignField: '_id',
+					as: 'subStatusInfo'
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$counsellor',
+						counselorName: '$counselorInfo.name',
+						statusId: '$_statusId',
+						statusTitle: { $arrayElemAt: ['$statusInfo.title', 0] },
+						subStatusId: '$_subStatusId',
+						subStatusTitle: { $arrayElemAt: ['$subStatusInfo.title', 0] }
+					},
+					count: { $sum: 1 },
+					kycStage: { $sum: { $cond: ['$kycStage', 1, 0] } },
+					kycApproved: { $sum: { $cond: ['$kycApproved', 1, 0] } },
+					admissionStatus: { $sum: { $cond: ['$admissionStatus', 1, 0] } },
+					batchAssigned: { $sum: { $cond: ['$batchAssigned', 1, 0] } },
+					zeroPeriodAssigned: { $sum: { $cond: ['$zeroPeriodAssigned', 1, 0] } },
+					batchFreezed: { $sum: { $cond: ['$batchFreezed', 1, 0] } },
+					dropOut: { $sum: { $cond: ['$dropOut', 1, 0] } },
+					appliedCourses: { $addToSet: '$_appliedId' }
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$_id.counselorId',
+						counselorName: '$_id.counselorName'
+					},
+					statuses: {
+						$push: {
+							statusId: '$_id.statusId',
+							statusTitle: '$_id.statusTitle',
+							subStatusId: '$_id.subStatusId',
+							subStatusTitle: '$_id.subStatusTitle',
+							count: '$count',
+							kycStage: '$kycStage',
+							kycApproved: '$kycApproved',
+							admissionStatus: '$admissionStatus',
+							batchAssigned: '$batchAssigned',
+							zeroPeriodAssigned: '$zeroPeriodAssigned',
+							batchFreezed: '$batchFreezed',
+							dropOut: '$dropOut'
+						}
+					},
+					totalLeads: { $sum: '$count' },
+					totalKycStage: { $sum: '$kycStage' },
+					totalKycApproved: { $sum: '$kycApproved' },
+					totalAdmissions: { $sum: '$admissionStatus' },
+					totalBatchAssigned: { $sum: '$batchAssigned' },
+					totalZeroPeriodAssigned: { $sum: '$zeroPeriodAssigned' },
+					totalBatchFreezed: { $sum: '$batchFreezed' },
+					totalDropouts: { $sum: '$dropOut' },
+					uniqueAppliedCourses: { $addToSet: { $concat: ['$_id.counselorId', '-', { $toString: '$_appliedId' }] } }
+				}
+			},
+			{
+				$project: {
+					_id: 0,
+					counselorId: '$_id.counselorId',
+					counselorName: '$_id.counselorName',
+					statuses: 1,
+					totalLeads: 1,
+					totalKycStage: 1,
+					totalKycApproved: 1,
+					totalAdmissions: 1,
+					totalBatchAssigned: 1,
+					totalZeroPeriodAssigned: 1,
+					totalBatchFreezed: 1,
+					totalDropouts: 1,
+					uniqueAppliedCourses: 1,
+					conversionRate: {
+						$cond: [
+							{ $gt: ['$totalLeads', 0] },
+							{ $multiply: [{ $divide: ['$totalAdmissions', '$totalLeads'] }, 100] },
+							0
+						]
+					},
+					dropoutRate: {
+						$cond: [
+							{ $gt: ['$totalLeads', 0] },
+							{ $multiply: [{ $divide: ['$totalDropouts', '$totalLeads'] }, 100] },
+							0
+						]
+					}
+				}
+			},
+			{
+				$sort: { counselorName: 1 }
+			}
+		]);
+
+		// Transform data to match frontend format
+		const transformedData = {};
+		
+		counselorMatrixData.forEach(counselor => {
+			const counselorName = counselor.counselorName || 'Unknown';
+			
+			transformedData[counselorName] = {
+				Total: counselor.totalLeads,
+				KYCDone: counselor.totalKycApproved,
+				KYCStage: counselor.totalKycStage,
+				Admissions: counselor.totalAdmissions,
+				Dropouts: counselor.totalDropouts,
+				Paid: counselor.totalAdmissions, // Assuming admissions are paid
+				Unpaid: counselor.totalLeads - counselor.totalAdmissions,
+				ConversionRate: parseFloat(counselor.conversionRate.toFixed(1)),
+				DropoutRate: parseFloat(counselor.dropoutRate.toFixed(1))
+			};
+
+			// Add status-wise data
+			counselor.statuses.forEach(statusData => {
+				const statusTitle = statusData.statusTitle || 'Unknown';
+				const subStatusTitle = statusData.subStatusTitle;
+				
+				if (!transformedData[counselorName][statusTitle]) {
+					transformedData[counselorName][statusTitle] = {
+						count: 0,
+						substatuses: {}
+					};
+				}
+				
+				transformedData[counselorName][statusTitle].count += statusData.count;
+				
+				if (subStatusTitle) {
+					if (!transformedData[counselorName][statusTitle].substatuses[subStatusTitle]) {
+						transformedData[counselorName][statusTitle].substatuses[subStatusTitle] = 0;
+					}
+					transformedData[counselorName][statusTitle].substatuses[subStatusTitle] += statusData.count;
+				}
+			});
+		});
+
+		return res.json({
+			status: true,
+			message: 'Counselor Performance Matrix data fetched successfully',
+			data: transformedData,
+			summary: {
+				totalCounselors: Object.keys(transformedData).length,
+				totalLeads: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Total, 0),
+				totalAdmissions: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Admissions, 0),
+				totalDropouts: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Dropouts, 0),
+				averageConversionRate: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.ConversionRate, 0) / Object.keys(transformedData).length || 0
+			}
+		});
+
+	} catch (error) {
+		console.error('Error fetching counselor performance matrix:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Error fetching counselor performance matrix data',
+			error: error.message
+		});
+	}
+});
+
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {
 // 	try{}
 // 	catch(err){}

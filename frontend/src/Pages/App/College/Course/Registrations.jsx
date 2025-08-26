@@ -2050,14 +2050,14 @@ const CRMDashboard = () => {
     try {
 
       console.log('Function in try');
-      
-      if(profile?._course?.center || profile?._course?.center?.length > 0){
+
+      if (profile?._course?.center || profile?._course?.center?.length > 0) {
         if (!profile._center || !profile._center._id) {
           alert('Please assign a branch/center first before moving to KYC!');
           return;
         }
       }
-      
+
 
       // Prepare the request body
       const updatedData = {
@@ -2109,6 +2109,30 @@ const CRMDashboard = () => {
     }
   };
 
+  // Helper function to check if fields are required
+  const isFieldRequired = (fieldType) => {
+    if (showPanel === 'followUp') {
+      return true; // All fields are required in followup panel
+    }
+    
+    if (seletectedSubStatus) {
+      if (fieldType === 'remarks') {
+        return seletectedSubStatus.hasRemarks;
+      }
+      if (fieldType === 'followup') {
+        return seletectedSubStatus.hasFollowup;
+      }
+    }
+    
+    return false;
+  };
+
+  // Helper function to get CSS class for required fields
+  const getRequiredFieldClass = (fieldType) => {
+    const isRequired = isFieldRequired(fieldType);
+    return isRequired ? 'border-danger' : '';
+  };
+
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
 
@@ -2125,6 +2149,20 @@ const CRMDashboard = () => {
           return;
         }
 
+        // Check for mandatory remarks and followup
+        const hasRemarksRequired = seletectedSubStatus && seletectedSubStatus.hasRemarks;
+        const hasFollowupRequired = seletectedSubStatus && seletectedSubStatus.hasFollowup;
+
+        if (hasRemarksRequired && (!remarks || remarks.trim() === '')) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (hasFollowupRequired && (!followupDate || !followupTime)) {
+          alert('Followup date and time are mandatory for this status. Please select followup date and time.');
+          return;
+        }
+
 
         // Prepare the request body
         const data = {
@@ -2133,9 +2171,7 @@ const CRMDashboard = () => {
           _leadSubStatus: seletectedSubStatus?._id || null,
           remarks: remarks || ''
         };
-
-
-
+        
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
@@ -2191,13 +2227,29 @@ const CRMDashboard = () => {
           return;
         }
 
+        // Check for mandatory remarks and followup
+        const hasRemarksRequired = seletectedSubStatus && seletectedSubStatus.hasRemarks;
+        const hasFollowupRequired = seletectedSubStatus && seletectedSubStatus.hasFollowup;
+
+        if (hasRemarksRequired && (!remarks || remarks.trim() === '')) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (hasFollowupRequired && (!followupDate || !followupTime)) {
+          alert('Followup date and time are mandatory for this status. Please select followup date and time.');
+          return;
+        }
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
           // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
+          const year = followupDate.getFullYear();
+          const month = String(followupDate.getMonth() + 1).padStart(2, "0");
+          const day = String(followupDate.getDate()).padStart(2, "0");
+
+          const dateStr = `${year}-${month}-${day}`;
 
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
@@ -2262,17 +2314,34 @@ const CRMDashboard = () => {
 
       }
       if (showPanel === 'followUp') {
+        // Validation checks for followup panel
+        if (!followupDate || !followupTime) {
+          alert('Followup date and time are mandatory. Please select both date and time.');
+          return;
+        }
 
+        if (!remarks || remarks.trim() === '') {
+          alert('Remarks are mandatory for followup. Please add remarks.');
+          return;
+        }
 
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
+
+          console.log('followupDate', followupDate)
+          console.log('followupTime', followupTime)
           // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
+          const year = followupDate.getFullYear();
+          const month = String(followupDate.getMonth() + 1).padStart(2, "0");
+          const day = String(followupDate.getDate()).padStart(2, "0");
+
+          const dateStr = `${year}-${month}-${day}`;
+
+          console.log('dateStr', dateStr)
 
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
+          console.log('followupDateTime', followupDateTime)
 
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
@@ -2361,7 +2430,7 @@ const CRMDashboard = () => {
       alert('Profile or course information is missing. Cannot fetch branches.');
       return;
     }
-    
+
     const courseId = profile._course._id;
     const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
       headers: {
@@ -3072,12 +3141,15 @@ const CRMDashboard = () => {
             )}
 
 
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup && (showPanel !== 'bulkstatuschange')) || (showPanel === 'followUp') || (showPanel !== 'bulkstatuschange')) && (
+            {(isFieldRequired('followup') || showPanel === 'followUp') && (
 
               <div className="row mb-1">
                 <div className="col-6">
                   <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
+                    Next Action Date 
+                    {(isFieldRequired('followup') || showPanel === 'followUp') && 
+                      <span className="text-danger">*</span>
+                    }
                   </label>
                   <div className="input-group">
                     {/* <input
@@ -3088,48 +3160,54 @@ const CRMDashboard = () => {
                     onChange={(e) => setFollowupDate(e.target.value)}
                   /> */}
                     <DatePicker
-                      className="form-control border-0  bgcolor"
+                      className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       onChange={setFollowupDate}
-
                       value={followupDate}
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
-
+                      placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Date is mandatory" : "Select date"}
                     />
                   </div>
                 </div>
 
                 <div className="col-6">
                   <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
+                    Time 
+                    {(isFieldRequired('followup') || showPanel === 'followUp') && 
+                      <span className="text-danger">*</span>
+                    }
                   </label>
                   <div className="input-group">
                     <input
                       type="time"
-                      className="form-control border-0  bgcolor"
+                      className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       id="actionTime"
                       onChange={handleTimeChange}
                       value={followupTime}
-
-
+                      placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Time is mandatory" : "Select time"}
                       style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                     />
                   </div>
                 </div>
               </div>)}
 
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || (setShowPanel === 'followUp')) && (
+            {(isFieldRequired('remarks') || showPanel === 'followUp') && (
 
               <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+                <label htmlFor="comment" className="form-label small fw-medium text-dark">
+                  Comment
+                  {(isFieldRequired('remarks') || showPanel === 'followUp') && 
+                    <span className="text-danger">*</span>
+                  }
+                </label>
                 <textarea
-                  className="form-control border-0 bgcolor"
+                  className={`form-control border-0 bgcolor ${getRequiredFieldClass('remarks')}`}
                   id="comment"
                   rows="4"
+                  value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-
+                  placeholder={(isFieldRequired('remarks') || showPanel === 'followUp') ? "Remarks are mandatory" : "Add remarks (optional)"}
                   style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-
                 ></textarea>
               </div>
             )}
@@ -5254,7 +5332,7 @@ const CRMDashboard = () => {
                                           >
                                             Change Center
                                           </button>*/}
-                                          <button 
+                                          <button
                                             className="btn btn-primary border-0 text-black"
                                             style={{
                                               width: "100%",
@@ -5956,26 +6034,26 @@ const CRMDashboard = () => {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                               
+
                                                 {jobHistory?.length > 0 ? (
-                                                        jobHistory?.map((job, index) => (
-                                                          <tr key={index}>
-                                                          <td>{index + 1}</td>
-                                                          <td>{job._job.displayCompanyName}</td>
-                                                          <td>{job._job.title}</td>
-                                                          {/* <td>
+                                                  jobHistory?.map((job, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{job._job.displayCompanyName}</td>
+                                                      <td>{job._job.title}</td>
+                                                      {/* <td>
                                                                   {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
                                                                   {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
                                                                 </td>
                                                                 <td>Remote</td>
                                                                 <td><span className="text-success">Completed</span></td> */}
-                                                        </tr>
-                                                        ))
-                                                      ) : (
-                                                        <tr>
-                                                          <td colSpan={6} className="text-center">No job history available</td>
-                                                        </tr>
-                                                      )}
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No job history available</td>
+                                                  </tr>
+                                                )}
                                               </tbody>
                                             </table>
                                           </div>

@@ -688,6 +688,10 @@ const LeadAnalyticsDashboard = () => {
   // Sample data based on actual AppliedCourses schema
   const [appliedCoursesData, setAppliedCoursesData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // New state for counselor performance matrix from API
+  const [counselorMatrixData, setCounselorMatrixData] = useState({});
+  const [counselorMatrixLoading, setCounselorMatrixLoading] = useState(false);
 
   // Move this inside the component
   const centers = useMemo(() => {
@@ -703,6 +707,11 @@ const LeadAnalyticsDashboard = () => {
 
     fetchProfileData();
   }, [token, backendUrl, startDate, endDate, selectedPeriod, useCustomDate]);
+
+  // Fetch counselor matrix data when filters change
+  useEffect(() => {
+    fetchCounselorMatrixData();
+  }, [token, backendUrl, startDate, endDate, selectedCenter]);
 
   const fetchProfileData = async (filters = filterData) => {
     try {
@@ -753,6 +762,43 @@ const LeadAnalyticsDashboard = () => {
       setAppliedCoursesData([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to fetch counselor performance matrix from API
+  const fetchCounselorMatrixData = async () => {
+    try {
+      setCounselorMatrixLoading(true);
+
+      if (!token) {
+        setCounselorMatrixData({});
+        setCounselorMatrixLoading(false);
+        return;
+      }
+
+      const queryParams = new URLSearchParams({
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+        ...(selectedCenter !== 'all' && { centerId: selectedCenter })
+      });
+
+      const response = await axios.get(`${backendUrl}/college/candidate/counselor-performance-matrix?${queryParams}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
+
+      if (response.data.status && response.data.data) {
+        setCounselorMatrixData(response.data.data);
+      } else {
+        setCounselorMatrixData({});
+      }
+
+    } catch (error) {
+      console.error('Error fetching counselor matrix data:', error);
+      setCounselorMatrixData({});
+    } finally {
+      setCounselorMatrixLoading(false);
     }
   };
 
@@ -1087,7 +1133,8 @@ const LeadAnalyticsDashboard = () => {
     return { totalFollowups, doneFollowups, missedFollowups, plannedFollowups };
   };
 
-  const counselorMatrix = getCounselorMatrix();
+  // Use API data for counselor matrix instead of local calculation
+  const counselorMatrix = counselorMatrixData;
   const centerAnalytics = getCenterAnalytics();
   const followupStats = getFollowupAnalytics();
   const dailyAdmissions = getDailyAdmissions();
@@ -2236,59 +2283,78 @@ const LeadAnalyticsDashboard = () => {
                     )}
                   </thead>
                   <tbody>
-                    {Object.entries(counselorMatrix).map(([counselor, data]) => (
-                      <tr key={counselor}>
-                        <td>{counselor}</td>
-                        {allStatuses.map(status =>
-                          expandedStatus === status && allSubstatuses[status]?.length > 0
-                            ? (
-                              <>
-                                {allSubstatuses[status].map(sub => (
-                                  <td key={sub} className="text-center">
-                                    <span className="badge rounded-pill bg-secondary">
-                                      {data[status]?.substatuses?.[sub] || 0}
-                                    </span>
-                                  </td>
-                                ))}
-                                <td className="text-center">
-                                  <span className="badge rounded-pill bg-primary">
-                                    {getSubstatusTotal(data, status, allSubstatuses[status])}
-                                  </span>
-                                </td>
-                              </>
-                            )
-                            : (
-                              <td key={status} className="text-center">
-                                <span className="badge rounded-pill bg-secondary">
-                                  {data[status]?.count || 0}
-                                </span>
-                              </td>
-                            )
-                        )}
-                        <td className="text-center fw-semibold">{data.Total}</td>
-                        <td className="text-center">
-                          <span className="text-purple fw-medium">{data.KYCDone}</span>
-                          <span className="text-muted small">/{data.KYCStage}</span>
-                        </td>
-                        <td className="text-center">
-                          <span className="text-success fw-medium">{data.Admissions}</span>
-                        </td>
-                        <td className="text-center">
-                          <span className={`fw-medium ${data.Dropouts > 0 ? 'text-danger' : 'text-muted'}`}>{data.Dropouts}</span>
-                        </td>
-                        <td className="text-center">
-                          <span className="text-success fw-medium">₹{(data.Paid * 15000).toLocaleString()}</span>
-                        </td>
-                        <td className="text-center">
-                          <span className={`badge rounded-pill ${data.ConversionRate > 50 ? 'bg-success' :
-                            data.ConversionRate > 30 ? 'bg-warning' :
-                              'bg-danger'
-                            }`}>
-                            {data.ConversionRate}%
-                          </span>
+                    {counselorMatrixLoading ? (
+                      <tr>
+                        <td colSpan={allStatuses.length + 7} className="text-center py-4">
+                          <div className="d-flex justify-content-center align-items-center">
+                            <div className="spinner-border spinner-border-sm me-2" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            Loading counselor performance data...
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : Object.keys(counselorMatrix).length === 0 ? (
+                      <tr>
+                        <td colSpan={allStatuses.length + 7} className="text-center py-4 text-muted">
+                          No counselor performance data available for the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      Object.entries(counselorMatrix).map(([counselor, data]) => (
+                        <tr key={counselor}>
+                          <td>{counselor}</td>
+                          {allStatuses.map(status =>
+                            expandedStatus === status && allSubstatuses[status]?.length > 0
+                              ? (
+                                <>
+                                  {allSubstatuses[status].map(sub => (
+                                    <td key={sub} className="text-center">
+                                      <span className="badge rounded-pill bg-secondary">
+                                        {data[status]?.substatuses?.[sub] || 0}
+                                      </span>
+                                    </td>
+                                  ))}
+                                  <td className="text-center">
+                                    <span className="badge rounded-pill bg-primary">
+                                      {getSubstatusTotal(data, status, allSubstatuses[status])}
+                                    </span>
+                                  </td>
+                                </>
+                              )
+                              : (
+                                <td key={status} className="text-center">
+                                  <span className="badge rounded-pill bg-secondary">
+                                    {data[status]?.count || 0}
+                                  </span>
+                                </td>
+                              )
+                          )}
+                          <td className="text-center fw-semibold">{data.Total}</td>
+                          <td className="text-center">
+                            <span className="text-purple fw-medium">{data.KYCDone}</span>
+                            <span className="text-muted small">/{data.KYCStage}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-success fw-medium">{data.Admissions}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className={`fw-medium ${data.Dropouts > 0 ? 'text-danger' : 'text-muted'}`}>{data.Dropouts}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-success fw-medium">₹{(data.Paid * 15000).toLocaleString()}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className={`badge rounded-pill ${data.ConversionRate > 50 ? 'bg-success' :
+                              data.ConversionRate > 30 ? 'bg-warning' :
+                                'bg-danger'
+                              }`}>
+                              {data.ConversionRate}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
