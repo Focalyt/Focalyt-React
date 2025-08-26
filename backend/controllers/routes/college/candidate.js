@@ -2359,6 +2359,108 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 		});
 	}
 });
+
+router.get('/pre-verification-stats', [isCollege], async (req, res) => {
+	try {
+	  const { date, startDate, endDate } = req.query;
+	  
+	  let query = {};
+	  
+	  // Single date filter
+	  if (date) {
+		const startOfDay = new Date(date);
+		startOfDay.setHours(0, 0, 0, 0);
+		const endOfDay = new Date(date);
+		endOfDay.setHours(23, 59, 59, 999);
+		
+		query.createdAt = { $gte: startOfDay, $lte: endOfDay };
+	  }
+	  
+	  // Date range filter
+	  if (startDate && endDate) {
+		const start = new Date(startDate);
+		start.setHours(0, 0, 0, 0);
+		const end = new Date(endDate);
+		end.setHours(23, 59, 59, 999);
+		
+		query.createdAt = { $gte: start, $lte: end };
+	  }
+	  
+	  // Get total count
+	  const totalCount = await QuestionAnswer.countDocuments(query);
+	  
+	  // Get today's count (if no date specified)
+	  if (!date && !startDate && !endDate) {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		
+		const todayCount = await QuestionAnswer.countDocuments({
+		  createdAt: { $gte: today, $lt: tomorrow }
+		});
+		
+		return res.json({
+		  success: true,
+		  data: {
+			today: todayCount,
+			total: totalCount
+		  }
+		});
+	  }
+	  
+	  res.json({
+		success: true,
+		data: {
+		  count: totalCount,
+		  date: date || `${startDate} to ${endDate}`
+		}
+	  });
+	  
+	} catch (error) {
+	  console.error('Error fetching pre-verification stats:', error);
+	  res.status(500).json({
+		success: false,
+		message: 'Error fetching statistics'
+	  });
+	}
+  });
+  router.get('/pre-verification-weekly-stats', [isCollege], async (req, res) => {
+	try {
+	  const { weeks = 4 } = req.query;
+	  const stats = [];
+	  
+	  for (let i = 0; i < parseInt(weeks); i++) {
+		const endDate = new Date();
+		endDate.setDate(endDate.getDate() - (i * 7));
+		const startDate = new Date(endDate);
+		startDate.setDate(startDate.getDate() - 6);
+		
+		const count = await QuestionAnswer.countDocuments({
+		  createdAt: { $gte: startDate, $lte: endDate }
+		});
+		
+		stats.push({
+		  week: i + 1,
+		  startDate: startDate.toISOString().split('T')[0],
+		  endDate: endDate.toISOString().split('T')[0],
+		  count: count
+		});
+	  }
+	  
+	  res.json({
+		success: true,
+		data: stats.reverse()
+	  });
+	  
+	} catch (error) {
+	  console.error('Error fetching weekly stats:', error);
+	  res.status(500).json({
+		success: false,
+		message: 'Error fetching weekly statistics'
+	  });
+	}
+  });
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {
 // 	try{}
 // 	catch(err){}

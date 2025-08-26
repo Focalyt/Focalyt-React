@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import axios from 'axios';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, Doughnut } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
-
+// import {Doughnut } from 'react-chartjs-2';
 // Add Bootstrap 5 CSS to your index.html or import it in your main app file
 // <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -449,6 +449,95 @@ const LeadAnalyticsDashboard = () => {
     };
   };
 
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const [stats, setStats] = useState({
+    today: 0,
+    total: 0,
+    completionRate: 0
+  });
+  const [weeklyStats, setWeeklyStats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [showPreVerificationDatePicker, setShowPreVerificationDatePicker] = useState(false);
+
+  useEffect(() => {
+    fetchStats();
+    fetchWeeklyStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/pre-verification-stats?date=${selectedDate}`,
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data.success) {
+        setStats(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWeeklyStats = async () => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/pre-verification-weekly-stats`,
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data.success) {
+        setWeeklyStats(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching weekly stats:', error);
+    }
+  };
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
+  };
+
+  const handleSearch = () => {
+    setLoading(true);
+    fetchStats();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedDate('');
+    setLoading(true);
+    fetchStats();
+  };
+
+  const handleShowAll = () => {
+    setSelectedDate('');
+    setLoading(true);
+    fetchStats();
+  };
+
+  // Keyboard shortcut for search (Enter key)
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && selectedDate) {
+      handleSearch();
+    }
+  };
+
+  const handlePreVerificationDateSelect = (startDate, endDate) => {
+    setSelectedDate(startDate);
+    setShowPreVerificationDatePicker(false);
+    fetchStats();
+  };
   //filter stats
 
   const [formData, setFormData] = useState({
@@ -1716,7 +1805,7 @@ const LeadAnalyticsDashboard = () => {
     return result;
   };
 
- 
+
 
   // Function to download as Excel (XLSX)
   const downloadExcel = async () => {
@@ -1834,7 +1923,7 @@ const LeadAnalyticsDashboard = () => {
     URL.revokeObjectURL(url);
   };
 
- 
+
 
   // Close download dropdown when clicking outside
   useEffect(() => {
@@ -1906,6 +1995,13 @@ const LeadAnalyticsDashboard = () => {
             isOpen={showCounsellorDatePicker}
             onClose={() => setShowCounsellorDatePicker(false)}
             onDateSelect={handleCounsellorDateSelect}
+          />
+
+          {/* Modern Date Picker for Pre-Verification Dashboard */}
+          <ModernDatePicker
+            isOpen={showPreVerificationDatePicker}
+            onClose={() => setShowPreVerificationDatePicker(false)}
+            onDateSelect={handlePreVerificationDateSelect}
           />
 
           {/* Filters */}
@@ -2820,6 +2916,138 @@ const LeadAnalyticsDashboard = () => {
               )}
             </div>
           </div>
+
+          <div className="container-fluid">
+            <div className="row">
+              <div className="col-12">
+                <h2 className="mb-4">Pre-Verification Dashboard</h2>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="row mb-4">
+              <div className="col-md-4">
+                <div className="card bg-primary text-white">
+                  <div className="card-body">
+                    <h5 className="card-title">Today's Pre-Verifications</h5>
+                    <h2 className="card-text">{loading ? '...' : stats.today}</h2>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="card bg-success text-white">
+                  <div className="card-body">
+                    <h5 className="card-title">Total Pre-Verifications</h5>
+                    <h2 className="card-text">{loading ? '...' : stats.total}</h2>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="card bg-info text-white">
+                  <div className="card-body">
+                    <h5 className="card-title">Completion Rate</h5>
+                    <h2 className="card-text">
+                      {loading ? '...' : stats.total > 0 ? Math.round((stats.today / stats.total) * 100) : 0}%
+                    </h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Date Filter */}
+            <div className="row mb-4">
+              <div className="col-md-6">
+                <div className="card shadow-sm">
+                  <div className="card-body">
+                    <div className="d-flex align-items-center gap-3">
+                      
+                      <button
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        Filters
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+             
+            </div>
+
+            {/* Charts */}
+            <div className="row">
+              <div className="col-md-8">
+                <div className="card">
+                  <div className="card-body">
+                    <h5 className="card-title">Weekly Pre-Verification Trend</h5>
+                    {loading ? (
+                      <div className="text-center py-4">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                    ) : weeklyStats.length > 0 ? (
+                      <BarChart width={600} height={300} data={weeklyStats}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="week" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#36a2eb" />
+                      </BarChart>
+                    ) : (
+                      <div className="text-center py-4 text-muted">
+                        No data available for weekly trend
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="card">
+                  <div className="card-body">
+                    <h5 className="card-title">Today vs Total</h5>
+                    {loading ? (
+                      <div className="text-center py-4">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                    ) : stats.total > 0 ? (
+                      <PieChart width={300} height={300}>
+                        <Pie
+                          data={[
+                            { name: 'Today', value: stats.today },
+                            { name: 'Other Days', value: Math.max(0, stats.total - stats.today) }
+                          ]}
+                          cx={150}
+                          cy={150}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          <Cell fill="#ff6384" />
+                          <Cell fill="#36a2eb" />
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    ) : (
+                      <div className="text-center py-4 text-muted">
+                        No data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+          </div>
         </>
       )}
 
@@ -3272,6 +3500,75 @@ const LeadAnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* pre verification filter  */}
+
+                <div className="col-md-6">
+                <div className="card shadow-sm">
+                  <div className="card-body">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="flex-grow-1">
+                        <label className="form-label fw-medium mb-2">
+                          <i className="fas fa-calendar-alt text-primary me-2"></i>
+                          Filter by Date
+                        </label>
+                        <div className="input-group">
+                          <DatePicker
+                            onChange={(date) => {
+                              const formattedDate = date ?
+                                `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                                : '';
+                              setSelectedDate(formattedDate);
+                              // Auto-trigger search when date changes
+                              if (formattedDate) {
+                                setLoading(true);
+                                setTimeout(() => fetchStats(), 100);
+                              }
+                            }}
+                            onKeyPress={handleKeyPress}
+                            value={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
+                            format="dd/MM/yyyy"
+                            className="form-control"
+                            clearIcon={null}
+                            calendarIcon={<i className="fas fa-calendar text-primary"></i>}
+                            placeholder="Select date to filter..."
+                            maxDate={new Date()}
+                          />
+                          <button
+                            className="btn btn-primary"
+                            onClick={handleSearch}
+                            disabled={loading}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                            Search
+                          </button>
+                          <button
+                            className="btn btn-outline-secondary"
+                            onClick={handleClearFilters}
+                            disabled={loading}
+                          >
+                            <i className="fas fa-times me-1"></i>
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="d-flex flex-column gap-2">
+                        <button
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={handleShowAll}
+                          disabled={loading}
+                        >
+                          <i className="fas fa-list me-1"></i>
+                          Show All
+                        </button>
+                        
+                      </div>
+
+                     
+                    </div>
+                  </div>
+                </div>
+              </div>
 
                 {/* Results Summary */}
                 <div className="row mt-4">
