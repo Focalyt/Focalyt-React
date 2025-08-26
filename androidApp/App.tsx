@@ -12,7 +12,7 @@ import AttendanceTracker from './components/AttendanceTracker';
 const Stack = createStackNavigator();
 
 // Main App Navigator
-function MainNavigator() {
+function MainNavigator({ onLogout }: { onLogout: () => void }) {
   const navigation = useNavigation();
   const [userData, setUserData] = useState<any>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -32,31 +32,7 @@ function MainNavigator() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem('isLoggedIn');
-              await AsyncStorage.removeItem('userPhone');
-              await AsyncStorage.removeItem('userData');
-              await AsyncStorage.removeItem('tempOTP');
-              await AsyncStorage.removeItem('tempPhone');
-              // The login state will be handled by the parent component
-            } catch (error) {
-              console.error('Error during logout:', error);
-            }
-          }
-        }
-      ]
-    );
-  };
+
 
   return (
     <Stack.Navigator
@@ -106,7 +82,7 @@ function MainNavigator() {
                   style={styles.menuItem}
                   onPress={() => {
                     setShowMenu(false);
-                    handleLogout();
+                    onLogout();
                   }}
                 >
                   <Text style={styles.menuItemText}>🚪 Logout</Text>
@@ -169,12 +145,86 @@ export default function App() {
   const checkLoginStatus = async () => {
     try {
       const loginStatus = await AsyncStorage.getItem('isLoggedIn');
-      setIsLoggedIn(loginStatus === 'true');
+      const isLoggedIn = loginStatus === 'true';
+      
+      if (isLoggedIn) {
+        // If user is logged in, check backend for today's attendance status
+        console.log('🔍 Checking backend for today\'s attendance status...');
+        await checkBackendAttendanceStatus();
+      }
+      
+      setIsLoggedIn(isLoggedIn);
     } catch (error) {
       console.error('Error checking login status:', error);
       setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const checkBackendAttendanceStatus = async () => {
+    try {
+      // Get user data from AsyncStorage
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (!userDataString) {
+        console.log('❌ No user data found for backend check');
+        return;
+      }
+
+      const userData = JSON.parse(userDataString);
+      const today = new Date().toISOString().split('T')[0]; // Use ISO format for API
+      
+      console.log('📅 Checking attendance for date:', today);
+      console.log('👤 User ID:', userData.executiveId || userData.id);
+
+      // Import apiService dynamically to avoid circular dependency
+      const apiService = require('./services/apiService').default;
+      await apiService.initialize();
+      
+      // Fetch today's attendance data from backend
+      const response = await apiService.getAttendanceData(today);
+      
+      if (response.success && response.data && response.data.entries) {
+        console.log('✅ Backend data found:', response.data.entries.length, 'entries');
+        
+        // Check if user has punched in today
+        const hasPunchIn = response.data.entries.some((entry: any) => entry.type === 'punchIn');
+        const hasPunchOut = response.data.entries.some((entry: any) => entry.type === 'punchOut');
+        
+        console.log('📊 Attendance Status - Punch In:', hasPunchIn, 'Punch Out:', hasPunchOut);
+        
+        // Update local attendance data with backend data
+        const attendanceData = {
+          [today]: response.data.entries
+        };
+        
+        await AsyncStorage.setItem('attendanceData', JSON.stringify(attendanceData));
+        console.log('💾 Local attendance data updated with backend data');
+        
+        // Set punch-in status in AsyncStorage
+        if (hasPunchIn && !hasPunchOut) {
+          await AsyncStorage.setItem('isPunchedIn', 'true');
+          await AsyncStorage.setItem('punchInTime', response.data.entries.find((e: any) => e.type === 'punchIn')?.fromTime || new Date().toISOString());
+          console.log('✅ User is already punched in today');
+        } else if (hasPunchIn && hasPunchOut) {
+          await AsyncStorage.setItem('isPunchedIn', 'false');
+          await AsyncStorage.removeItem('punchInTime');
+          console.log('✅ User has completed attendance today');
+        } else {
+          await AsyncStorage.setItem('isPunchedIn', 'false');
+          await AsyncStorage.removeItem('punchInTime');
+          console.log('✅ User has not punched in today');
+        }
+      } else {
+        console.log('📭 No attendance data found for today in backend');
+        // Clear local punch-in status if no backend data
+        await AsyncStorage.setItem('isPunchedIn', 'false');
+        await AsyncStorage.removeItem('punchInTime');
+      }
+    } catch (error) {
+      console.error('❌ Error checking backend attendance status:', error);
+      // If backend check fails, keep local status
+      console.log('🔄 Keeping local attendance status due to backend error');
     }
   };
 
@@ -197,9 +247,35 @@ export default function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem('isLoggedIn');
+              await AsyncStorage.removeItem('userPhone');
+              await AsyncStorage.removeItem('userData');
+              await AsyncStorage.removeItem('tempOTP');
+              await AsyncStorage.removeItem('tempPhone');
+              setIsLoggedIn(false); // This will trigger re-render and show login page
+            } catch (error) {
+              console.error('Error during logout:', error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <NavigationContainer>
-      <MainNavigator />
+      <MainNavigator onLogout={handleLogout} />
       <StatusBar style="auto" />
     </NavigationContainer>
   );

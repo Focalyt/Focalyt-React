@@ -17,6 +17,16 @@ import { WebView } from 'react-native-webview';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import apiService from '../services/apiService';
+import { 
+  getTodayISO, 
+  getTodayLocal, 
+  getYesterdayISO, 
+  getYesterdayLocal,
+  getDateForAPI,
+  getDateForStorage,
+  isToday,
+  isYesterday
+} from '../utils/dateUtils';
 
 interface LocationData {
   latitude: number;
@@ -194,20 +204,20 @@ const TimelinePage: React.FC = () => {
           } else {
             console.warn('Invalid first date:', firstDate);
             // Set today's date as fallback
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayISO();
             setSelectedDate(today);
             setCurrentDateIndex(0);
           }
         } catch (error) {
           console.error('Error validating first date:', firstDate, error);
           // Set today's date as fallback
-          const today = new Date().toISOString().split('T')[0];
+          const today = getTodayISO();
           setSelectedDate(today);
           setCurrentDateIndex(0);
         }
       } else if (dates.length === 0 && !selectedDate) {
         // Only set today's date if no date is currently selected
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayISO();
         setSelectedDate(today);
         setCurrentDateIndex(0);
       }
@@ -366,9 +376,11 @@ const TimelinePage: React.FC = () => {
       });
       console.log('🔄 Fetching attendance data from API for date:', date);
       
-      // Fetch attendance data for the specific date
+      // Fetch attendance data for the specific date (convert to ISO format for API)
+      const apiDate = getDateForAPI(date);
+      console.log('📅 Fetching API data for date:', date, '-> API date:', apiDate);
       console.log('📡 Making API call to getAttendanceData...');
-      const response = await apiService.getAttendanceData(date);
+      const response = await apiService.getAttendanceData(apiDate);
       
       console.log('📥 API Response Received:');
       console.log('📥 Response Success:', response.success);
