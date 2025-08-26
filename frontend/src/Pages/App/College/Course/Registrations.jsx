@@ -5428,6 +5428,11 @@ const CRMDashboard = () => {
                                                 <div className="info-label">BATCH NAME</div>
                                                 <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                               </div>
+                                           
+                                              <div className="info-group">
+                                                <div className="info-label">Source Contact Name</div>
+                                                <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
+                                              </div>
                                             </div>
 
                                             <div className="info-card">
@@ -5506,6 +5511,10 @@ const CRMDashboard = () => {
                                                       <div className="info-label">BATCH NAME</div>
                                                       <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                     </div>
+                                                    <div className="info-group">
+                                                <div className="info-label">Source Contact Name</div>
+                                                <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
+                                              </div>
                                                   </div>
 
                                                   <div className="info-card">
@@ -5706,6 +5715,13 @@ const CRMDashboard = () => {
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD OWNER</div>
                                                       <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
+                                                    </div>
+                                                    
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Source Contact Name</div>
+                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
                                                     </div>
                                                   </div>
                                                 </div>

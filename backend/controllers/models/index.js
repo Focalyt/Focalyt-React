@@ -96,4 +96,5 @@ module.exports.TypeOfB2B = require("./b2b/typeOfB2B");
 module.exports.LeadCategory = require("./b2b/leadCategory");
 module.exports.FollowUp = require("./b2b/followUp");
 module.exports.Lead = require("./b2b/lead");
+module.exports.Source = require("./source");
 

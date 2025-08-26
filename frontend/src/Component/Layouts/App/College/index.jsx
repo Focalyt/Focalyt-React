@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
-  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe
 } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -600,6 +600,12 @@ function CollegeLayout({ children }) {
                         <Link to="/institute/typeOfCategory" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faTags} />
                           <span className="menu-title">Type of Category</span>
+                        </Link>
+                      </li>
+                      <li className={`nav-item ${location.pathname === '/institute/source' ? 'active' : ''}`}>
+                        <Link to="/institute/source" onClick={() => handleSidebarClose()}>
+                          <FontAwesomeIcon icon={faGlobe} />
+                          <span className="menu-title">Source</span>
                         </Link>
                       </li>
                     </ul>
