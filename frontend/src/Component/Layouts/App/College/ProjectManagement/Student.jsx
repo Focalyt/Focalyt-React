@@ -3845,7 +3845,7 @@ const Student = ({
   };
 
   // Mark individual attendance
-  const markIndividualAttendance = async (studentId, status) => {
+  const markIndividualAttendance = async (studentId, status, showAlert = true) => {
 
     try {
       // Use IST date for marking attendance
@@ -3863,16 +3863,22 @@ const Student = ({
       });
 
       if (result.status) {
-        alert(result.data.message)
+        if (showAlert) {
+          alert(result.data.message)
+        }
         fetchProfileData()
       } else {
-        alert(result.data.message)
+        if (showAlert) {
+          alert(result.data.message)
+        }
         fetchProfileData()
       }
 
     } catch (error) {
       console.error("Error marking attendance:", error);
-      alert(error.response?.data?.message || "Failed to mark attendance")
+      if (showAlert) {
+        alert(error.response?.data?.message || "Failed to mark attendance")
+      }
     }
   };
 
@@ -3948,7 +3954,7 @@ const Student = ({
     if (!bulkAttendanceStatus || selectedStudents.size === 0) return;
 
     selectedStudents.forEach((studentId) => {
-      markIndividualAttendance(studentId, bulkAttendanceStatus);
+      markIndividualAttendance(studentId, bulkAttendanceStatus, false);
     });
 
     setSelectedStudents(new Set());
