@@ -711,7 +711,7 @@ const LeadAnalyticsDashboard = () => {
   // Fetch counselor matrix data when filters change
   useEffect(() => {
     fetchCounselorMatrixData();
-  }, [token, backendUrl, startDate, endDate, selectedCenter]);
+  }, [token, backendUrl, startDate, endDate, selectedCenter, filterData, formData]);
 
   const fetchProfileData = async (filters = filterData) => {
     try {
@@ -776,13 +776,25 @@ const LeadAnalyticsDashboard = () => {
         return;
       }
 
+      // Use the same filter structure as fetchProfileData
       const queryParams = new URLSearchParams({
-        ...(startDate && { startDate }),
-        ...(endDate && { endDate }),
-        ...(selectedCenter !== 'all' && { centerId: selectedCenter })
+        // Use advanced filter dates if available, otherwise use basic date filters
+        ...(filterData?.createdFromDate ? { startDate: filterData.createdFromDate.toLocaleDateString('en-CA') } : (startDate && { startDate })),
+        ...(filterData?.createdToDate ? { endDate: filterData.createdToDate.toLocaleDateString('en-CA') } : (endDate && { endDate })),
+        ...(selectedCenter !== 'all' && { centerId: selectedCenter }),
+        // Advanced filters from filterData
+        ...(filterData?.courseType && { courseType: filterData.courseType }),
+        // Multi-select filters
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
-      const response = await axios.get(`${backendUrl}/college/candidate/counselor-performance-matrix?${queryParams}`, {
+      console.log('Counselor Matrix queryParams', queryParams)
+
+      const response = await axios.get(`${backendUrl}/college/counselor-performance-matrix?${queryParams}`, {
         headers: {
           'x-auth': token,
         }
@@ -955,7 +967,7 @@ const LeadAnalyticsDashboard = () => {
       const substatusMap = {};
       appliedCoursesData.forEach(lead => {
         const status = (lead._leadStatus?.title || '').trim();
-        if (status) {
+        if (status && status !== 'Untouch Leads') { // Exclude "Untouch Leads" from dynamic columns
           statuses.add(status);
           if (!substatusMap[status]) substatusMap[status] = new Set();
           if (Array.isArray(lead._leadStatus?.substatuses)) {
@@ -2238,11 +2250,13 @@ const LeadAnalyticsDashboard = () => {
                 <UserCheck className="text-primary" size={20} />
                 Counselor Performance Matrix
               </h2>
-              <div className="table-responsive">
-                <table className="table table-hover align-middle">
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
                   <thead className="table-light">
                     <tr>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Counselor</th>
+                      <th rowSpan={expandedStatus ? 2 : 1} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>Counselor</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>Leads</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>Untouch</th>
                       {allStatuses.map(status => (
                         <th
                           key={status}
@@ -2258,10 +2272,12 @@ const LeadAnalyticsDashboard = () => {
                           {status} <span style={{ fontWeight: 'normal' }}>{expandedStatus === status ? '▲' : '▼'}</span>
                         </th>
                       ))}
-                      <th rowSpan={expandedStatus ? 2 : 1}>Total</th>
                       <th rowSpan={expandedStatus ? 2 : 1}>KYC</th>
                       <th rowSpan={expandedStatus ? 2 : 1}>Admissions</th>
                       <th rowSpan={expandedStatus ? 2 : 1}>Dropouts</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Assigned</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Freezed</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>Zero Period</th>
                       <th rowSpan={expandedStatus ? 2 : 1}>Revenue</th>
                       <th rowSpan={expandedStatus ? 2 : 1}>Conv. Rate</th>
                     </tr>
@@ -2285,7 +2301,7 @@ const LeadAnalyticsDashboard = () => {
                   <tbody>
                     {counselorMatrixLoading ? (
                       <tr>
-                        <td colSpan={allStatuses.length + 7} className="text-center py-4">
+                        <td colSpan={allStatuses.length + 10} className="text-center py-4">
                           <div className="d-flex justify-content-center align-items-center">
                             <div className="spinner-border spinner-border-sm me-2" role="status">
                               <span className="visually-hidden">Loading...</span>
@@ -2296,14 +2312,18 @@ const LeadAnalyticsDashboard = () => {
                       </tr>
                     ) : Object.keys(counselorMatrix).length === 0 ? (
                       <tr>
-                        <td colSpan={allStatuses.length + 7} className="text-center py-4 text-muted">
+                        <td colSpan={allStatuses.length + 10} className="text-center py-4 text-muted">
                           No counselor performance data available for the selected filters.
                         </td>
                       </tr>
                     ) : (
                       Object.entries(counselorMatrix).map(([counselor, data]) => (
                         <tr key={counselor}>
-                          <td>{counselor}</td>
+                          <td style={{ position: 'sticky', left: 0, zIndex: 1, backgroundColor: 'white' }}>{counselor}</td>
+                          <td className="text-center fw-semibold">{data.Leads}</td>
+                          <td className="text-center">
+                            <span className="text-warning fw-medium">{data.Untouch || 0}</span>
+                          </td>
                           {allStatuses.map(status =>
                             expandedStatus === status && allSubstatuses[status]?.length > 0
                               ? (
@@ -2330,7 +2350,6 @@ const LeadAnalyticsDashboard = () => {
                                 </td>
                               )
                           )}
-                          <td className="text-center fw-semibold">{data.Total}</td>
                           <td className="text-center">
                             <span className="text-purple fw-medium">{data.KYCDone}</span>
                             <span className="text-muted small">/{data.KYCStage}</span>
@@ -2340,6 +2359,15 @@ const LeadAnalyticsDashboard = () => {
                           </td>
                           <td className="text-center">
                             <span className={`fw-medium ${data.Dropouts > 0 ? 'text-danger' : 'text-muted'}`}>{data.Dropouts}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-info fw-medium">{data.BatchAssigned || 0}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-warning fw-medium">{data.BatchFreezed || 0}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-primary fw-medium">{data.ZeroPeriod || 0}</span>
                           </td>
                           <td className="text-center">
                             <span className="text-success fw-medium">₹{(data.Paid * 15000).toLocaleString()}</span>

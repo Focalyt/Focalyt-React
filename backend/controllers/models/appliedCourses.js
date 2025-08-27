@@ -68,9 +68,14 @@ const appliedCoursesSchema = new Schema(
       type: String,
       enum: ['Hot', 'Warm', 'Cold'],
     },
+    registeredByModel: {
+      type: String,
+      required: true,
+      enum: ["User", "Source"] // yahan dono models ka naam dena hai
+    },
     registeredBy: {
       type: ObjectId,
-      ref: "User",
+      refPath: "registeredByModel"
     },
     // Current Status
     courseStatus: {

@@ -10,13 +10,32 @@ const StatusLogsSchema = new mongoose.Schema({
     ref: 'AppliedCourses',
     required: true
   },
+  _courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course',
+  },
+  vertical: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vertical',
+  },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+  },
+  _centerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Center',
+  },
+  _batchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Batch',
+  },
   _statusId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Status',
   },
   _subStatusId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'SubStatus',
   },
   _collegeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +44,7 @@ const StatusLogsSchema = new mongoose.Schema({
   },
   counsellor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Counsellor',
+    ref: 'User',
     required: true
   },
   kycStage: {
