@@ -70,7 +70,6 @@ const appliedCoursesSchema = new Schema(
     },
     registeredByModel: {
       type: String,
-      required: true,
       enum: ["User", "Source"] // yahan dono models ka naam dena hai
     },
     registeredBy: {
@@ -411,6 +410,16 @@ appliedCoursesSchema.pre('save', async function(next) {
       await this.assignCounselor();
       // assignCounselor() method will modify the document, main save will handle the actual saving
     }
+    if (this.registeredBy && !this.registeredByModel) {
+      const User = mongoose.model("User");
+      const Source = mongoose.model("Source");
+  
+      if (await User.exists({ _id: this.registeredBy })) {
+        this.registeredByModel = "User";
+      } else if (await Source.exists({ _id: this.registeredBy })) {
+        this.registeredByModel = "Source";
+      }
+    }
     next();
   } catch (error) {
     next(error);
