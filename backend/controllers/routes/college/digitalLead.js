@@ -143,7 +143,7 @@ class BatchProcessor {
                 source = 'FB Form';
             }
 
-            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
                 throw new Error("All fields are required");
             }
 
@@ -307,7 +307,7 @@ router.route("/addleaddandcourseapply")
             // Basic validation only
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
-            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
                 return res.status(200).json({
                     status: false,
                     msg: "All fields are required"
@@ -418,5 +418,418 @@ router.post("/batch/process-now", (req, res) => {
         });
     }
 });
+
+// Source Leads API
+router.get("/sourceLeadsData", async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query
+        
+        const convertStartDate = new Date(startDate).setHours(0, 0, 0, 0);
+        // console.log("convertStartDate", new Date(convertStartDate))
+        const convertEndDate = new Date(endDate).setHours(23, 59, 59, 999);
+        // console.log("convertEndDate", new Date(convertEndDate))
+        const filter = {
+            createdAt: {
+                $gte: new Date(convertStartDate),
+                $lte: new Date(convertEndDate)
+            }
+        }
+        const aggregationPipeline = [
+            { 
+                $match: filter  // Apply the date filter
+            },
+            {
+                $group: {
+                    _id: "$registeredBy",  // Group by registeredBy (registeredBy is the field to group by)
+                    leadCount: { $sum: 1 }  // Count the number of leads for each registeredBy
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",  // Populating the user data for registeredBy
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "registeredByDetails"
+                }
+            },
+            {
+                $lookup: {
+                    from: "sources",  // Populating the sources data for registeredBy
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "registeredBySource"
+                }
+            },
+            {
+                $addFields: {
+                    registeredBy: {
+                        $ifNull: [{ $arrayElemAt: ["$registeredByDetails", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
+                    }
+                }
+            },
+            {
+                $project: {
+                    registeredBy: 1,
+                    leadCount: 1,
+                }
+            }
+            
+        ];
+
+        const sourceData = await AppliedCourses.aggregate(aggregationPipeline);
+
+
+        res.status(200).json({
+            status: true,
+            data: sourceData
+        });
+    }
+    catch (err) {
+        res.status(500).json({
+            status: false,
+            msg: "Failed to get source leads",
+            error: err.message
+        });
+
+    }
+})
+
+// router.get("/sourceLeads", async (req, res) => {
+//     try {
+//         console.log("sourceLeads... api hitting" )
+
+//         // Get date range from query parameters (optional)
+//         const { startDate, endDate, collegeId } = req.query;
+
+//         // Build date filter
+//         let dateFilter = {};
+//         if (startDate && endDate) {
+//             dateFilter = {
+//                 createdAt: {
+//                     $gte: new Date(startDate),
+//                     $lte: new Date(endDate)
+//                 }
+//             };
+//         }
+
+//         // Build college filter if provided
+//         let collegeFilter = {};
+//         if (collegeId) {
+//             collegeFilter = { collegeId: collegeId };
+//         }
+
+//         // Aggregate pipeline to count leads by source
+//         const sourceLeadsData = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     ...dateFilter,
+//                     ...collegeFilter,
+//                     isDeleted: { $ne: true }
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 },
+//                     leads: {
+//                         $push: {
+//                             _id: "$_id",
+//                             name: "$name",
+//                             mobile: "$mobile",
+//                             email: "$email",
+//                             createdAt: "$createdAt",
+//                             source: "$source"
+//                         }
+//                     }
+//                 }
+//             },
+//             {
+//                 $project: {
+//                     source: "$_id",
+//                     count: 1,
+//                     leads: 1,
+//                     _id: 0
+//                 }
+//             },
+//             {
+//                 $sort: { count: -1 }
+//             }
+//         ]);
+
+//         console.log("sourceLeadsData...", sourceLeadsData);
+
+//         // Calculate totals
+//         const totalLeads = sourceLeadsData.reduce((sum, item) => sum + item.count, 0);
+
+//         // Categorize sources
+//         const portalLeads = sourceLeadsData.filter(item => 
+//             item.source === 'website' || 
+//             item.source === 'portal' || 
+//             item.source === 'college_portal'
+//         );
+
+//         const thirdPartyLeads = sourceLeadsData.filter(item => 
+//             item.source !== 'website' && 
+//             item.source !== 'portal' && 
+//             item.source !== 'college_portal'
+//         );
+
+//         const portalLeadsCount = portalLeads.reduce((sum, item) => sum + item.count, 0);
+//         const thirdPartyLeadsCount = thirdPartyLeads.reduce((sum, item) => sum + item.count, 0);
+
+//         // Get recent leads (last 30 days)
+//         const thirtyDaysAgo = new Date();
+//         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+//         const recentLeadsData = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     createdAt: { $gte: thirtyDaysAgo },
+//                     isDeleted: { $ne: true }
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 }
+//                 }
+//             }
+//         ]);
+
+//         const recentPortalLeads = recentLeadsData
+//             .filter(item => ['website', 'portal', 'college_portal'].includes(item._id))
+//             .reduce((sum, item) => sum + item.count, 0);
+
+//         const recentThirdPartyLeads = recentLeadsData
+//             .filter(item => !['website', 'portal', 'college_portal'].includes(item._id))
+//             .reduce((sum, item) => sum + item.count, 0);
+
+//         console.log("summary...", {
+//             totalLeads,
+//             portalLeads: portalLeadsCount,
+//             thirdPartyLeads: thirdPartyLeadsCount,
+//             recentPortalLeads,
+//             recentThirdPartyLeads
+//         });
+
+//         res.status(200).json({
+//             status: true,
+//             msg: "Source leads data retrieved successfully",
+//             data: {
+//                 summary: {
+//                     totalLeads,
+//                     portalLeads: portalLeadsCount,
+//                     thirdPartyLeads: thirdPartyLeadsCount,
+//                     recentPortalLeads,
+//                     recentThirdPartyLeads
+//                 },
+//                 sourceBreakdown: sourceLeadsData,
+//                 portalLeads: portalLeads,
+//                 thirdPartyLeads: thirdPartyLeads
+//             }
+//         });
+
+//     } catch (err) {
+//         console.error("Error in sourceLeads API:", err);
+//         res.status(500).json({
+//             status: false,
+//             msg: "Failed to get source leads",
+//             error: err.message
+//         });
+//     }
+// });
+
+// router.get("/leadStats", async (req, res) => {
+//     try {
+//         console.log("leadStats... api hitting")
+
+//         const { startDate, endDate, collegeId } = req.query;
+
+//         // Build date filter
+//         let dateFilter = {};
+//         if (startDate && endDate) {
+//             dateFilter = {
+//                 createdAt: {
+//                     $gte: new Date(startDate),
+//                     $lte: new Date(endDate)
+//                 }
+//             };
+//         }
+
+//         // Build college filter if provided
+//         let collegeFilter = {};
+//         if (collegeId) {
+//             collegeFilter = { collegeId: collegeId };
+//         }
+
+//         // Get leads by month for the last 12 months
+//         const twelveMonthsAgo = new Date();
+//         twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+//         const monthlyLeads = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     createdAt: { $gte: twelveMonthsAgo },
+//                     isDeleted: { $ne: true },
+//                     ...collegeFilter
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: {
+//                         year: { $year: "$createdAt" },
+//                         month: { $month: "$createdAt" },
+//                         source: "$source"
+//                     },
+//                     count: { $sum: 1 }
+//                 }
+//             },
+//             {
+//                 $sort: { "_id.year": 1, "_id.month": 1 }
+//             }
+//         ]);
+
+//         // Get today's leads
+//         const today = new Date();
+//         today.setHours(0, 0, 0, 0);
+//         const tomorrow = new Date(today);
+//         tomorrow.setDate(tomorrow.getDate() + 1);
+
+//         const todayLeads = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     createdAt: { $gte: today, $lt: tomorrow },
+//                     isDeleted: { $ne: true },
+//                     ...collegeFilter
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 }
+//                 }
+//             }
+//         ]);
+
+//         // Get this week's leads
+//         const startOfWeek = new Date();
+//         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+//         startOfWeek.setHours(0, 0, 0, 0);
+
+//         const weekLeads = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     createdAt: { $gte: startOfWeek },
+//                     isDeleted: { $ne: true },
+//                     ...collegeFilter
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 }
+//                 }
+//             }
+//         ]);
+
+//         // Get this month's leads
+//         const startOfMonth = new Date();
+//         startOfMonth.setDate(1);
+//         startOfMonth.setHours(0, 0, 0, 0);
+
+//         const monthLeads = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     createdAt: { $gte: startOfMonth },
+//                     isDeleted: { $ne: true },
+//                     ...collegeFilter
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 }
+//                 }
+//             }
+//         ]);
+
+//         // Calculate portal vs third party for different time periods
+//         const calculatePortalVsThirdParty = (leadsData) => {
+//             const portalSources = ['website', 'portal', 'college_portal'];
+//             const portalCount = leadsData
+//                 .filter(item => portalSources.includes(item._id))
+//                 .reduce((sum, item) => sum + item.count, 0);
+//             const thirdPartyCount = leadsData
+//                 .filter(item => !portalSources.includes(item._id))
+//                 .reduce((sum, item) => sum + item.count, 0);
+//             return { portalCount, thirdPartyCount };
+//         };
+
+//         const todayStats = calculatePortalVsThirdParty(todayLeads);
+//         const weekStats = calculatePortalVsThirdParty(weekLeads);
+//         const monthStats = calculatePortalVsThirdParty(monthLeads);
+
+//         // Get top sources
+//         const topSources = await CandidateProfile.aggregate([
+//             {
+//                 $match: {
+//                     isDeleted: { $ne: true },
+//                     ...collegeFilter
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$source",
+//                     count: { $sum: 1 }
+//                 }
+//             },
+//             {
+//                 $sort: { count: -1 }
+//             },
+//             {
+//                 $limit: 10
+//             }
+//         ]);
+
+//         console.log("monthlyLeads...", monthlyLeads)
+//         console.log("monthLeads...", monthLeads)
+//         console.log("topSources...", topSources)
+
+//         res.status(200).json({
+//             status: true,
+//             msg: "Lead statistics retrieved successfully",
+//             data: {
+//                 today: {
+//                     total: todayLeads.reduce((sum, item) => sum + item.count, 0),
+//                     portal: todayStats.portalCount,
+//                     thirdParty: todayStats.thirdPartyCount,
+//                     breakdown: todayLeads
+//                 },
+//                 thisWeek: {
+//                     total: weekLeads.reduce((sum, item) => sum + item.count, 0),
+//                     portal: weekStats.portalCount,
+//                     thirdParty: weekStats.thirdPartyCount,
+//                     breakdown: weekLeads
+//                 },
+//                 thisMonth: {
+//                     total: monthLeads.reduce((sum, item) => sum + item.count, 0),
+//                     portal: monthStats.portalCount,
+//                     thirdParty: monthStats.thirdPartyCount,
+//                     breakdown: monthLeads
+//                 },
+//                 monthlyTrend: monthlyLeads,
+//                 topSources: topSources
+//             }
+//         });
+
+//     } catch (err) {
+//         console.error("Error in leadStats API:", err);
+//         res.status(500).json({
+//             status: false,
+//             msg: "Failed to get lead statistics",
+//             error: err.message
+//         });
+//     }
+// });
 
 module.exports = router;

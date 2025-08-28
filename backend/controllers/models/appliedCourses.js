@@ -418,8 +418,8 @@ appliedCoursesSchema.pre('save', async function(next) {
         this.registeredByModel = "User";
       } else if (await Source.exists({ _id: this.registeredBy })) {
         this.registeredByModel = "Source";
-      }
-    }
+      }
+    }
     next();
   } catch (error) {
     next(error);

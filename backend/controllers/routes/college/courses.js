@@ -839,20 +839,27 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		console.log("API hitting....");
-		const { courseId, candidateData, centerId, counselorId } = req.body;
+		const { courseId, candidateData, centerId, counselorId ,registeredBy} = req.body;
 
 
 		console.log("centerId from req.body", req.body)
+		const existingCandidate = await Candidate.findOne({ mobile: candidateData.mobile });
+		if (existingCandidate) {
+			return res.status(400).json({
+				status: false,
+				message: "Candidate already exists"
+			});
+		}
 		const candidate = await Candidate.create(candidateData);
 		console.log("candidate", candidate)
 
 		const counselor = await User.findById(counselorId);
-
 		const appliedCourse = await AppliedCourses.create({
 			_candidate: candidate._id,
 			_course: courseId,
 			_center: centerId,
 			counsellor: counselorId,
+			registeredBy: registeredBy,
 			leadAssignment: [{
 				_counsellor: counselorId,
 				counsellorName: counselor.name,
@@ -860,6 +867,8 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 				assignedBy: user._id
 			}]
 		});
+
+		console.log("appliedCourse", appliedCourse)
 
 		candidate.appliedCourses.push(appliedCourse._id);
 		await candidate.save();

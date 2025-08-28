@@ -34,6 +34,8 @@ const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);
 
+// const {getAllGoogleCalendarEvents, getGoogleAuthToken, getNewGoogleAccessToken, getGoogleCalendarEvents, createGoogleCalendarEvent, validateAndRefreshGoogleToken } = require("../../routes/services/googleservice");
+
 const storage = multer.diskStorage({
 	destination,
 	filename: (req, file, cb) => {
@@ -2155,12 +2157,12 @@ router.get("/appliedCourses/:candidateId", async (req, res) => {
 router.get("/appliedJobs/:candidateId", async (req, res) => {
 	try {
 
-		console.log('applied jobs...')
+		// console.log('applied jobs...')
 		const { candidateId } = req.params;
-		console.log("candidateId", candidateId)
+		// console.log("candidateId", candidateId)
 
 		const jobHistory = await AppliedJobs.find({ _candidate: candidateId }).populate({ path: '_job' })
-		console.log('jobHistory', jobHistory)
+		// console.log('jobHistory', jobHistory)
 		// 	  if(!candidate || !candidate?.appliedJobs?.length){
 		// 		return res.json({
 		// 			jobs: []
@@ -2272,10 +2274,10 @@ router.get("/appliedJobs/:candidateId", async (req, res) => {
 router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 	try {
 		const { startDate, endDate } = req.query;
-		console.log("Query params:", req.query);
+		// console.log("Query params:", req.query);
 
 		const collegeId = req.college?._id;
-		console.log("collegeId", collegeId)
+		// console.log("collegeId", collegeId)
 		if (!collegeId) {
 			return res.status(400).json({
 				status: false,
@@ -2283,7 +2285,7 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 			});
 		}
 
-		console.log("College ID:", collegeId);
+		// console.log("College ID:", collegeId);
 
 		// Get ALL CandidateVisitCalender data (for debugging)
 		const allVisits = await CandidateVisitCalender.find({}).populate({
@@ -2311,23 +2313,23 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 					select: 'name'
 				}
 			]
-		});
+		}).populate('updatedBy');
 
-		console.log("allVisits", allVisits)
+		// console.log("allVisits", allVisits)
 
 		// ✅ Apply date filtering if startDate and endDate are provided
 		let filteredVisits = allVisits;
 		if (startDate && endDate) {
-			console.log("🔍 Filtering by date range:", { startDate, endDate });
+			// console.log("🔍 Filtering by date range:", { startDate, endDate });
 			filteredVisits = allVisits.filter(visit => {
 				const visitDate = new Date(visit.visitDate);
 				const start = new Date(startDate);
 				const end = new Date(endDate);
 				const isInRange = visitDate >= start && visitDate <= end;
-				console.log(`Visit ${visit._id}: ${visit.visitDate} - In range: ${isInRange}`);
+				// console.log(`Visit ${visit._id}: ${visit.visitDate} - In range: ${isInRange}`);
 				return isInRange;
 			});
-			console.log(`📊 Filtered visits: ${filteredVisits.length} out of ${allVisits.length}`);
+			// console.log(`📊 Filtered visits: ${filteredVisits.length} out of ${allVisits.length}`);
 		}
 
 		// Format data for frontend calendar
@@ -2352,17 +2354,18 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 				candidateMobile: candidate?.mobile || 'Unknown',
 				candidateEmail: candidate?.email || 'Unknown',
 				courseId: appliedCourse._course,
-				courseName: course?.name || 'Unknown Course',
-				// centerId: appliedCourse._center,
+				courseName: course?.name || 'Unknown Course',				
 				centerName: center?.name || 'Unknown Center',
-				// batchId: appliedCourse.batch,
 				batchName: batch?.name || 'No Batch',
 				createdAt: visit.createdAt,
-				updatedAt: visit.updatedAt
+				updatedAt: visit.updatedAt,
+				remarks: visit.remarks,
+				updatedBy: visit.updatedBy?.name || 'Unknown',
+				statusUpdatedAt: visit.statusUpdatedAt
 			};
 		});
 
-		console.log("Formatted Calendar Data:", calendarData);
+		// console.log("Formatted Calendar Data:", calendarData);
 
 
 		return res.json({
@@ -2381,108 +2384,490 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 	}
 });
 
+router.get('/testverification', [isCollege], async (req, res) => {
+	try {
+		const { startDate, endDate } = req.query;
+		const filter = {
+			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+		};
+		const statusLogFilter = {
+			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
+			kycStage: true
+		};
+
+		// Get status logs and total leads in parallel
+		const [statusLogs, totalLeads] = await Promise.all([
+			StatusLogs.find(statusLogFilter),
+			AppliedCourses.countDocuments(filter)
+		]);
+
+		// Extract applied IDs from status logs
+		const appliedIds = statusLogs.map(log => log._appliedId);
+
+		// Get question answers for these specific applied IDs
+		const questionAnswers = await QuestionAnswer.find({
+			appliedcourse: { $in: appliedIds }
+		});
+
+		// Create set for fast lookup
+		const verifiedAppliedIds = new Set(
+			questionAnswers.map(qa => qa.appliedcourse.toString())
+		);
+
+		// Calculate counts
+		let verifiedCount = 0;
+		let unverifiedCount = 0;
+
+		statusLogs.forEach(statusLog => {
+			const appliedId = statusLog._appliedId.toString();
+			if (verifiedAppliedIds.has(appliedId)) {
+				verifiedCount++;
+			} else {
+				unverifiedCount++;
+			}
+		});
+
+		// Use totalLeads (AppliedCourses count) as the main total
+		const totalCount = totalLeads;
+
+		// console.log("totalCount (totalLeads)", totalCount);
+		// console.log("statusLogsCount", statusLogs.length);
+		// console.log("unverifiedCount", unverifiedCount);
+		// console.log("verifiedCount", verifiedCount);
+
+		return res.json({
+			success: true,
+			data: {
+				totalCount: totalCount,
+				unverifiedCount: unverifiedCount,
+				verifiedCount: verifiedCount
+			}
+		});
+
+	} catch (err) {
+		console.error('Error in testverification endpoint:', err);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching statistics',
+			error: err.message
+		});
+	}
+});
+
+// router.get('/testverification', [isCollege], async (req, res) => {
+// 	try {
+// 		const { startDate, endDate } = req.query
+// 		const filter = {
+// 			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+// 		}
+// 		const statusLogFilter = {
+// 			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+// 			, kycStage: true
+// 		}
+// 		const statusLogs = await StatusLogs.find(statusLogFilter);
+// 		const verified = await QuestionAnswer.find(filter);
+// 		const unverified = [];
+
+
+// 		const totalLeads = await AppliedCourses.countDocuments(filter);
+// 		statusLogs.forEach(async (statusLog) => {
+// 			const _appliedId = statusLog._appliedId;
+// 			const questionAnswer = await QuestionAnswer.find({ appliedcourse: _appliedId });
+// 			if(questionAnswer.length === 0){
+// 				unverified.push(_appliedId);
+// 			}
+// 		})
+
+
+// 		const totalCount = statusLogs.length
+// 		const unverifiedCount = unverified.length
+// 		const verifiedCount = verified.length
+// console.log("totalCount", totalLeads)
+// console.log("unverifiedCount", unverifiedCount)
+// console.log("verifiedCount", verifiedCount)
+
+// 		return res.json({
+// 			success: true,
+// 			data: {
+// 				totalCount: totalCount,
+// 				unverifiedCount: unverifiedCount,
+// 				verifiedCount: verifiedCount
+// 			}
+// 		})
+
+
+
+// 	}
+// 	catch (err) {
+// 		res.status(500).json({
+// 			success: false,
+// 			message: 'Error fetching statistics',
+// 			error: err.message
+// 		});
+// 	}
+// })
+
 router.get('/pre-verification-stats', [isCollege], async (req, res) => {
 	try {
-	  const { date, startDate, endDate } = req.query;
-	  
-	  let query = {};
-	  
-	  // Single date filter
-	  if (date) {
-		const startOfDay = new Date(date);
-		startOfDay.setHours(0, 0, 0, 0);
-		const endOfDay = new Date(date);
-		endOfDay.setHours(23, 59, 59, 999);
-		
-		query.createdAt = { $gte: startOfDay, $lte: endOfDay };
-	  }
-	  
-	  // Date range filter
-	  if (startDate && endDate) {
-		const start = new Date(startDate);
-		start.setHours(0, 0, 0, 0);
-		const end = new Date(endDate);
-		end.setHours(23, 59, 59, 999);
-		
-		query.createdAt = { $gte: start, $lte: end };
-	  }
-	  
-	  // Get total count
-	  const totalCount = await QuestionAnswer.countDocuments(query);
-	  
-	  // Get today's count (if no date specified)
-	  if (!date && !startDate && !endDate) {
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-		const tomorrow = new Date(today);
-		tomorrow.setDate(tomorrow.getDate() + 1);
-		
-		const todayCount = await QuestionAnswer.countDocuments({
-		  createdAt: { $gte: today, $lt: tomorrow }
-		});
-		
-		return res.json({
-		  success: true,
-		  data: {
-			today: todayCount,
-			total: totalCount
-		  }
-		});
-	  }
-	  
-	  res.json({
-		success: true,
-		data: {
-		  count: totalCount,
-		  date: date || `${startDate} to ${endDate}`
+
+		const { date, startDate, endDate } = req.query;
+
+		let query = {};
+		// If a single date is provided
+		if (date) {
+			const startOfDay = new Date(date);
+			startOfDay.setHours(0, 0, 0, 0);
+			const endOfDay = new Date(date);
+			endOfDay.setHours(23, 59, 59, 999);
+
+			query.createdAt = { $gte: startOfDay, $lte: endOfDay };
 		}
-	  });
-	  
+		// If a date range is provided
+		else if (startDate && endDate) {
+			const start = new Date(startDate);
+			start.setHours(0, 0, 0, 0);
+			const end = new Date(endDate);
+			end.setHours(23, 59, 59, 999);
+
+			query.createdAt = { $gte: start, $lte: end };
+		}
+
+		// Count based on filters (or all if no filters)
+		const totalCount = await QuestionAnswer.countDocuments(query);
+
+		if (!date && !startDate && !endDate) {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const tomorrow = new Date(today);
+			tomorrow.setDate(today.getDate() + 1);
+
+			const todayCount = await QuestionAnswer.countDocuments({
+				createdAt: { $gte: today, $lt: tomorrow }
+			});
+
+			return res.json({
+				success: true,
+				data: {
+					today: todayCount,
+					total: totalCount
+				}
+			});
+		}
+
+		// If specific date or range is provided
+		return res.json({
+			success: true,
+			data: {
+				count: totalCount,
+				date: date || `${startDate} to ${endDate}`
+			}
+		});
+
 	} catch (error) {
-	  console.error('Error fetching pre-verification stats:', error);
-	  res.status(500).json({
-		success: false,
-		message: 'Error fetching statistics'
-	  });
+		console.error('Error fetching pre-verification stats:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching statistics',
+			error: error.message
+		});
 	}
-  });
-  router.get('/pre-verification-weekly-stats', [isCollege], async (req, res) => {
+});
+
+router.get('/pre-verification-weekly-stats', [isCollege], async (req, res) => {
 	try {
-	  const { weeks = 4 } = req.query;
-	  const stats = [];
-	  
-	  for (let i = 0; i < parseInt(weeks); i++) {
-		const endDate = new Date();
-		endDate.setDate(endDate.getDate() - (i * 7));
-		const startDate = new Date(endDate);
-		startDate.setDate(startDate.getDate() - 6);
-		
-		const count = await QuestionAnswer.countDocuments({
-		  createdAt: { $gte: startDate, $lte: endDate }
+		const { weeks = 4 } = req.query;
+		const stats = [];
+
+		for (let i = 0; i < parseInt(weeks); i++) {
+			const endDate = new Date();
+			endDate.setDate(endDate.getDate() - (i * 7));
+			const startDate = new Date(endDate);
+			startDate.setDate(startDate.getDate() - 6);
+
+			const count = await QuestionAnswer.countDocuments({
+				createdAt: { $gte: startDate, $lte: endDate }
+			});
+
+			stats.push({
+				week: i + 1,
+				startDate: startDate.toISOString().split('T')[0],
+				endDate: endDate.toISOString().split('T')[0],
+				count: count
+			});
+		}
+
+		res.json({
+			success: true,
+			data: stats.reverse()
 		});
-		
-		stats.push({
-		  week: i + 1,
-		  startDate: startDate.toISOString().split('T')[0],
-		  endDate: endDate.toISOString().split('T')[0],
-		  count: count
-		});
-	  }
-	  
-	  res.json({
-		success: true,
-		data: stats.reverse()
-	  });
-	  
+
 	} catch (error) {
-	  console.error('Error fetching weekly stats:', error);
-	  res.status(500).json({
-		success: false,
-		message: 'Error fetching weekly statistics'
-	  });
+		console.error('Error fetching weekly stats:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching weekly statistics'
+		});
 	}
-  });
+});
 // API for Counselor Performance Matrix using statusLogs
+router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
+	try {
+		const { startDate, endDate, centerId } = req.query;
+
+		// Build date filter
+		let dateFilter = {};
+		if (startDate && endDate) {
+			dateFilter.createdAt = {
+				$gte: new Date(startDate),
+				$lte: new Date(endDate)
+			};
+		}
+
+		// Build center filter
+		let centerFilter = {};
+		if (centerId && centerId !== 'all') {
+			centerFilter._collegeId = centerId;
+		}
+
+		// Aggregate statusLogs data for counselor performance
+		const counselorMatrixData = await StatusLogs.aggregate([
+			{
+				$match: {
+					...dateFilter,
+					...centerFilter
+				}
+			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: '_appliedId',
+					foreignField: '_id',
+					as: 'appliedCourse'
+				}
+			},
+			{
+				$unwind: '$appliedCourse'
+			},
+			{
+				$lookup: {
+					from: 'counsellors',
+					localField: 'counsellor',
+					foreignField: '_id',
+					as: 'counselorInfo'
+				}
+			},
+			{
+				$unwind: '$counselorInfo'
+			},
+			{
+				$lookup: {
+					from: 'statuses',
+					localField: '_statusId',
+					foreignField: '_id',
+					as: 'statusInfo'
+				}
+			},
+			{
+				$lookup: {
+					from: 'substatuses',
+					localField: '_subStatusId',
+					foreignField: '_id',
+					as: 'subStatusInfo'
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$counsellor',
+						counselorName: '$counselorInfo.name',
+						statusId: '$_statusId',
+						statusTitle: { $arrayElemAt: ['$statusInfo.title', 0] },
+						subStatusId: '$_subStatusId',
+						subStatusTitle: { $arrayElemAt: ['$subStatusInfo.title', 0] }
+					},
+					count: { $sum: 1 },
+					kycStage: { $sum: { $cond: ['$kycStage', 1, 0] } },
+					kycApproved: { $sum: { $cond: ['$kycApproved', 1, 0] } },
+					admissionStatus: { $sum: { $cond: ['$admissionStatus', 1, 0] } },
+					batchAssigned: { $sum: { $cond: ['$batchAssigned', 1, 0] } },
+					zeroPeriodAssigned: { $sum: { $cond: ['$zeroPeriodAssigned', 1, 0] } },
+					batchFreezed: { $sum: { $cond: ['$batchFreezed', 1, 0] } },
+					dropOut: { $sum: { $cond: ['$dropOut', 1, 0] } },
+					appliedCourses: { $addToSet: '$_appliedId' }
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$_id.counselorId',
+						counselorName: '$_id.counselorName'
+					},
+					statuses: {
+						$push: {
+							statusId: '$_id.statusId',
+							statusTitle: '$_id.statusTitle',
+							subStatusId: '$_id.subStatusId',
+							subStatusTitle: '$_id.subStatusTitle',
+							count: '$count',
+							kycStage: '$kycStage',
+							kycApproved: '$kycApproved',
+							admissionStatus: '$admissionStatus',
+							batchAssigned: '$batchAssigned',
+							zeroPeriodAssigned: '$zeroPeriodAssigned',
+							batchFreezed: '$batchFreezed',
+							dropOut: '$dropOut'
+						}
+					},
+					totalLeads: { $sum: '$count' },
+					totalKycStage: { $sum: '$kycStage' },
+					totalKycApproved: { $sum: '$kycApproved' },
+					totalAdmissions: { $sum: '$admissionStatus' },
+					totalBatchAssigned: { $sum: '$batchAssigned' },
+					totalZeroPeriodAssigned: { $sum: '$zeroPeriodAssigned' },
+					totalBatchFreezed: { $sum: '$batchFreezed' },
+					totalDropouts: { $sum: '$dropOut' },
+					uniqueAppliedCourses: { $addToSet: { $concat: ['$_id.counselorId', '-', { $toString: '$_appliedId' }] } }
+				}
+			},
+			{
+				$project: {
+					_id: 0,
+					counselorId: '$_id.counselorId',
+					counselorName: '$_id.counselorName',
+					statuses: 1,
+					totalLeads: 1,
+					totalKycStage: 1,
+					totalKycApproved: 1,
+					totalAdmissions: 1,
+					totalBatchAssigned: 1,
+					totalZeroPeriodAssigned: 1,
+					totalBatchFreezed: 1,
+					totalDropouts: 1,
+					uniqueAppliedCourses: 1,
+					conversionRate: {
+						$cond: [
+							{ $gt: ['$totalLeads', 0] },
+							{ $multiply: [{ $divide: ['$totalAdmissions', '$totalLeads'] }, 100] },
+							0
+						]
+					},
+					dropoutRate: {
+						$cond: [
+							{ $gt: ['$totalLeads', 0] },
+							{ $multiply: [{ $divide: ['$totalDropouts', '$totalLeads'] }, 100] },
+							0
+						]
+					}
+				}
+			},
+			{
+				$sort: { counselorName: 1 }
+			}
+		]);
+
+		// Transform data to match frontend format
+		const transformedData = {};
+
+		counselorMatrixData.forEach(counselor => {
+			const counselorName = counselor.counselorName || 'Unknown';
+
+			transformedData[counselorName] = {
+				Total: counselor.totalLeads,
+				KYCDone: counselor.totalKycApproved,
+				KYCStage: counselor.totalKycStage,
+				Admissions: counselor.totalAdmissions,
+				Dropouts: counselor.totalDropouts,
+				Paid: counselor.totalAdmissions, // Assuming admissions are paid
+				Unpaid: counselor.totalLeads - counselor.totalAdmissions,
+				ConversionRate: parseFloat(counselor.conversionRate.toFixed(1)),
+				DropoutRate: parseFloat(counselor.dropoutRate.toFixed(1))
+			};
+
+			// Add status-wise data
+			counselor.statuses.forEach(statusData => {
+				const statusTitle = statusData.statusTitle || 'Unknown';
+				const subStatusTitle = statusData.subStatusTitle;
+
+				if (!transformedData[counselorName][statusTitle]) {
+					transformedData[counselorName][statusTitle] = {
+						count: 0,
+						substatuses: {}
+					};
+				}
+
+				transformedData[counselorName][statusTitle].count += statusData.count;
+
+				if (subStatusTitle) {
+					if (!transformedData[counselorName][statusTitle].substatuses[subStatusTitle]) {
+						transformedData[counselorName][statusTitle].substatuses[subStatusTitle] = 0;
+					}
+					transformedData[counselorName][statusTitle].substatuses[subStatusTitle] += statusData.count;
+				}
+			});
+		});
+
+		return res.json({
+			status: true,
+			message: 'Counselor Performance Matrix data fetched successfully',
+			data: transformedData,
+			summary: {
+				totalCounselors: Object.keys(transformedData).length,
+				totalLeads: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Total, 0),
+				totalAdmissions: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Admissions, 0),
+				totalDropouts: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.Dropouts, 0),
+				averageConversionRate: Object.values(transformedData).reduce((sum, counselor) => sum + counselor.ConversionRate, 0) / Object.keys(transformedData).length || 0
+			}
+		});
+
+	} catch (error) {
+		console.error('Error fetching counselor performance matrix:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Error fetching counselor performance matrix data',
+			error: error.message
+		});
+	}
+});
+
+
+router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
+	try {
+		const { eventId, status, remarks } = req.body;
+		const user = req.user;
+
+		// console.log("eventId", req.body)
+
+		const candidateVisitCalender = await CandidateVisitCalender.findById(eventId)
+		if (!candidateVisitCalender) {
+			return res.status(404).json({
+				status: false,
+				message: 'Candidate visit calender not found'
+			})
+		}
+
+		const updatedBy = user._id;
+		const statusUpdatedAt = new Date();
+
+		candidateVisitCalender.status = status;
+		candidateVisitCalender.updatedBy = updatedBy;
+		candidateVisitCalender.statusUpdatedAt = statusUpdatedAt;
+		candidateVisitCalender.remarks = remarks;
+		await candidateVisitCalender.save();
+
+		console.log("candidateVisitCalender", candidateVisitCalender)
+
+		return res.status(200).json({
+			status: true,
+			message: 'Candidate visit calender updated successfully'
+		})
+
+
+
+	}
+	catch (err) {
+		console.error('Error in updatecalendarevent:', err);
+	}
+})
 
 
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {

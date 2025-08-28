@@ -20,7 +20,7 @@ const { authChat } = require("../../helpers");
 const { updateSpreadSheetRequestCallValues,updateSpreadSheetCarrerValues,updateSpreadSheetLabLeadsValues } = require("./services/googleservice");
 const moment = require("moment");
 const {uploadSinglefile} = require('./functions/images')
-
+const AppliedCourses = require('../models/appliedCourses');
 
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
@@ -661,7 +661,15 @@ router.post('/career', async (req, res) => {
   }
 });
 
-
+router.get("/appliedDetail", async (req, res) => {
+	try {
+		const { appliedId } = req.query;
+    console.log("req.query", req.query)
+		const appliedCourse = await AppliedCourses.findById(appliedId).populate("registeredBy");
+		console.log("appliedCourse", appliedCourse)
+		res.status(200).json({ status: true, data: appliedCourse });
+	} catch (err) {}
+});
 
 
 
