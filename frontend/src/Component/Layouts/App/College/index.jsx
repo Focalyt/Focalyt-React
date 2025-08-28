@@ -65,7 +65,7 @@ function CollegeLayout({ children }) {
   const toggleSubmenu = (menu) => {
     setOpenSubmenu(prev => {
       const newState = { ...prev, [menu]: !prev[menu] };
-      console.log(`Toggling ${menu}:`, newState[menu]); // Debug log
+      // console.log(`Toggling ${menu}:`, newState[menu]); 
       return newState;
     });
   };
@@ -184,7 +184,7 @@ function CollegeLayout({ children }) {
         if (openSubmenu[key]) {
           // Opening: get scrollHeight without breaking transition
           const scrollHeight = ref.current.scrollHeight;
-          console.log(`${key} opening - height:`, scrollHeight); // Debug log
+          // console.log(`${key} opening - height:`, scrollHeight); 
           newHeights[key] = `${scrollHeight}px`;
         } else {
           // Closing: set current height first, then animate to 0
@@ -381,7 +381,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
                     <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faCalendarAlt} />
-                      <span className="menu-title">Calendar Follow-up B2C</span>
+                      <span className="menu-title">Candidate Visit Calender</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>

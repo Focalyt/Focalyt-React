@@ -809,7 +809,7 @@ const CRMDashboard = () => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
-
+  const [sources, setSources] = useState([]);
   // Fetch filter options from backend API on mount
   useEffect(() => {
     const initMap = () => {
@@ -1120,7 +1120,30 @@ const CRMDashboard = () => {
   //   alert(`Document ${status} successfully!`);
   //   closeDocumentModal();
   // };
-
+  useEffect(() => {
+    fetchSources();
+  }, []);
+  const fetchSources = async () => {
+    try {
+      const response = await fetch(`${backendUrl}/college/users/sources`, {
+        method: 'GET',
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+  
+      const data = await response.json();
+  
+      if (data.status || data.success) {
+        setSources(data.data || []);
+      } else {
+        console.error('Failed to fetch sources:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching sources:', error);
+    }
+  };
 
 
   const getFileType = (fileUrl) => {
@@ -1264,6 +1287,7 @@ const CRMDashboard = () => {
   const [centerId, setCenterId] = useState('');
   const [courseId, setCourseId] = useState('');
   const [counselorId, setCounselorId] = useState('');
+  const [registeredBy, setRegisteredBy] = useState('');
 
   const [candidateFormData, setCandidateFormData] = useState({
     // Basic Information
@@ -1420,7 +1444,8 @@ const CRMDashboard = () => {
             }
 
           }
-        }
+        },
+        registeredBy,
       };
 
       console.log('Submitting data:', requestData);
@@ -1468,6 +1493,7 @@ const CRMDashboard = () => {
         setCourseId('');
         setCenterId('');
         setCounselorId('');
+        setRegisteredBy('');
       }
       else {
         alert(response.data.message);
@@ -2114,7 +2140,7 @@ const CRMDashboard = () => {
     if (showPanel === 'followUp') {
       return true; // All fields are required in followup panel
     }
-    
+
     if (seletectedSubStatus) {
       if (fieldType === 'remarks') {
         return seletectedSubStatus.hasRemarks;
@@ -2123,7 +2149,7 @@ const CRMDashboard = () => {
         return seletectedSubStatus.hasFollowup;
       }
     }
-    
+
     return false;
   };
 
@@ -2171,7 +2197,7 @@ const CRMDashboard = () => {
           _leadSubStatus: seletectedSubStatus?._id || null,
           remarks: remarks || ''
         };
-        
+
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
@@ -2671,6 +2697,7 @@ const CRMDashboard = () => {
 
         if (response.data.success && response.data.data) {
           const data = response.data;
+          console.log('data', data)
 
 
           // Sirf ek state me data set karo - paginated data
@@ -3146,8 +3173,8 @@ const CRMDashboard = () => {
               <div className="row mb-1">
                 <div className="col-6">
                   <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date 
-                    {(isFieldRequired('followup') || showPanel === 'followUp') && 
+                    Next Action Date
+                    {(isFieldRequired('followup') || showPanel === 'followUp') &&
                       <span className="text-danger">*</span>
                     }
                   </label>
@@ -3172,8 +3199,8 @@ const CRMDashboard = () => {
 
                 <div className="col-6">
                   <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time 
-                    {(isFieldRequired('followup') || showPanel === 'followUp') && 
+                    Time
+                    {(isFieldRequired('followup') || showPanel === 'followUp') &&
                       <span className="text-danger">*</span>
                     }
                   </label>
@@ -3196,7 +3223,7 @@ const CRMDashboard = () => {
               <div className="mb-1">
                 <label htmlFor="comment" className="form-label small fw-medium text-dark">
                   Comment
-                  {(isFieldRequired('remarks') || showPanel === 'followUp') && 
+                  {(isFieldRequired('remarks') || showPanel === 'followUp') &&
                     <span className="text-danger">*</span>
                   }
                 </label>
@@ -3744,6 +3771,31 @@ const CRMDashboard = () => {
                     <option value="">Select Counselor name</option>
                     {counselorOptions.map((counselor, index) => (
                       <option key={index} value={counselor.value}>{counselor.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="mb-3">
+              <label>
+                    Source <span className="mandatory">*</span>
+                  </label>
+                <div className="mb-1" id="thirdPartySource">
+                
+                  <select
+                    className="form-control single-field"
+                    value={registeredBy}
+                    name="sourceType"
+                    id="thirdPartySourceSelect"
+                    onChange={(e) => {
+                      // const selectedSource = sources.find(s => s._id === e.target.value);
+                      setRegisteredBy(e.target.value);
+                    }}
+                  >
+                    <option value="">Select Third Party Source</option>
+                    {sources.map((source) => (
+                      <option key={source._id} value={source._id} className="text-capitalize">
+                        {source.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -5428,11 +5480,11 @@ const CRMDashboard = () => {
                                                 <div className="info-label">BATCH NAME</div>
                                                 <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                               </div>
-                                           
-                                              <div className="info-group">
+
+                                              {/* <div className="info-group">
                                                 <div className="info-label">Source Contact Name</div>
                                                 <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
-                                              </div>
+                                              </div> */}
                                             </div>
 
                                             <div className="info-card">
@@ -5511,10 +5563,10 @@ const CRMDashboard = () => {
                                                       <div className="info-label">BATCH NAME</div>
                                                       <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                     </div>
-                                                    <div className="info-group">
-                                                <div className="info-label">Source Contact Name</div>
-                                                <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
-                                              </div>
+                                                    {/* <div className="info-group">
+                                                      <div className="info-label">Source Contact Name</div>
+                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
+                                                    </div> */}
                                                   </div>
 
                                                   <div className="info-card">
@@ -5716,14 +5768,14 @@ const CRMDashboard = () => {
                                                       <div className="info-label">LEAD OWNER</div>
                                                       <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                     </div>
-                                                    
+
                                                   </div>
-                                                  <div className="col-xl- col-3">
+                                                  {/* <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">Source Contact Name</div>
                                                       <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
                                                     </div>
-                                                  </div>
+                                                  </div> */}
                                                 </div>
                                               </div>
                                             </div>

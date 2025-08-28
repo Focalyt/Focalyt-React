@@ -1293,17 +1293,47 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 				}
 			},
 			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
-
-			// Registered By lookup
 			{
 				$lookup: {
-					from: 'users',
-					localField: 'registeredBy',
-					foreignField: '_id',
-					as: 'registeredBy'
+				  from: "users",         // First lookup for User
+				  localField: "registeredBy", 
+				  foreignField: "_id", 
+				  as: "registeredByUser"
 				}
-			},
-			{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+			  },
+			  {
+				$lookup: {
+				  from: "sources",       // Second lookup for Source
+				  localField: "registeredBy", 
+				  foreignField: "_id", 
+				  as: "registeredBySource"
+				}
+			  },
+			  {
+				$addFields: {
+				  // We merge the results, prefer User data if available
+				  registeredBy: {
+					$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
+				  }
+				}
+			  },
+			  {
+				$project: {
+				  registeredByUser: 0,  // Removing intermediate fields
+				  registeredBySource: 0
+				}
+			  },
+
+			// Registered By lookup
+			// {
+			// 	$lookup: {
+			// 		from: 'users',
+			// 		localField: 'registeredBy',
+			// 		foreignField: '_id',
+			// 		as: 'registeredBy'
+			// 	}
+			// },
+			// { $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
 
 			// Candidate lookup with applied courses
 			{
@@ -1328,14 +1358,45 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 											as: '_course'
 										}
 									},
+									// {
+									// 	$lookup: {
+									// 		from: 'users',
+									// 		localField: 'registeredBy',
+									// 		foreignField: '_id',
+									// 		as: 'registeredBy'
+									// 	}
+									// },
 									{
 										$lookup: {
-											from: 'users',
-											localField: 'registeredBy',
-											foreignField: '_id',
-											as: 'registeredBy'
+										  from: "users",         // First lookup for User
+										  localField: "registeredBy", 
+										  foreignField: "_id", 
+										  as: "registeredByUser"
 										}
-									},
+									  },
+									  {
+										$lookup: {
+										  from: "sources",       // Second lookup for Source
+										  localField: "registeredBy", 
+										  foreignField: "_id", 
+										  as: "registeredBySource"
+										}
+									  },
+									  {
+										$addFields: {
+										  // We merge the results, prefer User data if available
+										  registeredBy: {
+											$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
+										  }
+										}
+									  },
+									  {
+										$project: {
+										  registeredByUser: 0,  // Removing intermediate fields
+										  registeredBySource: 0
+										}
+									  }
+									,
 									{
 										$lookup: {
 											from: 'centers',

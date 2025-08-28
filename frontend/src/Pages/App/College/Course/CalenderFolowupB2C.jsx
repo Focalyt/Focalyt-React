@@ -44,6 +44,13 @@ const CalenderFolowupB2C = () => {
     notes: ''
   });
 
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [remarksData, setRemarksData] = useState({
+    remarks: '',
+    status: ''
+  });
+  const [selectedEventForRemarks, setSelectedEventForRemarks] = useState(null);
+  const [showAllRemarks, setShowAllRemarks] = useState(false); // Toggle to show all remarks
   // Handle view mode changes and update date range accordingly
   const handleViewModeChange = (newViewMode) => {
     setViewMode(newViewMode);
@@ -197,6 +204,11 @@ const CalenderFolowupB2C = () => {
           description: `Visit Type: ${visit.visitType}\nCandidate: ${visit.candidateName}\nMobile: ${visit.candidateMobile}\nCourse: ${visit.courseName}\nCenter: ${visit.centerName}\nStatus: ${visit.status}`,
           location: visit.centerName,
           visitType: visit.visitType,
+          remarks: visit.remarks,
+          updatedBy: visit.updatedBy,
+          createdAt: visit.createdAt,
+          updatedAt: visit.updatedAt,
+          statusUpdatedAt: visit.statusUpdatedAt,
           candidateName: visit.candidateName,
           candidateMobile: visit.candidateMobile,
           candidateEmail: visit.candidateEmail,
@@ -213,10 +225,9 @@ const CalenderFolowupB2C = () => {
             candidateEmail: visit.candidateEmail,
             courseName: visit.courseName,
             centerName: visit.centerName,
-            status: visit.status
           }
         }));
-
+        // console.log("visitEvents", visitEvents)
         // Merge with existing calendar events
         setCalendarEvents(prev => {
           const existingEvents = prev.filter(event => event.extendedProps?.type !== 'visit');
@@ -467,29 +478,72 @@ const CalenderFolowupB2C = () => {
   };
 
   // Mark event as completed
-  const handleMarkAsCompleted = async () => {
-    if (!selectedEvent) return;
-
+  const handleMarkAsCompleted = async (event, status) => {
     try {
-      const response = await axios.post(`${backendUrl}/api/updatecalendarevent`, {
-        user: userData,
-        eventId: selectedEvent.id,
-        action: 'complete',
-        notes: 'Marked as completed via B2C Follow-up Calendar'
-      });
-
-      if (response.data.success) {
-        alert('Event marked as completed successfully!');
-        closeEventModal();
-        fetchCalendarEvents(); // Refresh events
+      const eventId = event.id.split("-")[1];
+      console.log("eventId", eventId)
+      let remarks = '';
+      if (status === 'cancelled') {
+        remarks = window.prompt("Enter the reason for cancellation");
       } else {
-        alert('Failed to mark event as completed: ' + response.data.error);
+        remarks = window.prompt("Enter the remarks for completion");
       }
-    } catch (error) {
-      console.error('Error marking event as completed:', error);
-      alert('Error marking event as completed. Please try again.');
+
+
+
+      const response = await axios.patch(
+        `${backendUrl}/college/candidate/updatecalendarevent`,
+        {
+          user: userData,
+          eventId: eventId,
+          status: status,
+          remarks,
+        },
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+
+      console.log('response', response);
+    } catch (err) {
+      console.error("Error marking event as completed", err.response?.data || err.message);
     }
   };
+
+
+
+  // const handleMarkAsCompleted = async () => {
+  //   if (!selectedEvent) return;
+
+  //   try {
+  //     const response = await axios.patch(`${backendUrl}/college/candidate/updatecalendarevent`, {
+  //       user: userData,
+  //       appliedId: selectedEvent.id,
+  //       status: 'completed',
+  //     });
+
+  //     // const response = await axios.put(`${backendUrl}/college/candidate/updatecalendarevent`, {
+  //     //   user: userData,
+  //     //   appliedId: selectedEvent.id,
+  //     //   status: 'completed',
+  //     // });
+
+  //     console.log("response" , response.data)
+  //     if (response.data.success) {
+  //       alert('Event marked as completed successfully!');
+  //       closeEventModal();
+  //       fetchCalendarEvents(); // Refresh events
+  //     } else {
+  //       alert('Failed to mark event as completed: ' + response.data.error);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error marking event as completed:', error);
+  //     alert('Error marking event as completed. Please try again.');
+  //   }
+  // };
 
   // Handle reschedule
   const handleReschedule = () => {
@@ -507,41 +561,41 @@ const CalenderFolowupB2C = () => {
   };
 
   // Submit reschedule
-  const submitReschedule = async () => {
-    if (!selectedEvent || !rescheduleData.newDate || !rescheduleData.newTime) {
-      alert('Please fill in all required fields.');
-      return;
-    }
+  // const submitReschedule = async () => {
+  //   if (!selectedEvent || !rescheduleData.newDate || !rescheduleData.newTime) {
+  //     alert('Please fill in all required fields.');
+  //     return;
+  //   }
 
-    try {
-      const newDateTime = new Date(`${rescheduleData.newDate}T${rescheduleData.newTime}`);
-      const originalStart = new Date(selectedEvent.start.dateTime || selectedEvent.start.date);
-      const originalEnd = new Date(selectedEvent.end.dateTime || selectedEvent.end.date);
-      const duration = originalEnd.getTime() - originalStart.getTime();
-      const newEndDateTime = new Date(newDateTime.getTime() + duration);
+  //   try {
+  //     const newDateTime = new Date(`${rescheduleData.newDate}T${rescheduleData.newTime}`);
+  //     const originalStart = new Date(selectedEvent.start.dateTime || selectedEvent.start.date);
+  //     const originalEnd = new Date(selectedEvent.end.dateTime || selectedEvent.end.date);
+  //     const duration = originalEnd.getTime() - originalStart.getTime();
+  //     const newEndDateTime = new Date(newDateTime.getTime() + duration);
 
-      const response = await axios.post(`${backendUrl}/api/updatecalendarevent`, {
-        user: userData,
-        eventId: selectedEvent.id,
-        action: 'reschedule',
-        newStartTime: newDateTime.toISOString(),
-        newEndTime: newEndDateTime.toISOString(),
-        notes: rescheduleData.notes || 'Event rescheduled via B2C Follow-up Calendar'
-      });
+  //     const response = await axios.post(`${backendUrl}/api/updatecalendarevent`, {
+  //       user: userData,
+  //       eventId: selectedEvent.id,
+  //       action: 'reschedule',
+  //       newStartTime: newDateTime.toISOString(),
+  //       newEndTime: newEndDateTime.toISOString(),
+  //       notes: rescheduleData.notes || 'Event rescheduled via B2C Follow-up Calendar'
+  //     });
 
-      if (response.data.success) {
-        alert('Event rescheduled successfully!');
-        closeRescheduleModal();
-        closeEventModal();
-        fetchCalendarEvents(); // Refresh events
-      } else {
-        alert('Failed to reschedule event: ' + response.data.error);
-      }
-    } catch (error) {
-      console.error('Error rescheduling event:', error);
-      alert('Error rescheduling event. Please try again.');
-    }
-  };
+  //     if (response.data.success) {
+  //       alert('Event rescheduled successfully!');
+  //       closeRescheduleModal();
+  //       closeEventModal();
+  //       fetchCalendarEvents(); // Refresh events
+  //     } else {
+  //       alert('Failed to reschedule event: ' + response.data.error);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error rescheduling event:', error);
+  //     alert('Error rescheduling event. Please try again.');
+  //   }
+  // };
 
   // Calendar view component
   const CalendarView = () => {
@@ -604,41 +658,41 @@ const CalenderFolowupB2C = () => {
                       const isVisitEvent = event.extendedProps?.type === 'visit';
 
                       return (
-                        <div 
-                        key={eventIndex} 
-                        className={`calendar-event ${getStatusColor(status)} ${isVisitEvent ? 'visit-event' : ''}`}
-                        title={event.summary}
-                        onClick={() => handleEventClick(event)}
-                        style={{
-                          backgroundColor: event.backgroundColor || '#e3f2fd',
-                          borderLeftColor: event.borderColor || '#007bff'
-                        }}
-                      >
-                        <div className="event-time">
-                          {new Date(event.start.dateTime || event.start.date).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                        <div
+                          key={eventIndex}
+                          className={`calendar-event ${getStatusColor(status)} ${isVisitEvent ? 'visit-event' : ''}`}
+                          title={event.summary}
+                          onClick={() => handleEventClick(event)}
+                          style={{
+                            backgroundColor: event.backgroundColor || '#e3f2fd',
+                            borderLeftColor: event.borderColor || '#007bff'
+                          }}
+                        >
+                          <div className="event-time">
+                            {new Date(event.start.dateTime || event.start.date).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          {/* Show candidate name for visit events */}
+                          {isVisitEvent && event.extendedProps.candidateName && (
+                            <div className="event-candidate-name">
+                              <small className="text-white fw-bold">
+                                {event.extendedProps.candidateName}
+                              </small>
+                            </div>
+                          )}
+                          {isVisitEvent && (
+                            <div className="event-visit-type">
+                              <span className="badge bg-primary badge-sm">
+                                {event.extendedProps.visitType}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {/* Show candidate name for visit events */}
-                        {isVisitEvent && event.extendedProps.candidateName && (
-                          <div className="event-candidate-name">
-                            <small className="text-white fw-bold">
-                              {event.extendedProps.candidateName}
-                            </small>
-                          </div>
-                        )}
-                        {isVisitEvent && (
-                          <div className="event-visit-type">
-                            <span className="badge bg-primary badge-sm">
-                              {event.extendedProps.visitType}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                    
+                      );
+                    })}
+
                   </div>
                 </div>
               );
@@ -748,7 +802,7 @@ const CalenderFolowupB2C = () => {
                   <input
                     type="text"
                     className="form-control ps-5"
-                                            placeholder="Search candidate names , course name , center name"
+                    placeholder="Search candidate names , course name , center name"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -1059,6 +1113,15 @@ const CalenderFolowupB2C = () => {
                                     <span>{event.location}</span>
                                   </div>
                                 )} */}
+                                {(event.status === 'cancelled' || event.status === 'completed') && event.remarks && (
+                                  <div className="alert alert-light py-2 px-3 mb-2">
+                                    <div className="d-flex align-items-center text-muted small">
+                                      <MapPin className="me-2" size={14} />
+                                      <span><strong>Remarks:</strong> {event.remarks}</span>
+                                    </div>
+                                  </div>
+                                )}
+
                               </div>
 
                               <div className="col-md-4">
@@ -1074,6 +1137,14 @@ const CalenderFolowupB2C = () => {
                                   <button className="btn btn-outline-info btn-sm">
                                     <Calendar className="me-1" size={14} />
                                     Reschedule
+                                  </button>
+                                  <button className="btn btn-outline-info btn-sm" onClick={() => handleMarkAsCompleted(event, 'completed')}>
+                                    <Calendar className="me-1" size={14} />
+                                    Mark as Completed
+                                  </button>
+                                  <button className="btn btn-outline-info btn-sm" onClick={() => handleMarkAsCompleted(event, 'cancelled')}>
+                                    <Calendar className="me-1" size={14} />
+                                    Cancel
                                   </button>
                                 </div>
                               </div>
@@ -1462,6 +1533,50 @@ const CalenderFolowupB2C = () => {
                         </div>
                       </div>
                     )}
+                    {selectedEvent.remarks && (
+                      <div className="mb-3">
+                        <div className="d-flex align-items-center text-muted mb-2">
+                          <MapPin className="me-2" size={16} />
+                          <strong>Remarks</strong>
+                        </div>
+                        <div className="ps-4 text-break">
+                          {selectedEvent.remarks}
+                        </div>
+                      </div>
+                    )}
+                    {selectedEvent.status && (
+                      <div className="mb-3">
+                        <div className="d-flex align-items-center text-muted mb-2">
+                          <MapPin className="me-2" size={16} />
+                          <strong>Status</strong>
+                        </div>
+                        <div className="ps-4 text-break">
+                          {selectedEvent.status}
+                        </div>
+                      </div>
+                    )}
+                    {selectedEvent.updatedBy && (
+                      <div className="mb-3">
+                        <div className="d-flex align-items-center text-muted mb-2">
+                          <MapPin className="me-2" size={16} />
+                          <strong>Updated By</strong>
+                        </div>
+                        <div className="ps-4 text-break">
+                          {selectedEvent.updatedBy}
+                        </div>
+                      </div>
+                    )}
+                    {selectedEvent.statusUpdatedAt && (
+                      <div className="mb-3">
+                        <div className="d-flex align-items-center text-muted mb-2">
+                          <MapPin className="me-2" size={16} />
+                          <strong>Status Updated At</strong>
+                        </div>
+                        <div className="ps-4 text-break">
+                          {new Date(selectedEvent.statusUpdatedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="col-lg-4">
@@ -1484,11 +1599,12 @@ const CalenderFolowupB2C = () => {
                       </button>
                       <button
                         className="btn btn-warning btn-sm"
-                        onClick={handleMarkAsCompleted}
+                        onClick={() => handleMarkAsCompleted(selectedEvent)}
                       >
                         <AlertCircle className="me-2" size={16} />
                         Mark as Completed
                       </button>
+                      <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMarkAsCompleted(selectedEvent, 'cancelled')}>Cancel</button>
                       <button className="btn btn-outline-secondary btn-sm">
                         <CalendarDays className="me-2" size={16} />
                         View in Google Calendar
@@ -1500,10 +1616,10 @@ const CalenderFolowupB2C = () => {
                       <h6 className="mb-3">Event Details</h6>
                       <div className="small text-muted">
                         <div className="mb-1">
-                          <strong>Created:</strong> {new Date(selectedEvent.created).toLocaleString()}
+                          <strong>Created:</strong> {new Date(selectedEvent.createdAt).toLocaleString()}
                         </div>
                         <div className="mb-1">
-                          <strong>Last Updated:</strong> {new Date(selectedEvent.updated).toLocaleString()}
+                          <strong>Last Updated:</strong> {new Date(selectedEvent.updatedAt).toLocaleString()}
                         </div>
                         <div className="mb-1">
                           <strong>Event ID:</strong>
@@ -1606,7 +1722,9 @@ const CalenderFolowupB2C = () => {
                 <button type="button" className="btn btn-secondary" onClick={closeRescheduleModal}>
                   Cancel
                 </button>
-                <button type="button" className="btn btn-primary" onClick={submitReschedule}>
+                <button type="button" className="btn btn-primary"
+                // onClick={submitReschedule}
+                >
                   Reschedule Event
                 </button>
               </div>

@@ -454,39 +454,24 @@ const LeadAnalyticsDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [stats, setStats] = useState({
-    today: 0,
-    total: 0,
-    completionRate: 0
+    totalCount: 0,
+    unverifiedCount: 0,
+    verifiedCount: 0
   });
   const [weeklyStats, setWeeklyStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [showPreVerificationDatePicker, setShowPreVerificationDatePicker] = useState(false);
 
+  // Lead tracking state
+  const [leadData, setLeadData] = useState([]);
+
   useEffect(() => {
-    fetchStats();
+    
     fetchWeeklyStats();
+    fetchSourceLeads();
   }, []);
 
-  const fetchStats = async () => {
-    try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
-      const response = await axios.get(
-        `${backendUrl}/college/candidate/pre-verification-stats?date=${selectedDate}`,
-        { headers: { 'x-auth': token } }
-      );
-
-      if (response.data.success) {
-        setStats(response.data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchWeeklyStats = async () => {
     try {
@@ -650,7 +635,8 @@ const LeadAnalyticsDashboard = () => {
     verticals: [],
     course: [],
     center: [],
-    counselor: []
+    counselor: [],
+    leadSource: [],
 
   });
 
@@ -774,14 +760,112 @@ const LeadAnalyticsDashboard = () => {
     }
   };
 
+
+  
+  useEffect(() => {
+    fetchStats();
+  }, [filterData , startDate, endDate])
+ 
+
+  const fetchStats = async (filters = filterData) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      setIsLoading(true);
+
+      if (!token) {
+        setAppliedCoursesData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const queryParams = new URLSearchParams({
+        ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
+       
+ 
+      });
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/testverification?${queryParams}`,
+        { headers: { 'x-auth': token } }
+      );
+      // const response = await axios.get(
+      //   `${backendUrl}/college/candidate/pre-verification-stats?${queryParams}`,
+      //   { headers: { 'x-auth': token } }
+      // );
+      console.log("response" , response.data)
+
+
+      if (response.data.success) {
+        setStats(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSourceLeads();
+  }, [filterData , startDate, endDate])
+
+  const fetchSourceLeads = async (filters = filterData) => {
+    try {
+      setIsLoading(true);
+      
+      if (!token) {
+        setAppliedCoursesData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const queryParams = new URLSearchParams({
+
+        ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
+
+       
+      });
+      // If no date filter is selected, send no parameters (will return all data)
+      console.log(formData.counselor.values, 'queryParams')
+
+
+      const response = await axios.get(`${backendUrl}/college/digitalLead/sourceLeadsData?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      // const response = await axios.get(`${backendUrl}/college/digitalLead/sourceLeadsData?startDate=${startDate}&endDate=${endDate}`, {
+      //   headers: { 'x-auth': token }
+      // });
+
+      console.log('Source leads response:', response.data);
+
+      if (response.data.status) {
+        setLeadData(response.data.data);
+        console.log('Source leads data set:', response.data.data);
+      } else {
+        alert(response.data.msg);
+      }
+    } catch (error) {
+      console.error('Error fetching source leads:', error);
+      alert(error.message || 'An unexpected error occurred.');
+    }
+    finally{
+      setIsLoading(false);
+    }
+  };
+
+
   // Sample data based on actual AppliedCourses schema
   const [appliedCoursesData, setAppliedCoursesData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // New state for counselor performance matrix from API
   const [counselorMatrixData, setCounselorMatrixData] = useState({});
   const [counselorMatrixLoading, setCounselorMatrixLoading] = useState(false);
-
+  const [sourceLeadsLoading, setSourceLeadsLoading] = useState(false);
   // Move this inside the component
   const centers = useMemo(() => {
     if (!appliedCoursesData || appliedCoursesData.length === 0) return [];
@@ -2996,7 +3080,7 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card bg-primary text-white">
                   <div className="card-body">
                     <h5 className="card-title">Today's Pre-Verifications</h5>
-                    <h2 className="card-text">{loading ? '...' : stats.today}</h2>
+                    <h2 className="card-text">{loading ? '...' : stats.verifiedCount}</h2>
                   </div>
                 </div>
               </div>
@@ -3004,7 +3088,7 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card bg-success text-white">
                   <div className="card-body">
                     <h5 className="card-title">Total Pre-Verifications</h5>
-                    <h2 className="card-text">{loading ? '...' : stats.total}</h2>
+                    <h2 className="card-text">{loading ? '...' : stats.totalCount}</h2>
                   </div>
                 </div>
               </div>
@@ -3013,7 +3097,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="card-body">
                     <h5 className="card-title">Completion Rate</h5>
                     <h2 className="card-text">
-                      {loading ? '...' : stats.total > 0 ? Math.round((stats.today / stats.total) * 100) : 0}%
+                      {loading ? '...' : stats.totalCount > 0 ? Math.round((stats.verifiedCount / stats.totalCount) * 100) : 0}%
                     </h2>
                   </div>
                 </div>
@@ -3021,35 +3105,10 @@ const LeadAnalyticsDashboard = () => {
             </div>
 
             {/* Date Filter */}
-            <div className="row mb-4">
-              <div className="col-md-6">
-                <div className="card shadow-sm">
-                  <div className="card-body">
-                    <div className="d-flex align-items-center gap-3">
-                      
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-             
-            </div>
 
             {/* Charts */}
-            <div className="row">
-              <div className="col-md-8">
+            <div className="row justify-content-center">
+              {/* <div className="col-md-8">
                 <div className="card">
                   <div className="card-body">
                     <h5 className="card-title">Weekly Pre-Verification Trend</h5>
@@ -3074,23 +3133,23 @@ const LeadAnalyticsDashboard = () => {
                     )}
                   </div>
                 </div>
-              </div>
+              </div> */}
               <div className="col-md-4">
                 <div className="card">
                   <div className="card-body">
-                    <h5 className="card-title">Today vs Total</h5>
+                    <h5 className="card-title">verified vs unverified</h5>
                     {loading ? (
                       <div className="text-center py-4">
                         <div className="spinner-border text-primary" role="status">
                           <span className="visually-hidden">Loading...</span>
                         </div>
                       </div>
-                    ) : stats.total > 0 ? (
+                    ) : stats.totalCount > 0 ? (
                       <PieChart width={300} height={300}>
                         <Pie
                           data={[
-                            { name: 'Today', value: stats.today },
-                            { name: 'Other Days', value: Math.max(0, stats.total - stats.today) }
+                            { name: 'Verified', value: stats.verifiedCount },
+                            // { name: 'Unverified', value: stats.unverifiedCount },
                           ]}
                           cx={150}
                           cy={150}
@@ -3112,8 +3171,239 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
           </div>
+
+          {/* Enhanced Lead Sources Overview */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h2 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
+                  <Users className="text-primary" size={20} />
+                  Lead Sources Overview
+                </h2>
+
+              </div>
+
+              {/* Enhanced Lead Sources Summary Cards */}
+              <div className="row g-3 mb-4">
+                {leadData.loading && (
+                  <div className="col-12 text-center">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-2 text-muted">Loading lead data...</p>
+                  </div>
+                )}
+
+                {leadData.error && (
+                  <div className="col-12">
+                    <div className="alert alert-danger" role="alert">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      Error loading lead data: {leadData.error}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed Lead Sources Table */}
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Source Name</th>
+                      <th>Total Leads</th>
+
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leadData.length > 0 ? (
+                      leadData.map((source, index) => {
+                        return (
+                          <tr key={index}>
+                            <td>{source?.registeredBy?.name || 'Self registered'}</td>
+                            <td>{source?.leadCount || 0}</td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="text-center text-muted">
+                          <i className="fas fa-inbox me-2"></i>
+                          No lead sources data available
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Lead Source Performance Charts */}
+              <div className="row mt-4">
+                <div className="col-md-8">
+                  <div className="card border-0 bg-light">
+                    <div className="card-body">
+                      <h6 className="card-title mb-3">Lead Source Performance Trend</h6>
+                      {leadData.loading ? (
+                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center">
+                          <div className="text-center">
+                            <div className="spinner-border text-primary mb-2" role="status"></div>
+                            <p className="mb-0 text-muted">Loading chart data...</p>
+                          </div>
+                        </div>
+                      ) : leadData.error ? (
+                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-danger">
+                          <div className="text-center">
+                            <i className="fas fa-exclamation-triangle mb-2" style={{ fontSize: '2rem' }}></i>
+                            <p className="mb-0">Error loading chart data</p>
+                            <small>{leadData.error}</small>
+                          </div>
+                        </div>
+                      ) : leadData.leadStats?.monthlyTrend?.length > 0 ? (
+                        <div style={{ height: '250px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={leadData.leadStats.monthlyTrend.map(item => ({
+                              month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
+                              [item._id.source]: item.count
+                            }))}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="website"
+                                stroke="#007bff"
+                                strokeWidth={2}
+                                name="Website"
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="facebook"
+                                stroke="#28a745"
+                                strokeWidth={2}
+                                name="Facebook"
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="google"
+                                stroke="#ffc107"
+                                strokeWidth={2}
+                                name="Google"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-muted">
+                          <div className="text-center">
+                            <i className="fas fa-chart-line mb-2" style={{ fontSize: '2rem' }}></i>
+                            <p className="mb-0">No trend data available</p>
+                            <small>Monthly lead generation trends will appear here</small>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="card border-0 bg-light">
+                    <div className="card-body">
+                      <h6 className="card-title mb-3">Source Distribution</h6>
+                      <div className="d-flex flex-column gap-3">
+                        {leadData.loading ? (
+                          <div className="text-center">
+                            <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <small className="text-muted">Loading...</small>
+                          </div>
+                        ) : leadData.error ? (
+                          <div className="text-center text-danger">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            <small>Error loading data</small>
+                          </div>
+                        ) : leadData.sourceLeads?.summary ? (
+                          <>
+                            <div>
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="small fw-semibold">Portal Leads</span>
+                                <span className="badge bg-primary">
+                                  {leadData.sourceLeads.summary.totalLeads > 0
+                                    ? ((leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
+                                    : 0}%
+                                </span>
+                              </div>
+                              <div className="progress" style={{ height: '10px' }}>
+                                <div
+                                  className="progress-bar bg-primary"
+                                  style={{
+                                    width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                      ? (leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100
+                                      : 0}%`
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="small fw-semibold">Third Party</span>
+                                <span className="badge bg-success">
+                                  {leadData.sourceLeads.summary.totalLeads > 0
+                                    ? ((leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
+                                    : 0}%
+                                </span>
+                              </div>
+                              <div className="progress" style={{ height: '10px' }}>
+                                <div
+                                  className="progress-bar bg-success"
+                                  style={{
+                                    width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                      ? (leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100
+                                      : 0}%`
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            {/* Top Sources Breakdown */}
+                            {leadData.leadStats?.topSources?.slice(0, 3).map((source, index) => (
+                              <div key={index}>
+                                <div className="d-flex justify-content-between align-items-center mb-1">
+                                  <span className="small fw-semibold text-capitalize">
+                                    {source._id ? source._id.replace('_', ' ') : 'Unknown Source'}
+                                  </span>
+                                  <span className="badge bg-secondary">
+                                    {source.count}
+                                  </span>
+                                </div>
+                                <div className="progress" style={{ height: '8px' }}>
+                                  <div
+                                    className="progress-bar bg-secondary"
+                                    style={{
+                                      width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                        ? (source.count / leadData.sourceLeads.summary.totalLeads) * 100
+                                        : 0}%`
+                                    }}
+                                  ></div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-center text-muted">
+                            <i className="fas fa-chart-pie"></i>
+                            <small>No data available</small>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </>
       )}
 
@@ -3569,72 +3859,72 @@ const LeadAnalyticsDashboard = () => {
 
                 {/* pre verification filter  */}
 
-                <div className="col-md-6">
-                <div className="card shadow-sm">
-                  <div className="card-body">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="flex-grow-1">
-                        <label className="form-label fw-medium mb-2">
-                          <i className="fas fa-calendar-alt text-primary me-2"></i>
-                          Filter by Date
-                        </label>
-                        <div className="input-group">
-                          <DatePicker
-                            onChange={(date) => {
-                              const formattedDate = date ?
-                                `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                                : '';
-                              setSelectedDate(formattedDate);
-                              // Auto-trigger search when date changes
-                              if (formattedDate) {
-                                setLoading(true);
-                                setTimeout(() => fetchStats(), 100);
-                              }
-                            }}
-                            onKeyPress={handleKeyPress}
-                            value={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
-                            format="dd/MM/yyyy"
-                            className="form-control"
-                            clearIcon={null}
-                            calendarIcon={<i className="fas fa-calendar text-primary"></i>}
-                            placeholder="Select date to filter..."
-                            maxDate={new Date()}
-                          />
-                          <button
-                            className="btn btn-primary"
-                            onClick={handleSearch}
-                            disabled={loading}
-                          >
-                            <i className="fas fa-search me-1"></i>
-                            Search
-                          </button>
-                          <button
-                            className="btn btn-outline-secondary"
-                            onClick={handleClearFilters}
-                            disabled={loading}
-                          >
-                            <i className="fas fa-times me-1"></i>
-                            Clear
-                          </button>
+                {/* <div className="col-md-6">
+                  <div className="card shadow-sm">
+                    <div className="card-body">
+                      <div className="d-flex align-items-center gap-3">
+                        <div className="flex-grow-1">
+                          <label className="form-label fw-medium mb-2">
+                            <i className="fas fa-calendar-alt text-primary me-2"></i>
+                            Filter by Date
+                          </label>
+                          <div className="input-group">
+                            <DatePicker
+                              onChange={(date) => {
+                                const formattedDate = date ?
+                                  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                                  : '';
+                                setSelectedDate(formattedDate);
+                                // Auto-trigger search when date changes
+                                if (formattedDate) {
+                                  setLoading(true);
+                                  setTimeout(() => fetchStats(), 100);
+                                }
+                              }}
+                              onKeyPress={handleKeyPress}
+                              value={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
+                              format="dd/MM/yyyy"
+                              className="form-control"
+                              clearIcon={null}
+                              calendarIcon={<i className="fas fa-calendar text-primary"></i>}
+                              placeholder="Select date to filter..."
+                              maxDate={new Date()}
+                            />
+                            <button
+                              className="btn btn-primary"
+                              onClick={handleSearch}
+                              disabled={loading}
+                            >
+                              <i className="fas fa-search me-1"></i>
+                              Search
+                            </button>
+                            <button
+                              className="btn btn-outline-secondary"
+                              onClick={handleClearFilters}
+                              disabled={loading}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="d-flex flex-column gap-2">
-                        <button
-                          className="btn btn-outline-primary btn-sm"
-                          onClick={handleShowAll}
-                          disabled={loading}
-                        >
-                          <i className="fas fa-list me-1"></i>
-                          Show All
-                        </button>
-                        
-                      </div>
+                        <div className="d-flex flex-column gap-2">
+                          <button
+                            className="btn btn-outline-primary btn-sm"
+                            onClick={handleShowAll}
+                            disabled={loading}
+                          >
+                            <i className="fas fa-list me-1"></i>
+                            Show All
+                          </button>
 
-                     
+                        </div>
+
+
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                </div> */}
 
                 {/* Results Summary */}
                 <div className="row mt-4">
