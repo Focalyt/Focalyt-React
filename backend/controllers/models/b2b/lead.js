@@ -5,10 +5,12 @@ const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
   typeOfB2B: { type: ObjectId, ref: 'TypeOfB2B', required: true },
   businessName: { type: String, required: true },
-  address: { type: String },
+  address: { type: String },  
+  city: { type: String },
+  state: { type: String },
   coordinates: {
     type: { type: String, default: "Point" },
-    coordinates: { type: [Number], required: true }
+    coordinates: { type: [Number], default: [0, 0] }
   },
   concernPersonName: { type: String, required: true },
   designation: { type: String },
