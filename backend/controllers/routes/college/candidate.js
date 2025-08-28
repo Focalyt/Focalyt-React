@@ -68,7 +68,7 @@ const {
 	StatusLogs
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
-
+const { statusLogHelper } = require("../../../helpers/college");
 const { generatePassword, sendMail } = require("../../../helpers");
 const users = require("../../models/users");
 
@@ -1356,20 +1356,11 @@ router.post('/assign-batch', [isCollege], async (req, res) => {
 			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
 		}
 		const appliedCourse = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, { $set: { batch: batchId, isBatchAssigned: true } }, { new: true })
-		const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
-		if (!existingStatusLogs) {
-			const newStatusLogs = new StatusLogs({
-				_appliedId: appliedCourseId,
-				_collegeId: req.user.college._id,
-				counsellor: appliedCourse.counsellor,
-				batchAssigned: true
-			});
-			await newStatusLogs.save();
-		}
-		else {
-			existingStatusLogs.batchAssigned = true;
-			await existingStatusLogs.save();
-		}
+
+		const newStatusLogs = await statusLogHelper(appliedCourseId, {
+			batchAssigned: true
+		});
+
 		return res.send({ status: true, message: 'Batch assigned successfully', data: appliedCourse })
 	} catch (err) {
 		console.error('Error assigning batch:', err);
@@ -1687,20 +1678,11 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			await appliedCourse.save();
 
-			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
-			if (!existingStatusLogs) {
-				const newStatusLogs = new StatusLogs({
-					_appliedId: appliedCourseId,
-					_collegeId: req.user.college._id,
-					counsellor: appliedCourse.counsellor,
-					zeroPeriodAssigned: true
-				});
-				await newStatusLogs.save();
-			}
-			else {
-				existingStatusLogs.zeroPeriodAssigned = true;
-				await existingStatusLogs.save();
-			}
+
+			const newStatusLogs = await statusLogHelper(appliedCourseId, {
+				zeroPeriodAssigned: true
+			});
+
 
 			return res.status(200).json({
 				status: true,
@@ -1725,20 +1707,11 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			await appliedCourse.save();
 
-			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
-			if (!existingStatusLogs) {
-				const newStatusLogs = new StatusLogs({
-					_appliedId: appliedCourseId,
-					_collegeId: req.user.college._id,
-					counsellor: appliedCourse.counsellor,
-					batchFreezed: true
-				});
-				await newStatusLogs.save();
-			}
-			else {
-				existingStatusLogs.batchFreezed = true;
-				await existingStatusLogs.save();
-			}
+			const newStatusLogs = await statusLogHelper(appliedCourseId, {
+				batchFreezed: true
+			});
+
+
 
 			return res.status(200).json({
 				status: true,
@@ -1765,20 +1738,12 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			await appliedCourse.save();
 
-			const existingStatusLogs = await StatusLogs.findOne({ _appliedId: appliedCourseId, createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 1)) } });
-			if (!existingStatusLogs) {
-				const newStatusLogs = new StatusLogs({
-					_appliedId: appliedCourseId,
-					_collegeId: req.user.college._id,
-					counsellor: appliedCourse.counsellor,
-					dropOut: true
-				});
-				await newStatusLogs.save();
-			}
-			else {
-				existingStatusLogs.dropOut = true;
-				await existingStatusLogs.save();
-			}
+
+			const newStatusLogs = await statusLogHelper(appliedCourseId, {
+				dropOut: true
+			});
+
+
 
 			return res.status(200).json({
 				status: true,
@@ -2863,6 +2828,7 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 		});
 	}
 });
+
 
 router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 	try {

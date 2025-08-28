@@ -677,4 +677,6 @@ router.get("/appliedDetail", async (req, res) => {
 
 
 
+
+
 module.exports = router;

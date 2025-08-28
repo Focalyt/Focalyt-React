@@ -6,7 +6,10 @@ let router = express.Router();
 
 // Models
 let Status = require('../../models/status');
-let { AppliedCourses, CandidateProfile, Courses, Center, User } = require('../../models');
+let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User } = require('../../models');
+
+//helpers
+let { statusLogHelper } = require('../../../helpers/college');
 
 // ===================================
 // BATCH PROCESSOR CLASS - Queue Logic
@@ -237,7 +240,6 @@ class BatchProcessor {
                     source
                 };
 
-                console.log("Final Candidate Data:", candidateData);
 
                 // Create CandidateProfile
                 let candidate = await CandidateProfile.create(candidateData);
@@ -259,7 +261,8 @@ class BatchProcessor {
                     _center: selectedCenter
                 });
 
-                console.log(`   ✅ Created new candidate: ${name} (${mobile})`);
+             
+
 
                 return {
                     status: "created",
