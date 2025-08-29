@@ -299,67 +299,223 @@ const batchProcessor = new BatchProcessor();
 // ===================================
 
 // MAIN ROUTE - Modified to use batch processor
-router.route("/addleaddandcourseapply")
-    .post(async (req, res) => {
-        try {
-            console.log("Lead received:", req.body.FirstName);
+// router.route("/addleaddandcourseapply")
+    // .post(async (req, res) => {
+    //     try {
+    //         console.log("Lead received:", req.body.FirstName);
 
-            // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
+    //         // Basic validation only
+    //         let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
-            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
-                return res.status(200).json({
-                    status: false,
-                    msg: "All fields are required"
-                });
-            }
-            if (MobileNumber) {
-                MobileNumber = MobileNumber.toString();
+    //         if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
+    //             return res.status(200).json({
+    //                 status: false,
+    //                 msg: "All fields are required"
+    //             });
+    //         }
+    //         if (MobileNumber) {
+    //             MobileNumber = MobileNumber.toString();
 
-                console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
+    //             console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
 
-                if (MobileNumber.startsWith('+91')) {
-                    MobileNumber = MobileNumber.slice(3);
-                } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
-                    MobileNumber = MobileNumber.slice(2);
-                }
+    //             if (MobileNumber.startsWith('+91')) {
+    //                 MobileNumber = MobileNumber.slice(3);
+    //             } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+    //                 MobileNumber = MobileNumber.slice(2);
+    //             }
 
-                if (!/^[0-9]{10}$/.test(MobileNumber)) {
-                    return res.status(200).json({
-                        status: false,
-                        msg: "Invalid mobile number format"
-                    });
-                }
-                MobileNumber = parseInt(MobileNumber);
-            } else {
-                return res.status(200).json({
-                    status: false,
-                    msg: "Mobile number is required"
-                });
-            }
+    //             if (!/^[0-9]{10}$/.test(MobileNumber)) {
+    //                 return res.status(200).json({
+    //                     status: false,
+    //                     msg: "Invalid mobile number format"
+    //                 });
+    //             }
+    //             MobileNumber = parseInt(MobileNumber);
+    //         } else {
+    //             return res.status(200).json({
+    //                 status: false,
+    //                 msg: "Mobile number is required"
+    //             });
+    //         }
 
-            // Add to batch processor queue
-            const result = await batchProcessor.addToQueue(req.body);
+    //         // Add to batch processor queue
+    //         const result = await batchProcessor.addToQueue(req.body);
 
-            // Immediate response - NO DATABASE OPERATIONS HERE!
-            return res.json({
-                status: true,
-                msg: "Lead added to processing queue",
-                queueLength: result.queueLength,
-                message: "Your lead will be processed within 5-10 seconds"
-            });
+    //         // Immediate response - NO DATABASE OPERATIONS HERE!
+    //         return res.json({
+    //             status: true,
+    //             msg: "Lead added to processing queue",
+    //             queueLength: result.queueLength,
+    //             message: "Your lead will be processed within 5-10 seconds"
+    //         });
 
-        } catch (err) {
-            console.error("Error adding to queue:", err);
-            // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
-            return res.status(500).json({
-                status: false,
-                msg: err.message || "Failed to add lead to queue"
-            });
-        }
-    });
+    //     } catch (err) {
+    //         console.error("Error adding to queue:", err);
+    //         // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
+    //         return res.status(500).json({
+    //             status: false,
+    //             msg: err.message || "Failed to add lead to queue"
+    //         });
+    //     }
+    // });
 
 // Queue status check endpoint
+
+router.route("/addleaddandcourseapply")
+.post(async (req, res) => {
+    try {
+        console.log("Lead received:", req.body.FirstName);
+
+        // Basic validation only
+        let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
+
+        if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
+            return res.status(200).json({
+                status: false,
+                msg: "All fields are required"
+            });
+        }
+        if (MobileNumber) {
+            MobileNumber = MobileNumber.toString();
+
+            console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
+
+            if (MobileNumber.startsWith('+91')) {
+                MobileNumber = MobileNumber.slice(3);
+            } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+                MobileNumber = MobileNumber.slice(2);
+            }
+
+            if (!/^[0-9]{10}$/.test(MobileNumber)) {
+                return res.status(200).json({
+                    status: false,
+                    msg: "Invalid mobile number format"
+                });
+            }
+            MobileNumber = parseInt(MobileNumber);
+
+
+        } else {
+            return res.status(200).json({
+                status: false,
+                msg: "Mobile number is required"
+            });
+        }
+
+        let mobile = MobileNumber;
+            let name = FirstName;
+            let sex = Gender;
+            let dob = DateOfBirth;
+            let email = Email;
+
+            if (typeof courseId === 'string') {
+                courseId = new mongoose.Types.ObjectId(courseId);
+            }
+
+            let course = await Courses.findById(courseId);
+            if (!course) {
+                throw new Error("Course not found");
+            }
+
+            let centerName = Field4?.trim();
+            let selectedCenterName = await Center.findOne({ name: centerName, college: course.college });
+            if (!selectedCenterName) {
+                throw new Error("Center not found");
+            }
+
+            let selectedCenter = selectedCenterName._id;
+
+            if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
+            if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
+
+            if (dob) dob = new Date(dob);
+
+            let existingCandidate = await CandidateProfile.findOne({ mobile });
+            if (existingCandidate) {
+                let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
+                if (alreadyApplied) {
+                    return {
+                        status: "already_exists",
+                        msg: "Candidate already exists and course already applied",
+                        data: { existingCandidate, alreadyApplied },
+                        mobile: mobile
+                    };
+                }
+                if (existingCandidate && !alreadyApplied) {
+                    let appliedCourseEntry = await AppliedCourses.create({
+                        _candidate: existingCandidate._id,
+                        _course: courseId,
+                        _center: selectedCenter
+                    });
+
+                    console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
+
+                    return {
+                        status: "updated",
+                        msg: "Candidate already exists and course applied successfully",
+                        data: { existingCandidate, appliedCourseEntry },
+                        mobile: mobile
+                    };
+                }
+            }
+            else {
+                // Build CandidateProfile Data
+                let candidateData = {
+                    name,
+                    mobile,
+                    email,
+                    sex,
+                    dob,
+                    appliedCourses: [
+                        {
+                            courseId: courseId,
+                            centerId: selectedCenter
+                        }
+                    ],
+                    verified: false,
+                    source
+                };
+
+
+                // Create CandidateProfile
+                let candidate = await CandidateProfile.create(candidateData);
+                let user = await User.create({
+                    name: candidate.name,
+                    email: candidate.email,
+                    mobile: candidate.mobile,
+                    role: 3,
+                    status: true,
+                    source
+                });
+
+                console.log('selectedCenter', typeof selectedCenter)
+
+                // Insert AppliedCourses Record
+                let appliedCourseEntry = await AppliedCourses.create({
+                    _candidate: candidate._id,
+                    _course: courseId,
+                    _center: selectedCenter
+                });
+            }
+
+        
+
+        // Immediate response - NO DATABASE OPERATIONS HERE!
+        return res.json({
+            status: true,
+            msg: "Lead added successfully"
+        });
+
+    } catch (err) {
+        console.error("Error adding lead:", err);
+        // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
+        return res.status(500).json({
+            status: false,
+            msg: err.message || "Failed to add lead"
+        });
+    }
+});
+
 router.get("/queue/status", (req, res) => {
     const status = batchProcessor.getStatus();
     res.json({

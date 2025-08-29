@@ -12,7 +12,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -10448,6 +10448,55 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			message: 'Error fetching counselor performance matrix data',
 			error: error.message
 		});
+	}
+});
+
+router.delete('/delete-leads', async (req, res) => {
+	try {
+		console.log('req.body:', req.body);
+		const mobiles = req.body.mobiles;
+		for (let mobile of mobiles) {
+			// Ensure string type
+			mobile = mobile.toString().trim();
+		
+			// Agar mobile "91" se start hota hai aur length > 10 hai
+			if (mobile.startsWith("91") && mobile.length > 10) {
+				mobile = mobile.substring(2); // Remove first 2 digits
+			}
+		
+			// Agar mobile ki length abhi bhi 10 nahi hai to skip ya log kar do
+			if (mobile.length !== 10) {
+				console.log("Invalid mobile number format:", mobile);
+				continue;
+			}
+		
+			// Delete User
+			await User.deleteOne({ mobile });
+			console.log("User deleted successfully mobile:", mobile);
+		
+			// Candidate find
+			const candidate = await CandidateProfile.findOne({ mobile });
+			console.log("candidate:", candidate);
+		
+			if (candidate) {
+				// AppliedCourses delete
+				const applied = await AppliedCourses.deleteOne({ _candidate: candidate._id });
+				console.log("applied:", applied);
+		
+				console.log("AppliedCourses deleted successfully mobile:", mobile);
+		
+				// CandidateProfile delete
+				await CandidateProfile.deleteOne({ _id: candidate._id });
+				console.log("CandidateProfile deleted successfully mobile:", mobile);
+			} else {
+				console.log("Candidate not found for mobile:", mobile);
+			}
+			await new Promise(resolve => setTimeout(resolve, 1000));
+		}
+		
+		res.json({ status: true, message: 'Leads deleted successfully' });
+	} catch (error) {
+		res.status(500).json({ status: false, message: 'Error deleting lead', error: error.message });
 	}
 });
 
