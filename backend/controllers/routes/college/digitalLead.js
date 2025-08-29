@@ -367,13 +367,16 @@ router.route("/addleaddandcourseapply")
         console.log("Lead received:", req.body.FirstName);
 
         // Basic validation only
-        let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
+        let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
 
         if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
             return res.status(200).json({
                 status: false,
                 msg: "All fields are required"
             });
+        }
+        if (!source) {
+            source = 'Digital Lead';
         }
         if (MobileNumber) {
             MobileNumber = MobileNumber.toString();
