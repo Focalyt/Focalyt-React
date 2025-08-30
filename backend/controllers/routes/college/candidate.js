@@ -1135,6 +1135,11 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 
 		console.log('experiences from frontend', experiences)
 
+		if(name || email){
+			const updateUser = await User.findOneAndUpdate({mobile:mobile, role: 3},{$set:{name:name, email:email}},{new:true});
+			console.log("updateUser", updateUser)
+		}
+
 		// Build dynamic update object
 		const updatePayload = {
 
@@ -2384,75 +2389,157 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 	}
 });
 
+// router.get('/testverification', [isCollege], async (req, res) => {
+// 	try {
+// 		const { startDate, endDate } = req.query;
+// 		const filter = {
+// 			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+// 		};
+// 		const statusLogFilter = {
+// 			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
+// 			kycStage: true
+// 		};
+
+// 		// Get status logs and total leads in parallel
+// 		const [statusLogs, totalLeads] = await Promise.all([
+// 			StatusLogs.find(statusLogFilter),
+// 			AppliedCourses.countDocuments(filter)
+// 		]);
+
+// 		// Extract applied IDs from status logs
+// 		const appliedIds = statusLogs.map(log => log._appliedId);
+
+// 		// Get question answers for these specific applied IDs
+// 		const questionAnswers = await QuestionAnswer.find({
+// 			appliedcourse: { $in: appliedIds }
+// 		});
+
+// 		// Create set for fast lookup
+// 		const verifiedAppliedIds = new Set(
+// 			questionAnswers.map(qa => qa.appliedcourse.toString())
+// 		);
+
+// 		// Calculate counts
+// 		let verifiedCount = 0;
+// 		let unverifiedCount = 0;
+
+// 		statusLogs.forEach(statusLog => {
+// 			const appliedId = statusLog._appliedId.toString();
+// 			if (verifiedAppliedIds.has(appliedId)) {
+// 				verifiedCount++;
+// 			} else {
+// 				unverifiedCount++;
+// 			}
+// 		});
+
+// 		// Use totalLeads (AppliedCourses count) as the main total
+// 		const totalCount = totalLeads;
+
+// 		// console.log("totalCount (totalLeads)", totalCount);
+// 		// console.log("statusLogsCount", statusLogs.length);
+// 		// console.log("unverifiedCount", unverifiedCount);
+// 		// console.log("verifiedCount", verifiedCount);
+
+// 		return res.json({
+// 			success: true,
+// 			data: {
+// 				totalCount: totalCount,
+// 				unverifiedCount: unverifiedCount,
+// 				verifiedCount: verifiedCount
+// 			}
+// 		});
+
+// 	} catch (err) {
+// 		console.error('Error in testverification endpoint:', err);
+// 		res.status(500).json({
+// 			success: false,
+// 			message: 'Error fetching statistics',
+// 			error: err.message
+// 		});
+// 	}
+// });
+
 router.get('/testverification', [isCollege], async (req, res) => {
 	try {
-		const { startDate, endDate } = req.query;
-		const filter = {
-			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
-		};
-		const statusLogFilter = {
-			createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
-			kycStage: true
-		};
-
-		// Get status logs and total leads in parallel
-		const [statusLogs, totalLeads] = await Promise.all([
-			StatusLogs.find(statusLogFilter),
-			AppliedCourses.countDocuments(filter)
-		]);
-
-		// Extract applied IDs from status logs
-		const appliedIds = statusLogs.map(log => log._appliedId);
-
-		// Get question answers for these specific applied IDs
-		const questionAnswers = await QuestionAnswer.find({
-			appliedcourse: { $in: appliedIds }
+	  const { startDate, endDate } = req.query;
+  
+	  if (!startDate || !endDate) {
+		return res.status(400).json({
+		  success: false,
+		  message: "startDate and endDate query parameters are required"
 		});
-
-		// Create set for fast lookup
-		const verifiedAppliedIds = new Set(
-			questionAnswers.map(qa => qa.appliedcourse.toString())
-		);
-
-		// Calculate counts
-		let verifiedCount = 0;
-		let unverifiedCount = 0;
-
-		statusLogs.forEach(statusLog => {
-			const appliedId = statusLog._appliedId.toString();
-			if (verifiedAppliedIds.has(appliedId)) {
-				verifiedCount++;
-			} else {
-				unverifiedCount++;
-			}
-		});
-
-		// Use totalLeads (AppliedCourses count) as the main total
-		const totalCount = totalLeads;
-
-		// console.log("totalCount (totalLeads)", totalCount);
-		// console.log("statusLogsCount", statusLogs.length);
-		// console.log("unverifiedCount", unverifiedCount);
-		// console.log("verifiedCount", verifiedCount);
-
-		return res.json({
-			success: true,
-			data: {
-				totalCount: totalCount,
-				unverifiedCount: unverifiedCount,
-				verifiedCount: verifiedCount
-			}
-		});
-
+	  }
+  
+	
+	  const startDateObj = new Date(startDate);
+	  startDateObj.setHours(0, 0, 0, 0);
+  
+	  const endDateObj = new Date(endDate);
+	  endDateObj.setHours(23, 59, 59, 999); 
+  
+	  const filter = {
+		createdAt: { $gte: startDateObj, $lte: endDateObj }
+	  };
+  
+	  const statusLogFilter = {
+		createdAt: { $gte: startDateObj, $lte: endDateObj },
+		kycStage: true
+	  };
+  
+	  // Get status logs and total leads in parallel
+	  const [statusLogs, totalLeads] = await Promise.all([
+		StatusLogs.find(statusLogFilter),
+		AppliedCourses.countDocuments(filter)
+	  ]);
+  
+	  // Extract applied IDs from status logs
+	  const appliedIds = statusLogs.map(log => log._appliedId);
+  
+	  // Get question answers for these specific applied IDs
+	  const questionAnswers = await QuestionAnswer.find({
+		appliedcourse: { $in: appliedIds }
+	  });
+  
+	  // Create set for fast lookup
+	  const verifiedAppliedIds = new Set(
+		questionAnswers.map(qa => qa.appliedcourse.toString())
+	  );
+  
+	  // Calculate counts
+	  let verifiedCount = 0;
+	  let unverifiedCount = 0;
+  
+	  statusLogs.forEach(statusLog => {
+		const appliedId = statusLog._appliedId.toString();
+		if (verifiedAppliedIds.has(appliedId)) {
+		  verifiedCount++;
+		} else {
+		  unverifiedCount++;
+		}
+	  });
+  
+	  // Use totalLeads (AppliedCourses count) as the main total
+	  const totalCount = totalLeads;
+  
+	  return res.json({
+		success: true,
+		data: {
+		  totalCount,
+		  unverifiedCount,
+		  verifiedCount
+		}
+	  });
+  
 	} catch (err) {
-		console.error('Error in testverification endpoint:', err);
-		res.status(500).json({
-			success: false,
-			message: 'Error fetching statistics',
-			error: err.message
-		});
+	  console.error('Error in testverification endpoint:', err);
+	  res.status(500).json({
+		success: false,
+		message: 'Error fetching statistics',
+		error: err.message
+	  });
 	}
-});
+  });
+  
 
 // router.get('/testverification', [isCollege], async (req, res) => {
 // 	try {
@@ -2869,6 +2956,103 @@ router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 	}
 })
 
+
+router.get('/misreport/:batchId', [isCollege], async (req, res) => {
+	try {
+	  console.log("misreport api hitting..");
+  
+	  const { batchId } = req.params;
+  
+	  if (!batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
+		return res.status(400).json({
+		  status: false,
+		  message: 'Valid Batch ID is required'
+		});
+	  }
+  
+	  const appliedCourses = await AppliedCourses.aggregate([
+		{
+		  $match: {
+			batch: new mongoose.Types.ObjectId(batchId),
+			isBatchFreeze: true,
+			dropout: false
+		  }
+		},
+		{
+		  $lookup: {
+			from: "courses",
+			localField: "_course",
+			foreignField: "_id",
+			as: "course"
+		  }
+		},
+		{ $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
+  
+		{
+		  $lookup: {
+			from: "coursesectors",
+			localField: "course.sectors",
+			foreignField: "_id",
+			as: "sector"
+		  }
+		},
+		{ $unwind: { path: '$sector', preserveNullAndEmptyArrays: true } },
+  
+		{
+		  $lookup: {
+			from: 'batches',
+			localField: 'batch',
+			foreignField: '_id',
+			as: 'batch'
+		  }
+		},
+		{ $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+  
+		{
+		  $lookup: {
+			from: 'candidateprofiles',
+			localField: '_candidate',
+			foreignField: '_id',
+			as: 'candidate'
+		  }
+		},
+		{ $unwind: { path: '$candidate', preserveNullAndEmptyArrays: true } },
+  
+		{
+		  $group: {
+			_id: '$_id',
+			course: { $first: '$course.name' },
+			sector: { $first: '$sector.name' },
+			batch: { $first: '$batch.name' },
+			startDate: { $first: '$batch.startDate' },
+			endDate: { $first: '$batch.endDate' },
+			candidateName: { $first: '$candidate.name' },
+			mobile: { $first: '$candidate.mobile' },
+			email: { $first: '$candidate.email' },
+			dob: { $first: '$candidate.dob' },
+			gender: { $first: '$candidate.sex' },
+			address: { $first: '$candidate.personalInfo.currentAddress' }
+		  }
+		}
+	  ]);
+  
+	console.log("appliedCourses:", appliedCourses);
+	  res.status(200).json({
+		status: true,
+		message: 'MIS report fetched successfully',
+		data: appliedCourses,
+		totalCount: appliedCourses.length
+	  });
+  
+	} catch (err) {
+	  console.error('Error in misreport:', err);
+	  res.status(500).json({
+		status: false,
+		message: 'Error in fetching misreport',
+		error: err.message
+	  });
+	}
+  });
 
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {
 // 	try{}

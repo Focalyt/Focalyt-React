@@ -3755,7 +3755,7 @@ const CRMDashboard = () => {
                 <div className="position-relative">
                   <select
                     className="form-select border-0 shadow-sm"
-                    id="counselorName" required
+                    id="counselorName" 
                     value={counselorId}
                     onChange={(e) => setCounselorId(e.target.value)}
                     style={{
@@ -6818,7 +6818,7 @@ const CRMDashboard = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-              zIndex: 15,
+              zIndex: 10,
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed'
             }}>

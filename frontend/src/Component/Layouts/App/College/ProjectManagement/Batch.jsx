@@ -2119,7 +2119,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile.batch.name || 'N/A'}</div>
+                                              <div className="info-value">{profile.batch?.name || 'N/A'}</div>
                                             </div>
                                           </div>
 
@@ -2193,7 +2193,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile.batch.name || 'N/A'}</div>
+                                                    <div className="info-value">{profile.batch?.name || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
@@ -2299,7 +2299,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile.batch.name || 'N/A'}</div>
+                                                    <div className="info-value">{profile.batch?.name || 'N/A'}</div>
                                                   </div>
                                                 </div>
 

@@ -109,6 +109,7 @@ import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
 import CalenderFolowupB2C from './Pages/App/College/Course/CalenderFolowupB2C';
 import Source from './Pages/App/College/Settings/Source/Source';
+import MisReport from './Pages/App/College/MisReport/MisReport';
 
 const Layout = () => {
   const location = useLocation();
@@ -240,6 +241,7 @@ const Layout = () => {
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
+          <Route path='misreport/:batchId' element={<MisReport/>}/>
         </Route>
 
         {/* company  */}

@@ -5449,7 +5449,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				baseMatchStage.createdAt.$lte = toDate;
 			}
 		}
-
+console.log("modificationbefore" , modifiedFromDate , modifiedToDate)
 		if (modifiedFromDate || modifiedToDate) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
@@ -5460,6 +5460,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				toDate.setHours(23, 59, 59, 999);
 				baseMatchStage.updatedAt.$lte = toDate;
 			}
+			console.log("modificationafter" , baseMatchStage.updatedAt)
 		}
 
 		if (nextActionFromDate || nextActionToDate) {

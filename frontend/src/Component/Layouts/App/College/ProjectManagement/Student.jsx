@@ -10,6 +10,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import axios from "axios";
 import moment from "moment";
+import { Link } from "react-router-dom";
 
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
@@ -277,7 +278,7 @@ const Student = ({
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
+
     return {
       startDate: startOfMonth.toISOString().split('T')[0],
       endDate: endOfMonth.toISOString().split('T')[0]
@@ -345,6 +346,11 @@ const Student = ({
   const [classroomMediaData, setClassroomMediaData] = useState([]);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadDescription, setUploadDescription] = useState('');
+
+  const [showMISReportModal, setShowMISReportModal] = useState(false);
+  const [studentList, setStudentList] = useState([]);
+  const [studentListLoading, setStudentListLoading] = useState(true);
+  const [studentListError, setStudentListError] = useState(null);
 
   const downloadImage = (fileUrl, fileName) => {
     try {
@@ -705,7 +711,9 @@ const Student = ({
 
   };
 
-
+  const MISReportManagement = () => {
+    setShowMISReportModal(true);
+  }
 
   const handleMoveCandidate = async (profile, e) => {
     console.log('e', e);
@@ -2196,7 +2204,7 @@ const Student = ({
 
     // Get start and end dates with fallback to current month
     let startDate, endDate;
-    
+
     if (registerDateRange.startDate && registerDateRange.endDate) {
       startDate = new Date(registerDateRange.startDate);
       endDate = new Date(registerDateRange.endDate);
@@ -2236,7 +2244,7 @@ const Student = ({
 
   const getAttendanceStatus = (profile, date, period = 'all') => {
     let sessions = [];
-    
+
     // Filter sessions based on period
     if (period === 'zeroPeriod') {
       sessions = profile.attendance?.zeroPeriod?.sessions || [];
@@ -2373,7 +2381,7 @@ const Student = ({
                         type="date"
                         className="form-control form-control-sm"
                         value={registerDateRange.startDate}
-                        onChange={(e) => setRegisterDateRange(prev => ({...prev, startDate: e.target.value}))}
+                        onChange={(e) => setRegisterDateRange(prev => ({ ...prev, startDate: e.target.value }))}
                       />
                     </div>
                     <div className="col-6">
@@ -2382,7 +2390,7 @@ const Student = ({
                         type="date"
                         className="form-control form-control-sm"
                         value={registerDateRange.endDate}
-                        onChange={(e) => setRegisterDateRange(prev => ({...prev, endDate: e.target.value}))}
+                        onChange={(e) => setRegisterDateRange(prev => ({ ...prev, endDate: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -2419,8 +2427,8 @@ const Student = ({
                   <i className="fas fa-users-slash fa-3x text-muted mb-3"></i>
                   <h5 className="text-muted">No Students Found</h5>
                   <p className="text-muted">
-                    {registerTab === "zeroPeriod" 
-                      ? "No students are currently in Zero Period." 
+                    {registerTab === "zeroPeriod"
+                      ? "No students are currently in Zero Period."
                       : "No students are currently in Batch Freeze."}
                   </p>
                 </div>
@@ -2428,176 +2436,176 @@ const Student = ({
             ) : (
               <div className="table-responsive" style={{ maxHeight: '600px', overflow: 'auto' }}>
                 <table className="table table-bordered attendance-register-table">
-                
-                <thead className="table-dark sticky-header">
-                  <tr>
-                    <th rowSpan="2" className="student-info-header">
-                      <div className="student-header-content">
-                        <i className="fas fa-users me-2"></i>
-                        Student Information
-                      </div>
-                    </th>
-                    <th colSpan={dates.length} className="dates-header text-center">
-                      <i className="fas fa-calendar-alt me-2"></i>
-                      Attendance Dates ({dates.length} days)
-                    </th>
-                    <th rowSpan="2" className="summary-header">
-                      <div className="summary-header-content">
-                        <i className="fas fa-chart-pie me-2"></i>
-                        Summary
-                      </div>
-                    </th>
-                  </tr>
-                  <tr>
-                    {dates.map((dateInfo, index) => (
-                      <th key={index} className={`date-header ${dateInfo.isWeekend ? 'weekend-header' : ''}`}>
-                        <div className="date-header-content">
-                          <div className="date-number">{dateInfo.day}</div>
-                          <div className="day-name">{dateInfo.dayName}</div>
+
+                  <thead className="table-dark sticky-header">
+                    <tr>
+                      <th rowSpan="2" className="student-info-header">
+                        <div className="student-header-content">
+                          <i className="fas fa-users me-2"></i>
+                          Student Information
                         </div>
                       </th>
-                    ))}
-                  </tr>
-                </thead>
+                      <th colSpan={dates.length} className="dates-header text-center">
+                        <i className="fas fa-calendar-alt me-2"></i>
+                        Attendance Dates ({dates.length} days)
+                      </th>
+                      <th rowSpan="2" className="summary-header">
+                        <div className="summary-header-content">
+                          <i className="fas fa-chart-pie me-2"></i>
+                          Summary
+                        </div>
+                      </th>
+                    </tr>
+                    <tr>
+                      {dates.map((dateInfo, index) => (
+                        <th key={index} className={`date-header ${dateInfo.isWeekend ? 'weekend-header' : ''}`}>
+                          <div className="date-header-content">
+                            <div className="date-number">{dateInfo.day}</div>
+                            <div className="day-name">{dateInfo.dayName}</div>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  {filteredStudents.map((student, studentIndex) => (
-                    <tr key={student._id} className="student-row">
-                      {/* Student Information Column */}
-                      <td className="student-info-cell">
-                        <div className="student-info-content">
-                          <div className="d-flex align-items-center">
-                            <div className="student-avatar me-3">
-                              <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
-                                style={{ width: "45px", height: "45px" }}>
-                                <i className="bi bi-person-fill text-primary fs-5"></i>
+                  <tbody>
+                    {filteredStudents.map((student, studentIndex) => (
+                      <tr key={student._id} className="student-row">
+                        {/* Student Information Column */}
+                        <td className="student-info-cell">
+                          <div className="student-info-content">
+                            <div className="d-flex align-items-center">
+                              <div className="student-avatar me-3">
+                                <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                  style={{ width: "45px", height: "45px" }}>
+                                  <i className="bi bi-person-fill text-primary fs-5"></i>
+                                </div>
+                              </div>
+                              <div className="student-details">
+                                <h6 className="mb-1 fw-bold student-name">{student._candidate.name}</h6>
+                                <small className="text-muted enrollment-number">
+                                  {student.enrollmentNumber}
+                                </small>
+                                <div className="mt-1">
+                                  {getAdmissionStatusBadge(student)}
+                                </div>
+                                <div className="student-contact mt-1">
+                                  <small className="text-muted">
+                                    <i className="fas fa-phone me-1"></i>
+                                    {student._candidate.mobile}
+                                  </small>
+                                </div>
                               </div>
                             </div>
-                            <div className="student-details">
-                              <h6 className="mb-1 fw-bold student-name">{student._candidate.name}</h6>
-                              <small className="text-muted enrollment-number">
-                                {student.enrollmentNumber}
-                              </small>
-                              <div className="mt-1">
-                                {getAdmissionStatusBadge(student)}
+                          </div>
+                        </td>
+
+                        {/* Attendance Cells for each date */}
+                        {dates.map((dateInfo, dateIndex) => {
+                          const attendanceInfo = getAttendanceStatus(student, dateInfo.date, registerTab);
+                          return (
+                            <td
+                              key={dateIndex}
+                              className={`attendance-cell ${attendanceInfo.class} ${dateInfo.isWeekend ? 'weekend-cell' : ''}`}
+                              title={`${student.name} - ${dateInfo.date}: ${attendanceInfo.title}${attendanceInfo.timeIn ? ` (In: ${attendanceInfo.timeIn})` : ''}${attendanceInfo.lateMinutes > 0 ? ` - Late by ${attendanceInfo.lateMinutes} min` : ''}`}
+                            >
+                              <div className="attendance-symbol">
+                                {attendanceInfo.symbol}
                               </div>
-                              <div className="student-contact mt-1">
-                                <small className="text-muted">
-                                  <i className="fas fa-phone me-1"></i>
-                                  {student._candidate.mobile}
+                              {attendanceInfo.timeIn && (
+                                <div className="time-info">
+                                  {attendanceInfo.timeIn}
+                                </div>
+                              )}
+                              {attendanceInfo.lateMinutes > 0 && (
+                                <div className="late-indicator">
+                                  +{attendanceInfo.lateMinutes}m
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Summary Column */}
+                        <td className="summary-cell">
+                          <div className="summary-content">
+                            <div className="summary-stats">
+                              <div className="stat-item present">
+                                <span className="stat-label">P:</span>
+                                <span className="stat-value">{student.filteredStats.presentDays}</span>
+                              </div>
+                              <div className="stat-item absent">
+                                <span className="stat-label">A:</span>
+                                <span className="stat-value">{student.filteredStats.absentDays}</span>
+                              </div>
+
+                            </div>
+                            <div className="attendance-percentage mt-2">
+                              <div className="percentage-bar">
+                                <div
+                                  className={`percentage-fill bg-${getProgressColor(student.filteredStats.attendancePercentage)}`}
+                                  style={{ width: `${student.filteredStats.attendancePercentage}%` }}
+                                ></div>
+                              </div>
+                              {/* <small className="percentage-text fw-bold">
+                              {student.filteredStats.attendancePercentage}%
+                            </small> */}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+
+                  {/* Summary Row */}
+                  <tfoot className="table-secondary">
+                    <tr className="summary-row">
+                      <td className="summary-row-header">
+                        <strong>
+                          <i className="fas fa-calculator me-2"></i>
+                          Daily Summary
+                        </strong>
+                      </td>
+                      {dates.map((dateInfo, dateIndex) => {
+                        const dayStats = filteredStudents.reduce((acc, student) => {
+                          const status = getAttendanceStatus(student, dateInfo.date, registerTab);
+                          acc[status.class] = (acc[status.class] || 0) + 1;
+                          return acc;
+                        }, {});
+
+                        const totalStudents = filteredStudents.length;
+                        const presentCount = (dayStats.present || 0) + (dayStats.late || 0);
+                        const attendancePercentage = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(1) : 0;
+
+                        return (
+                          <td key={dateIndex} className={`summary-cell ${dateInfo.isWeekend ? 'weekend-summary' : ''}`}>
+                            <div className="day-summary">
+                              <div className="summary-percentage">
+                                {attendancePercentage}%
+                              </div>
+                              <div className="summary-counts">
+                                <small>
+                                  P:{dayStats.present || 0} | A:{dayStats.absent || 0} | L:{dayStats.late || 0}
                                 </small>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Attendance Cells for each date */}
-                      {dates.map((dateInfo, dateIndex) => {
-                        const attendanceInfo = getAttendanceStatus(student, dateInfo.date, registerTab);
-                        return (
-                          <td
-                            key={dateIndex}
-                            className={`attendance-cell ${attendanceInfo.class} ${dateInfo.isWeekend ? 'weekend-cell' : ''}`}
-                            title={`${student.name} - ${dateInfo.date}: ${attendanceInfo.title}${attendanceInfo.timeIn ? ` (In: ${attendanceInfo.timeIn})` : ''}${attendanceInfo.lateMinutes > 0 ? ` - Late by ${attendanceInfo.lateMinutes} min` : ''}`}
-                          >
-                            <div className="attendance-symbol">
-                              {attendanceInfo.symbol}
-                            </div>
-                            {attendanceInfo.timeIn && (
-                              <div className="time-info">
-                                {attendanceInfo.timeIn}
-                              </div>
-                            )}
-                            {attendanceInfo.lateMinutes > 0 && (
-                              <div className="late-indicator">
-                                +{attendanceInfo.lateMinutes}m
-                              </div>
-                            )}
                           </td>
                         );
                       })}
-
-                      {/* Summary Column */}
-                      <td className="summary-cell">
-                        <div className="summary-content">
-                          <div className="summary-stats">
-                            <div className="stat-item present">
-                              <span className="stat-label">P:</span>
-                              <span className="stat-value">{student.filteredStats.presentDays}</span>
-                            </div>
-                            <div className="stat-item absent">
-                              <span className="stat-label">A:</span>
-                              <span className="stat-value">{student.filteredStats.absentDays}</span>
-                            </div>
-
-                          </div>
-                          <div className="attendance-percentage mt-2">
-                            <div className="percentage-bar">
-                              <div
-                                className={`percentage-fill bg-${getProgressColor(student.filteredStats.attendancePercentage)}`}
-                                style={{ width: `${student.filteredStats.attendancePercentage}%` }}
-                              ></div>
-                            </div>
-                            {/* <small className="percentage-text fw-bold">
-                              {student.filteredStats.attendancePercentage}%
-                            </small> */}
+                      <td className="overall-summary">
+                        <div className="overall-stats">
+                          <strong>Overall Average</strong>
+                          <div className="overall-percentage">
+                            {filteredStudents.length > 0
+                              ? (filteredStudents.reduce((sum, s) => sum + s.filteredStats.attendancePercentage, 0) / filteredStudents.length).toFixed(1)
+                              : 0}%
                           </div>
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-
-                {/* Summary Row */}
-                <tfoot className="table-secondary">
-                  <tr className="summary-row">
-                    <td className="summary-row-header">
-                      <strong>
-                        <i className="fas fa-calculator me-2"></i>
-                        Daily Summary
-                      </strong>
-                    </td>
-                    {dates.map((dateInfo, dateIndex) => {
-                      const dayStats = filteredStudents.reduce((acc, student) => {
-                        const status = getAttendanceStatus(student, dateInfo.date, registerTab);
-                        acc[status.class] = (acc[status.class] || 0) + 1;
-                        return acc;
-                      }, {});
-
-                      const totalStudents = filteredStudents.length;
-                      const presentCount = (dayStats.present || 0) + (dayStats.late || 0);
-                      const attendancePercentage = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(1) : 0;
-
-                      return (
-                        <td key={dateIndex} className={`summary-cell ${dateInfo.isWeekend ? 'weekend-summary' : ''}`}>
-                          <div className="day-summary">
-                            <div className="summary-percentage">
-                              {attendancePercentage}%
-                            </div>
-                            <div className="summary-counts">
-                              <small>
-                                P:{dayStats.present || 0} | A:{dayStats.absent || 0} | L:{dayStats.late || 0}
-                              </small>
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                    <td className="overall-summary">
-                      <div className="overall-stats">
-                        <strong>Overall Average</strong>
-                        <div className="overall-percentage">
-                          {filteredStudents.length > 0
-                            ? (filteredStudents.reduce((sum, s) => sum + s.filteredStats.attendancePercentage, 0) / filteredStudents.length).toFixed(1)
-                            : 0}%
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </tfoot>
+                </table>
+              </div>
             )}
           </div>
 
@@ -2946,6 +2954,166 @@ const Student = ({
     );
   };
 
+  const StudentReportTable = () => {
+    // if (studentListLoading) {
+    //   return (
+    //     <div className="text-center py-5">
+    //       <div className="spinner-border" role="status">
+    //         <span className="visually-hidden">Loading...</span>
+    //       </div>
+    //     </div>
+    //   );
+    // }
+
+    return (
+      <div className="card shadow-sm mb-4 student-list-card">
+        <div className="card-body">
+          <h5 className="card-title">Student List</h5>
+
+          <div className="row g-3 mb-4">
+            {studentList.loading && (
+              <div className="col-12 loading-container">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-2 text-muted">Loading student list...</p>
+              </div>
+            )}
+
+            {studentList.error && (
+              <div className="col-12">
+                <div className="alert error-alert" role="alert">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  Error loading student list: {studentList.error}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="table-responsive student-table-container">
+            <table className="table table-hover align-middle student-table">
+              <thead className="table-light">
+                <tr>
+                  <th>Sr.No</th>
+                  <th>Sector</th>
+                  <th>Course Name</th>
+                  <th>Batch NO</th>
+                  <th>Name</th>
+                  <th>Gender</th>
+                  <th>Age</th>
+                  <th>Category</th>
+                  <th>Religion</th>
+                  <th>District</th>
+                  <th>Block</th>
+                  <th>Residential Type</th>
+                  <th>Address</th>
+                  <th>Contact</th>
+                  <th>Email</th>
+                  <th>Aadhaar No</th>
+                  <th>Reg. No/ Date</th>
+                  <th>Course Start Date</th>
+                  <th>Expected Course Completion Date</th>
+                  <th>Actual Course Completion Date</th>
+                  <th>Assessment Date</th>
+                  <th>Whether Assessment Result Received</th>
+                  <th>Assessment Result</th>
+                  <th>Re-assessment Date</th>
+                  <th>No. of Attempts for Assessment*</th>
+                  <th>RE-assessment Result</th>
+                  <th>Whether Certificate Received</th>
+                  <th>Date of Certification Received</th>
+                  <th>Placement Date</th>
+                  <th>Placement Sector/ Type of Industry where Student is placed*</th>
+                  <th>Name of Organisation where Student is placed</th>
+                  <th>Job Location</th>
+                  <th>Joining Date</th>
+                  <th>Placement Job Monthly Salary (INR)</th>
+                  <th>Student Status</th>
+                  <th>Job_Offer_Date</th>
+                  <th>Job_Offer_Sector</th>
+                  <th>Job_Offer_Jobrole</th>
+                  <th>Job_Offer_Salary</th>
+                  <th>Placement_Jobrole</th>
+                  <th>Whether Pursuing Higher Studies</th>
+                  <th>Higher Studies Institute</th>
+                  <th>Whether Pursuing Competitive Examination</th>
+                  <th>Competitive Examination Name</th>
+                  <th>Whether Unemployed</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentList.length > 0 ? (
+                  studentList.map((source, index) => {
+                    return (
+                      <tr key={index}>
+                        <td className="data-value">{index + 1}</td>
+                        <td className="data-value">{source?.sector || 'NA'}</td>
+                        <td className="data-value">{source?.courseName || 'NA'}</td>
+                        <td className="data-value">{source?.batchNo || 'NA'}</td>
+                        <td className="data-value">{source?.name || 'NA'}</td>
+                        <td className="data-value">{source?.gender || 'NA'}</td>
+                        <td className="data-value">{source?.age || 'NA'}</td>
+                        <td className="data-value">{source?.category || 'NA'}</td>
+                        <td className="data-value">{source?.religion || 'NA'}</td>
+                        <td className="data-value">{source?.district || 'NA'}</td>
+                        <td className="data-value">{source?.block || 'NA'}</td>
+                        <td className="data-value">{source?.residentialType || 'NA'}</td>
+                        <td className="data-value">{source?.address || 'NA'}</td>
+                        <td className="data-value">{source?.contact || 'NA'}</td>
+                        <td className="data-value">{source?.email || 'NA'}</td>
+                        <td className="data-value">{source?.aadhaarNo || 'NA'}</td>
+                        <td className="data-value">{source?.regNo || 'NA'}</td>
+                        <td className="data-value">{source?.courseStartDate || 'NA'}</td>
+                        <td className="data-value">{source?.expectedCourseCompletionDate || 'NA'}</td>
+                        <td className="data-value">{source?.actualCourseCompletionDate || 'NA'}</td>
+                        <td className="data-value">{source?.assessmentDate || 'NA'}</td>
+                        <td className="data-value">{source?.whetherAssessmentResultReceived || 'NA'}</td>
+                        <td className="data-value">{source?.assessmentResult || 'NA'}</td>
+                        <td className="data-value">{source?.reAssessmentDate || 'NA'}</td>
+                        <td className="data-value">{source?.noOfAttemptsForAssessment || 'NA'}</td>
+                        <td className="data-value">{source?.reAssessmentResult || 'NA'}</td>
+                        <td className="data-value">{source?.whetherCertificateReceived || 'NA'}</td>
+                        <td className="data-value">{source?.dateOfCertificationReceived || 'NA'}</td>
+                        <td className="data-value">{source?.placementDate || 'NA'}</td>
+                        <td className="data-value">{source?.placementSector || 'NA'}</td>
+                        <td className="data-value">{source?.nameOfOrganisation || 'NA'}</td>
+                        <td className="data-value">{source?.jobLocation || 'NA'}</td>
+                        <td className="data-value">{source?.joiningDate || 'NA'}</td>
+                        <td className="data-value">{source?.placementJobMonthlySalary || 'NA'}</td>
+                        <td className="data-value status-cell">{source?.studentStatus || 'NA'}</td>
+                        <td className="data-value">{source?.jobOfferDate || 'NA'}</td>
+                        <td className="data-value">{source?.jobOfferSector || 'NA'}</td>
+                        <td className="data-value">{source?.jobOfferJobrole || 'NA'}</td>
+                        <td className="data-value">{source?.jobOfferSalary || 'NA'}</td>
+                        <td className="data-value">{source?.placementJobrole || 'NA'}</td>
+                        <td className="data-value">{source?.whetherPursuingHigherStudies || 'NA'}</td>
+                        <td className="data-value">{source?.higherStudiesInstitute || 'NA'}</td>
+                        <td className="data-value">{source?.whetherPursuingCompetitiveExamination || 'NA'}</td>
+                        <td className="data-value">{source?.competitiveExaminationName || 'NA'}</td>
+                        <td className="data-value">{source?.whetherUnemployed || 'NA'}</td>
+                        <td className="data-value">{source?.remarks || 'NA'}</td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr className="empty-state">
+                    <td colSpan="50" className="text-center text-muted">
+                      <i className="fas fa-inbox me-2"></i>
+                      No student data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+
+
+      </div>
+    );
+  };
 
   // Document Modal Component
   const DocumentModal = () => {
@@ -4300,6 +4468,8 @@ const Student = ({
                           <i className="fas fa-chart-line me-1"></i>
                           Attendance Dashboard
                         </button>
+                        {/* <button className="btn btn-sm btn-primary me-2" >MIS Report</button> */}
+                        <Link className="btn btn-sm btn-primary me-2" to={`/institute/misreport/${selectedBatch._id}`} >MIS Report</Link>
                       </div>
                     </div>
                   </div>
@@ -6781,87 +6951,257 @@ const Student = ({
 
       {/* Attendance Modal */}
       {showMarkAttendanceModal && (
-      <div className="modal d-flex justify-content-center w-100" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-        <div className="modal-dialog modal-lg d-flex justify-content-center w-100">
-          <div className="modal-content p-0">
-            <div className="modal-header">
-              <h5 className="modal-title text-white">
-                Student List
-              </h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setShowAttendanceModal(false)}
-              ></button>
-            </div>
+        <div className="modal d-flex justify-content-center w-100" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+          <div className="modal-dialog modal-lg d-flex justify-content-center w-100">
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h5 className="modal-title text-white">
+                  Student List
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowAttendanceModal(false)}
+                ></button>
+              </div>
 
-            <div className="modal-body">
-              <table className="table table-sm table-striped">
-                <thead className="table-dark">
-                  <tr>
-                    <th>S.No</th>
-                    <th>Student Name</th>
-                    <th>Attendance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allProfiles.map((student, index) => (
-                    <tr key={student._id}>
-                      <td>{index + 1}</td>
-                      <td>{student._candidate?.name || 'N/A'}</td>
-                      <td>
-                        <div className="btn-group btn-group-sm" role="group">
-                          <button
-                            type="button"
-                            className="btn btn-outline-success"
-                            onClick={() => {
-                              // Mark as present logic here
-                              console.log('Marked present for:', student._candidate?.name);
-                            }}
-                          >
-                            Present
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline-danger"
-                            onClick={() => {
-                              // Mark as absent logic here
-                              console.log('Marked absent for:', student._candidate?.name);
-                            }}
-                          >
-                            Absent
-                          </button>
-                        </div>
-                      </td>
+              <div className="modal-body">
+                <table className="table table-sm table-striped">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>S.No</th>
+                      <th>Student Name</th>
+                      <th>Attendance</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {allProfiles.map((student, index) => (
+                      <tr key={student._id}>
+                        <td>{index + 1}</td>
+                        <td>{student._candidate?.name || 'N/A'}</td>
+                        <td>
+                          <div className="btn-group btn-group-sm" role="group">
+                            <button
+                              type="button"
+                              className="btn btn-outline-success"
+                              onClick={() => {
+                                // Mark as present logic here
+                                console.log('Marked present for:', student._candidate?.name);
+                              }}
+                            >
+                              Present
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger"
+                              onClick={() => {
+                                // Mark as absent logic here
+                                console.log('Marked absent for:', student._candidate?.name);
+                              }}
+                            >
+                              Absent
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowAttendanceModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  // Save attendance logic here
-                  console.log('Saving attendance for all students');
-                  setShowAttendanceModal(false);
-                }}
-              >
-                Mark Attendance
-              </button>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAttendanceModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    // Save attendance logic here
+                    console.log('Saving attendance for all students');
+                    setShowAttendanceModal(false);
+                  }}
+                >
+                  Mark Attendance
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* {MIS Report} */}
+      {showMISReportModal && (
+        <div className="modal d-flex justify-content-center w-100" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+          <div className="modal-dialog modal-lg d-flex justify-content-center w-100">
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h5 className="modal-title text-white">
+                  MIS Report
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowMISReportModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row">
+                  <div className="card shadow-sm mb-4 student-list-card">
+                    <div className="card-body">
+                      <h5 className="card-title">Student List</h5>
+
+                      <div className="row g-3 mb-4">
+                        {studentList.loading && (
+                          <div className="col-12 loading-container">
+                            <div className="spinner-border text-primary" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <p className="mt-2 text-muted">Loading student list...</p>
+                          </div>
+                        )}
+
+                        {studentList.error && (
+                          <div className="col-12">
+                            <div className="alert error-alert" role="alert">
+                              <i className="fas fa-exclamation-triangle me-2"></i>
+                              Error loading student list: {studentList.error}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="table-responsive student-table-container">
+                        <table className="table table-hover align-middle student-table">
+                          <thead className="table-light">
+                            <tr>
+                              <th>Sr.No</th>
+                              <th>Sector</th>
+                              <th>Course Name</th>
+                              <th>Batch NO</th>
+                              <th>Name</th>
+                              <th>Gender</th>
+                              <th>Age</th>
+                              <th>Category</th>
+                              <th>Religion</th>
+                              <th>District</th>
+                              <th>Block</th>
+                              <th>Residential Type</th>
+                              <th>Address</th>
+                              <th>Contact</th>
+                              <th>Email</th>
+                              <th>Aadhaar No</th>
+                              <th>Reg. No/ Date</th>
+                              <th>Course Start Date</th>
+                              <th>Expected Course Completion Date</th>
+                              <th>Actual Course Completion Date</th>
+                              <th>Assessment Date</th>
+                              <th>Whether Assessment Result Received</th>
+                              <th>Assessment Result</th>
+                              <th>Re-assessment Date</th>
+                              <th>No. of Attempts for Assessment*</th>
+                              <th>RE-assessment Result</th>
+                              <th>Whether Certificate Received</th>
+                              <th>Date of Certification Received</th>
+                              <th>Placement Date</th>
+                              <th>Placement Sector/ Type of Industry where Student is placed*</th>
+                              <th>Name of Organisation where Student is placed</th>
+                              <th>Job Location</th>
+                              <th>Joining Date</th>
+                              <th>Placement Job Monthly Salary (INR)</th>
+                              <th>Student Status</th>
+                              <th>Job_Offer_Date</th>
+                              <th>Job_Offer_Sector</th>
+                              <th>Job_Offer_Jobrole</th>
+                              <th>Job_Offer_Salary</th>
+                              <th>Placement_Jobrole</th>
+                              <th>Whether Pursuing Higher Studies</th>
+                              <th>Higher Studies Institute</th>
+                              <th>Whether Pursuing Competitive Examination</th>
+                              <th>Competitive Examination Name</th>
+                              <th>Whether Unemployed</th>
+                              <th>Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {studentList.length > 0 ? (
+                              studentList.map((source, index) => {
+                                return (
+                                  <tr key={index}>
+                                    <td className="data-value">{index + 1}</td>
+                                    <td className="data-value">{source?.sector || 'NA'}</td>
+                                    <td className="data-value">{source?.courseName || 'NA'}</td>
+                                    <td className="data-value">{source?.batchNo || 'NA'}</td>
+                                    <td className="data-value">{source?.name || 'NA'}</td>
+                                    <td className="data-value">{source?.gender || 'NA'}</td>
+                                    <td className="data-value">{source?.age || 'NA'}</td>
+                                    <td className="data-value">{source?.category || 'NA'}</td>
+                                    <td className="data-value">{source?.religion || 'NA'}</td>
+                                    <td className="data-value">{source?.district || 'NA'}</td>
+                                    <td className="data-value">{source?.block || 'NA'}</td>
+                                    <td className="data-value">{source?.residentialType || 'NA'}</td>
+                                    <td className="data-value">{source?.address || 'NA'}</td>
+                                    <td className="data-value">{source?.contact || 'NA'}</td>
+                                    <td className="data-value">{source?.email || 'NA'}</td>
+                                    <td className="data-value">{source?.aadhaarNo || 'NA'}</td>
+                                    <td className="data-value">{source?.regNo || 'NA'}</td>
+                                    <td className="data-value">{source?.courseStartDate || 'NA'}</td>
+                                    <td className="data-value">{source?.expectedCourseCompletionDate || 'NA'}</td>
+                                    <td className="data-value">{source?.actualCourseCompletionDate || 'NA'}</td>
+                                    <td className="data-value">{source?.assessmentDate || 'NA'}</td>
+                                    <td className="data-value">{source?.whetherAssessmentResultReceived || 'NA'}</td>
+                                    <td className="data-value">{source?.assessmentResult || 'NA'}</td>
+                                    <td className="data-value">{source?.reAssessmentDate || 'NA'}</td>
+                                    <td className="data-value">{source?.noOfAttemptsForAssessment || 'NA'}</td>
+                                    <td className="data-value">{source?.reAssessmentResult || 'NA'}</td>
+                                    <td className="data-value">{source?.whetherCertificateReceived || 'NA'}</td>
+                                    <td className="data-value">{source?.dateOfCertificationReceived || 'NA'}</td>
+                                    <td className="data-value">{source?.placementDate || 'NA'}</td>
+                                    <td className="data-value">{source?.placementSector || 'NA'}</td>
+                                    <td className="data-value">{source?.nameOfOrganisation || 'NA'}</td>
+                                    <td className="data-value">{source?.jobLocation || 'NA'}</td>
+                                    <td className="data-value">{source?.joiningDate || 'NA'}</td>
+                                    <td className="data-value">{source?.placementJobMonthlySalary || 'NA'}</td>
+                                    <td className="data-value status-cell">{source?.studentStatus || 'NA'}</td>
+                                    <td className="data-value">{source?.jobOfferDate || 'NA'}</td>
+                                    <td className="data-value">{source?.jobOfferSector || 'NA'}</td>
+                                    <td className="data-value">{source?.jobOfferJobrole || 'NA'}</td>
+                                    <td className="data-value">{source?.jobOfferSalary || 'NA'}</td>
+                                    <td className="data-value">{source?.placementJobrole || 'NA'}</td>
+                                    <td className="data-value">{source?.whetherPursuingHigherStudies || 'NA'}</td>
+                                    <td className="data-value">{source?.higherStudiesInstitute || 'NA'}</td>
+                                    <td className="data-value">{source?.whetherPursuingCompetitiveExamination || 'NA'}</td>
+                                    <td className="data-value">{source?.competitiveExaminationName || 'NA'}</td>
+                                    <td className="data-value">{source?.whetherUnemployed || 'NA'}</td>
+                                    <td className="data-value">{source?.remarks || 'NA'}</td>
+                                  </tr>
+                                )
+                              })
+                            ) : (
+                              <tr className="empty-state">
+                                <td colSpan="50" className="text-center text-muted">
+                                  <i className="fas fa-inbox me-2"></i>
+                                  No student data available
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                    </div>
+
+
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Enhanced CSS for styling */}
@@ -11698,6 +12038,320 @@ html body .content .content-wrapper {
   }
 
   `}
+      </style>
+      <style>
+        {
+          `
+    /* Dashboard Student List Table Styles */
+
+/* Card Container */
+.student-list-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e9ecef;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.student-list-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.student-list-card .card-body {
+  padding: 1.5rem;
+}
+
+.student-list-card .card-title {
+  color: #2c3e50;
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #3498db;
+  position: relative;
+}
+
+.student-list-card .card-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, #3498db, #2980b9);
+}
+
+/* Loading and Error States */
+.loading-container {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.loading-container .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  color: #3498db;
+}
+
+.loading-container p {
+  color: #6c757d;
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
+
+.error-alert {
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.error-alert i {
+  color: #fff3cd;
+}
+
+/* Table Styles */
+.student-table-container {
+  border-radius: 8px;
+  overflow: auto;
+  border: 1px solid #e9ecef;
+  background: #ffffff;
+}
+
+.student-table {
+  margin-bottom: 0;
+  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Table Header */
+.student-table thead {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: 2px solid #dee2e6;
+}
+
+.student-table thead th {
+  background: transparent;
+  color: #495057;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1rem 0.75rem;
+  border: none;
+  white-space: nowrap;
+  position: relative;
+  vertical-align: middle;
+}
+
+.student-table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.student-table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+.student-table thead th::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #dee2e6;
+}
+
+/* Table Body */
+.student-table tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.student-table tbody tr:hover {
+  background: linear-gradient(135deg, #f8f9ff, #e3f2fd);
+  transform: scale(1.001);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
+}
+
+.student-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.student-table tbody td {
+  padding: 0.875rem 0.75rem;
+  vertical-align: middle;
+  border: none;
+  color: #495057;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Specific Column Styling */
+.student-table tbody td:nth-child(1) {
+  font-weight: 600;
+  color: #3498db;
+  text-align: center;
+  min-width: 50px;
+}
+
+.student-table tbody td:nth-child(5) {
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 120px;
+}
+
+.student-table tbody td:nth-child(6) {
+  text-transform: capitalize;
+}
+
+.student-table tbody td:nth-child(14),
+.student-table tbody td:nth-child(15) {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+/* Status Indicators */
+.status-cell {
+  position: relative;
+  padding-left: 1.5rem !important;
+}
+
+.status-cell::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28a745;
+}
+
+.status-cell.status-active::before {
+  background: #28a745;
+}
+
+.status-cell.status-inactive::before {
+  background: #dc3545;
+}
+
+.status-cell.status-pending::before {
+  background: #ffc107;
+}
+
+
+// .empty-state {
+//   padding: 3rem 1rem;
+//   text-align: center;
+//   color: #6c757d;
+// }
+
+// .empty-state i {
+//   font-size: 3rem;
+//   color: #dee2e6;
+//   margin-bottom: 1rem;
+//   display: block;
+// }
+
+// .empty-state td {
+//   padding: 2rem !important;
+//   font-size: 1rem !important;
+//   color: #6c757d !important;
+// }
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .student-table-container {
+    overflow-x: auto;
+  }
+  
+  .student-table {
+    min-width: 1200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .student-list-card .card-body {
+    padding: 1rem;
+  }
+  
+  .student-table thead th,
+  .student-table tbody td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .student-table thead th {
+    font-size: 0.7rem;
+  }
+}
+
+/* Scrollbar Styling */
+.student-table-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.student-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.student-table-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.student-table-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+
+// @keyframes fadeInUp {
+//   from {
+//     opacity: 0;
+//     transform: translateY(20px);
+//   }
+//   to {
+//     opacity: 1;
+//     transform: translateY(0);
+//   }
+// }
+
+// .student-table tbody tr {
+//   animation: fadeInUp 0.3s ease forwards;
+// }
+
+// .student-table tbody tr:nth-child(1) { animation-delay: 0.1s; }
+// .student-table tbody tr:nth-child(2) { animation-delay: 0.2s; }
+// .student-table tbody tr:nth-child(3) { animation-delay: 0.3s; }
+// .student-table tbody tr:nth-child(4) { animation-delay: 0.4s; }
+// .student-table tbody tr:nth-child(5) { animation-delay: 0.5s; }
+
+/* Data value styling */
+.data-value {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.data-value.na {
+  color: #6c757d;
+  font-style: italic;
+  font-weight: 400;
+}
+
+    `
+        }
       </style>
     </div>
   );

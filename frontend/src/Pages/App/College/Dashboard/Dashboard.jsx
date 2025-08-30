@@ -465,9 +465,12 @@ const LeadAnalyticsDashboard = () => {
 
   // Lead tracking state
   const [leadData, setLeadData] = useState([]);
+  const [studentList, setStudentList] = useState([]);
+  const [studentListLoading, setStudentListLoading] = useState(true);
+  const [studentListError, setStudentListError] = useState(null);
 
   useEffect(() => {
-    
+
     fetchWeeklyStats();
     fetchSourceLeads();
   }, []);
@@ -761,11 +764,11 @@ const LeadAnalyticsDashboard = () => {
   };
 
 
-  
+
   useEffect(() => {
     fetchStats();
-  }, [filterData , startDate, endDate])
- 
+  }, [filterData, startDate, endDate])
+
 
   const fetchStats = async (filters = filterData) => {
     try {
@@ -783,8 +786,8 @@ const LeadAnalyticsDashboard = () => {
       const queryParams = new URLSearchParams({
         ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
-       
- 
+
+
       });
       const response = await axios.get(
         `${backendUrl}/college/candidate/testverification?${queryParams}`,
@@ -794,7 +797,7 @@ const LeadAnalyticsDashboard = () => {
       //   `${backendUrl}/college/candidate/pre-verification-stats?${queryParams}`,
       //   { headers: { 'x-auth': token } }
       // );
-      console.log("response" , response.data)
+      console.log("response", response.data)
 
 
       if (response.data.success) {
@@ -809,12 +812,12 @@ const LeadAnalyticsDashboard = () => {
 
   useEffect(() => {
     fetchSourceLeads();
-  }, [filterData , startDate, endDate])
+  }, [filterData, startDate, endDate])
 
   const fetchSourceLeads = async (filters = filterData) => {
     try {
       setIsLoading(true);
-      
+
       if (!token) {
         setAppliedCoursesData([]);
         setIsLoading(false);
@@ -826,7 +829,7 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
 
-       
+
       });
       // If no date filter is selected, send no parameters (will return all data)
       console.log(formData.counselor.values, 'queryParams')
@@ -852,11 +855,23 @@ const LeadAnalyticsDashboard = () => {
       console.error('Error fetching source leads:', error);
       alert(error.message || 'An unexpected error occurred.');
     }
-    finally{
+    finally {
       setIsLoading(false);
     }
   };
 
+  const fetchStudentList = async () =>{
+    try{
+      const response = await axios.get(`${backendUrl}/college/student/list`,{
+        headers:{
+          'x-auth':token
+        }
+      })
+    }
+    catch(err){
+      
+    }
+  }
 
   // Sample data based on actual AppliedCourses schema
   const [appliedCoursesData, setAppliedCoursesData] = useState([]);
@@ -3177,7 +3192,7 @@ const LeadAnalyticsDashboard = () => {
                         <Pie
                           data={[
                             { name: 'Verified', value: stats.verifiedCount },
-                            // { name: 'Unverified', value: stats.unverifiedCount },
+                            { name: 'Unverified', value: stats.unverifiedCount },
                           ]}
                           cx={150}
                           cy={150}

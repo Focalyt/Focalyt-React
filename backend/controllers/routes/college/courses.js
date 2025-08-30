@@ -839,9 +839,20 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		console.log("API hitting....");
-		const { courseId, candidateData, centerId, counselorId ,registeredBy} = req.body;
+		const { courseId, candidateData, centerId, counselorId, registeredBy } = req.body;
 
-
+		const existingUser = await User.find({ mobile: candidateData.mobile, role: 3 });
+		if (!existingUser) {
+			const newUser = await User.create({
+				role: 3,
+				mobile: candidateData.mobile,
+				name: candidateData.name,
+				email: candidateData.email,
+				status: true,
+			});
+		}
+	
+		console.log("existingUser", existingUser)
 		console.log("centerId from req.body", req.body)
 		const existingCandidate = await Candidate.findOne({ mobile: candidateData.mobile });
 		if (existingCandidate) {
@@ -850,6 +861,7 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 				message: "Candidate already exists"
 			});
 		}
+
 		const candidate = await Candidate.create(candidateData);
 		console.log("candidate", candidate)
 
@@ -923,57 +935,57 @@ router.get('/course_centers', async (req, res) => {
 router.post('/candidate-visit-calendar', async (req, res) => {
 	try {
 		console.log('req.body123')
-	  const { visitDate, visitType, appliedCourseId } = req.body;
-  
-	  console.log('req.body123', req.body)
-	  console.log('visitType received:', visitType);
-	  
-	  if (!visitDate || !visitType || !appliedCourseId) {
-		return res.status(400).json({ error: 'Missing required fields' });
-	  }
+		const { visitDate, visitType, appliedCourseId } = req.body;
 
-	  // Validate visitType enum values
-	  const validVisitTypes = ['Visit', 'Joining', 'Both'];
-	  if (!validVisitTypes.includes(visitType)) {
-		return res.status(400).json({
-		  error: `Invalid visitType: "${visitType}". Must be one of: ${validVisitTypes.join(', ')}. If you're sending a question answer, please map it correctly to the visitType field.`
+		console.log('req.body123', req.body)
+		console.log('visitType received:', visitType);
+
+		if (!visitDate || !visitType || !appliedCourseId) {
+			return res.status(400).json({ error: 'Missing required fields' });
+		}
+
+		// Validate visitType enum values
+		const validVisitTypes = ['Visit', 'Joining', 'Both'];
+		if (!validVisitTypes.includes(visitType)) {
+			return res.status(400).json({
+				error: `Invalid visitType: "${visitType}". Must be one of: ${validVisitTypes.join(', ')}. If you're sending a question answer, please map it correctly to the visitType field.`
+			});
+		}
+
+
+		const newVisit = new CandidateVisitCalender({
+			appliedCourse: appliedCourseId,
+			visitDate: new Date(visitDate),
+			visitType: visitType,
+			createdBy: req.user._id,
+			status: 'pending'
 		});
-	  }
-  
-	
-	  const newVisit = new CandidateVisitCalender({
-		appliedCourse: appliedCourseId,
-		visitDate: new Date(visitDate),
-		visitType: visitType,
-		createdBy: req.user._id,
-		status: 'pending'
-	  });
-  
-	  await newVisit.save();
-  
-	  res.status(201).json({ 
-		message: 'Visit scheduled successfully',
-		visitId: newVisit._id 
-	  });
-  
+
+		await newVisit.save();
+
+		res.status(201).json({
+			message: 'Visit scheduled successfully',
+			visitId: newVisit._id
+		});
+
 	} catch (error) {
-	  console.error('Error:', error);
-	  res.status(500).json({ error: 'Internal server error' });
+		console.error('Error:', error);
+		res.status(500).json({ error: 'Internal server error' });
 	}
-  });
-  
- 
+});
+
+
 //   router.get('/candidate-visit-calendar', async (req, res) => {
 // 	try {
 // 	  const { appliedCourseId } = req.query;
-	  
+
 // 	  const visits = await CandidateVisitCalender.find({ 
 // 		appliedCourse: appliedCourseId 
 // 	  })
 // 	  .populate('appliedCourse')
 // 	  .populate('createdBy', 'name email')
 // 	  .sort({ visitDate: 1 });
-	  
+
 // 	  res.json({ status: true, data: visits });
 // 	} catch (error) {
 // 	  res.status(500).json({ error: 'Internal server error' });
@@ -984,7 +996,7 @@ router.post('/candidate-visit-calendar', async (req, res) => {
 // 	try {
 // 	  const { visitId } = req.params;
 // 	  const { status, remarks } = req.body;
-	  
+
 // 	  const visit = await CandidateVisitCalender.findByIdAndUpdate(
 // 		visitId,
 // 		{
@@ -995,7 +1007,7 @@ router.post('/candidate-visit-calendar', async (req, res) => {
 // 		},
 // 		{ new: true }
 // 	  );
-	  
+
 // 	  res.json({ status: true, data: visit });
 // 	} catch (error) {
 // 	  res.status(500).json({ error: 'Internal server error' });
