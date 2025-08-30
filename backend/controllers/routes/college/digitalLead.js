@@ -261,7 +261,7 @@ class BatchProcessor {
                     _center: selectedCenter
                 });
 
-             
+
 
 
                 return {
@@ -300,112 +300,112 @@ const batchProcessor = new BatchProcessor();
 
 // MAIN ROUTE - Modified to use batch processor
 // router.route("/addleaddandcourseapply")
-    // .post(async (req, res) => {
-    //     try {
-    //         console.log("Lead received:", req.body.FirstName);
+// .post(async (req, res) => {
+//     try {
+//         console.log("Lead received:", req.body.FirstName);
 
-    //         // Basic validation only
-    //         let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
+//         // Basic validation only
+//         let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
-    //         if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
-    //             return res.status(200).json({
-    //                 status: false,
-    //                 msg: "All fields are required"
-    //             });
-    //         }
-    //         if (MobileNumber) {
-    //             MobileNumber = MobileNumber.toString();
+//         if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
+//             return res.status(200).json({
+//                 status: false,
+//                 msg: "All fields are required"
+//             });
+//         }
+//         if (MobileNumber) {
+//             MobileNumber = MobileNumber.toString();
 
-    //             console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
+//             console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
 
-    //             if (MobileNumber.startsWith('+91')) {
-    //                 MobileNumber = MobileNumber.slice(3);
-    //             } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
-    //                 MobileNumber = MobileNumber.slice(2);
-    //             }
+//             if (MobileNumber.startsWith('+91')) {
+//                 MobileNumber = MobileNumber.slice(3);
+//             } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+//                 MobileNumber = MobileNumber.slice(2);
+//             }
 
-    //             if (!/^[0-9]{10}$/.test(MobileNumber)) {
-    //                 return res.status(200).json({
-    //                     status: false,
-    //                     msg: "Invalid mobile number format"
-    //                 });
-    //             }
-    //             MobileNumber = parseInt(MobileNumber);
-    //         } else {
-    //             return res.status(200).json({
-    //                 status: false,
-    //                 msg: "Mobile number is required"
-    //             });
-    //         }
+//             if (!/^[0-9]{10}$/.test(MobileNumber)) {
+//                 return res.status(200).json({
+//                     status: false,
+//                     msg: "Invalid mobile number format"
+//                 });
+//             }
+//             MobileNumber = parseInt(MobileNumber);
+//         } else {
+//             return res.status(200).json({
+//                 status: false,
+//                 msg: "Mobile number is required"
+//             });
+//         }
 
-    //         // Add to batch processor queue
-    //         const result = await batchProcessor.addToQueue(req.body);
+//         // Add to batch processor queue
+//         const result = await batchProcessor.addToQueue(req.body);
 
-    //         // Immediate response - NO DATABASE OPERATIONS HERE!
-    //         return res.json({
-    //             status: true,
-    //             msg: "Lead added to processing queue",
-    //             queueLength: result.queueLength,
-    //             message: "Your lead will be processed within 5-10 seconds"
-    //         });
+//         // Immediate response - NO DATABASE OPERATIONS HERE!
+//         return res.json({
+//             status: true,
+//             msg: "Lead added to processing queue",
+//             queueLength: result.queueLength,
+//             message: "Your lead will be processed within 5-10 seconds"
+//         });
 
-    //     } catch (err) {
-    //         console.error("Error adding to queue:", err);
-    //         // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
-    //         return res.status(500).json({
-    //             status: false,
-    //             msg: err.message || "Failed to add lead to queue"
-    //         });
-    //     }
-    // });
+//     } catch (err) {
+//         console.error("Error adding to queue:", err);
+//         // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
+//         return res.status(500).json({
+//             status: false,
+//             msg: err.message || "Failed to add lead to queue"
+//         });
+//     }
+// });
 
 // Queue status check endpoint
 
 router.route("/addleaddandcourseapply")
-.post(async (req, res) => {
-    try {
-        console.log("Lead received:", req.body.FirstName);
+    .post(async (req, res) => {
+        try {
+            console.log("Lead received:", req.body.FirstName);
 
-        // Basic validation only
-        let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
+            // Basic validation only
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
 
-        if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
-            return res.status(200).json({
-                status: false,
-                msg: "All fields are required"
-            });
-        }
-        if (!source) {
-            source = 'Digital Lead';
-        }
-        if (MobileNumber) {
-            MobileNumber = MobileNumber.toString();
-
-            console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
-
-            if (MobileNumber.startsWith('+91')) {
-                MobileNumber = MobileNumber.slice(3);
-            } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
-                MobileNumber = MobileNumber.slice(2);
-            }
-
-            if (!/^[0-9]{10}$/.test(MobileNumber)) {
+            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
                 return res.status(200).json({
                     status: false,
-                    msg: "Invalid mobile number format"
+                    msg: "All fields are required"
                 });
             }
-            MobileNumber = parseInt(MobileNumber);
+            if (!source) {
+                source = 'Digital Lead';
+            }
+            if (MobileNumber) {
+                MobileNumber = MobileNumber.toString();
+
+                console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
+
+                if (MobileNumber.startsWith('+91')) {
+                    MobileNumber = MobileNumber.slice(3);
+                } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+                    MobileNumber = MobileNumber.slice(2);
+                }
+
+                if (!/^[0-9]{10}$/.test(MobileNumber)) {
+                    return res.status(200).json({
+                        status: false,
+                        msg: "Invalid mobile number format"
+                    });
+                }
+                MobileNumber = parseInt(MobileNumber);
 
 
-        } else {
-            return res.status(200).json({
-                status: false,
-                msg: "Mobile number is required"
-            });
-        }
+            } else {
+                return res.status(200).json({
+                    status: false,
+                    msg: "Mobile number is required"
+                });
+            }
 
-        let mobile = MobileNumber;
+            let mobile = MobileNumber;
             let name = FirstName;
             let sex = Gender;
             let dob = DateOfBirth;
@@ -427,6 +427,7 @@ router.route("/addleaddandcourseapply")
             }
 
             let selectedCenter = selectedCenterName._id;
+            console.log('selectedCenter:', selectedCenter);
 
             if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
             if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
@@ -435,14 +436,16 @@ router.route("/addleaddandcourseapply")
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
+                console.log('existingCandidate:', existingCandidate);
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
+                console.log('alreadyApplied:', alreadyApplied);
                 if (alreadyApplied) {
-                    return {
-                        status: "already_exists",
+                    return res.json({
+                        status: false,
                         msg: "Candidate already exists and course already applied",
                         data: { existingCandidate, alreadyApplied },
                         mobile: mobile
-                    };
+                    });
                 }
                 if (existingCandidate && !alreadyApplied) {
                     let appliedCourseEntry = await AppliedCourses.create({
@@ -453,12 +456,12 @@ router.route("/addleaddandcourseapply")
 
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
 
-                    return {
+                    return res.json( {
                         status: "updated",
                         msg: "Candidate already exists and course applied successfully",
                         data: { existingCandidate, appliedCourseEntry },
                         mobile: mobile
-                    };
+                    });
                 }
             }
             else {
@@ -501,23 +504,23 @@ router.route("/addleaddandcourseapply")
                 });
             }
 
-        
 
-        // Immediate response - NO DATABASE OPERATIONS HERE!
-        return res.json({
-            status: true,
-            msg: "Lead added successfully"
-        });
 
-    } catch (err) {
-        console.error("Error adding lead:", err);
-        // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
-        return res.status(500).json({
-            status: false,
-            msg: err.message || "Failed to add lead"
-        });
-    }
-});
+            // Immediate response - NO DATABASE OPERATIONS HERE!
+            return res.json({
+                status: true,
+                msg: "Lead added successfully"
+            });
+
+        } catch (err) {
+            console.error("Error adding lead:", err);
+            // req.flash ko remove kar diya kyunki immediate response me ye nahi chahiye
+            return res.status(500).json({
+                status: false,
+                msg: err.message || "Failed to add lead"
+            });
+        }
+    });
 
 router.get("/queue/status", (req, res) => {
     const status = batchProcessor.getStatus();
@@ -582,7 +585,7 @@ router.post("/batch/process-now", (req, res) => {
 router.get("/sourceLeadsData", async (req, res) => {
     try {
         const { startDate, endDate } = req.query
-        
+
         const convertStartDate = new Date(startDate).setHours(0, 0, 0, 0);
         // console.log("convertStartDate", new Date(convertStartDate))
         const convertEndDate = new Date(endDate).setHours(23, 59, 59, 999);
@@ -594,7 +597,7 @@ router.get("/sourceLeadsData", async (req, res) => {
             }
         }
         const aggregationPipeline = [
-            { 
+            {
                 $match: filter  // Apply the date filter
             },
             {
@@ -632,7 +635,7 @@ router.get("/sourceLeadsData", async (req, res) => {
                     leadCount: 1,
                 }
             }
-            
+
         ];
 
         const sourceData = await AppliedCourses.aggregate(aggregationPipeline);
