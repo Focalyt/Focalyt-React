@@ -472,11 +472,9 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		}
 		
 		const statuses = await StatusB2b.find({ college: college._id }).sort({ index: 1 });
-		console.log(`Found ${statuses.length} statuses for college: ${college._id}`);
 
 		// Get total count
 		const totalLeads = await Lead.countDocuments(baseQuery);
-		console.log(`Total leads: ${totalLeads}`);
 
 		// Get count by status
 		const statusCounts = await Promise.all(
@@ -485,7 +483,6 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 					...baseQuery,
 					status: status._id
 				});
-				console.log(`Status: ${status.title}, Count: ${count}`);
 				return {
 					statusId: status._id,
 					statusName: status.title,
@@ -499,7 +496,6 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			...baseQuery,
 			status: null
 		});
-		console.log(`Null status count: ${nullStatusCount}`);
 
 		// Add null status to the results if there are leads without status
 		if (nullStatusCount > 0) {
@@ -576,8 +572,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			]
 		};
 
-		console.log('Search query:', search);
-		console.log('Final query:', JSON.stringify(finalQuery, null, 2));
+	
 
 		// Sorting options
 		const sortOptions = {};
@@ -590,7 +585,7 @@ router.get('/leads', isCollege, async (req, res) => {
 		const totalLeads = await Lead.countDocuments(finalQuery);
 		const totalPages = Math.ceil(totalLeads / limit);
 
-		console.log('Total leads found:', totalLeads);
+
 
 		// Fetch leads based on the query, sorted and paginated
 		const leads = await Lead.find(finalQuery)
@@ -665,6 +660,69 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 	}
 });
 
+//get lead logs by id
+router.get('/leads/:id/logs', isCollege, async (req, res) => {
+	try {
+		console.log(req.params.id, 'req.params.id')
+		const logs = await Lead.aggregate([
+			{
+				$match: {
+					_id: new mongoose.Types.ObjectId(req.params.id),
+				}
+			},{ $project: { logs: 1 } },
+
+			// work per-log
+			{ $unwind: "$logs" },
+		  
+			// join the user for this log
+			{
+			  $lookup: {
+				from: "users",                 // <-- your users collection name
+				localField: "logs.user",
+				foreignField: "_id",
+				as: "u"
+			  }
+			  
+			},
+		  { $unwind: "$u" },
+			{
+			  $set:{
+				"logs.user": "$u.name"
+			  }
+			},
+			{
+			  $group: {
+				_id: "$_id",
+				logs: { $push: "$logs"}
+			  }
+			}
+		])
+			
+
+		if (!logs) {
+			return res.status(404).json({
+				status: false,
+				message: 'No logs found'
+			});
+		}
+
+
+
+		res.json({
+			status: true,
+			data: logs[0],
+			message: 'Lead logs retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting lead:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve lead',
+			error: error.message
+		});
+	}
+});
+
 // Create new lead
 router.post('/add-lead', isCollege, async (req, res) => {
 	try {
@@ -673,6 +731,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			typeOfB2B,
 			businessName,
 			address,
+			city,
+			state,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -711,6 +771,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			typeOfB2B,
 			businessName,
 			address,
+			city,
+			state,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -766,13 +828,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		const { id } = req.params;
 		const { status, subStatus, remarks } = req.body;
 		
-		console.log('Status update request:', {
-			leadId: id,
-			status,
-			subStatus,
-			remarks,
-			userId: req.user._id
-		});
+	
 
 		// Validate required fields
 		if (!status) {
@@ -784,7 +840,6 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Find the lead
 		const lead = await Lead.findById(id);
-		console.log('Lead found:', lead ? lead._id : 'Not found');
 		
 		if (!lead) {
 			return res.status(404).json({
@@ -795,18 +850,13 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Check ownership
 		let teamMembers = await getAllTeamMembers(req.user._id);
-		console.log('Team members:', teamMembers);
-		console.log('Lead ownership:', {
-			leadAddedBy: lead.leadAddedBy,
-			leadOwner: lead.leadOwner
-		});
+	
 		
 		const isOwner = teamMembers.some(member => 
 			lead.leadAddedBy.toString() === member.toString() || 
 			lead.leadOwner.toString() === member.toString()
 		);
 		
-		console.log('Is owner:', isOwner);
 
 		if (!isOwner) {
 			return res.status(403).json({
@@ -827,7 +877,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		if (oldStatus) {
 			const oldStatusDoc = await StatusB2b.findById(oldStatus);
-			oldStatusName = oldStatusDoc ? oldStatusDoc.name : 'Unknown Status';
+			oldStatusName = oldStatusDoc ? oldStatusDoc.title : 'Unknown Status';
 		}
 
 		if (oldSubStatus) {
@@ -843,7 +893,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Get new status names
 		const newStatusDoc = await StatusB2b.findById(status);
-		newStatusName = newStatusDoc ? newStatusDoc.name : 'Unknown Status';
+		newStatusName = newStatusDoc ? newStatusDoc.title : 'Unknown Status';
 
 		if (subStatus) {
 			// Find substatus within the new status
@@ -858,18 +908,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		lead.subStatus = subStatus;
 		lead.updatedBy = req.user._id;
 
-		console.log('Updating lead with:', {
-			status,
-			subStatus,
-			updatedBy: req.user._id
-		});
-
-		console.log('Status Change Details:', {
-			from: `${oldStatusName} (${oldSubStatusName})`,
-			to: `${newStatusName} (${newSubStatusName})`,
-			leadId: id,
-			userId: req.user._id
-		});
+		
 
 		// Add to logs with detailed status change information
 		lead.logs.push({
@@ -880,7 +919,6 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		});
 
 		await lead.save();
-		console.log('Lead updated successfully');
 
 		// Populate the updated lead
 		const updatedLead = await Lead.findById(id)

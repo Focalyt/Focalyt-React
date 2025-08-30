@@ -337,8 +337,13 @@ const B2BSales = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState(null);
+
   const [selectedCounselor, setSelectedCounselor] = useState(null);
   const [counselors, setCounselors] = useState([]);
+
+  // Lead logs state
+  const [leadLogsLoading, setLeadLogsLoading] = useState(false);
+  const [leadLogs, setLeadLogs] = useState([]);
 
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
@@ -418,27 +423,26 @@ const B2BSales = () => {
   const [loading, setLoading] = useState(false);
 
   const businessNameInputRef = useRef(null);
+  const cityInputRef = useRef(null);
+  const stateInputRef = useRef(null);
   const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
   const handleGoogleLogin = async() => {
     try {
       setIsgoogleLoginLoading(true);
-      console.log('🚀 Starting popup login...');
       
       const result = await getGoogleAuthCode({
         scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
         user: userData
       });
 
-      console.log('✅ Login successful:', result);
 
       const refreshToken = await getGoogleRefreshToken({
         code: result,
         user: userData
       });
 
-      console.log('✅ Refresh token successful:', refreshToken.data);
       
       const user = {
         ...userData,
@@ -502,7 +506,6 @@ const B2BSales = () => {
           subStatus: seletectedSubStatus?._id || null,
           remarks: followupFormData.remarks || 'Status updated via B2B panel'
         };
-        console.log('Status data to send:', statusData);
         await updateLeadStatus(selectedProfile._id, statusData);
       }
 
@@ -545,7 +548,6 @@ const B2BSales = () => {
 
         if (response.data.success) {
           alert('✅ Follow-up added to Google Calendar!');
-          console.log('✅ Follow-up added to Google Calendar:', response.data.data);
         } else {
           alert('❌ Failed to add to Google Calendar');
           console.error('❌ Failed to add to Google Calendar:', response.data.message);
@@ -565,22 +567,18 @@ const B2BSales = () => {
   };
 
   const initializeBusinessNameAutocomplete = () => {
-    console.log('Initializing business name autocomplete...');
 
     // Check if Google Maps is available
     if (!window.google || !window.google.maps || !window.google.maps.places) {
-      console.log('Google Maps not available yet');
       return;
     }
 
     // Get input element using ref
     const input = businessNameInputRef.current;
     if (!input) {
-      console.log('Business name input not found');
       return;
     }
 
-    console.log('Business name input found, initializing autocomplete...');
 
     // Remove any existing autocomplete to prevent duplicates
     if (input.autocomplete) {
@@ -593,7 +591,6 @@ const B2BSales = () => {
     });
 
     autocomplete.addListener('place_changed', () => {
-      console.log('Place selected from autocomplete');
       const place = autocomplete.getPlace();
       if (!place || !place.geometry || !place.geometry.location) return;
 
@@ -631,7 +628,91 @@ const B2BSales = () => {
 
     // Store reference to autocomplete
     input.autocomplete = autocomplete;
-    console.log('Business name autocomplete initialized successfully');
+  };
+
+  const initializeCityAutocomplete = () => {
+    // Check if Google Maps is available
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      return;
+    }
+
+    // Get input element using ref
+    const input = cityInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    // Remove any existing autocomplete to prevent duplicates
+    if (input.autocomplete) {
+      window.google.maps.event.clearInstanceListeners(input);
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+      types: ['(cities)'],
+      componentRestrictions: { country: 'in' },
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place) return;
+
+      let city = '';
+      place.address_components?.forEach((component) => {
+        const types = component.types.join(',');
+        if (types.includes("locality")) city = component.long_name;
+        if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+      });
+
+      setLeadFormData(prev => ({
+        ...prev,
+        city: city || place.name || input.value
+      }));
+    });
+
+    // Store reference to autocomplete
+    input.autocomplete = autocomplete;
+  };
+
+  const initializeStateAutocomplete = () => {
+    // Check if Google Maps is available
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      return;
+    }
+
+    // Get input element using ref
+    const input = stateInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    // Remove any existing autocomplete to prevent duplicates
+    if (input.autocomplete) {
+      window.google.maps.event.clearInstanceListeners(input);
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+      types: ['administrative_area_level_1'],
+      componentRestrictions: { country: 'in' },
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place) return;
+
+      let state = '';
+      place.address_components?.forEach((component) => {
+        const types = component.types.join(',');
+        if (types.includes("administrative_area_level_1")) state = component.long_name;
+      });
+
+      setLeadFormData(prev => ({
+        ...prev,
+        state: state || place.name || input.value
+      }));
+    });
+
+    // Store reference to autocomplete
+    input.autocomplete = autocomplete;
   };
 
   // Fetch filter options from backend API on mount
@@ -642,19 +723,15 @@ const B2BSales = () => {
     fetchStatusCounts(); // Fetch status counts
   }, []);
 
-  // Test Google Maps API availability on component mount
-  useEffect(() => {
-    console.log('B2BSales component mounted');
-    console.log('Google Maps API available:', !!(window.google && window.google.maps && window.google.maps.places));
-  }, []);
 
   // Initialize autocomplete when modal is opened
   useEffect(() => {
     if (showAddLeadModal) {
-      console.log('Modal opened, initializing autocomplete...');
       // Small delay to ensure modal is fully rendered and Google Maps is loaded
       const timer = setTimeout(() => {
         initializeBusinessNameAutocomplete();
+        initializeCityAutocomplete();
+        initializeStateAutocomplete();
       }, 300);
 
       return () => clearTimeout(timer);
@@ -673,7 +750,6 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
       if (leadCategoriesRes.data.status) {
-        console.log('leadCategoriesRes.data.data', leadCategoriesRes.data.data)
         setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
           value: cat._id,
           label: cat.name || cat.title
@@ -695,9 +771,7 @@ const B2BSales = () => {
     }
   };
 
-  useEffect(() => {
-    console.log('leadCategoryOptions', leadCategoryOptions)
-  }, [leadCategoryOptions]);
+
 
   // Fetch users for Lead Owner dropdown
   const fetchUsers = async () => {
@@ -712,7 +786,6 @@ const B2BSales = () => {
       });
 
       if (response.data.success) {
-        console.log('response.data.data.users', response.data.data)
         // Update users state with detailed access summary
         setUsers(response.data.data.users.map(user => ({
           _id: user._id,
@@ -729,10 +802,7 @@ const B2BSales = () => {
     }
   };
 
-  // Fetch users on component mount
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+
 
 
 
@@ -781,7 +851,6 @@ const B2BSales = () => {
   const handleLeadInputChange = (e) => {
     const { name, value } = e.target;
 
-    console.log(name, value, 'name, value')
     setLeadFormData(prev => ({
       ...prev,
       [name]: value
@@ -898,19 +967,15 @@ const B2BSales = () => {
 
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
-    console.log('Status card clicked:', statusId);
-    console.log('Previous selectedStatusFilter:', selectedStatusFilter);
+
     setSelectedStatusFilter(statusId);
-    console.log('New selectedStatusFilter will be:', statusId);
     fetchLeads(statusId);
   };
 
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
-    console.log('Total card clicked');
-    console.log('Previous selectedStatusFilter:', selectedStatusFilter);
+
     setSelectedStatusFilter(null);
-    console.log('New selectedStatusFilter will be: null');
     fetchLeads();
   };
 
@@ -933,8 +998,7 @@ const B2BSales = () => {
   };
 
   const applyFilters = () => {
-    console.log('Applying filters:', filters);
-    console.log('Selected status filter:', selectedStatusFilter);
+    
     fetchLeads(selectedStatusFilter);
   };
 
@@ -954,6 +1018,7 @@ const B2BSales = () => {
 
   const fetchLeads = async (statusFilter = null) => {
     try {
+      closePanel();
       setLoadingLeads(true);
       
       // Build query parameters
@@ -982,16 +1047,13 @@ const B2BSales = () => {
         params.endDate = filters.dateRange.end;
       }
       
-      console.log('API Request URL:', `${backendUrl}/college/b2b/leads`);
-      console.log('API Request Params:', params);
-      console.log('API Request Headers:', { 'x-auth': token });
+    
       
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
         params: params
       });
 
-      console.log('Leads response:', response.data.data);
 
       if (response.data.status) {
         setLeads(response.data.data.leads || []);
@@ -1013,7 +1075,6 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('Status counts response:', response.data);
 
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
@@ -1028,13 +1089,8 @@ const B2BSales = () => {
     }
   };
 
-  useEffect(() => {
-    console.log('leads', leads)
-  }, [leads])
 
-  useEffect(() => {
-    console.log('selectedStatusFilter changed to:', selectedStatusFilter)
-  }, [selectedStatusFilter])
+
 
   // Update lead status
   const updateLeadStatus = async (leadId, statusData) => {
@@ -1045,9 +1101,7 @@ const B2BSales = () => {
       const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
       const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
       
-      console.log('Calling update API:', `${backendUrl}/college/b2b/leads/${leadId}/status`);
-      console.log('Status data:', statusData);
-      console.log('Status Change:', `${currentStatus} (${currentSubStatus}) → ${newStatus} (${newSubStatus})`);
+      
       
       const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
         headers: { 'x-auth': token }
@@ -1087,6 +1141,8 @@ const B2BSales = () => {
         typeOfB2B: leadFormData.typeOfB2B,
         businessName: leadFormData.businessName,
         address: leadFormData.address,
+        city: leadFormData.city,
+        state: leadFormData.state,
         concernPersonName: leadFormData.concernPersonName,
         designation: leadFormData.designation,
         email: leadFormData.email,
@@ -1108,7 +1164,6 @@ const B2BSales = () => {
         };
       }
 
-      console.log('Submitting lead data:', leadData);
 
       // Send data to backend API
       const response = await axios.post(`${backendUrl}/college/b2b/add-lead`, leadData, {
@@ -1133,11 +1188,15 @@ const B2BSales = () => {
           businessName: '',
           businessAddress: '',
           concernPersonName: '',
+          address: '',
+          city: '',
+          state: '',
           designation: '',
           email: '',
           mobile: '',
           whatsapp: '',
-          leadOwner: ''
+          leadOwner: '',
+          remark: ''
         });
         setFormErrors({});
         setExtractedNumbers([]);
@@ -1171,11 +1230,15 @@ const B2BSales = () => {
       businessName: '',
       businessAddress: '',
       concernPersonName: '',
+      address: '',
+      city: '',
+      state: '',
       designation: '',
       email: '',
       mobile: '',
       whatsapp: '',
-      leadOwner: ''
+      leadOwner: '',
+      remark: ''
     });
     setFormErrors({});
     setExtractedNumbers([]);
@@ -1185,7 +1248,6 @@ const B2BSales = () => {
 
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
-    console.log('handleOpenLeadModal')
     setShowAddLeadModal(true);
   };
 
@@ -1339,7 +1401,6 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -1372,7 +1433,6 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -1397,7 +1457,6 @@ const B2BSales = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
     setSelectedProfile(null)
     setShowPanel('')
     setSelectedStatus(null)
@@ -1467,7 +1526,6 @@ const B2BSales = () => {
 
 
   const openRefferPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
 
     if (profile) {
       setSelectedProfile(profile);
@@ -1503,7 +1561,6 @@ const B2BSales = () => {
           'x-auth': token,
         },
       });
-      console.log(userData, 'userData');
       let concernPersons = [];
       await response.data.concernPerson.map(person => {
         if (person._id._id.toString() !== userData._id.toString()) {
@@ -1517,12 +1574,10 @@ const B2BSales = () => {
 
 
   const handleConcernPersonChange = (e) => {
-    console.log(e.target.value, 'e.target.value');
     setSelectedConcernPerson(e.target.value);
   }
 
   const handleReferLead = async () => {
-    console.log(selectedConcernPerson, 'selectedConcernPerson');
     try {
       const response = await axios.post(`${backendUrl}/college/refer-leads`, {
         counselorId: selectedConcernPerson,
@@ -1567,9 +1622,6 @@ const B2BSales = () => {
     }
   };
 
-  useEffect(() => {
-    console.log('selectedProfile', selectedProfile);
-  }, [selectedProfile]);
 
   const openProfileEditPanel = async (profile = null) => {
     if (profile) {
@@ -2095,9 +2147,41 @@ const B2BSales = () => {
       </div>
     ) : null;
   };
+
+  const fetchLeadLogs = async (leadId) => {
+    try {
+      setLeadLogsLoading(true);
+      const response = await axios.get(`${backendUrl}/college/b2b/leads/${leadId}/logs`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data.status) {
+        console.log(response.data.data, 'response.data.data')
+        setLeadLogs(response.data.data);
+      }
+    } catch (error) {
+      console.log(error, 'error');
+    } finally {
+      setLeadLogsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (showPanel === 'leadHistory') {
+      fetchLeadLogs(selectedProfile._id);
+    }
+  }, [showPanel]);
+
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderLeadHistoryPanel = () => {
     const panelContent = (
+      <>
+      {leadLogsLoading ? (
+        <div className="d-flex justify-content-center align-items-center h-100">
+          <div className="text-center">
+            <i className="fas fa-spinner fa-spin"></i>
+          </div>
+        </div>
+      ) : (
       <div className="card border-0 shadow-sm h-100">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
@@ -2119,15 +2203,15 @@ const B2BSales = () => {
               minHeight: '200px'
             }}
           >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+            {leadLogs && leadLogs.logs && leadLogs.logs.length > 0 ? (
               <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
+                {leadLogs.logs.map((log, index) => (
                   <div key={index} className="timeline-item mb-4">
                     <div className="timeline-marker">
                       <div className="timeline-marker-icon">
                         <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
+                      {index !== leadLogs.logs.length - 1 && (
                         <div className="timeline-line"></div>
                       )}
                     </div>
@@ -2147,7 +2231,7 @@ const B2BSales = () => {
                             </span>
                             <small className="text-muted">
                               <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
+                              Modified By: {log.user || 'Unknown User'}
                             </small>
                           </div>
 
@@ -2204,8 +2288,10 @@ const B2BSales = () => {
               </button>
             </div>
           </div>
+          </div>
         </div>
-      </div>
+      )}
+      </>
     );
 
     if (isMobile) {
@@ -2268,7 +2354,7 @@ const B2BSales = () => {
     border: 1px solid #f0f0f0;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .lead-card:hover {
@@ -2280,7 +2366,7 @@ const B2BSales = () => {
   .lead-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 1.5rem;
+    padding: 1rem;
     position: relative;
     overflow: hidden;
   }
@@ -2303,25 +2389,91 @@ const B2BSales = () => {
   }
 
   .lead-business-name {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.25rem 0;
     color: white;
-    line-height: 1.3;
+    line-height: 1.2;
   }
 
   .lead-contact-person {
-    font-size: 0.9rem;
-    margin: 0;
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem 0;
     opacity: 0.9;
     display: flex;
     align-items: center;
   }
 
+  .lead-contact-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .lead-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    opacity: 0.9;
+    max-width: 200px;
+  }
+
+  .lead-contact-item i {
+    font-size: 0.65rem;
+    width: 10px;
+    flex-shrink: 0;
+  }
+
+  .lead-contact-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Compact Additional Info Section */
+  .compact-info-section {
+    margin-top: 0.5rem;
+  }
+
+  .compact-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .compact-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+  }
+
+  .compact-info-item i {
+    font-size: 0.7rem;
+    width: 12px;
+    flex-shrink: 0;
+  }
+
+  .compact-info-label {
+    font-weight: 600;
+    color: #6c757d;
+    min-width: 50px;
+    flex-shrink: 0;
+  }
+
+  .compact-info-value {
+    color: #212529;
+    flex: 1;
+    word-break: break-word;
+  }
+
   .lead-badges {
     position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
+    top: 1rem;
+    right: 1rem;
     display: flex;
     gap: 0.5rem;
     z-index: 2;
@@ -2350,14 +2502,11 @@ const B2BSales = () => {
 
   /* Content Section */
   .lead-content {
-    padding: 1.5rem;
+    padding: 0.75rem;
   }
 
   .contact-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    display: none; /* Hide the large contact grid since we're moving info to header */
   }
 
   .contact-item {
@@ -2423,7 +2572,7 @@ const B2BSales = () => {
     color: #6c757d;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.1rem;
   }
 
   .contact-value {
@@ -2459,7 +2608,7 @@ const B2BSales = () => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 0.5rem 0.75rem;
     background: #f8f9fa;
     border-top: 1px solid #e9ecef;
   }
@@ -2552,7 +2701,7 @@ const B2BSales = () => {
   }
 
   .status-count-card .card-body {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 
   .status-count-card h4 {
@@ -2697,6 +2846,11 @@ const B2BSales = () => {
   .text-info {
     color: #17a2b8 !important;
   }
+
+  /* Override card margin-bottom to reduce spacing */
+  .card {
+    margin-bottom: 0.5rem !important;
+  }
 `}</style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass} style={{
@@ -2728,13 +2882,13 @@ const B2BSales = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '10px' }}
+            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '5px' }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">B2B Cycle</h4>
+                      <h5 className="fw-bold text-dark mb-0 me-3" style={{ fontSize: '1.1rem' }}>B2B Cycle</h5>
                       <nav aria-label="breadcrumb">
                         <ol className="breadcrumb mb-0 small">
                           <li className="breadcrumb-item">
@@ -2853,13 +3007,13 @@ const B2BSales = () => {
 
 
                   {/* Filter Buttons Row */}
-                  <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                  <div className="col-12 mt-1">
+                    <div className="d-flex flex-wrap gap-1 align-items-center">
                       {/* Status Count Cards */}
                       {loadingStatusCounts ? (
                         <div className="d-flex gap-2">
                           {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '80px' }}>
+                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
                               <div className="card-body d-flex align-items-center justify-content-center">
                                 <div className="spinner-border spinner-border-sm text-primary" role="status">
                                   <span className="visually-hidden">Loading...</span>
@@ -2874,20 +3028,20 @@ const B2BSales = () => {
                           <div 
                             className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
                             style={{ 
-                              minWidth: '140px', 
-                              height: '60px',
+                              minWidth: '110px', 
+                              height: '45px',
                               cursor: 'pointer',
                               border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
                             }}
                             onClick={handleTotalCardClick}
                             title="Click to view all leads"
                           >
-                            <div className="card-body p-2 text-center d-flex align-items-center justify-content-center">
+                            <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                               <div className="d-flex align-items-center">
-                                <i className="fas fa-chart-line me-2" style={{ color: '#007bff', fontSize: '16px' }}></i>
+                                <i className="fas fa-chart-line me-1" style={{ color: '#007bff', fontSize: '12px' }}></i>
                                 <div>
-                                  <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '16px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
-                                  <small style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
+                                  <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
+                                  <small style={{ color: '#ffffff', fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
                                 </div>
                               </div>
                             </div>
@@ -2896,14 +3050,13 @@ const B2BSales = () => {
                           {/* Status Count Cards */}
                           {statusCounts.map((status, index) => {
                             const isSelected = selectedStatusFilter === status.statusId;
-                            console.log(`Status ${status.statusName}: isSelected = ${isSelected}, statusId = ${status.statusId}, selectedStatusFilter = ${selectedStatusFilter}`);
                             return (
                             <div 
                               key={status.statusId || index} 
                               className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
                               style={{ 
-                                minWidth: '140px', 
-                                height: '60px',
+                                minWidth: '110px', 
+                                height: '45px',
                                 cursor: 'pointer',
                                 border: isSelected ? '2px solid #007bff' : '1px solid transparent',
                                 backgroundColor: isSelected ? '#f8f9ff' : 'white'
@@ -2911,12 +3064,12 @@ const B2BSales = () => {
                               onClick={() => handleStatusCardClick(status.statusId)}
                               title={`Click to view ${status.statusName} leads`}
                             >
-                              <div className="card-body p-2 text-center d-flex align-items-center justify-content-center">
+                              <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                                 <div className="d-flex align-items-center">
-                                  <i className="fas fa-tag me-2" style={{ color: '#28a745', fontSize: '16px' }}></i>
+                                  <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
                                   <div>
-                                    <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '14px' }}>{status.statusName}</h6>
-                                    <small style={{ color: '#6c757d', fontSize: '12px' }}>{status.count} leads</small>
+                                    <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
+                                    <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
                                   </div>
                                 </div>
                               </div>
@@ -2939,7 +3092,7 @@ const B2BSales = () => {
 
           {/* Main Content */}
           <div className="content-body marginTopMobile" style={{
-            marginTop: `${navHeight + 10}px`,
+            marginTop: `${navHeight + 5}px`,
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
@@ -2963,7 +3116,7 @@ const B2BSales = () => {
                   </p>
                 </div>
               ) : (
-                <div className="row g-3">
+                <div className="row g-2">
                   {leads.map((lead, leadIndex) => (
                     <div key={lead._id || leadIndex} className="col-12">
                       <div className="lead-card">
@@ -2977,6 +3130,34 @@ const B2BSales = () => {
                               <i className="fas fa-user me-2"></i>
                               {lead.concernPersonName || 'Contact Person Not Available'}
                             </p>
+                            
+                            {/* Compact Contact Info */}
+                            <div className="lead-contact-info">
+                              {lead.email && (
+                                <div className="lead-contact-item">
+                                  <i className="fas fa-envelope"></i>
+                                  <span>{lead.email}</span>
+                                </div>
+                              )}
+                              {lead.designation && (
+                                <div className="lead-contact-item">
+                                  <i className="fas fa-id-badge"></i>
+                                  <span>{lead.designation}</span>
+                                </div>
+                              )}
+                              {lead.mobile && (
+                                <div className="lead-contact-item">
+                                  <i className="fas fa-phone"></i>
+                                  <span>{lead.mobile}</span>
+                                </div>
+                              )}
+                              {lead.whatsapp && (
+                                <div className="lead-contact-item">
+                                  <i className="fab fa-whatsapp"></i>
+                                  <span>{lead.whatsapp}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="lead-badges">
                             {lead.leadCategory?.name && (
@@ -2995,7 +3176,7 @@ const B2BSales = () => {
                         {/* Card Content */}
                         <div className="lead-content">
                           {/* Status Section */}
-                          <div className="status-section mb-3">
+                          <div className="status-section mb-2">
                             <div className="d-flex align-items-center justify-content-between">
                               <div className="d-flex align-items-center">
                                 <i className="fas fa-tag text-primary me-2"></i>
@@ -3007,7 +3188,6 @@ const B2BSales = () => {
                                   <span className="ms-2 badge bg-secondary">
                                     {(() => {
                                       const substatus = lead.status?.substatuses?.find(sub => sub._id === lead.subStatus);
-                                      console.log('Lead substatus:', lead.subStatus, 'Found substatus:', substatus);
                                       return substatus?.title || 'No Sub-Status';
                                     })()}
                                   </span>
@@ -3024,133 +3204,38 @@ const B2BSales = () => {
                             </div>
                           </div>
 
-                          {/* Contact Info Grid */}
-                          <div className="contact-grid">
-                            <div className="contact-item">
-                              <div className="contact-icon">
-                                <i className="fas fa-envelope"></i>
-                              </div>
-                              <div className="contact-details">
-                                <span className="contact-label">Email</span>
-                                <span className="contact-value">
-                                  {lead.email || 'Not provided'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="contact-item">
-                              <div className="contact-icon">
-                                <i className="fas fa-id-badge"></i>
-                              </div>
-                              <div className="contact-details">
-                                <span className="contact-label">Designation</span>
-                                <span className="contact-value">
-                                  {lead.designation || 'Not specified'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="contact-item">
-                              <div className="contact-icon phone">
-                                <i className="fas fa-phone"></i>
-                              </div>
-                              <div className="contact-details">
-                                <span className="contact-label">Mobile</span>
-                                <span className="contact-value">
-                                  {lead.mobile ? (
-                                    <a href={`tel:${lead.mobile}`} className="contact-link">
-                                      {lead.mobile}
-                                    </a>
-                                  ) : 'Not provided'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="contact-item">
-                              <div className="contact-icon whatsapp">
-                                <i className="fab fa-whatsapp"></i>
-                              </div>
-                              <div className="contact-details">
-                                <span className="contact-label">WhatsApp</span>
-                                <span className="contact-value">
-                                  {lead.whatsapp ? (
-                                    <a href={`https://wa.me/${lead.whatsapp}`} target="_blank" rel="noopener noreferrer" className="contact-link">
-                                      {lead.whatsapp}
-                                    </a>
-                                  ) : 'Not provided'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Address Section */}
-                          {lead.address && (
-                            <div className="address-section">
-                              <div className="contact-item">
-                                <div className="contact-icon address">
-                                  <i className="fas fa-map-marker-alt"></i>
+                          {/* Compact Additional Info */}
+                          <div className="compact-info-section">
+                            <div className="compact-info-grid">
+                              {lead.address && (
+                                <div className="compact-info-item">
+                                  <i className="fas fa-map-marker-alt text-danger"></i>
+                                  <span className="compact-info-label">Address:</span>
+                                  <span className="compact-info-value">{lead.address}</span>
                                 </div>
-                                <div className="contact-details">
-                                  <span className="contact-label">Address</span>
-                                  <span className="contact-value address-text">
-                                    {lead.address}
-                                  </span>
+                              )}
+                              {lead.leadOwner?.name && (
+                                <div className="compact-info-item">
+                                  <i className="fas fa-user-tie text-warning"></i>
+                                  <span className="compact-info-label">Owner:</span>
+                                  <span className="compact-info-value">{lead.leadOwner.name}</span>
                                 </div>
-                              </div>
+                              )}
+                              {lead.leadAddedBy?.name && (
+                                <div className="compact-info-item">
+                                  <i className="fas fa-user-plus text-info"></i>
+                                  <span className="compact-info-label">Added:</span>
+                                  <span className="compact-info-value">{lead.leadAddedBy.name}</span>
+                                </div>
+                              )}
+                              {lead.remark && (
+                                <div className="compact-info-item">
+                                  <i className="fas fa-comment text-success"></i>
+                                  <span className="compact-info-label">Remarks:</span>
+                                  <span className="compact-info-value">{lead.remark}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-
-                          {/* Lead Owner Section */}
-                          {lead.leadOwner?.name && (
-                            <div className="owner-section">
-                              <div className="contact-item">
-                                <div className="contact-icon owner">
-                                  <i className="fas fa-user-tie"></i>
-                                </div>
-                                <div className="contact-details">
-                                  <span className="contact-label">Lead Owner</span>
-                                  <span className="contact-value">
-                                    {lead.leadOwner.name}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className='d-flex gap-4'>
-
-                            {/* Lead Added By Section */}
-                            {lead.leadAddedBy?.name && (
-                              <div className="owner-section">
-                                <div className="contact-item">
-                                  <div className="contact-icon added-by">
-                                    <i className="fas fa-user-plus"></i>
-                                  </div>
-                                  <div className="contact-details">
-                                    <span className="contact-label">Added By</span>
-                                    <span className="contact-value">
-                                      {lead.leadAddedBy.name}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {lead.remark && (
-                              <div className="owner-section">
-                                <div className="contact-item">
-                                  <div className="contact-icon added-by">
-                                    <i className="fas fa-comment"></i>
-                                  </div>
-                                  <div className="contact-details">
-                                    <span className="contact-label">Remarks</span>
-                                    <span className="contact-value">
-                                      {lead.remark}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
 
@@ -3206,7 +3291,7 @@ const B2BSales = () => {
               )}
 
               {/* Pagination */}
-              <nav aria-label="Page navigation" className="mt-4">
+              <nav aria-label="Page navigation" className="mt-2">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <small className="text-muted">
                     Page {currentPage} of {totalPages} ({leads.length} results)
@@ -3545,7 +3630,6 @@ const B2BSales = () => {
                         Business Address
                       </label>
                       <input
-
                         type="text"
                         className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
                         name="address"
@@ -3560,6 +3644,41 @@ const B2BSales = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Manual Location Fields */}
+                    <div className="col-md-4">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-city text-primary me-1"></i>
+                        City
+                      </label>
+                      <input
+                        ref={cityInputRef}
+                        type="text"
+                        className="form-control"
+                        name="city"
+                        value={leadFormData.city}
+                        onChange={handleLeadInputChange}
+                        placeholder="Start typing city name..."
+                      />
+                    </div>
+
+                    <div className="col-md-4">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-map text-primary me-1"></i>
+                        State
+                      </label>
+                      <input
+                        ref={stateInputRef}
+                        type="text"
+                        className="form-control"
+                        name="state"
+                        value={leadFormData.state}
+                        onChange={handleLeadInputChange}
+                        placeholder="Start typing state name..."
+                      />
+                    </div>
+
+
 
                     {/* Concern Person Name */}
                     <div className="col-md-6">
