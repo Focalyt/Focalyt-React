@@ -790,7 +790,7 @@ const LeadAnalyticsDashboard = () => {
 
       });
       const response = await axios.get(
-        `${backendUrl}/college/candidate/testverification?${queryParams}`,
+        `${backendUrl}/college/candidate/preVerifieedCount?${queryParams}`,
         { headers: { 'x-auth': token } }
       );
       // const response = await axios.get(
@@ -860,16 +860,16 @@ const LeadAnalyticsDashboard = () => {
     }
   };
 
-  const fetchStudentList = async () =>{
-    try{
-      const response = await axios.get(`${backendUrl}/college/student/list`,{
-        headers:{
-          'x-auth':token
+  const fetchStudentList = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/student/list`, {
+        headers: {
+          'x-auth': token
         }
       })
     }
-    catch(err){
-      
+    catch (err) {
+
     }
   }
 
@@ -3111,31 +3111,120 @@ const LeadAnalyticsDashboard = () => {
           </div>
 
           <div className="container-fluid">
-            <div className="row">
-              <div className="col-12">
-                <h2 className="mb-4">Pre-Verification Dashboard</h2>
-              </div>
-            </div>
 
             {/* Stats Cards */}
-            <div className="row mb-4">
-              <div className="col-md-4">
-                <div className="card bg-primary text-white">
-                  <div className="card-body">
-                    <h5 className="card-title">Today's Pre-Verifications</h5>
-                    <h2 className="card-text">{loading ? '...' : stats.verifiedCount}</h2>
+            <div className="row mb-4 ">
+
+
+              <div className="col-6 border-right">
+
+                <div className="row">
+                  <div className="col-12">
+                    <h2 className="mb-4">Pre-Verification Dashboard</h2>
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="card bg-primary text-white">
+                      <div className="card-body">
+                        <h5 className="card-title">Total Pre Verified</h5>
+                        <h2 className="card-text">{loading ? '...' : stats.verifiedCount}</h2>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="card bg-success text-white">
+                      <div className="card-body">
+                        <h5 className="card-title">Total Pre Unverified</h5>
+                        <h2 className="card-text">{loading ? '...' : stats.unverifiedCount}</h2>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-10">
+                    <div className="row justify-content-center">
+                      <div className="col-md-12">
+                        <div className="card">
+                          <div className="card-body">
+                            <h5 className="card-title">Verified vs Unverified</h5>
+                            {loading ? (
+                              <div className="text-center py-4">
+                                <div className="spinner-border text-primary" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                              </div>
+                            ) : stats.verifiedCount > 0 ? (
+                              <PieChart width={300} height={300}>
+                                <Pie
+                                  data={[
+                                    { name: 'Verified', value: stats.verifiedCount ? stats.verifiedCount : 0 },
+                                    { name: 'Unverified', value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
+                                  ]}
+                                  cx={150}
+                                  cy={150}
+                                  outerRadius={80}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  <Cell fill="#ff6384" />
+                                  <Cell fill="#36a2eb" />
+                                </Pie>
+                                <Tooltip />
+                              </PieChart>
+                            ) : (
+                              <div className="text-center py-4 text-muted">
+                                No data available
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="col-md-4">
-                <div className="card bg-success text-white">
-                  <div className="card-body">
-                    <h5 className="card-title">Total Pre-Verifications</h5>
-                    <h2 className="card-text">{loading ? '...' : stats.totalCount}</h2>
+              {/* <div className="col-6">
+                <div className="row justify-content-center">
+                  <div className="col-md-12">
+                    <div className="card">
+                      <div className="card-body">
+                        <h5 className="card-title">Verified vs Unverified</h5>
+                        {loading ? (
+                          <div className="text-center py-4">
+                            <div className="spinner-border text-primary" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                          </div>
+                        ) : stats.verifiedCount > 0 ? (
+                          <PieChart width={300} height={300}>
+                            <Pie
+                              data={[
+                                { name: 'Verified', value: stats.verifiedCount ? stats.verifiedCount : 0 },
+                                { name: 'Unverified', value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
+                              ]}
+                              cx={150}
+                              cy={150}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              <Cell fill="#ff6384" />
+                              <Cell fill="#36a2eb" />
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        ) : (
+                          <div className="text-center py-4 text-muted">
+                            No data available
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="col-md-4">
+              </div> */}
+
+              {/* <div className="col-md-4">
                 <div className="card bg-info text-white">
                   <div className="card-body">
                     <h5 className="card-title">Completion Rate</h5>
@@ -3144,307 +3233,244 @@ const LeadAnalyticsDashboard = () => {
                     </h2>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Date Filter */}
-
-            {/* Charts */}
-            <div className="row justify-content-center">
-              {/* <div className="col-md-8">
-                <div className="card">
-                  <div className="card-body">
-                    <h5 className="card-title">Weekly Pre-Verification Trend</h5>
-                    {loading ? (
-                      <div className="text-center py-4">
-                        <div className="spinner-border text-primary" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                      </div>
-                    ) : weeklyStats.length > 0 ? (
-                      <BarChart width={600} height={300} data={weeklyStats}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="week" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#36a2eb" />
-                      </BarChart>
-                    ) : (
-                      <div className="text-center py-4 text-muted">
-                        No data available for weekly trend
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div> */}
-              <div className="col-md-4">
-                <div className="card">
-                  <div className="card-body">
-                    <h5 className="card-title">verified vs unverified</h5>
-                    {loading ? (
-                      <div className="text-center py-4">
-                        <div className="spinner-border text-primary" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                      </div>
-                    ) : stats.totalCount > 0 ? (
-                      <PieChart width={300} height={300}>
-                        <Pie
-                          data={[
-                            { name: 'Verified', value: stats.verifiedCount },
-                            { name: 'Unverified', value: stats.unverifiedCount },
-                          ]}
-                          cx={150}
-                          cy={150}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          <Cell fill="#ff6384" />
-                          <Cell fill="#36a2eb" />
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    ) : (
-                      <div className="text-center py-4 text-muted">
-                        No data available
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
 
-          </div>
-
-          {/* Enhanced Lead Sources Overview */}
-          <div className="card shadow-sm mb-4">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
-                  <Users className="text-primary" size={20} />
-                  Lead Sources Overview
-                </h2>
-
-              </div>
-
-              {/* Enhanced Lead Sources Summary Cards */}
-              <div className="row g-3 mb-4">
-                {leadData.loading && (
-                  <div className="col-12 text-center">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="mt-2 text-muted">Loading lead data...</p>
-                  </div>
-                )}
-
-                {leadData.error && (
+              <div className="col-md-6">
+                <div className="row">
                   <div className="col-12">
-                    <div className="alert alert-danger" role="alert">
-                      <i className="fas fa-exclamation-triangle me-2"></i>
-                      Error loading lead data: {leadData.error}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    <div className="card shadow-sm mb-4">
+                      <div className="card-body">
+                        <div className="d-flex justify-content-between align-items-center mb-4">
+                          <h2 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
+                            <Users className="text-primary" size={20} />
+                            Lead Sources Overview
+                          </h2>
 
-              {/* Detailed Lead Sources Table */}
-              <div className="table-responsive">
-                <table className="table table-hover align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Source Name</th>
-                      <th>Total Leads</th>
+                        </div>
 
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leadData.length > 0 ? (
-                      leadData.map((source, index) => {
-                        return (
-                          <tr key={index}>
-                            <td>{source?.registeredBy?.name || 'Self registered'}</td>
-                            <td>{source?.leadCount || 0}</td>
-                          </tr>
-                        )
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="text-center text-muted">
-                          <i className="fas fa-inbox me-2"></i>
-                          No lead sources data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Lead Source Performance Charts */}
-              <div className="row mt-4">
-                <div className="col-md-8">
-                  <div className="card border-0 bg-light">
-                    <div className="card-body">
-                      <h6 className="card-title mb-3">Lead Source Performance Trend</h6>
-                      {leadData.loading ? (
-                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center">
-                          <div className="text-center">
-                            <div className="spinner-border text-primary mb-2" role="status"></div>
-                            <p className="mb-0 text-muted">Loading chart data...</p>
-                          </div>
-                        </div>
-                      ) : leadData.error ? (
-                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-danger">
-                          <div className="text-center">
-                            <i className="fas fa-exclamation-triangle mb-2" style={{ fontSize: '2rem' }}></i>
-                            <p className="mb-0">Error loading chart data</p>
-                            <small>{leadData.error}</small>
-                          </div>
-                        </div>
-                      ) : leadData.leadStats?.monthlyTrend?.length > 0 ? (
-                        <div style={{ height: '250px' }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={leadData.leadStats.monthlyTrend.map(item => ({
-                              month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
-                              [item._id.source]: item.count
-                            }))}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="month" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend />
-                              <Line
-                                type="monotone"
-                                dataKey="website"
-                                stroke="#007bff"
-                                strokeWidth={2}
-                                name="Website"
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="facebook"
-                                stroke="#28a745"
-                                strokeWidth={2}
-                                name="Facebook"
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="google"
-                                stroke="#ffc107"
-                                strokeWidth={2}
-                                name="Google"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      ) : (
-                        <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-muted">
-                          <div className="text-center">
-                            <i className="fas fa-chart-line mb-2" style={{ fontSize: '2rem' }}></i>
-                            <p className="mb-0">No trend data available</p>
-                            <small>Monthly lead generation trends will appear here</small>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="card border-0 bg-light">
-                    <div className="card-body">
-                      <h6 className="card-title mb-3">Source Distribution</h6>
-                      <div className="d-flex flex-column gap-3">
-                        {leadData.loading ? (
-                          <div className="text-center">
-                            <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
-                            <small className="text-muted">Loading...</small>
-                          </div>
-                        ) : leadData.error ? (
-                          <div className="text-center text-danger">
-                            <i className="fas fa-exclamation-triangle"></i>
-                            <small>Error loading data</small>
-                          </div>
-                        ) : leadData.sourceLeads?.summary ? (
-                          <>
-                            <div>
-                              <div className="d-flex justify-content-between align-items-center mb-1">
-                                <span className="small fw-semibold">Portal Leads</span>
-                                <span className="badge bg-primary">
-                                  {leadData.sourceLeads.summary.totalLeads > 0
-                                    ? ((leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
-                                    : 0}%
-                                </span>
+                        {/* Enhanced Lead Sources Summary Cards */}
+                        <div className="row g-3 mb-4">
+                          {leadData.loading && (
+                            <div className="col-12 text-center">
+                              <div className="spinner-border text-primary" role="status">
+                                <span className="visually-hidden">Loading...</span>
                               </div>
-                              <div className="progress" style={{ height: '10px' }}>
-                                <div
-                                  className="progress-bar bg-primary"
-                                  style={{
-                                    width: `${leadData.sourceLeads.summary.totalLeads > 0
-                                      ? (leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100
-                                      : 0}%`
-                                  }}
-                                ></div>
+                              <p className="mt-2 text-muted">Loading lead data...</p>
+                            </div>
+                          )}
+
+                          {leadData.error && (
+                            <div className="col-12">
+                              <div className="alert alert-danger" role="alert">
+                                <i className="fas fa-exclamation-triangle me-2"></i>
+                                Error loading lead data: {leadData.error}
                               </div>
                             </div>
+                          )}
+                        </div>
 
-                            <div>
-                              <div className="d-flex justify-content-between align-items-center mb-1">
-                                <span className="small fw-semibold">Third Party</span>
-                                <span className="badge bg-success">
-                                  {leadData.sourceLeads.summary.totalLeads > 0
-                                    ? ((leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
-                                    : 0}%
-                                </span>
-                              </div>
-                              <div className="progress" style={{ height: '10px' }}>
-                                <div
-                                  className="progress-bar bg-success"
-                                  style={{
-                                    width: `${leadData.sourceLeads.summary.totalLeads > 0
-                                      ? (leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100
-                                      : 0}%`
-                                  }}
-                                ></div>
+                        {/* Detailed Lead Sources Table */}
+                        <div className="table-responsive">
+                          <table className="table table-hover align-middle">
+                            <thead className="table-light">
+                              <tr>
+                                <th>Source Name</th>
+                                <th>Total Leads</th>
+
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {leadData.length > 0 ? (
+                                leadData.map((source, index) => {
+                                  return (
+                                    <tr key={index}>
+                                      <td>{source?.registeredBy?.name || 'Self registered'}</td>
+                                      <td>{source?.leadCount || 0}</td>
+                                    </tr>
+                                  )
+                                })
+                              ) : (
+                                <tr>
+                                  <td colSpan="6" className="text-center text-muted">
+                                    <i className="fas fa-inbox me-2"></i>
+                                    No lead sources data available
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Lead Source Performance Charts */}
+                        <div className="row mt-4">
+                          <div className="col-md-8">
+                            <div className="card border-0 bg-light">
+                              <div className="card-body">
+                                <h6 className="card-title mb-3">Lead Source Performance Trend</h6>
+                                {leadData.loading ? (
+                                  <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center">
+                                    <div className="text-center">
+                                      <div className="spinner-border text-primary mb-2" role="status"></div>
+                                      <p className="mb-0 text-muted">Loading chart data...</p>
+                                    </div>
+                                  </div>
+                                ) : leadData.error ? (
+                                  <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-danger">
+                                    <div className="text-center">
+                                      <i className="fas fa-exclamation-triangle mb-2" style={{ fontSize: '2rem' }}></i>
+                                      <p className="mb-0">Error loading chart data</p>
+                                      <small>{leadData.error}</small>
+                                    </div>
+                                  </div>
+                                ) : leadData.leadStats?.monthlyTrend?.length > 0 ? (
+                                  <div style={{ height: '250px' }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <LineChart data={leadData.leadStats.monthlyTrend.map(item => ({
+                                        month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
+                                        [item._id.source]: item.count
+                                      }))}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="month" />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line
+                                          type="monotone"
+                                          dataKey="website"
+                                          stroke="#007bff"
+                                          strokeWidth={2}
+                                          name="Website"
+                                        />
+                                        <Line
+                                          type="monotone"
+                                          dataKey="facebook"
+                                          stroke="#28a745"
+                                          strokeWidth={2}
+                                          name="Facebook"
+                                        />
+                                        <Line
+                                          type="monotone"
+                                          dataKey="google"
+                                          stroke="#ffc107"
+                                          strokeWidth={2}
+                                          name="Google"
+                                        />
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                ) : (
+                                  <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center text-muted">
+                                    <div className="text-center">
+                                      <i className="fas fa-chart-line mb-2" style={{ fontSize: '2rem' }}></i>
+                                      <p className="mb-0">No trend data available</p>
+                                      <small>Monthly lead generation trends will appear here</small>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="card border-0 bg-light">
+                              <div className="card-body">
+                                <h6 className="card-title mb-3">Source Distribution</h6>
+                                <div className="d-flex flex-column gap-3">
+                                  {leadData.loading ? (
+                                    <div className="text-center">
+                                      <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                      <small className="text-muted">Loading...</small>
+                                    </div>
+                                  ) : leadData.error ? (
+                                    <div className="text-center text-danger">
+                                      <i className="fas fa-exclamation-triangle"></i>
+                                      <small>Error loading data</small>
+                                    </div>
+                                  ) : leadData.sourceLeads?.summary ? (
+                                    <>
+                                      <div>
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <span className="small fw-semibold">Portal Leads</span>
+                                          <span className="badge bg-primary">
+                                            {leadData.sourceLeads.summary.totalLeads > 0
+                                              ? ((leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
+                                              : 0}%
+                                          </span>
+                                        </div>
+                                        <div className="progress" style={{ height: '10px' }}>
+                                          <div
+                                            className="progress-bar bg-primary"
+                                            style={{
+                                              width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                                ? (leadData.sourceLeads.summary.portalLeads / leadData.sourceLeads.summary.totalLeads) * 100
+                                                : 0}%`
+                                            }}
+                                          ></div>
+                                        </div>
+                                      </div>
 
-                            {/* Top Sources Breakdown */}
-                            {leadData.leadStats?.topSources?.slice(0, 3).map((source, index) => (
-                              <div key={index}>
-                                <div className="d-flex justify-content-between align-items-center mb-1">
-                                  <span className="small fw-semibold text-capitalize">
-                                    {source._id ? source._id.replace('_', ' ') : 'Unknown Source'}
-                                  </span>
-                                  <span className="badge bg-secondary">
-                                    {source.count}
-                                  </span>
-                                </div>
-                                <div className="progress" style={{ height: '8px' }}>
-                                  <div
-                                    className="progress-bar bg-secondary"
-                                    style={{
-                                      width: `${leadData.sourceLeads.summary.totalLeads > 0
-                                        ? (source.count / leadData.sourceLeads.summary.totalLeads) * 100
-                                        : 0}%`
-                                    }}
-                                  ></div>
+                                      <div>
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                          <span className="small fw-semibold">Third Party</span>
+                                          <span className="badge bg-success">
+                                            {leadData.sourceLeads.summary.totalLeads > 0
+                                              ? ((leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100).toFixed(1)
+                                              : 0}%
+                                          </span>
+                                        </div>
+                                        <div className="progress" style={{ height: '10px' }}>
+                                          <div
+                                            className="progress-bar bg-success"
+                                            style={{
+                                              width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                                ? (leadData.sourceLeads.summary.thirdPartyLeads / leadData.sourceLeads.summary.totalLeads) * 100
+                                                : 0}%`
+                                            }}
+                                          ></div>
+                                        </div>
+                                      </div>
+
+                                      {/* Top Sources Breakdown */}
+                                      {leadData.leadStats?.topSources?.slice(0, 3).map((source, index) => (
+                                        <div key={index}>
+                                          <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <span className="small fw-semibold text-capitalize">
+                                              {source._id ? source._id.replace('_', ' ') : 'Unknown Source'}
+                                            </span>
+                                            <span className="badge bg-secondary">
+                                              {source.count}
+                                            </span>
+                                          </div>
+                                          <div className="progress" style={{ height: '8px' }}>
+                                            <div
+                                              className="progress-bar bg-secondary"
+                                              style={{
+                                                width: `${leadData.sourceLeads.summary.totalLeads > 0
+                                                  ? (source.count / leadData.sourceLeads.summary.totalLeads) * 100
+                                                  : 0}%`
+                                              }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <div className="text-center text-muted">
+                                      <i className="fas fa-chart-pie"></i>
+                                      <small>No data available</small>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-center text-muted">
-                            <i className="fas fa-chart-pie"></i>
-                            <small>No data available</small>
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+
           </div>
 
         </>
@@ -3452,6 +3478,9 @@ const LeadAnalyticsDashboard = () => {
 
       {/* Custom styles for Bootstrap colors not available by default */}
       <style jsx>{`
+      .border-right{
+      border-right:1px solid ;
+      }
         .text-purple { color: #6f42c1; }
         .text-indigo { color: #6610f2; }
         .bg-purple { background-color: #6f42c1; }
@@ -4364,6 +4393,10 @@ height:min-content !important;
 }
 text tspan{
 font-size: 15px !important;
+}
+.recharts-wrapper{
+width:100%!important;
+height:100%!important;
 }
    
             `

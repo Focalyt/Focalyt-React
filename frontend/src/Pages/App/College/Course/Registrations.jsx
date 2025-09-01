@@ -1030,7 +1030,7 @@ const CRMDashboard = () => {
         if (closeButton) {
           closeButton.click();
         }
-        fetchProfileData()
+        // fetchProfileData()
       } else {
         alert('Failed to upload file');
       }

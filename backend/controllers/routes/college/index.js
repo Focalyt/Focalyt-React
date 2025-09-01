@@ -226,7 +226,6 @@ router.route("/login")
 
 			const user = await User.findOne(query);
 
-			console.log(user, 'user');
 
 			if (!user) {
 				return res.json({ status: false, error: "User not found" });
@@ -258,7 +257,6 @@ router.route("/login")
 				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin, googleAuthToken: user.googleAuthToken
 			};
 
-			console.log(userData, 'userData');
 			return res.json({ status: true, message: "Login successful", userData });
 
 		} catch (err) {
@@ -272,7 +270,6 @@ router.route("/register")
 		try {
 			const { collegeName, concernedPerson, email, mobile, type, password, confirmPassword, location } = req.body;
 
-			console.log(req.body, 'req.body');
 
 			const { value, error } = await CollegeValidators.register(req.body)
 			if (error) {
@@ -343,16 +340,12 @@ router.route("/register")
 					}
 
 					const newStatus = await new Status(statusData).save();
-					console.log(newStatus, 'newStatus');
 					newStatus.substatuses.push(newSubstatus);
 					const newSubStatusData = await newStatus.save();
-					console.log(newSubStatusData, 'newSubStatusData');
 
 					const newStatusB2B = await new StatusB2b(statusData).save();
-					console.log(newStatusB2B, 'newStatusB2B');
 					newStatusB2B.substatuses.push(newSubstatus);
 					const newSubStatusB2BData = await newStatusB2B.save();
-					console.log(newSubStatusB2BData, 'newSubStatusB2BData');
 
 					return res.send({
 						status: "success",
@@ -1200,7 +1193,6 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 
 		// Get the specific lead ID from request body
 		let { leadId } = req.query;
-		console.log('leadId', leadId)
 
 		if (!leadId) {
 			return res.status(400).json({
@@ -1584,7 +1576,6 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			};
 		});
 
-		console.log('lead details', results[0])
 
 		res.status(200).json({
 			success: true,
@@ -1620,7 +1611,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor
 		} = req.query;
 
-		console.log('req.query', req.query)
 
 		// Parse multi-select filters
 		let projectsArray = [];
@@ -1838,7 +1828,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
 		// Only set _leadStatus if it's a valid ObjectId string
 		if (mongoose.Types.ObjectId.isValid(filters.leadStatus)) {
-			console.log('Valid leadStatus:', filters.leadStatus);
 			baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
 		} else {
 			console.log('Invalid leadStatus:', filters.leadStatus);
@@ -2176,9 +2165,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 			if (appliedFilters.createdToDate) {
 				const toDate = new Date(appliedFilters.createdToDate);
-				console.log('toDate in count', toDate)
 				toDate.setDate(toDate.getDate() + 1);
-				console.log('toDate after updating date in count', toDate)
 				// Set time to 18:30:00.000 (6:30 PM)
 				// Use this modified 'toDate' as the upper limit in the filter
 				dateFilters.createdAt.$lte = toDate;
@@ -2289,7 +2276,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 
 
-		console.log('movedInKYCPipeline', JSON.stringify(movedInKYCPipeline[0].$match))
 
 
 
@@ -4697,7 +4683,6 @@ router.put('/update/:id', isCollege, async (req, res) => {
 			return res.status(404).json({ success: false, message: "Applied course not found" });
 		}
 
-		console.log("appliedCourses", appliedCourse)
 
 		// Update fields
 		Object.keys(updateData).forEach(key => {
@@ -5331,7 +5316,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		const user = req.user;
 		let teamMembers = [user._id];
 
-		console.log(teamMembers, 'teamMembers');
 
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
@@ -5382,7 +5366,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		if (projectsArray.length > 0) {
 
-			console.log(projectsArray, 'projectsArray');
 			teamMembers = [];
 		}
 
@@ -5406,7 +5389,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		if (name && name.trim() !== '') {
 
-			console.log(name, 'name');
 			teamMembers = [];
 		}
 
@@ -5430,7 +5412,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		if (teamMemberIds && teamMemberIds.length > 0) {
 
-			console.log(teamMemberIds, 'teamMemberIds');
 			baseMatchStage.$or = [
 				{ registeredBy: { $in: teamMemberIds } },
 				{ counsellor: { $in: teamMemberIds } }
@@ -5449,7 +5430,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				baseMatchStage.createdAt.$lte = toDate;
 			}
 		}
-console.log("modificationbefore" , modifiedFromDate , modifiedToDate)
 		if (modifiedFromDate || modifiedToDate) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
@@ -5460,7 +5440,6 @@ console.log("modificationbefore" , modifiedFromDate , modifiedToDate)
 				toDate.setHours(23, 59, 59, 999);
 				baseMatchStage.updatedAt.$lte = toDate;
 			}
-			console.log("modificationafter" , baseMatchStage.updatedAt)
 		}
 
 		if (nextActionFromDate || nextActionToDate) {
@@ -6758,7 +6737,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		} = req.query;
 		// Parse multi-select filter values
 
-		console.log(req.query, 'req.query')
 
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -6819,7 +6797,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 
 		if (teamMemberIds && teamMemberIds.length > 0) {
 
-			console.log(teamMemberIds, 'teamMemberIds');
 			baseMatchStage.$or = [
 				{ registeredBy: { $in: teamMemberIds } },
 				{ counsellor: { $in: teamMemberIds } }
@@ -8454,7 +8431,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		// Add base match stage
 		aggregationPipeline.push({ $match: baseMatchStage });
 
-		console.log('Base match stage:', JSON.stringify(baseMatchStage, null, 2));
 
 		// Lookup stages for all related collections
 		aggregationPipeline.push(
@@ -8591,15 +8567,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Test intermediate results before college filter
 		const intermediateResults = await AppliedCourses.aggregate(aggregationPipeline);
-		console.log('Results before college filter:', intermediateResults.length);
-
-		if (intermediateResults.length > 0) {
-			console.log('First intermediate result:', JSON.stringify({
-				_id: intermediateResults[0]._id,
-				courseCollege: intermediateResults[0]._course?.college,
-				candidateName: intermediateResults[0]._candidate?.name,
-			}, null, 2));
-		}
+		
 
 		// Filter by college
 		aggregationPipeline.push({
@@ -8608,7 +8576,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			}
 		});
 
-		console.log('College ID:', college._id);
 
 		// Apply additional filters based on populated data
 		let additionalMatches = {};
@@ -8654,7 +8621,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Add additional match stage if any filters are applied
 		if (Object.keys(additionalMatches).length > 0) {
-			console.log('Additional matches:', JSON.stringify(additionalMatches, null, 2));
 			aggregationPipeline.push({ $match: additionalMatches });
 		}
 
@@ -8665,16 +8631,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Execute aggregation for total count (without pagination)
 		const totalResults = await AppliedCourses.aggregate(aggregationPipeline);
-		console.log('Total results count:', totalResults.length);
-
-		if (totalResults.length > 0) {
-			console.log('First result sample:', JSON.stringify({
-				_id: totalResults[0]._id,
-				candidateName: totalResults[0]._candidate?.name,
-				candidateMobile: totalResults[0]._candidate?.mobile,
-				candidateEmail: totalResults[0]._candidate?.email,
-			}, null, 2));
-		}
+	
 
 		const totalCount = totalResults.length;
 
@@ -8716,7 +8673,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		};
 
 		const filterCounts = await calculateFilterCounts();
-		console.log('filterCounts', filterCounts);
 		// Process results for document counts and other formatting
 		const result = appliedCourses.map(doc => {
 			let selectedSubstatus = null;
@@ -8942,7 +8898,6 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 		// Add base match stage
 		aggregationPipeline.push({ $match: baseMatchStage });
 
-		console.log('Base match stage:', JSON.stringify(baseMatchStage, null, 2));
 
 		// Lookup stages for all related collections
 		aggregationPipeline.push(
@@ -9079,15 +9034,7 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 
 		// Test intermediate results before college filter
 		const intermediateResults = await AppliedCourses.aggregate(aggregationPipeline);
-		console.log('Results before college filter:', intermediateResults.length);
-
-		if (intermediateResults.length > 0) {
-			console.log('First intermediate result:', JSON.stringify({
-				_id: intermediateResults[0]._id,
-				courseCollege: intermediateResults[0]._course?.college,
-				candidateName: intermediateResults[0]._candidate?.name,
-			}, null, 2));
-		}
+		
 
 		// Filter by college
 		aggregationPipeline.push({
@@ -9096,7 +9043,6 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 			}
 		});
 
-		console.log('College ID:', college._id);
 
 		// Apply additional filters based on populated data
 		let additionalMatches = {};
@@ -9142,7 +9088,6 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 
 		// Add additional match stage if any filters are applied
 		if (Object.keys(additionalMatches).length > 0) {
-			console.log('Additional matches:', JSON.stringify(additionalMatches, null, 2));
 			aggregationPipeline.push({ $match: additionalMatches });
 		}
 
@@ -9153,16 +9098,7 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 
 		// Execute aggregation for total count (without pagination)
 		const totalResults = await AppliedCourses.aggregate(aggregationPipeline);
-		console.log('Total results count:', totalResults.length);
 
-		if (totalResults.length > 0) {
-			console.log('First result sample:', JSON.stringify({
-				_id: totalResults[0]._id,
-				candidateName: totalResults[0]._candidate?.name,
-				candidateMobile: totalResults[0]._candidate?.mobile,
-				candidateEmail: totalResults[0]._candidate?.email,
-			}, null, 2));
-		}
 
 		const totalCount = totalResults.length;
 
@@ -9204,7 +9140,6 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 		};
 
 		const filterCounts = await calculateFilterCounts();
-		console.log('filterCounts', filterCounts);
 		// Process results for document counts and other formatting
 		const result = appliedCourses.map(doc => {
 			let selectedSubstatus = null;
@@ -9946,7 +9881,6 @@ router.post('/lead-details-by-ids', [isCollege], async (req, res) => {
 router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 	try {
 
-		console.log('req.query', req.query)
 				let {
 			startDate,
 			endDate,
@@ -9965,8 +9899,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 		let dateFilter = {};
 		
 		if (startDate && endDate) {
-			console.log('startDate', startDate)
-			console.log('endDate', endDate)
 			
 			// Create start date (beginning of day)
 			const startDateObj = new Date(startDate);
@@ -9976,8 +9908,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			const endDateObj = new Date(endDate);
 			endDateObj.setHours(23, 59, 59, 999);
 
-			console.log('startDateObj', startDateObj)
-			console.log('endDateObj', endDateObj)
 
 			dateFilter.createdAt = {
 				$gte: startDateObj,
@@ -9991,8 +9921,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			const todayEndTime = new Date();
 			todayEndTime.setHours(23, 59, 59, 999);
 
-			console.log('todayStartTime', todayStartTime)
-			console.log('todayEndTime', todayEndTime)
 			
 			dateFilter.createdAt = {
 				$gte: todayStartTime,
@@ -10023,13 +9951,9 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			title: { $regex: /untouch/i } 
 		});
 		
-		console.log('College ID:', req.user.college._id);
-		console.log('Untouch status found:', untouchStatus);
 		
 		if (!untouchStatus) {
-			console.log('No untouch status found for this college. Checking all statuses...');
 			const allStatuses = await Status.find({ college: req.user.college._id });
-			console.log('All college statuses:', allStatuses.map(s => ({ id: s._id, title: s.title })));
 		}
 		
 		// Get total leads and untouch leads from AppliedCourses based on creation date and counselor
@@ -10371,13 +10295,10 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 		const totalLeadsMap = {};
 		const untouchLeadsMap = {};
 
-		console.log('appliedCoursesLeads:', appliedCoursesLeads);
 		appliedCoursesLeads.forEach(item => {
 			const counselorName = item._id.counselorName || 'Unknown';
 			totalLeadsMap[counselorName] = item.totalLeads;
 			untouchLeadsMap[counselorName] = item.untouchLeads || 0;
-			console.log(`Total leads for ${counselorName}: ${item.totalLeads}`);
-			console.log(`Untouch leads for ${counselorName}: ${item.untouchLeads || 0}`);
 		});
 
 		// Transform data to match frontend format - Counselor-wise with status and sub-status breakdowns
@@ -10454,7 +10375,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 
 router.delete('/delete-leads', async (req, res) => {
 	try {
-		console.log('req.body:', req.body);
 		const mobiles = req.body.mobiles;
 		for (let mobile of mobiles) {
 			// Ensure string type
@@ -10467,30 +10387,23 @@ router.delete('/delete-leads', async (req, res) => {
 		
 			// Agar mobile ki length abhi bhi 10 nahi hai to skip ya log kar do
 			if (mobile.length !== 10) {
-				console.log("Invalid mobile number format:", mobile);
 				continue;
 			}
 		
 			// Delete User
 			await User.deleteOne({ mobile });
-			console.log("User deleted successfully mobile:", mobile);
 		
 			// Candidate find
 			const candidate = await CandidateProfile.findOne({ mobile });
-			console.log("candidate:", candidate);
 		
 			if (candidate) {
 				// AppliedCourses delete
 				const applied = await AppliedCourses.deleteOne({ _candidate: candidate._id });
-				console.log("applied:", applied);
 		
-				console.log("AppliedCourses deleted successfully mobile:", mobile);
 		
 				// CandidateProfile delete
 				await CandidateProfile.deleteOne({ _id: candidate._id });
-				console.log("CandidateProfile deleted successfully mobile:", mobile);
 			} else {
-				console.log("Candidate not found for mobile:", mobile);
 			}
 			await new Promise(resolve => setTimeout(resolve, 1000));
 		}

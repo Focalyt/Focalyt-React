@@ -39,6 +39,139 @@ const MisReport = () => {
             fetchStudentList();
         }
     }, [batchId, token, backendUrl]);
+
+    const downloadMISReport = () => {
+      if (!studentList || studentList.length === 0) {
+        alert('No student data available to download');
+        return;
+      }
+    
+      // Create CSV headers based on your table columns
+      const headers = [
+        'Sr.No',
+        'Sector',
+        'Course Name',
+        'Batch NO',
+        'Name',
+        'Gender',
+        'DOB',
+        'Age',
+        'Category',
+        'Religion',
+        'District',
+        'Block',
+        'Residential Type',
+        'Address',
+        'Contact',
+        'Email',
+        'Aadhaar No',
+        'Reg. No/ Date',
+        'Course Start Date',
+        'Expected Course Completion Date',
+        'Actual Course Completion Date',
+        'Assessment Date',
+        'Whether Assessment Result Received',
+        'Assessment Result',
+        'Re-assessment Date',
+        'No. of Attempts for Assessment',
+        'RE-assessment Result',
+        'Whether Certificate Received',
+        'Date of Certification Received',
+        'Placement Date',
+        'Placement Sector/ Type of Industry where Student is placed',
+        'Name of Organisation where Student is placed',
+        'Job Location',
+        'Joining Date',
+        'Placement Job Monthly Salary (INR)',
+        'Student Status',
+        'Job_Offer_Date',
+        'Job_Offer_Sector',
+        'Job_Offer_Jobrole',
+        'Job_Offer_Salary',
+        'Placement_Jobrole',
+        'Whether Pursuing Higher Studies',
+        'Higher Studies Institute',
+        'Whether Pursuing Competitive Examination',
+        'Competitive Examination Name',
+        'Whether Unemployed',
+        'Remarks'
+      ];
+    
+      const csvRows = [headers.join(',')];
+    
+      // Process each student record
+      studentList.forEach((student, index) => {
+        const row = [
+          index + 1,
+          student?.sector || '',
+          student?.course || '',
+          student?.batch || '',
+          student?.candidateName?.toUpperCase() || '',
+          student?.gender === 'M' ? 'Male' : student?.gender === 'F' ? 'Female' : student?.gender || '',
+          student?.dob ? new Date(student.dob).toLocaleDateString('en-GB') : '',
+          student?.dob ? Math.floor((new Date() - new Date(student.dob)) / (1000 * 60 * 60 * 24 * 365.25)) + ' years' : '',
+          student?.category || '',
+          student?.religion || '',
+          student?.district || '',
+          student?.block || '',
+          student?.residentialType || '',
+          student?.address?.fullAddress || '',
+          student?.mobile || '',
+          student?.email || '',
+          student?.aadhaarNo || '',
+          student?.regNo || '',
+          student?.startDate ? new Date(student.startDate).toLocaleDateString('en-GB') : '',
+          student?.endDate ? new Date(student.endDate).toLocaleDateString('en-GB') : '',
+          student?.actualCourseCompletionDate || '',
+          student?.assessmentDate || '',
+          student?.whetherAssessmentResultReceived || '',
+          student?.assessmentResult || '',
+          student?.reAssessmentDate || '',
+          student?.noOfAttemptsForAssessment || '',
+          student?.reAssessmentResult || '',
+          student?.whetherCertificateReceived || '',
+          student?.dateOfCertificationReceived || '',
+          student?.placementDate || '',
+          student?.placementSector || '',
+          student?.nameOfOrganisation || '',
+          student?.jobLocation || '',
+          student?.joiningDate || '',
+          student?.placementJobMonthlySalary || '',
+          student?.studentStatus || '',
+          student?.jobOfferDate || '',
+          student?.jobOfferSector || '',
+          student?.jobOfferJobrole || '',
+          student?.jobOfferSalary || '',
+          student?.placementJobrole || '',
+          student?.whetherPursuingHigherStudies || '',
+          student?.higherStudiesInstitute || '',
+          student?.whetherPursuingCompetitiveExamination || '',
+          student?.competitiveExaminationName || '',
+          student?.whetherUnemployed || '',
+          student?.remarks || ''
+        ];
+    
+        // Escape any commas in the data and wrap in quotes
+        const csvRow = row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+        csvRows.push(csvRow);
+      });
+    
+      // Create CSV content
+      const csvContent = csvRows.join('\n');
+      const filename = `mis-report-batch-${new Date().toISOString().split('T')[0]}.csv`;
+    
+      // Download the file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
   return (
      <div>
          <div className="card shadow-sm mb-4 student-list-card">
@@ -65,6 +198,11 @@ const MisReport = () => {
                 )}
               </div>
               <div className="table-responsive student-table-container">
+              <button className="btn btn-primary float-end"  onClick={() => {
+                        console.log('Download button clicked');
+                        downloadMISReport();
+                        console.log('New state will be:');
+                      }}>Download</button>
                 <table className="table table-hover align-middle student-table">
                   <thead className="table-light">
                     <tr>
@@ -75,6 +213,7 @@ const MisReport = () => {
                       <th>Name</th>
                       <th>Gender</th>
                       <th>DOB</th>
+                      <th>Age</th>
                       <th>Category</th>
                       <th>Religion</th>
                       <th>District</th>
@@ -122,12 +261,13 @@ const MisReport = () => {
                         return (
                           <tr key={index}>
                             <td className="data-value">{index + 1}</td>
-                            <td className="data-value">{source?.sector || '-'}</td>
-                            <td className="data-value">{source?.course || '-'}</td>
+                            <td className="data-value" title={source?.sector || '-'}>{source?.sector || '-'}</td>
+                            <td className="data-value" title={source?.course || '-'}>{source?.course || '-'}</td>
                             <td className="data-value">{source?.batch || '-'}</td>
-                            <td className="data-value">{source?.candidateName || '-'}</td>
-                            <td className="data-value">{source?.gender || '-'}</td>
+                            <td className="data-value">{source?.candidateName?.toUpperCase() || '-'}</td>
+                            <td className="data-value">{source?.gender=='M' ? 'Male': source?.gender=='F'?'Female':source?.gender || '-'}</td>
                             <td className="data-value">{source?.dob ? new Date(source.dob).toLocaleDateString('en-GB') : '-'}</td>
+                            <td className="data-value">{Math.floor((new Date() - new Date(source.dob)) / (1000 * 60 * 60 * 24 * 365.25))+' years'}</td>
                             <td className="data-value">{source?.category || '-'}</td>
                             <td className="data-value">{source?.religion || '-'}</td>
                             <td className="data-value">{source?.district || '-'}</td>
@@ -338,7 +478,7 @@ const MisReport = () => {
 .student-table tbody td {
   padding: 0.875rem 0.75rem;
   vertical-align: middle;
-  border: none;
+  // border: none;
   color: #495057;
   font-size: 0.8rem;
   line-height: 1.4;
@@ -494,7 +634,8 @@ const MisReport = () => {
 .data-value {
   font-weight: 500;
   color: #2c3e50;
-}
+  border-right:1px solid #ccc;
+  }
 
 .data-value.na {
   color: #6c757d;

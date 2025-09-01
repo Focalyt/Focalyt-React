@@ -219,7 +219,6 @@ router
 
 		let extension = req.files.filename.name.split(".").pop();
 		if (extension !== "xlsx" && extension !== "xls" && extension !== "xl") {
-			console.log("upload excel file only");
 			req.flash("error", "Excel format not matched.");
 			return res.redirect("/panel/college/candidate/bulkUpload");
 		}
@@ -229,7 +228,6 @@ router
 			if (err) {
 				console.log(err);
 			}
-			console.log("********* File Upload successfully!");
 		});
 
 		// const dirPath = path.join(__dirname, "../../../public/") + filename;
@@ -258,7 +256,6 @@ router
 				checkFileError = true;
 			}
 		});
-		console.log("checkFileError1", checkFileError);
 		if (checkFileError == false) {
 			req.flash("error", "Please upload right pattern file");
 			return res.redirect("/panel/college/candidate/bulkUpload");
@@ -439,10 +436,7 @@ router
 									record: recordCount + 1,
 									_college: collegedetail._id,
 								};
-								console.log(
-									"--------------------- REcord INSERTED ---------------------------"
-								);
-								console.log(imports);
+
 								await Import.create(imports);
 							}
 							recordCount++;
@@ -474,7 +468,6 @@ router
 									_college: collegedetail._id,
 									session: "2022-2022",
 								};
-								console.log(tutorial, "tutorial");
 								if (ID != "") {
 									tutorial._qualification = ID;
 								}
@@ -482,7 +475,6 @@ router
 									tutorial._subQualification = SQID;
 								}
 								const candidate = await Candidate.create(tutorial);
-								console.log(candidate);
 								if (totalRows == recordCount + 1) {
 									var imports = {
 										name: req.files.filename.name,
@@ -491,14 +483,9 @@ router
 										record: recordCount + 1,
 										_college: collegedetail._id,
 									};
-									console.log(
-										"--------------------- REcord INSERTED ---------------------------"
-									);
-									console.log(imports);
 									await Import.create(imports);
 								}
 								recordCount++;
-								console.log(recordCount, "- recordCount");
 							}
 							// req.flash("success", "Data uploaded successfully");
 						}
@@ -722,7 +709,6 @@ router.route("/course/:courseId/apply")
 	.post(isCollege, async (req, res) => {
 		try {
 			let { courseId } = req.params;
-			console.log("courseId", courseId);
 
 			const user = req.user._id;
 			const userName = req.user.name;
@@ -731,13 +717,11 @@ router.route("/course/:courseId/apply")
 
 			let { mobile, selectedCenter } = req.body;
 			if (!mobile) {
-				console.log("mobile number not found.");
 				return res.status(404).json({ status: false, msg: "mobile number required." });
 
 			}
 			// // Check if courseId is a string
 			if (typeof courseId === "string") {
-				console.log("courseId is a string:", courseId);
 
 				//   // Validate if it's a valid ObjectId before converting
 				if (mongoose.Types.ObjectId.isValid(courseId)) {
@@ -748,10 +732,8 @@ router.route("/course/:courseId/apply")
 			}
 
 
-			console.log("selectedCenter", selectedCenter)
 
 			if (typeof selectedCenter === "string") {
-				console.log("selectedCenter is a string:", selectedCenter);
 
 				//   // Validate if it's a valid ObjectId before converting
 				if (mongoose.Types.ObjectId.isValid(selectedCenter)) {
@@ -768,11 +750,9 @@ router.route("/course/:courseId/apply")
 			}
 
 			const candidate = await Candidate.findOne({ mobile: mobile }).lean();
-			console.log("candidate", candidate)
 
 			if (!candidate) {
 				return res.status(404).json({ status: false, msg: "Candidate not found." });
-				console.log("Candidate not found.")
 			}
 
 			// // Check if already applied
@@ -782,7 +762,6 @@ router.route("/course/:courseId/apply")
 					applied.courseId && applied.courseId.toString() === courseId.toString()
 				)
 			) {
-				console.log("Already applied");
 				return res.status(400).json({ status: false, msg: "Course already applied." });
 			}
 
@@ -854,7 +833,6 @@ router.route("/course/:courseId/apply")
 			}
 
 
-			console.log("Candidate Mobile", candidateMob);
 
 			return res.status(200).json({ status: true, msg: "Course applied successfully." });
 		} catch (error) {
@@ -865,9 +843,7 @@ router.route("/course/:courseId/apply")
 
 router.route("/addleaddandcourseapply")
 	.post(isCollege, async (req, res) => {
-		console.log("req.body");
 		try {
-			console.log("Incoming body:", req.body);
 
 			let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude, sourceType, source, sourceName, sourceContactName, } = req.body;
 			// let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude } = req.body;
@@ -921,12 +897,10 @@ router.route("/addleaddandcourseapply")
 				verified: true
 			};
 
-			console.log("Final Candidate Data:", candidateData);
 
 			// ✅ Create CandidateProfile
 			const candidate = await Candidate.create(candidateData);
 
-			console.log('selectedCenter', typeof selectedCenter)
 			// ✅ Insert AppliedCourses Record
 			const appliedCourseEntry = await AppliedCourses.create({
 				_candidate: candidate._id,
@@ -935,7 +909,6 @@ router.route("/addleaddandcourseapply")
 				registeredBy: userId
 			});
 
-			console.log("Candidate Profile created and Course Applied.");
 
 			// ✅ Optional: Update your Google Spreadsheet
 			const capitalizeWords = (str) => {
@@ -980,13 +953,11 @@ router.route("/addleaddandcourseapply")
 router.route("/verifyuser")
 	.post(async (req, res) => {
 		try {
-			console.log("body data", req.body)
 
 			let { mobile, courseId } = req.body
 			let candidate = await Candidate.findOne({ mobile: mobile })
 			if (candidate) {
 				if (candidate.status === false) {
-					console.log("user status flase by admin")
 					req.flash("Contact with admin!");
 
 					return res.redirect("back");
@@ -995,7 +966,6 @@ router.route("/verifyuser")
 
 					// // Check if courseId is a string
 					if (typeof courseId === "string") {
-						console.log("courseId is a string:", courseId);
 
 						//   // Validate if it's a valid ObjectId before converting
 						if (mongoose.Types.ObjectId.isValid(courseId)) {
@@ -1004,15 +974,12 @@ router.route("/verifyuser")
 							return res.status(400).json({ error: "Invalid course ID" });
 						}
 					}
-					console.log("checking apply")
 					// // Check if already applied
 					if (candidate.appliedCourses && candidate.appliedCourses.some(appliedId => appliedId.equals(courseId))) {
-						console.log("course already applied")
 						return res.status(200).json({ status: true, msg: "Course already applied.", appliedStatus: true });
 					}
 					else {
 
-						console.log("Course already not applied.")
 
 
 						return res.status(200).json({ status: true, msg: "Course already not applied.", appliedStatus: false });
@@ -1087,7 +1054,6 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
 		let { id } = req.params
-		console.log('id', id)
 
 		const educations = await Qualification.find({ status: true });
 
@@ -1096,7 +1062,6 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 		}
 
 		const candidate = await Candidate.findById(id);
-		console.log(candidate, 'candidate')
 
 		if (!candidate) {
 			return res.status(404).json({ status: false, message: "Candidate not found" });
@@ -1116,7 +1081,6 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 
 router.post('/saveProfile', [isCollege], async (req, res) => {
 	try {
-		console.log("save profile...")
 		const user = req.user;
 
 		const {
@@ -1133,11 +1097,9 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 			isExperienced, showProfileForm
 		} = req.body;
 
-		console.log('experiences from frontend', experiences)
 
-		if(name || email){
-			const updateUser = await User.findOneAndUpdate({mobile:mobile, role: 3},{$set:{name:name, email:email}},{new:true});
-			console.log("updateUser", updateUser)
+		if (name || email) {
+			const updateUser = await User.findOneAndUpdate({ mobile: mobile, role: 3 }, { $set: { name: name, email: email } }, { new: true });
 		}
 
 		// Build dynamic update object
@@ -1249,8 +1211,7 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 					}
 				}));
 		}
-		console.log('updatePayload', updatePayload)
-		console.log('Incoming Data:', req.body);
+
 
 		// Final DB Update
 		const updatedProfile = await Candidate.findOneAndUpdate(
@@ -1259,7 +1220,6 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 			{ new: true, runValidators: true }
 		);
 
-		console.log('updatedProfile', updatedProfile)
 
 
 		return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
@@ -1273,7 +1233,6 @@ router.patch('/updatefiles', [isCollege], async (req, res) => {
 	try {
 		// Step 1: Find dynamic key (should be only 1 key in body)
 
-		console.log('updatefiles')
 		const keys = Object.keys(req.body);
 		if (keys.length !== 1) {
 			return res.send({ status: false, message: 'Invalid request structure' });
@@ -1282,7 +1241,6 @@ router.patch('/updatefiles', [isCollege], async (req, res) => {
 		const fieldName = keys[0];
 		const fileData = req.body[fieldName];
 
-		console.log('fieldName', fieldName, 'fileData', fileData)
 
 		// Step 2: Validate allowed fields
 		const arrayFields = ['resume', 'voiceIntro'];
@@ -1296,7 +1254,6 @@ router.patch('/updatefiles', [isCollege], async (req, res) => {
 		const updateQuery = arrayFields.includes(fieldName)
 			? { $push: { [`personalInfo.${fieldName}`]: fileData } }
 			: { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
-		console.log('updateQuery', updateQuery)
 		// Step 4: Execute update
 		const candidate = await Candidate.findOneAndUpdate(
 			{ mobile: req.user.mobile },
@@ -1314,16 +1271,12 @@ router.patch('/updatefiles', [isCollege], async (req, res) => {
 
 router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 	try {
-		console.log('api hiting upload file')
 		const { name, mimetype: ContentType } = req.files.file;
 		const { mobile } = req.body
-		console.log('body', req.body)
 		const ext = name.split('.').pop();
 		const { filename } = req.params
 		let userId = await Candidate.findOne({ mobile: mobile }).select('_id')
-		console.log('userId', userId)
 		const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
-		console.log('key', key)
 		if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
 
 		const data = req.files.file.data
@@ -1331,16 +1284,13 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 			Bucket: bucketName, Body: data, Key: key, ContentType,
 		};
 
-		console.log('params', params)
 
 		const url = await s3.upload(params).promise()
-		console.log('url', url)
 
 
 
 
 		const updatedProfile = await Candidate.findOneAndUpdate({ mobile: mobile }, { $set: { personalInfo: { image: url.Location } } }, { new: true })
-		console.log('updatedProfile', updatedProfile)
 
 		let newData = {
 			Location: url.Location,
@@ -1354,9 +1304,7 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 
 router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
-		console.log('assign batch api hiting...')
 		const { batchId, appliedCourseId } = req.body
-		console.log('batchId', batchId)
 		if (!batchId || !appliedCourseId) {
 			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
 		}
@@ -1651,7 +1599,6 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 		const { status, dropoutReason } = req.body;
 
 		const markedBy = req.user._id;
-		console.log('appliedCourseId', appliedCourseId)
 
 		if (typeof appliedCourseId === 'string') {
 			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
@@ -1887,9 +1834,7 @@ router.get('/zero-period-students/:batchId', [isCollege], async (req, res) => {
 
 router.post('/questionAnswer', [isCollege], async (req, res) => {
 	try {
-		console.log("questions", req.body)
 		const { appliedcourse, responses, visitDate } = req.body;
-		console.log("questions", req.body)
 
 		if (!appliedcourse || !responses || !Array.isArray(responses) || responses.length === 0) {
 			return res.status(400).json({
@@ -1931,14 +1876,12 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 			});
 		}
 
-		console.log("existingQuestionAnswer", existingQuestionAnswer)
 
 		// Create new question answer entry
 		const questionAnswer = new QuestionAnswer({
 			appliedcourse,
 			responses: response
 		});
-		console.log("questionAnswer", questionAnswer)
 
 		await questionAnswer.save();
 
@@ -2118,7 +2061,6 @@ router.put('/visit-calendar/:visitId', [isCollege], async (req, res) => {
 
 router.get("/appliedCourses/:candidateId", async (req, res) => {
 	try {
-		console.log("API hitting");
 		const { candidateId } = req.params;
 		// console.log("candidateId", candidateId)
 
@@ -2359,7 +2301,7 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 				candidateMobile: candidate?.mobile || 'Unknown',
 				candidateEmail: candidate?.email || 'Unknown',
 				courseId: appliedCourse._course,
-				courseName: course?.name || 'Unknown Course',				
+				courseName: course?.name || 'Unknown Course',
 				centerName: center?.name || 'Unknown Center',
 				batchName: batch?.name || 'No Batch',
 				createdAt: visit.createdAt,
@@ -2459,87 +2401,81 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 // 	}
 // });
 
-router.get('/testverification', [isCollege], async (req, res) => {
+router.get('/preVerifieedCount', [isCollege], async (req, res) => {
 	try {
-	  const { startDate, endDate } = req.query;
-  
-	  if (!startDate || !endDate) {
-		return res.status(400).json({
-		  success: false,
-		  message: "startDate and endDate query parameters are required"
-		});
-	  }
-  
-	
-	  const startDateObj = new Date(startDate);
-	  startDateObj.setHours(0, 0, 0, 0);
-  
-	  const endDateObj = new Date(endDate);
-	  endDateObj.setHours(23, 59, 59, 999); 
-  
-	  const filter = {
-		createdAt: { $gte: startDateObj, $lte: endDateObj }
-	  };
-  
-	  const statusLogFilter = {
-		createdAt: { $gte: startDateObj, $lte: endDateObj },
-		kycStage: true
-	  };
-  
-	  // Get status logs and total leads in parallel
-	  const [statusLogs, totalLeads] = await Promise.all([
-		StatusLogs.find(statusLogFilter),
-		AppliedCourses.countDocuments(filter)
-	  ]);
-  
-	  // Extract applied IDs from status logs
-	  const appliedIds = statusLogs.map(log => log._appliedId);
-  
-	  // Get question answers for these specific applied IDs
-	  const questionAnswers = await QuestionAnswer.find({
-		appliedcourse: { $in: appliedIds }
-	  });
-  
-	  // Create set for fast lookup
-	  const verifiedAppliedIds = new Set(
-		questionAnswers.map(qa => qa.appliedcourse.toString())
-	  );
-  
-	  // Calculate counts
-	  let verifiedCount = 0;
-	  let unverifiedCount = 0;
-  
-	  statusLogs.forEach(statusLog => {
-		const appliedId = statusLog._appliedId.toString();
-		if (verifiedAppliedIds.has(appliedId)) {
-		  verifiedCount++;
-		} else {
-		  unverifiedCount++;
+		console.log('verified api..')
+		let { startDate, endDate } = req.query;
+
+
+
+		if (!startDate) {
+			startDate = new Date().setHours(0, 0, 0, 0)
+
 		}
-	  });
-  
-	  // Use totalLeads (AppliedCourses count) as the main total
-	  const totalCount = totalLeads;
-  
-	  return res.json({
-		success: true,
-		data: {
-		  totalCount,
-		  unverifiedCount,
-		  verifiedCount
+
+		if (!endDate) {
+			endDate = new Date().setHours(23, 59, 59, 999)
 		}
-	  });
-  
+
+
+		const startDateObj = new Date(startDate);
+		startDateObj.setHours(0, 0, 0, 0);
+
+		const endDateObj = new Date(endDate);
+		endDateObj.setHours(23, 59, 59, 999);
+
+		const filter = {
+			createdAt: { $gte: startDateObj, $lte: endDateObj }
+		};
+
+		const statusLogFilter = {
+			createdAt: { $gte: startDateObj, $lte: endDateObj },
+			kycStage: true
+		};
+
+		// Get status logs and total leads in parallel
+		const [statusLogs, verified] = await Promise.all([
+			StatusLogs.find(statusLogFilter),
+			QuestionAnswer.find(filter)
+		]);
+
+
+
+		let unVerified = []
+
+		statusLogs.forEach(qa => {
+
+			const unverifiedlog = verified.find(log => {
+				log.appliedcourse.toString() === qa._appliedId.toString()
+
+			})
+
+			if (!unverifiedlog || unverifiedlog.length === 0) {
+				unVerified.push(qa._appliedId)
+			}
+
+		})
+
+		console.log("unVerified", unVerified)
+
+		  return res.json({
+			success: true,
+			data: {			 
+			  unverifiedCount:unVerified.length,
+			  verifiedCount:verified.length
+			}
+		  });
+
 	} catch (err) {
-	  console.error('Error in testverification endpoint:', err);
-	  res.status(500).json({
-		success: false,
-		message: 'Error fetching statistics',
-		error: err.message
-	  });
+		console.error('Error in testverification endpoint:', err);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching statistics',
+			error: err.message
+		});
 	}
-  });
-  
+});
+
 
 // router.get('/testverification', [isCollege], async (req, res) => {
 // 	try {
@@ -2959,100 +2895,100 @@ router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 
 router.get('/misreport/:batchId', [isCollege], async (req, res) => {
 	try {
-	  console.log("misreport api hitting..");
-  
-	  const { batchId } = req.params;
-  
-	  if (!batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
-		return res.status(400).json({
-		  status: false,
-		  message: 'Valid Batch ID is required'
-		});
-	  }
-  
-	  const appliedCourses = await AppliedCourses.aggregate([
-		{
-		  $match: {
-			batch: new mongoose.Types.ObjectId(batchId),
-			isBatchFreeze: true,
-			dropout: false
-		  }
-		},
-		{
-		  $lookup: {
-			from: "courses",
-			localField: "_course",
-			foreignField: "_id",
-			as: "course"
-		  }
-		},
-		{ $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
-  
-		{
-		  $lookup: {
-			from: "coursesectors",
-			localField: "course.sectors",
-			foreignField: "_id",
-			as: "sector"
-		  }
-		},
-		{ $unwind: { path: '$sector', preserveNullAndEmptyArrays: true } },
-  
-		{
-		  $lookup: {
-			from: 'batches',
-			localField: 'batch',
-			foreignField: '_id',
-			as: 'batch'
-		  }
-		},
-		{ $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
-  
-		{
-		  $lookup: {
-			from: 'candidateprofiles',
-			localField: '_candidate',
-			foreignField: '_id',
-			as: 'candidate'
-		  }
-		},
-		{ $unwind: { path: '$candidate', preserveNullAndEmptyArrays: true } },
-  
-		{
-		  $group: {
-			_id: '$_id',
-			course: { $first: '$course.name' },
-			sector: { $first: '$sector.name' },
-			batch: { $first: '$batch.name' },
-			startDate: { $first: '$batch.startDate' },
-			endDate: { $first: '$batch.endDate' },
-			candidateName: { $first: '$candidate.name' },
-			mobile: { $first: '$candidate.mobile' },
-			email: { $first: '$candidate.email' },
-			dob: { $first: '$candidate.dob' },
-			gender: { $first: '$candidate.sex' },
-			address: { $first: '$candidate.personalInfo.currentAddress' }
-		  }
+		console.log("misreport api hitting..");
+
+		const { batchId } = req.params;
+
+		if (!batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Valid Batch ID is required'
+			});
 		}
-	  ]);
-  
-	console.log("appliedCourses:", appliedCourses);
-	  res.status(200).json({
-		status: true,
-		message: 'MIS report fetched successfully',
-		data: appliedCourses,
-		totalCount: appliedCourses.length
-	  });
-  
+
+		const appliedCourses = await AppliedCourses.aggregate([
+			{
+				$match: {
+					batch: new mongoose.Types.ObjectId(batchId),
+					isBatchFreeze: true,
+					dropout: false
+				}
+			},
+			{
+				$lookup: {
+					from: "courses",
+					localField: "_course",
+					foreignField: "_id",
+					as: "course"
+				}
+			},
+			{ $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
+
+			{
+				$lookup: {
+					from: "coursesectors",
+					localField: "course.sectors",
+					foreignField: "_id",
+					as: "sector"
+				}
+			},
+			{ $unwind: { path: '$sector', preserveNullAndEmptyArrays: true } },
+
+			{
+				$lookup: {
+					from: 'batches',
+					localField: 'batch',
+					foreignField: '_id',
+					as: 'batch'
+				}
+			},
+			{ $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+
+			{
+				$lookup: {
+					from: 'candidateprofiles',
+					localField: '_candidate',
+					foreignField: '_id',
+					as: 'candidate'
+				}
+			},
+			{ $unwind: { path: '$candidate', preserveNullAndEmptyArrays: true } },
+
+			{
+				$group: {
+					_id: '$_id',
+					course: { $first: '$course.name' },
+					sector: { $first: '$sector.name' },
+					batch: { $first: '$batch.name' },
+					startDate: { $first: '$batch.startDate' },
+					endDate: { $first: '$batch.endDate' },
+					candidateName: { $first: '$candidate.name' },
+					mobile: { $first: '$candidate.mobile' },
+					email: { $first: '$candidate.email' },
+					dob: { $first: '$candidate.dob' },
+					gender: { $first: '$candidate.sex' },
+					address: { $first: '$candidate.personalInfo.currentAddress' }
+				}
+			}
+		]);
+
+		console.log("appliedCourses:", appliedCourses);
+		res.status(200).json({
+			status: true,
+			message: 'MIS report fetched successfully',
+			data: appliedCourses,
+			totalCount: appliedCourses.length
+		});
+
 	} catch (err) {
-	  console.error('Error in misreport:', err);
-	  res.status(500).json({
-		status: false,
-		message: 'Error in fetching misreport',
-		error: err.message
-	  });
+		console.error('Error in misreport:', err);
+		res.status(500).json({
+			status: false,
+			message: 'Error in fetching misreport',
+			error: err.message
+		});
 	}
-  });
+});
 
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {
 // 	try{}

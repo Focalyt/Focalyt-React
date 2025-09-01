@@ -1092,7 +1092,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
         // Optionally refresh data here
         closeUploadModal();
-        fetchProfileData()
+        // fetchProfileData()
       } else {
         alert('Failed to upload file');
       }
