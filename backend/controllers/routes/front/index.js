@@ -401,47 +401,47 @@ router.get("/courses", async (req, res) => {
 	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
 
 	// Modify script to run after DOM is loaded and escape quotes properly
-	const storageScript = `
-	  <script>
-		document.addEventListener('DOMContentLoaded', function() {
-		  try {
-			const storedurl = localStorage.getItem('entryUrl');
-			if(!storedurl){
-			  // Store current URL immediately
-			  const data = {
-				url: '${fullUrl.replace(/'/g, "\\'")}',
-				timestamp: new Date().getTime()
-			  };
-			  localStorage.setItem('entryUrl', JSON.stringify(data));
+	// const storageScript = `
+	//   <script>
+	// 	document.addEventListener('DOMContentLoaded', function() {
+	// 	  try {
+	// 		const storedurl = localStorage.getItem('entryUrl');
+	// 		if(!storedurl){
+	// 		  // Store current URL immediately
+	// 		  const data = {
+	// 			url: '${fullUrl.replace(/'/g, "\\'")}',
+	// 			timestamp: new Date().getTime()
+	// 		  };
+	// 		  localStorage.setItem('entryUrl', JSON.stringify(data));
 			  
-			  // Verify it was stored
-			  console.log('URL stored:', localStorage.getItem('entryUrl'))
-			};
+	// 		  // Verify it was stored
+	// 		  console.log('URL stored:', localStorage.getItem('entryUrl'))
+	// 		};
 			
-			// Function to check and clean expired URL
-			function cleanExpiredUrl() {
-			  const stored = localStorage.getItem('entryUrl');
-			  if (stored) {
-				const data = JSON.parse(stored);
-				const now = new Date().getTime();
-				const hours24 = 24 * 60 * 60 * 1000;
+	// 		// Function to check and clean expired URL
+	// 		function cleanExpiredUrl() {
+	// 		  const stored = localStorage.getItem('entryUrl');
+	// 		  if (stored) {
+	// 			const data = JSON.parse(stored);
+	// 			const now = new Date().getTime();
+	// 			const hours24 = 24 * 60 * 60 * 1000;
 				
-				if (now - data.timestamp > hours24) {
-				  localStorage.removeItem('entryUrl');
-				  console.log('Expired URL removed');
-				}
-			  }
-			}
+	// 			if (now - data.timestamp > hours24) {
+	// 			  localStorage.removeItem('entryUrl');
+	// 			  console.log('Expired URL removed');
+	// 			}
+	// 		  }
+	// 		}
 			
-			// Check for expired URLs
-			cleanExpiredUrl();
+	// 		// Check for expired URLs
+	// 		cleanExpiredUrl();
 			
-		  } catch (error) {
-			console.error('Error storing URL:', error);
-		  }
-		});
-	  </script>
-	`;
+	// 	  } catch (error) {
+	// 		console.error('Error storing URL:', error);
+	// 	  }
+	// 	});
+	//   </script>
+	// `;
 
 	const countJobs = await Courses.find(filter).countDocuments()
 	const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
@@ -481,7 +481,7 @@ router.get("/courses", async (req, res) => {
 		{
 			$replaceRoot: { newRoot: "$doc" }
 		},
-		{ $sort: { createdAt: -1 } },
+		{ $sort: { updatedAt: -1 } },
 		{ $skip: perPage * (page - 1) },
 		{ $limit: perPage }
 	]);
@@ -512,7 +512,7 @@ router.get("/courses", async (req, res) => {
 	// Use res.json() to send JSON data, not res.send.json()
 	return res.json({
 		courses,
-		storageScript,
+		// storageScript,
 		phoneToCall: contact[0]?.mobile,
 		totalPages,
 		uniqueSectors,

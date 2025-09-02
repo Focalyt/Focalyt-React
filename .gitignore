@@ -33,7 +33,7 @@ frontend/src/Pages/App/College/Settings/AccessManagement copy.jsx
 .env.test.local
 .env.production.local
 .env
-
+frontend/src/Pages/Front/Courses/Course.jsx
 # Logs
 npm-debug.log*
 yarn-debug.log*

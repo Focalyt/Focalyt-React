@@ -2147,6 +2147,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     const [rejectionReason, setRejectionReason] = useState('');
     const [documentZoom, setDocumentZoom] = useState(1);
     const [documentRotation, setDocumentRotation] = useState(0);
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+    const [accumulatedPan, setAccumulatedPan] = useState({ x: 0, y: 0 });
 
     const latestUpload = useMemo(() => {
       if (!selectedDocument) return null;
@@ -2172,6 +2176,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     const handleReset = useCallback(() => {
       setDocumentZoom(1);
       setDocumentRotation(0);
+      setPanOffset({ x: 0, y: 0 });
+      setAccumulatedPan({ x: 0, y: 0 });
     }, []);
 
     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
@@ -2369,7 +2375,44 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
           <div className="modal-body">
             <div className="document-preview-section">
-              <div className="document-preview-container" style={{ height: 'auto' }}>
+              <div
+                className="document-preview-container"
+                style={{
+                  height: 'auto',
+                  cursor: isPanning ? 'grabbing' : documentZoom > 1 ? 'grab' : 'default',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+                onWheel={(e) => {
+                  if (e.ctrlKey) {
+                    e.preventDefault();
+                    const delta = -Math.sign(e.deltaY) * 0.1;
+                    const next = Math.min(3, Math.max(0.5, documentZoom + delta));
+                    setDocumentZoom(next);
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (documentZoom <= 1) return;
+                  setIsPanning(true);
+                  setPanStart({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseMove={(e) => {
+                  if (!isPanning) return;
+                  setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+                }}
+                onMouseUp={() => {
+                  if (!isPanning) return;
+                  setIsPanning(false);
+                  setAccumulatedPan(prev => ({ x: prev.x + panOffset.x, y: prev.y + panOffset.y }));
+                  setPanOffset({ x: 0, y: 0 });
+                }}
+                onMouseLeave={() => {
+                  if (!isPanning) return;
+                  setIsPanning(false);
+                  setAccumulatedPan(prev => ({ x: prev.x + panOffset.x, y: prev.y + panOffset.y }));
+                  setPanOffset({ x: 0, y: 0 });
+                }}
+              >
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
@@ -2395,28 +2438,37 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 src={fileUrl}
                                 alt="Document Preview"
                                 style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
+                                  transform: `translate(${accumulatedPan.x + panOffset.x}px, ${accumulatedPan.y + panOffset.y}px) scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                                  transition: isPanning ? 'none' : 'transform 0.15s ease',
                                   maxWidth: '100%',
-                                  objectFit: 'contain'
+                                  maxHeight: '100%',
+                                  objectFit: 'contain',
+                                  userSelect: 'none',
+                                  pointerEvents: 'none'
                                 }}
+                                draggable={false}
                               />
                             );
                           } else if (fileType === 'pdf') {
                             return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
-                                <iframe
-                                  src={fileUrl + '#navpanes=0&toolbar=0'}
-                                  width="100%"
-                                  height="100%"
+                              <div className="pdf-viewer" style={{ width: '100%', height: '780px', overflow: 'hidden', position: 'relative' }}>
+                                <div
                                   style={{
-                                    border: 'none',
-                                    transform: `scale(${documentZoom})`,
-                                    transformOrigin: 'top left',
-                                    transition: 'transform 0.3s ease'
+                                    width: '100%',
+                                    height: '100%',
+                                    transform: `translate(${accumulatedPan.x + panOffset.x}px, ${accumulatedPan.y + panOffset.y}px) scale(${documentZoom})`,
+                                    transformOrigin: 'center center',
+                                    transition: isPanning ? 'none' : 'transform 0.15s ease'
                                   }}
-                                  title="PDF Document"
-                                />
+                                >
+                                  <iframe
+                                    src={fileUrl + '#navpanes=0&toolbar=0'}
+                                    width="100%"
+                                    height="100%"
+                                    style={{ border: 'none', pointerEvents: 'none' }}
+                                    title="PDF Document"
+                                  />
+                                </div>
                               </div>
                             );
                           } else {
