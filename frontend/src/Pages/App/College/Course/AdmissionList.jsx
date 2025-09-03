@@ -1362,9 +1362,20 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
         }
 
         // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
+        // const response = await axios.put(
+        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+        //   data,
+        //   {
+        //     headers: {
+        //       'x-auth': token,
+        //       'Content-Type': 'application/json'
+        //     }
+        //   }
+        // );
+
+        const response = await axios.post(
+          `${backendUrl}/college/b2c-set-followups`,
+          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
           {
             headers: {
               'x-auth': token,
@@ -1372,6 +1383,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
             }
           }
         );
+
 
         console.log('API response:', response.data);
 
@@ -4847,11 +4859,15 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
         {
           `
             #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
           .site-header--sticky--admission--list--post:not(.mobile-sticky-enable){
           top: 170px;

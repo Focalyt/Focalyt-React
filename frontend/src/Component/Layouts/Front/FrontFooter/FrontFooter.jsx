@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {Link } from 'react-router-dom';
-import { faFacebookF, faLinkedinIn, faYoutube } from '@fortawesome/free-brands-svg-icons';
+import { faFacebookF, faLinkedinIn, faYoutube ,faInstagram} from '@fortawesome/free-brands-svg-icons';
 import "./FrontFooter.css";
 import axios from 'axios'
 function Footer() {
@@ -147,20 +147,26 @@ function Footer() {
                   <ul className="list-social list-social--hvr-black">
                     <li>
                       <a href="https://www.facebook.com/focalyt.learn/" target="_blank">
-                        {/* <i className="fa-brands fa-facebook-f"></i> */}
+                       
                         <FontAwesomeIcon icon={faFacebookF} size="2x" />
                       </a>
                     </li>
                     <li>
                       <a href="https://www.instagram.com/p/CX3iTqQFHQF/" target="_blank">
-                        {/* <i className="fa-brands fa-instagram"></i> */}
-                        <FontAwesomeIcon icon={faYoutube} size="2x" />
+                     
+                        <FontAwesomeIcon icon={faInstagram} size="2x" />
                       </a>
                     </li>
                     <li>
                       <a href="https://www.linkedin.com/company/focalytlearn?originalSubdomain=in" target="_blank">
-                        {/* <i className="fa-brands fa-linkedin"></i> */}
+                      
                         <FontAwesomeIcon icon={faLinkedinIn} size="2x" />
+                      </a>
+                    </li>
+                    <li>
+                      <a href="https://www.youtube.com/@focalyt" target="_blank">
+                
+                        <FontAwesomeIcon icon={faYoutube} size="2x" />
                       </a>
                     </li>
                   </ul>

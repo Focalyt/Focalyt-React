@@ -1132,9 +1132,9 @@ const CRMDashboard = () => {
           'Content-Type': 'application/json'
         }
       });
-  
+
       const data = await response.json();
-  
+
       if (data.status || data.success) {
         setSources(data.data || []);
       } else {
@@ -2396,9 +2396,19 @@ const CRMDashboard = () => {
         }
 
         // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
+        // const response = await axios.put(
+        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+        //   data,
+        //   {
+        //     headers: {
+        //       'x-auth': token,
+        //       'Content-Type': 'application/json'
+        //     }
+        //   }
+        // );
+        const response = await axios.post(
+          `${backendUrl}/college/b2c-set-followups`,
+          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
           {
             headers: {
               'x-auth': token,
@@ -2567,6 +2577,7 @@ const CRMDashboard = () => {
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     setIsLoadingProfiles(true);
+    closePanel();
     setLeadDetailsVisible(null);
     fetchRegistrationCrmFilterCounts();
 
@@ -2694,6 +2705,7 @@ const CRMDashboard = () => {
         const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
           headers: { 'x-auth': token }
         });
+        console.log("leadDetailsVisible", response)
 
         if (response.data.success && response.data.data) {
           const data = response.data;
@@ -3755,7 +3767,7 @@ const CRMDashboard = () => {
                 <div className="position-relative">
                   <select
                     className="form-select border-0 shadow-sm"
-                    id="counselorName" 
+                    id="counselorName"
                     value={counselorId}
                     onChange={(e) => setCounselorId(e.target.value)}
                     style={{
@@ -3776,11 +3788,11 @@ const CRMDashboard = () => {
                 </div>
               </div>
               <div className="mb-3">
-              <label>
-                    Source <span className="mandatory">*</span>
-                  </label>
+                <label>
+                  Source <span className="mandatory">*</span>
+                </label>
                 <div className="mb-1" id="thirdPartySource">
-                
+
                   <select
                     className="form-control single-field"
                     value={registeredBy}
@@ -3995,11 +4007,50 @@ const CRMDashboard = () => {
       </div>
     ) : null;
   };
+  /************************************/
+
+  //lead history
+
+  const [leadHistory, setLeadHistory] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+
+
+  useEffect(() => {
+    if (showPanel === 'leadHistory' && selectedProfile) {
+      fetchLeadHistory();
+    }
+  }, [showPanel]);
+
+  const fetchLeadHistory = async () => {
+    try {
+      setIsHistoryLoading(true);
+      setLeadHistory([])
+      const response = await axios.get(`${backendUrl}/college/lead-history/${selectedProfile._id}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
+      if (response.data.success) {
+        console.log("response", response)
+        setLeadHistory(response.data.data);
+      } else {
+        alert('Field to history load')
+      }
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+      alert('Field to history load')
+
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }
+  /************************************/
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderLeadHistoryPanel = () => {
     const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
+      <div className="card col-12 border-0 shadow-sm h-100">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
             <div className="me-2">
@@ -4010,102 +4061,109 @@ const CRMDashboard = () => {
           <button className="btn-close" type="button" onClick={closePanel}>
           </button>
         </div>
-
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-              <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+        {isHistoryLoading ? (
+          <div className="card-body p-0 d-flex flex-column h-100 d-flex align-items-center justify-content-center">
+            <div className="spinner-border" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <span className="ms-2 mt-2">Loading...</span>
+          </div>
+        ) : (
+          <div className="card-body p-0 d-flex flex-column h-100">
+            {/* Scrollable Content Area */}
+            <div
+              className="flex-grow-1 overflow-auto px-3 py-2"
+              style={{
+                maxHeight: isMobile ? '60vh' : '65vh',
+                minHeight: '200px'
+              }}
+            >
+              {leadHistory && Array.isArray(leadHistory) && leadHistory.length > 0 ? (
+                <div className="timeline">
+                  {leadHistory.map((log, index) => (
+                    <div key={index} className="timeline-item mb-4">
+                      <div className="timeline-marker">
+                        <div className="timeline-marker-icon">
+                          <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                        </div>
+                        {index !== leadHistory.length - 1 && (
+                          <div className="timeline-line"></div>
+                        )}
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
 
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
-                            </small>
-                          </div>
-
-                          <div className="mb-2">
-                            <strong className="text-dark d-block mb-1">Action:</strong>
-                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                              {log.action ? (
-                                log.action.split(';').map((actionPart, actionIndex) => (
-                                  <div key={actionIndex} className="mb-1">
-                                    • {actionPart.trim()}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted">No action specified</div>
-                              )}
+                      <div className="timeline-content">
+                        <div className="card border-0 shadow-sm">
+                          <div className="card-body p-3">
+                            <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                              <span className="bg-light text-dark border">
+                                {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : 'Unknown Date'}
+                              </span>
+                              <small className="text-muted">
+                                <i className="fas fa-user me-1"></i>
+                                Modified By: {log.user?.name || 'Unknown User'}
+                              </small>
                             </div>
-                          </div>
 
-                          {log.remarks && (
-                            <div>
-                              <strong className="text-dark d-block mb-1">Remarks:</strong>
-                              <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                {log.remarks}
-                              </p>
+                            <div className="mb-2">
+                              <strong className="text-dark d-block mb-1">Action:</strong>
+                              <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                {log.action ? (
+                                  log.action.split(';').map((actionPart, actionIndex) => (
+                                    <div key={actionIndex} className="mb-1">
+                                      • {actionPart.trim()}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-muted">No action specified</div>
+                                )}
+                              </div>
                             </div>
-                          )}
+
+                            {log.remarks && (
+                              <div>
+                                <strong className="text-dark d-block mb-1">Remarks:</strong>
+                                <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                  {log.remarks}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                  ))}
                 </div>
-                <h6 className="text-muted mb-2">No History Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closePanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
+              ) : (
+                <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                  <div className="mb-3">
+                    <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                  </div>
+                  <h6 className="text-muted mb-2">No History Available</h6>
+                  <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+
+            {/* Fixed Footer */}
+            <div className="border-top px-3 py-3 bg-light">
+              <div className="d-flex justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closePanel}
+                >
+                  <i className="fas fa-times me-1"></i>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>)}
       </div>
     );
 
@@ -4128,7 +4186,7 @@ const CRMDashboard = () => {
     }
 
     return showPanel === 'leadHistory' ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
+      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh', width: '-webkit-fill-available' }}>
         {panelContent}
       </div>
     ) : null;
@@ -4157,15 +4215,15 @@ const CRMDashboard = () => {
               minHeight: '200px'
             }}
           >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+            {leadHistory && Array.isArray(leadHistory) && leadHistory.length > 0 ? (
               <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
+                {leadHistory.map((log, index) => (
                   <div key={index} className="timeline-item mb-4">
                     <div className="timeline-marker">
                       <div className="timeline-marker-icon">
                         <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
+                      {index !== leadHistory.length - 1 && (
                         <div className="timeline-line"></div>
                       )}
                     </div>
@@ -4561,7 +4619,7 @@ const CRMDashboard = () => {
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-6 firstDatepicker">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -6818,9 +6876,10 @@ const CRMDashboard = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-              zIndex: 10,
+              zIndex: 13,
               transition: 'margin-top 0.2s ease-in-out',
-              position: 'fixed'
+              position: 'fixed',
+              width: '-webkit-fill-available'
             }}>
               {renderEditPanel()}
               {renderRefferPanel()}
@@ -9336,11 +9395,15 @@ background: #fd2b5a;
     z-index: 10;
 }
            #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
 @media (min-width: 992px) {
     .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
@@ -10245,9 +10308,16 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
+.firstDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(0px)!important;
+}
 .react-calendar{
-width:min-content !important;
-height:min-content !important;
+    height: min-content !important;
+    transform: translateX(-110px) !important;
+    width: 250px !important;
+
 }
 @media (max-width: 768px) {
   .multi-select-options-new {

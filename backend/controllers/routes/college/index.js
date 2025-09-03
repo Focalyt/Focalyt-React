@@ -12,7 +12,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -1288,34 +1288,34 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
 			{
 				$lookup: {
-				  from: "users",         // First lookup for User
-				  localField: "registeredBy", 
-				  foreignField: "_id", 
-				  as: "registeredByUser"
+					from: "users",         // First lookup for User
+					localField: "registeredBy",
+					foreignField: "_id",
+					as: "registeredByUser"
 				}
-			  },
-			  {
+			},
+			{
 				$lookup: {
-				  from: "sources",       // Second lookup for Source
-				  localField: "registeredBy", 
-				  foreignField: "_id", 
-				  as: "registeredBySource"
+					from: "sources",       // Second lookup for Source
+					localField: "registeredBy",
+					foreignField: "_id",
+					as: "registeredBySource"
 				}
-			  },
-			  {
+			},
+			{
 				$addFields: {
-				  // We merge the results, prefer User data if available
-				  registeredBy: {
-					$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
-				  }
+					// We merge the results, prefer User data if available
+					registeredBy: {
+						$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
+					}
 				}
-			  },
-			  {
+			},
+			{
 				$project: {
-				  registeredByUser: 0,  // Removing intermediate fields
-				  registeredBySource: 0
+					registeredByUser: 0,  // Removing intermediate fields
+					registeredBySource: 0
 				}
-			  },
+			},
 
 			// Registered By lookup
 			// {
@@ -1361,34 +1361,34 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 									// },
 									{
 										$lookup: {
-										  from: "users",         // First lookup for User
-										  localField: "registeredBy", 
-										  foreignField: "_id", 
-										  as: "registeredByUser"
+											from: "users",         // First lookup for User
+											localField: "registeredBy",
+											foreignField: "_id",
+											as: "registeredByUser"
 										}
-									  },
-									  {
+									},
+									{
 										$lookup: {
-										  from: "sources",       // Second lookup for Source
-										  localField: "registeredBy", 
-										  foreignField: "_id", 
-										  as: "registeredBySource"
+											from: "sources",       // Second lookup for Source
+											localField: "registeredBy",
+											foreignField: "_id",
+											as: "registeredBySource"
 										}
-									  },
-									  {
+									},
+									{
 										$addFields: {
-										  // We merge the results, prefer User data if available
-										  registeredBy: {
-											$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
-										  }
+											// We merge the results, prefer User data if available
+											registeredBy: {
+												$ifNull: [{ $arrayElemAt: ["$registeredByUser", 0] }, { $arrayElemAt: ["$registeredBySource", 0] }]
+											}
 										}
-									  },
-									  {
+									},
+									{
 										$project: {
-										  registeredByUser: 0,  // Removing intermediate fields
-										  registeredBySource: 0
+											registeredByUser: 0,  // Removing intermediate fields
+											registeredBySource: 0
 										}
-									  }
+									}
 									,
 									{
 										$lookup: {
@@ -4433,13 +4433,13 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		// Save the updated document
 		await doc.save();
 
-	
-			const newStatusLogs = await statusLogHelper(id, {
-				_statusId: _leadStatus,
-				_subStatusId: _leadSubStatus,
-			});
-			
-		
+
+		const newStatusLogs = await statusLogHelper(id, {
+			_statusId: _leadStatus,
+			_subStatusId: _leadSubStatus,
+		});
+
+
 
 		return res.json({ success: true, data: doc });
 	} catch (error) {
@@ -4703,12 +4703,12 @@ router.put('/update/:id', isCollege, async (req, res) => {
 				remarks: 'Profile moved to KYC by College'
 			});
 
-			
-				const newStatusLogs = await statusLogHelper(id, {
-					kycStage: true
-				});
-				
-			
+
+			const newStatusLogs = await statusLogHelper(id, {
+				kycStage: true
+			});
+
+
 		}
 
 
@@ -4722,13 +4722,13 @@ router.put('/update/:id', isCollege, async (req, res) => {
 				remarks: 'Profile moved to Admission List by College'
 			});
 
-			
-				const newStatusLogs = await statusLogHelper(id, {
-					admissionStatus: true
-				});
 
-				
-			
+			const newStatusLogs = await statusLogHelper(id, {
+				admissionStatus: true
+			});
+
+
+
 		}
 
 		await appliedCourse.save();
@@ -6301,10 +6301,66 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 	}
 });
 
-
-
-router.get("/leads/my-followups", async (req, res) => {
+router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 	try {
+		const user = req.user;
+		const collegeId = req.college._id;
+		console.log("req", req.college._id);
+		let { appliedCourseId, followupDate, remarks } = req.body;
+		if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
+			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
+		}
+
+		const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
+
+		if (!followup) {
+			return res.status(400).json({ status: false, message: "Followup not created" });
+		}
+
+		let actionParts = [];
+		actionParts.push(`Followup added to ${new Date(followupDate).toLocaleString()}`);
+
+
+		if (remarks) {
+			//   actionParts.push(`Remarks updated: "${remarks}"`);
+			actionParts.push(`Remarks updated`);  // Remarks included 
+
+		}
+
+
+		const newLogEntry = {
+			user: user._id,
+			action: actionParts.join('; '), // Combine all actions in one log message
+			remarks: remarks || '', // Optional remarks in the log
+			timestamp: new Date() // Add timestamp if your schema supports it
+		};
+
+		const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
+			$set: { remarks: remarks },
+			$push: { logs: newLogEntry }
+		});
+
+		if (!updateAppliedRemarks) {
+			return res.status(400).json({ status: false, message: "Applied course remarks not updated" });
+		}
+
+
+
+
+
+
+		return res.status(200).json({ status: true, message: "Followup created successfully", data: followup });
+
+	} catch (err) {
+		console.log(err);
+		return res.status(500).send({ status: false, message: err.message });
+	}
+});
+
+router.get("/leads/my-followups", isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+
 		const { fromDate, toDate, page = 1, limit = 10 } = req.query;
 
 		// Add date validation
@@ -6328,187 +6384,72 @@ router.get("/leads/my-followups", async (req, res) => {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
 
-		const skip = (parseInt(page) - 1) * parseInt(limit);
-
-		// First, get the documents that match our criteria
-		const matchingDocs = await AppliedCourses.find({
-			followups: { $exists: true, $ne: [] },
-			"followups.date": { $gte: from, $lte: to }
-		})
-			.populate([
-				{
-					path: '_course',
-					select: 'name description docsRequired',
-					populate: { path: 'sectors', select: 'name' }
-				},
-				{ path: '_leadStatus' },
-				{ path: 'registeredBy' },
-				{
-					path: '_candidate',
-					populate: [
-						{
-							path: '_appliedCourses',
-							populate: [
-								{ path: '_course', select: 'name description' },
-								{ path: 'registeredBy', select: 'name email' },
-								{ path: '_center', select: 'name location' },
-								{ path: '_leadStatus', select: 'title' }
-							]
-						}
-					]
-				},
-				{
-					path: 'logs',
-					populate: {
-						path: 'user',
-						select: 'name'
-					}
+		const aggregate = [
+			{
+				$match: {
+					createdBy: user._id,
+					followupDate: { $gte: from, $lte: to }
 				}
-			]);
-
-		// Now flatten and filter the followups
-		let allFollowups = [];
-
-		matchingDocs.forEach(doc => {
-			doc.followups.forEach(followup => {
-				if (followup.date >= from && followup.date <= to) {
-					allFollowups.push({
-						...doc.toObject(), // Convert to plain object here
-						followupDate: followup.date,
-						followupStatus: followup.status
-					});
+			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: 'appliedCourseId',
+					foreignField: '_id',
+					as: "appliedCourseId"
 				}
-			});
-		});
+			},
+			{
+				$unwind: {
+					path: '$appliedCourseId',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'candidateprofiles',
+					localField: 'appliedCourseId._candidate',
+					foreignField: '_id',
+					as: 'candidate'
+				}
+			},
+			{
+				$unwind: {
+					path: '$candidate',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$group: {
+					_id: '$_id',
+					name: { $first: '$candidate.name' },
+					email: { $first: '$candidate.email' },
+					mobile: { $first: '$candidate.mobile' },
+					appliedCourseId: { $first: '$appliedCourseId._id' },
+					followupDate: { $first: '$followupDate' },
+					remarks: { $first: '$remarks' }
 
-		// Sort by followup date
-		allFollowups.sort((a, b) => new Date(b.followupDate) - new Date(a.followupDate));
-
-		// Apply pagination
-		const total = allFollowups.length;
-		const totalPages = Math.ceil(total / parseInt(limit));
-		const paginatedData = allFollowups.slice(skip, skip + parseInt(limit));
-
-		const result = paginatedData.map(doc => {
-			let selectedSubstatus = null;
-
-			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
-				selectedSubstatus = doc._leadStatus.substatuses.find(
-					sub => sub._id.toString() === doc._leadSubStatus.toString()
-				);
+				}
 			}
-
-			// doc is already a plain object from toObject() above, so no need to call toObject() again
-			const docObj = doc;
-
-			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
-			if (docObj._course) {
-				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
-			}
-
-			const requiredDocs = docObj._course?.docsRequired || [];
-			const uploadedDocs = docObj.uploadedDocs || [];
-
-			// Map uploaded docs by docsId for quick lookup
-			const uploadedDocsMap = {};
-			uploadedDocs.forEach(d => {
-				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
-			});
-
-			// Prepare combined docs array
-			const allDocs = requiredDocs.map(reqDoc => {
-				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-				if (uploadedDoc) {
-					// Agar uploaded hai to uploadedDoc details bhejo
-					return {
-						...uploadedDoc,
-						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
-						_id: reqDoc._id
-					};
-				} else {
-					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
-					return {
-						docsId: reqDoc._id,
-						Name: reqDoc.Name,
-						status: "Not Uploaded",
-						fileUrl: null,
-						reason: null,
-						verifiedBy: null,
-						verifiedDate: null,
-						uploadedAt: null
-					};
-				}
-			});
-
-			let combinedDocs = []; // Initialize combinedDocs
-
-			if (requiredDocs && requiredDocs.length > 0) {
-				// Create a merged array with both required docs and uploaded docs info
-				combinedDocs = requiredDocs.map(reqDoc => {
-					// Handle both Mongoose documents and plain objects
-					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-
-					// Find matching uploaded docs for this required doc
-					const matchingUploads = uploadedDocs.filter(
-						uploadDoc => uploadDoc.docsId && uploadDoc.docsId.toString() === docObj._id.toString()
-					);
-
-					return {
-						_id: docObj._id,
-						Name: docObj.Name || 'Document',
-						description: docObj.description || '',
-						uploads: matchingUploads || []
-					};
-				});
-			} else {
-				console.log("Course not found or no docs required");
-			}
-
-			// Count calculations
-			let verifiedCount = 0;
-			let RejectedCount = 0;
-			let pendingVerificationCount = 0;
-			let notUploadedCount = 0;
-
-			allDocs.forEach(doc => {
-				if (doc.status === "Verified") verifiedCount++;
-				else if (doc.status === "Rejected") RejectedCount++;
-				else if (doc.status === "Pending") pendingVerificationCount++;
-				else if (doc.status === "Not Uploaded") notUploadedCount++;
-			});
-
-			const totalRequired = allDocs.length;
-			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
-			const uploadPercentage = totalRequired > 0
-				? Math.round((uploadedCount / totalRequired) * 100)
-				: 0;
-
-			return {
-				...docObj,
-				selectedSubstatus,
-				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
-				docCounts: {
-					totalRequired,
-					RejectedCount,
-					uploadedCount,
-					verifiedCount,
-					pendingVerificationCount,
-					notUploadedCount,
-					uploadPercentage
-				}
-			};
-		});
+		]
 
 
 
-		res.status(200).json({
-			success: true,
-			page: parseInt(page),
-			limit: parseInt(limit),
-			total,
-			totalPages,
-			data: result
-		});
+		const followups = await B2cFollowup.aggregate(aggregate);
+
+		// const followups = await B2cFollowup.aggregate(aggregate).populate({
+		// 	path: 'appliedCourseId',
+		// 	select: 'name mobile email'
+		// });	
+
+
+		console.log("followups", followups)
+
+		if (!followups) {
+			return res.status(400).json({ error: "No followups found" });
+		}
+
+		return res.status(200).json({ success: true, data: followups });
 
 	} catch (err) {
 		console.error(err);
@@ -6517,6 +6458,37 @@ router.get("/leads/my-followups", async (req, res) => {
 });
 
 
+router.get("/lead-history/:leadId", isCollege, async (req, res) => {
+	try {
+		const { leadId } = req.params;
+		const lead = await AppliedCourses.findById(leadId)
+			.select('logs')
+			.populate({
+				path: 'logs.user',
+				select: 'name email role' // jo bhi fields chahiye
+			})
+			.lean();
+
+
+		const logs = lead.logs;
+		console.log("logs", logs)
+
+		// const logsData = logs.map(log => {
+		// 	return {
+		// 		action: log.action,
+		// 		remarks: log.remarks,
+		// 		timestamp: log.timestamp
+		// 	};
+		// });
+
+		return res.status(200).json({ success: true, data: logs });
+
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server Error" });
+	}
+});
 
 // Get admission list
 // Verify document and update KYC status
@@ -6679,12 +6651,12 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 			updatedProfile.kyc = true;
 			await updatedProfile.save();
 
-			
-				const newStatusLogs = await statusLogHelper(id, {
-					kycApproved: true
-				});
-				
-			
+
+			const newStatusLogs = await statusLogHelper(id, {
+				kycApproved: true
+			});
+
+
 		}
 
 		return res.json({
@@ -8567,7 +8539,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Test intermediate results before college filter
 		const intermediateResults = await AppliedCourses.aggregate(aggregationPipeline);
-		
+
 
 		// Filter by college
 		aggregationPipeline.push({
@@ -8631,7 +8603,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Execute aggregation for total count (without pagination)
 		const totalResults = await AppliedCourses.aggregate(aggregationPipeline);
-	
+
 
 		const totalCount = totalResults.length;
 
@@ -9034,7 +9006,7 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 
 		// Test intermediate results before college filter
 		const intermediateResults = await AppliedCourses.aggregate(aggregationPipeline);
-		
+
 
 		// Filter by college
 		aggregationPipeline.push({
@@ -9881,11 +9853,11 @@ router.post('/lead-details-by-ids', [isCollege], async (req, res) => {
 router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 	try {
 
-				let {
+		let {
 			startDate,
 			endDate,
 			centerId, // Add centerId from query parameters
-			
+
 			// Advanced filter parameters (matching frontend structure)
 			courseType,
 			projects,
@@ -9897,13 +9869,13 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 
 		// Build date filter
 		let dateFilter = {};
-		
+
 		if (startDate && endDate) {
-			
+
 			// Create start date (beginning of day)
 			const startDateObj = new Date(startDate);
 			startDateObj.setHours(0, 0, 0, 0);
-			
+
 			// Create end date (end of day)
 			const endDateObj = new Date(endDate);
 			endDateObj.setHours(23, 59, 59, 999);
@@ -9917,11 +9889,11 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			// If no date range provided, get today's data
 			const todayStartTime = new Date();
 			todayStartTime.setHours(0, 0, 0, 0);
-			
+
 			const todayEndTime = new Date();
 			todayEndTime.setHours(23, 59, 59, 999);
 
-			
+
 			dateFilter.createdAt = {
 				$gte: todayStartTime,
 				$lte: todayEndTime
@@ -9946,16 +9918,16 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 		}
 
 		// First, find the college's untouch status ID
-		const untouchStatus = await Status.findOne({ 
-			college: req.user.college._id, 
-			title: { $regex: /untouch/i } 
+		const untouchStatus = await Status.findOne({
+			college: req.user.college._id,
+			title: { $regex: /untouch/i }
 		});
-		
-		
+
+
 		if (!untouchStatus) {
 			const allStatuses = await Status.find({ college: req.user.college._id });
 		}
-		
+
 		// Get total leads and untouch leads from AppliedCourses based on creation date and counselor
 		const appliedCoursesLeads = await AppliedCourses.aggregate([
 			{
@@ -10031,8 +10003,8 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 						}
 					},
 					totalLeads: { $sum: 1 },
-					untouchLeads: { 
-						$sum: { 
+					untouchLeads: {
+						$sum: {
 							$cond: [
 								{ $eq: ['$_leadStatus', untouchStatus ? untouchStatus._id : null] },
 								1,
@@ -10379,35 +10351,35 @@ router.delete('/delete-leads', async (req, res) => {
 		for (let mobile of mobiles) {
 			// Ensure string type
 			mobile = mobile.toString().trim();
-		
+
 			// Agar mobile "91" se start hota hai aur length > 10 hai
 			if (mobile.startsWith("91") && mobile.length > 10) {
 				mobile = mobile.substring(2); // Remove first 2 digits
 			}
-		
+
 			// Agar mobile ki length abhi bhi 10 nahi hai to skip ya log kar do
 			if (mobile.length !== 10) {
 				continue;
 			}
-		
+
 			// Delete User
 			await User.deleteOne({ mobile });
-		
+
 			// Candidate find
 			const candidate = await CandidateProfile.findOne({ mobile });
-		
+
 			if (candidate) {
 				// AppliedCourses delete
 				const applied = await AppliedCourses.deleteOne({ _candidate: candidate._id });
-		
-		
+
+
 				// CandidateProfile delete
 				await CandidateProfile.deleteOne({ _id: candidate._id });
 			} else {
 			}
 			await new Promise(resolve => setTimeout(resolve, 1000));
 		}
-		
+
 		res.json({ status: true, message: 'Leads deleted successfully' });
 	} catch (error) {
 		res.status(500).json({ status: false, message: 'Error deleting lead', error: error.message });

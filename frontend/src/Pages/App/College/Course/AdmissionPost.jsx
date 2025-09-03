@@ -226,78 +226,78 @@ const CRMDashboard = (profile) => {
     const getBranches = async (profile) => {
         // Check if profile and course exist
         if (!profile || !profile._course || !profile._course._id) {
-          alert('Profile or course information is missing. Cannot fetch branches.');
-          return;
+            alert('Profile or course information is missing. Cannot fetch branches.');
+            return;
         }
-        
+
         const courseId = profile._course._id;
         const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'multipart/form-data',
-          }
+            headers: {
+                'x-auth': token,
+                'Content-Type': 'multipart/form-data',
+            }
         });
         console.log('res..', response)
         if (response.data.status) {
-          setBranches(response.data);
-          setSelectedBranch('');
+            setBranches(response.data);
+            setSelectedBranch('');
         } else {
-          alert('Failed to fetch branches');
+            alert('Failed to fetch branches');
         }
-      }
-    
-      const updateBranch = async (profile, selectedBranchId) => {
+    }
+
+    const updateBranch = async (profile, selectedBranchId) => {
         console.log("updateBranch")
         if (!selectedBranchId) {
-          alert('Please select a branch first');
-          return;
+            alert('Please select a branch first');
+            return;
         }
-    
+
         const profileId = profile._id;
         console.log("profile", profileId)
         console.log("profileId", profileId)
         console.log("selectedBranchId", selectedBranchId)
-    
+
         try {
-          const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
-            centerId: selectedBranchId
-          }, {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json',
+            const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+                centerId: selectedBranchId
+            }, {
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'application/json',
+                }
+            });
+            console.log('response', response)
+            if (response.data.success) {
+                alert('Branch updated successfully!');
+                // Optionally refresh the data or close modal
+                setShowBranchModal(false);
+
+                // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+                // setAllProfiles(prevProfiles => 
+                //   prevProfiles.map(p => 
+                //     p._id === profile._id 
+                //       ? {
+                //           ...p,
+                //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+                //         }
+                //       : p
+                //   )
+                // );
+
+                setSelectedBranch('');
+
+
+
+                await fetchProfileData();
+            } else {
+                alert('Failed to update branch');
             }
-          });
-          console.log('response', response)
-          if (response.data.success) {
-            alert('Branch updated successfully!');
-            // Optionally refresh the data or close modal
-            setShowBranchModal(false);
-    
-            // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
-            // setAllProfiles(prevProfiles => 
-            //   prevProfiles.map(p => 
-            //     p._id === profile._id 
-            //       ? {
-            //           ...p,
-            //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
-            //         }
-            //       : p
-            //   )
-            // );
-    
-            setSelectedBranch('');
-    
-    
-    
-            await fetchProfileData();
-          } else {
-            alert('Failed to update branch');
-          }
         } catch (error) {
-          console.error('Error updating branch:', error);
-          alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+            console.error('Error updating branch:', error);
+            alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
         }
-      }
+    }
 
     //filte stats
 
@@ -830,7 +830,45 @@ const CRMDashboard = (profile) => {
     }
 
 
+    /************************************/
 
+    //lead history
+
+    const [leadHistory, setLeadHistory] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+
+
+    useEffect(() => {
+        if (showPanel === 'leadHistory' && selectedProfile) {
+            fetchLeadHistory();
+        }
+    }, [showPanel]);
+
+    const fetchLeadHistory = async () => {
+        try {
+            setIsHistoryLoading(true);
+            setLeadHistory([])
+            const response = await axios.get(`${backendUrl}/college/lead-history/${selectedProfile._id}`, {
+                headers: {
+                    'x-auth': token,
+                }
+            });
+            if (response.data.success) {
+                console.log("response", response)
+                setLeadHistory(response.data.data);
+            } else {
+                alert('Field to history load')
+            }
+        } catch (error) {
+            console.error('Error fetching lead history:', error);
+            alert('Field to history load')
+
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    }
+    /************************************/
 
 
     // Leads Panel
@@ -849,101 +887,109 @@ const CRMDashboard = (profile) => {
                     </button>
                 </div>
 
-                <div className="card-body p-0 d-flex flex-column h-100">
-                    {/* Scrollable Content Area */}
-                    <div
-                        className="flex-grow-1 overflow-auto px-3 py-2"
-                        style={{
-                            maxHeight: isMobile ? '50vh' : '55vh',
-                            minHeight: '200px'
-                        }}
-                    >
-                        {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-                            <div className="timeline">
-                                {selectedProfile.logs.map((log, index) => (
-                                    <div key={index} className="timeline-item mb-4">
-                                        <div className="timeline-marker">
-                                            <div className="timeline-marker-icon">
-                                                <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                {isHistoryLoading ? (
+                    <div className="d-flex justify-content-center align-items-center h-100">
+                        <div className="spinner-border" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <span className="ms-2 mt-2">Loading...</span>
+                    </div>
+                ) : (
+                    <div className="card-body p-0 d-flex flex-column h-100">
+                        {/* Scrollable Content Area */}
+                        <div
+                            className="flex-grow-1 overflow-auto px-3 py-2"
+                            style={{
+                                maxHeight: isMobile ? '50vh' : '55vh',
+                                minHeight: '200px'
+                            }}
+                        >
+                            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+                                <div className="timeline">
+                                    {selectedProfile.logs.map((log, index) => (
+                                        <div key={index} className="timeline-item mb-4">
+                                            <div className="timeline-marker">
+                                                <div className="timeline-marker-icon">
+                                                    <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                                                </div>
+                                                {index !== selectedProfile.logs.length - 1 && (
+                                                    <div className="timeline-line"></div>
+                                                )}
                                             </div>
-                                            {index !== selectedProfile.logs.length - 1 && (
-                                                <div className="timeline-line"></div>
-                                            )}
-                                        </div>
 
-                                        <div className="timeline-content">
-                                            <div className="card border-0 shadow-sm">
-                                                <div className="card-body p-3">
-                                                    <div className="d-flex justify-content-between align-items-start mb-2 flex-column">
-                                                        <span className="bg-light text-dark border">
-                                                            {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric',
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            }) : 'Unknown Date'}
-                                                        </span>
-                                                        <small className="text-muted">
-                                                            <i className="fas fa-user me-1"></i>
-                                                            Modified By: {log.user?.name || 'Unknown User'}
-                                                        </small>
-                                                    </div>
-
-                                                    <div className="mb-2">
-                                                        <strong className="text-dark d-block mb-1">Action:</strong>
-                                                        <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                                                            {log.action ? (
-                                                                log.action.split(';').map((actionPart, actionIndex) => (
-                                                                    <div key={actionIndex} className="mb-1">
-                                                                        • {actionPart.trim()}
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div className="text-muted">No action specified</div>
-                                                            )}
+                                            <div className="timeline-content">
+                                                <div className="card border-0 shadow-sm">
+                                                    <div className="card-body p-3">
+                                                        <div className="d-flex justify-content-between align-items-start mb-2 flex-column">
+                                                            <span className="bg-light text-dark border">
+                                                                {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                }) : 'Unknown Date'}
+                                                            </span>
+                                                            <small className="text-muted">
+                                                                <i className="fas fa-user me-1"></i>
+                                                                Modified By: {log.user?.name || 'Unknown User'}
+                                                            </small>
                                                         </div>
-                                                    </div>
 
-                                                    {log.remarks && (
-                                                        <div>
-                                                            <strong className="text-dark d-block mb-1">Remarks:</strong>
-                                                            <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                                                {log.remarks}
-                                                            </p>
+                                                        <div className="mb-2">
+                                                            <strong className="text-dark d-block mb-1">Action:</strong>
+                                                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                                                {log.action ? (
+                                                                    log.action.split(';').map((actionPart, actionIndex) => (
+                                                                        <div key={actionIndex} className="mb-1">
+                                                                            • {actionPart.trim()}
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="text-muted">No action specified</div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    )}
+
+                                                        {log.remarks && (
+                                                            <div>
+                                                                <strong className="text-dark d-block mb-1">Remarks:</strong>
+                                                                <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                                                    {log.remarks}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                                <div className="mb-3">
-                                    <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                                    ))}
                                 </div>
-                                <h6 className="text-muted mb-2">No History Available</h6>
-                                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Fixed Footer */}
-                    <div className="border-top px-3 py-3 bg-light">
-                        <div className="d-flex justify-content-end">
-                            <button
-                                type="button"
-                                className="btn btn-outline-secondary"
-                                onClick={closeleadHistoryPanel}
-                            >
-                                <i className="fas fa-times me-1"></i>
-                                Close
-                            </button>
+                            ) : (
+                                <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                                    <div className="mb-3">
+                                        <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                                    </div>
+                                    <h6 className="text-muted mb-2">No History Available</h6>
+                                    <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                </div>
+
+                        {/* Fixed Footer */}
+                        <div className="border-top px-3 py-3 bg-light">
+                            <div className="d-flex justify-content-end">
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary"
+                                    onClick={closeleadHistoryPanel}
+                                >
+                                    <i className="fas fa-times me-1"></i>
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>)}
             </div>
         );
 
@@ -1334,7 +1380,7 @@ const CRMDashboard = (profile) => {
                                 <i className="fas fa-check me-1"></i>
                                 Assign Batch
                             </button>
-                            
+
                         </div>
                     </div>
                 </div>
@@ -1727,11 +1773,15 @@ const CRMDashboard = (profile) => {
           z-index: 10;
           }
            #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
 
           .whatsapp-chat .topbar-container {
@@ -6530,6 +6580,7 @@ background: #fd2b5a;
         /* position: absolute !important; */
         /* min-height: 200px; */
         background: white;
+        width:-webkit-fill-available;
         
         }
         }

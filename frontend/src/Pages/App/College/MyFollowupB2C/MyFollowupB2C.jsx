@@ -187,6 +187,10 @@ const MyFollowups = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
+  // Loading state for fetchProfileData
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
+
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
@@ -1906,7 +1910,6 @@ const MyFollowups = () => {
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
-  
       if (!token) {
         console.warn('No token found in session storage.');
         return;
@@ -2164,6 +2167,8 @@ const MyFollowups = () => {
       setMainContentClass('col-8');
     }
   };
+
+
 
   const toggleLeadDetails = (profileIndex) => {
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
@@ -4037,24 +4042,29 @@ const MyFollowups = () => {
                             {/* Profile Header Card */}
                             <div className="card border-0 shadow-sm mb-0 mt-2">
                               <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center">
+                                <div className="row align-items-center justify-content-between">
                                   <div className="col-md-6">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-3">
                                         <input className="form-check-input" type="checkbox" />
                                       </div>
                                       <div className="me-3">
-                                        <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                        {/* <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                           <svg width="40" height="40">
                                             <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                             <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
                                           </svg>
                                           <div className="progress-text"></div>
-                                        </div>
+                                        </div> */}
                                       </div>
                                       <div>
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
+                                        <h6 className="mb-0 fw-bold">{profile?.name || 'Your Name'}</h6>
+                                        <small className="text-muted">
+                                        <i className="fas fa-phone" style={{fontSize:'12px', marginRight:'5px'}}></i>
+                                          {profile?.mobile || 'Mobile Number'}</small>
+                                       <br/>
+                                        <small className="text-muted">
+                                        <i className="fas fa-envelope" style={{fontSize:'12px' , marginRight:'5px'}}></i>{profile?.email || 'Email'}</small>
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
@@ -4072,7 +4082,7 @@ const MyFollowups = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-4">
+                                  {/* <div className="col-md-4">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -4088,7 +4098,7 @@ const MyFollowups = () => {
                                             height: '20px',
                                             fontSize: '10px'
                                           }}
-                                          value={profile._leadStatus?.title}
+                                          value={profile?.leadStatus?.title}
                                           readOnly
                                           onClick={() => {
                                             openEditPanel(profile, 'StatusChange');
@@ -4114,7 +4124,7 @@ const MyFollowups = () => {
                                         />
                                       </div>
                                     </div>
-                                  </div>
+                                  </div> */}
 
                                   <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">

@@ -6,7 +6,8 @@
 					<h3 class="content-header-title float-left mb-0">All Courses</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
+							</li>
 							<li class="breadcrumb-item active">All Courses</li>
 						</ol>
 					</div>
@@ -81,6 +82,7 @@
 								<table class="table table-hover-animation mb-0 table-hover">
 									<thead>
 										<tr>
+											<th>Sequence</th>
 											<th>Sector</th>
 											<th>Course Level</th>
 											<th>Course Name</th>
@@ -97,6 +99,12 @@
 									<tbody>
 										<%courses.forEach((course,i)=>{%>
 											<tr>
+												<td>
+													<input type="number" id="course-seq" value="<%= course.sequence %>"
+														onblur="updateSequence(event,'<%= course._id %>')" name="sequence"
+														maxlength="4" onkeypress="if(this.value.length==4) return false"
+														class="form-control w-50" data-id="<%= course._id %>">
+												</td>
 												<td>
 													<%course?.sectors.forEach((sector,i)=>{%>
 														<option value="<%=sector._id %>">
@@ -121,28 +129,29 @@
 													</a>
 												</td>
 
-												<% if (canEdit ===true) { %>
-												<td>
-													<div class="custom-control custom-switch custom-control-inline">
-														<input type="checkbox"
-															onclick="myOnOffFunc('<%= course._id %>', `<%= course.status %>`);"
-															class="custom-control-input" id="customSwitch<%= i %>" <% if
-															(course.status) { %> checked <% } %> />
-															<label class="custom-control-label"
-																for="customSwitch<%= i %>">
-															</label>
-													</div>
-												</td>
-												
-												<td valign="middle"
-													class="qualification-action-custom-class d-flex justify-content-center">
+												<% if (canEdit===true) { %>
+													<td>
+														<div class="custom-control custom-switch custom-control-inline">
+															<input type="checkbox"
+																onclick="myOnOffFunc('<%= course._id %>', `<%= course.status %>`);"
+																class="custom-control-input" id="customSwitch<%= i %>"
+																<% if (course.status) { %> checked <% } %> />
+																<label class="custom-control-label"
+																	for="customSwitch<%= i %>">
+																</label>
+														</div>
+													</td>
+
+													<td valign="middle"
+														class="qualification-action-custom-class d-flex justify-content-center">
 
 
-													<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/edit/<%=course._id %>">
-														<i class="feather icon-edit fa-lg primary"></i>
-													</a>
-												</td>
-												<%}%>
+														<a
+															href="<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/edit/<%=course._id %>">
+															<i class="feather icon-edit fa-lg primary"></i>
+														</a>
+													</td>
+													<%}%>
 											</tr>
 											<%})%>
 
@@ -161,6 +170,14 @@
 
 		</div>
 		<script>
+			function updateSequence(e, id) {
+				const val = e.target.value;
+				axios.patch("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/coursesequence", { id, val }).then((res) => {
+					if (res.data.status === true) {
+						e.target.value = res.data.sequence
+					}
+				})
+			}
 			function myOnOffFunc(id, status) {
 				let data = { id: id, status: !(status == 'true') }
 				let headers = { 'x-auth': localStorage.getItem('token') }
@@ -221,5 +238,6 @@
 		<% include ../partials/footer %>
 
 	</div>
-</body>
-</html>
+	</body>
+
+	</html>

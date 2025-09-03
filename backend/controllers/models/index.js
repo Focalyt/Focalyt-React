@@ -88,6 +88,7 @@ module.exports.QuestionAnswer = require("./questionAnswer");
 module.exports.CandidateVisitCalender = require("./candidateVisitCalender");
 module.exports.AttendanceTracking = require("./attendanceTracking");
 module.exports.StatusLogs = require("./statusLogs");
+module.exports.B2cFollowup = require("./b2cFollowup");
 // module.exports.Manager = required("");
 
 
