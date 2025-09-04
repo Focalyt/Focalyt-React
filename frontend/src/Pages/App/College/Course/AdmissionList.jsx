@@ -2952,7 +2952,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-6 lastDatepicker">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -7705,6 +7705,11 @@ background: #fd2b5a;
     width: 250px !important;
     height: min-content !important;
     transform: translateX(0px)!important;
+}
+.lastDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(-110px)!important;
 }
 .react-calendar{
 // width:min-content !important;
