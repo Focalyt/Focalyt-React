@@ -1194,6 +1194,8 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Get the specific lead ID from request body
 		let { leadId } = req.query;
 
+		console.log("leadId", leadId)
+
 		if (!leadId) {
 			return res.status(400).json({
 				success: false,
@@ -1575,6 +1577,8 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 				}
 			};
 		});
+
+		console.log("results", results)
 
 
 		res.status(200).json({
@@ -4739,6 +4743,118 @@ router.put('/update/:id', isCollege, async (req, res) => {
 	}
 });
 
+// missed followup api
+router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const { id } = req.params;
+		const b2cFollowup = await B2cFollowup.findOneAndUpdate({
+			_id: id,
+			status: 'pending'
+		},
+			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } }, { new: true }
+		).sort({ createdAt: -1 });
+
+		console.log("b2cFollowup", b2cFollowup)
+
+		if (!b2cFollowup) {
+			return res.status(404).json({ success: false, message: 'Followup not found' });
+		}
+
+		const newLogEntry = {
+			user: user._id,
+			action: 'Followup Marked Complete',
+			remarks: 'Followup completed successfully',
+			timestamp: new Date()
+		};
+
+		const appliedcourse = await AppliedCourses.findOneAndUpdate({
+			_id: b2cFollowup.appliedCourseId
+		},
+			{ $push: { logs: newLogEntry } }, { new: true }
+		);
+		console.log("appliedcourse", appliedcourse)
+
+		// const newStatusLogs = await statusLogHelper(id, {
+		// 	followupCompleted: true
+		// });
+
+		return res.json({
+			success: true,
+			message: "Follow-up marked complete successfully",
+			data: {
+				b2cFollowup: b2cFollowup
+			}
+		});
+
+	} catch (err) {
+		console.error("Error updating follow-up:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
+router.get('/followupcounts', isCollege, async (req, res) => {
+	try {
+
+		const user = req.user;
+
+		const { fromDate, toDate } = req.query;
+		console.log("fromDate", fromDate)
+		console.log("toDate", toDate)
+		const followupCounts = await B2cFollowup.aggregate([
+			{
+			  $match: {
+				createdBy: user._id,
+				createdAt: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+			  }
+			},
+			{
+			  $group: {
+				_id: "$status",
+				count: { $sum: 1 }
+			  }
+			},
+			{
+			  $project: {
+				k: "$_id",
+				v: "$count",
+				_id: 0
+			  }
+			},
+			{
+			  $group: {
+				_id: null,
+				counts: { $push: { k: "$k", v: "$v" } }
+			  }
+			},
+			{
+			  $replaceRoot: {
+				newRoot: { $arrayToObject: "$counts" }
+			  }
+			},
+		  ]);
+		  
+		console.log("followupCounts", followupCounts[0])
+		return res.json({ success: true, data: followupCounts[0] });
+
+
+	}
+	catch (err) {
+		console.error("Error fetching followup counts:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
+
+
 //KYC Leads
 
 // router.route("/kycCandidates").get(isCollege, async (req, res) => {
@@ -6361,7 +6477,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 
-		const { fromDate, toDate, page = 1, limit = 10 } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus } = req.query;
 
 		// Add date validation
 		let from, to;
@@ -6388,6 +6504,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			{
 				$match: {
 					createdBy: user._id,
+					status: followupStatus,
 					followupDate: { $gte: from, $lte: to }
 				}
 			},
@@ -6443,7 +6560,6 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		// });	
 
 
-		console.log("followups", followups)
 
 		if (!followups) {
 			return res.status(400).json({ error: "No followups found" });

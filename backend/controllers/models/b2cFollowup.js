@@ -6,7 +6,7 @@ const B2cFollowupSchema = new Schema({
   collegeId: { type: Types.ObjectId, ref: 'College', required: true },
   followupDate: { type: Date, required: true },
 
-  status: { type: String, enum: ['pending', 'missed', 'done'], default: 'pending' },
+  status: { type: String, enum: ['planned', 'missed', 'done'], default: 'planned' },
   updatedBy: { type: Types.ObjectId, ref: 'User' },
   statusUpdatedAt: { type: Date },
   remarks : { type: String },

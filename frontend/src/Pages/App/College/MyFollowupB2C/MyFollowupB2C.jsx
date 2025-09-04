@@ -145,6 +145,7 @@ const MyFollowups = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [activeFollowupStatus, setActiveFollowupStatus] = useState('planned');
   const [plannedCount, setPlannedCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [missedCount, setMissedCount] = useState(0);
@@ -209,7 +210,7 @@ const MyFollowups = () => {
     setIsUploading(false);
   };
 
-  
+
   const [formData, setFormData] = useState({
     projects: {
       type: "includes",
@@ -851,8 +852,8 @@ const MyFollowups = () => {
                 )}
               </div>
 
-                {/* Enhanced Document History with iframe/img Preview */}
-                {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+              {/* Enhanced Document History with iframe/img Preview */}
+              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card">
                   <h4>Document History</h4>
                   <div className="document-history">
@@ -906,7 +907,7 @@ const MyFollowups = () => {
                                 <i className="fas fa-download me-1"></i>
                                 Download
                               </a>
-                             
+
                             </div>
                           )}
                         </div>
@@ -954,7 +955,7 @@ const MyFollowups = () => {
                 </div>
               )}
 
-            
+
             </div>
           </div>
         </div>
@@ -1127,7 +1128,7 @@ const MyFollowups = () => {
     leadStatus: '',
     sector: '',
     fromDate: null,
-    toDate: null,    
+    toDate: null,
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -1662,6 +1663,59 @@ const MyFollowups = () => {
     }
   };
 
+  const handleMarkCompleteFollowup = async (profile) => {
+    console.log('Marking followup complete');
+    console.log("profile", profile)
+    try {
+      setIsLoadingProfiles(true);
+      
+      const response = await axios.post(`${backendUrl}/college/mark_complete_followup/${profile._id}`, {
+        
+      }, {
+        headers: { 'x-auth': token }
+      });
+      
+      console.log('API response:', response.data);
+      
+      // if (response.data.success) {
+      //   alert('Followup marked as complete successfully!');
+      //   await fetchProfileData();
+      //   const updatedProfiles = allProfilesData.map(p => {
+      //     if (p._id === profile._id) {
+      //       return {
+      //         ...p,
+      //         followupStatus: 'Done',
+      //         followups: p.followups?.map(f => 
+      //           f.status === 'Planned' ? { ...f, status: 'Done' } : f
+      //         )
+      //       };
+      //     }
+      //     return p;
+      //   });
+        
+      //   setAllProfiles(updatedProfiles);
+      //   setAllProfilesData(updatedProfiles);
+        
+      // } else {
+      //   alert('Failed to mark followup as complete: ' + (response.data.message || 'Unknown error'));
+      // }
+      
+    } catch (error) {
+      console.error('Error marking followup complete:', error);
+      
+      if (error.response?.data?.message) {
+        alert('Error: ' + error.response.data.message);
+      } else if (error.response?.status === 404) {
+        alert('Profile not found. Please refresh the page and try again.');
+      } else if (error.response?.status === 401) {
+        alert('Session expired. Please login again.');
+      } else {
+        alert('An error occurred while marking followup complete. Please try again.');
+      }
+    } finally {
+      setIsLoadingProfiles(false);
+    }
+  };
   const fetchSubStatus = async () => {
     try {
       const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
@@ -1868,47 +1922,17 @@ const MyFollowups = () => {
 
 
 
-  const [user, setUser] = useState({
-    image: '',
-    name: 'John Doe'
-  });
+  const [user, setUser] = useState({ });
 
-  // Inside CRMDashboard component:
 
   useEffect(() => {
     fetchProfileData();
-  }, []);
+  }, [filterData, activeFollowupStatus]);
 
-  useEffect(() => {
-    if (allProfilesData) {  // Safe check for response and data
-          const filteredProfiles = (status) => {
-            return allProfilesData?.filter(profile => {  // Safe check for allProfilesData
-              return profile._leadStatus && profile.followupStatus === status;
-            });
-          };
-
-          // Ensure filteredProfiles is defined and then calculate length
-          const plannedProfiles = filteredProfiles('Planned') || [];
-          const doneProfiles = filteredProfiles('Doen') || [];
-          const missedProfiles = filteredProfiles('Missed') || [];
-          setPlannedCount(plannedProfiles.length);
-          setDoneCount(doneProfiles.length);
-          setMissedCount(missedProfiles.length);
-        } else {
-          console.error("Error: No profile data available or response is malformed.");
-          // Optionally, you can set a fallback or handle empty state:
-          setPlannedCount(0);
-          setDoneCount(0);
-          setMissedCount(0)
-
-        };
-  }, [allProfilesData]);
-
-  useEffect(() => {
-    fetchProfileData();
-  }, [filterData]);
+  const [isLoadingAllProfiles, setIsLoadingAllProfiles] = useState(false);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
+    setIsLoadingAllProfiles(true);
     try {
       if (!token) {
         console.warn('No token found in session storage.');
@@ -1916,7 +1940,7 @@ const MyFollowups = () => {
       }
   
       const queryParams = new URLSearchParams({
-        page: page.toString(),
+        page: page?.toString(),
         limit: pageSize.toString(),
         ...(filters?.name && { name: filters.name }),
         ...(filters?.courseType && { courseType: filters.courseType }),
@@ -1940,6 +1964,7 @@ const MyFollowups = () => {
         // You can add fromDate and toDate here if needed for followup date filtering
         ...(filters?.fromDate && { fromDate: filters.fromDate }),
         ...(filters?.toDate && { toDate: filters.toDate }),
+         followupStatus:activeFollowupStatus,
       });
   
       // Use the My Followups specific API endpoint
@@ -1954,22 +1979,161 @@ const MyFollowups = () => {
       if (response.data.success && response.data.data) {
         const data = response.data.data;
         setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data); // Store all data for filtering
         setTotalPages(response.data.totalPages);
         setCurrentPage(response.data.page);
-        
+
       } else {
         console.error('Failed to fetch followups data', response.data.message);
         setAllProfiles([]);
-        setAllProfilesData([]);
       }
     } catch (error) {
       console.error('Error fetching followups data:', error);
       setAllProfiles([]);
-      setAllProfilesData([]);
+    }
+    finally {
+      setIsLoadingAllProfiles(false);
     }
   };
 
+
+  // job history
+
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+
+  useEffect(() => {
+    fetchCourseHistory();
+    console.log("courseHistory", courseHistory)
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const [candidateDetails, setCandidateDetails] = useState(null);
+
+ 
+    const fetchLeadDetails = async (profile, profileIndex) => {
+      if ((leadDetailsVisible === null || leadDetailsVisible === undefined) && ( profile === null || profile === undefined) && ((activeTab[profileIndex] || 0) === 0)) {
+        return;
+      }
+      try {
+        setIsLoadingProfilesData(true);
+        const leadId = profile.appliedCourseId;
+        console.log('profile', profile)
+        const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+          headers: { 'x-auth': token }
+        });
+        console.log("leadDetailsVisible", response)
+
+        // if (response.data.success && response.data.data) {
+        //   const data = response.data;
+        //   console.log('data', data)
+
+
+        //   // Sirf ek state me data set karo - paginated data
+        //   if (!isLoadingProfiles) {
+        //     allProfiles[leadDetailsVisible] = data.data;
+        //   }
+
+
+        // } else {
+        //   console.error('Failed to fetch profile data', response.data.message);
+        // }
+        if (response.data.success && response.data.data) {
+          const data = response.data;
+          console.log('data', data)
+
+          // Properly update state without direct mutation
+          // if (!isLoadingProfiles) {
+          //   setAllProfiles(prevProfiles => {
+          //     const updatedProfiles = [...prevProfiles];
+          //     updatedProfiles[leadDetailsVisible] = {
+          //       ...prevProfiles[leadDetailsVisible], // Keep existing data
+          //       ...data.data // Merge new data
+          //     };
+          //     return updatedProfiles;
+          //   });
+          // }
+
+          setCandidateDetails(data.data);
+        } else {
+          console.error('Failed to fetch profile data', response.data.message || 'Unknown error');
+        }
+      }
+      catch (error) {
+        console.error('Error fetching profile data:', error);
+      }
+      finally {
+        setIsLoadingProfilesData(false);
+      }
+    }
+
+
+    useEffect(() => {
+      fetchLeadDetails(selectedProfile, leadDetailsVisible)
+    }, [selectedProfile, leadDetailsVisible, activeTab]);
+ 
+
+useEffect(() => {
+  fetchFollowupCounts();
+}, [filterData, activeFollowupStatus]);
+
+const fetchFollowupCounts = async () => {
+  try {
+    const response = await axios.get(`${backendUrl}/college/followupcounts?fromDate=${filterData.fromDate}&toDate=${filterData.toDate}`, {
+      headers: { 'x-auth': token }
+    });
+    console.log("response", response);
+    if (response.data.success && response.data.data) {
+      
+      setDoneCount(response.data.data?.done || 0);
+      setPlannedCount(response.data.data?.planned || 0);
+      setMissedCount(response.data.data?.missed || 0);
+    }
+  }
+  catch (error) {
+    console.log("error", error);
+  }
+}
 
   const [experiences, setExperiences] = useState([{
     jobTitle: '',
@@ -2020,22 +2184,18 @@ const MyFollowups = () => {
     });
   }, [allProfiles, totalPages, currentPage, pageSize]);
 
+  const resetAllPanels = () => {
+    setShowPopup(null)
+    setSelectedProfile(null)
+    setCandidateDetails(null)
+    setLeadDetailsVisible(null)
+    setLeadHistoryPanel(false)
+  }
   const handleCrmFilterClick = (status, index) => {
-
+    resetAllPanels()
     setCurrentPage(1);
-
-    // Filter karo jisme leadStatus._id match ho
-    const filteredProfiles = allProfilesData.filter(profile => {
-      return profile._leadStatus && profile.followupStatus === status;
-    });
-
-
+    setActiveFollowupStatus(status)
     setActiveCrmFilter(index)
-    setAllProfiles(filteredProfiles);
-    // Calculate total pages
-    const totalPages = Math.ceil(filteredProfiles.length / pageSize);
-    setTotalPages(totalPages > 0 ? totalPages : 1);
-
 
   };
 
@@ -2170,8 +2330,10 @@ const MyFollowups = () => {
 
 
 
-  const toggleLeadDetails = (profileIndex) => {
+  const toggleLeadDetails = (profileIndex, profile) => {
+    setSelectedProfile(profile)
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+    fetchLeadDetails(profile, profileIndex)
   };
 
   const closeleadHistoryPanel = () => {
@@ -2330,9 +2492,13 @@ const MyFollowups = () => {
         fromDate: start,
         toDate: end
       }));
-      
+
       setIsRangeMode(true);
     };
+
+    useEffect(() => {
+      console.log("filterData", filterData)
+    }, [filterData]);
 
     const setCustomDaysRange = () => {
       if (!customDays || customDays < 1) return;
@@ -2348,7 +2514,7 @@ const MyFollowups = () => {
         fromDate: start,
         toDate: end
       }));
-      
+
       setRangePreset('custom');
     };
 
@@ -2482,7 +2648,7 @@ const MyFollowups = () => {
     };
 
     const clearRange = () => {
-        setFilterData(prev => ({
+      setFilterData(prev => ({
         ...prev,
         fromDate: null,
         toDate: null
@@ -3564,7 +3730,7 @@ const MyFollowups = () => {
                       <div className='d-flex'>
                         <button
                           className={`btn btn-sm ${activeCrmFilter === 0 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('Planned', 0)}
+                          onClick={() => handleCrmFilterClick('planned', 0)}
 
                         >
                           Planned Followups
@@ -3582,12 +3748,12 @@ const MyFollowups = () => {
                       <div className='d-flex'>
                         <button
                           className={`btn btn-sm ${activeCrmFilter === 1 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('Done', 1)}
+                          onClick={() => handleCrmFilterClick('done', 1)}
 
                         >
                           Done Followups
                           <span className={`ms-1 ${activeCrmFilter === 1 ? 'text-white' : 'text-dark'}`}>
-                          {doneCount}
+                            {doneCount}
                           </span>
                         </button>
 
@@ -3600,7 +3766,7 @@ const MyFollowups = () => {
                       <div className='d-flex'>
                         <button
                           className={`btn btn-sm ${activeCrmFilter === 2 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('Missed', 2)}
+                          onClick={() => handleCrmFilterClick('missed', 2)}
 
                         >
                           Missed Followups
@@ -4025,14 +4191,21 @@ const MyFollowups = () => {
               </div>
             </div>
           )}
-         
+
           {/* Main Content */}
-          <div className="content-body" style={{marginTop:'150px'}}>
+          <div className="content-body" style={{ marginTop: '150px' }}>
             <section className="list-view">
 
               <div className='row'>
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
+                    {isLoadingAllProfiles ? (
+                      <div className="text-center">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
 
@@ -4060,11 +4233,11 @@ const MyFollowups = () => {
                                       <div>
                                         <h6 className="mb-0 fw-bold">{profile?.name || 'Your Name'}</h6>
                                         <small className="text-muted">
-                                        <i className="fas fa-phone" style={{fontSize:'12px', marginRight:'5px'}}></i>
+                                          <i className="fas fa-phone" style={{ fontSize: '12px', marginRight: '5px' }}></i>
                                           {profile?.mobile || 'Mobile Number'}</small>
-                                       <br/>
+                                        <br />
                                         <small className="text-muted">
-                                        <i className="fas fa-envelope" style={{fontSize:'12px' , marginRight:'5px'}}></i>{profile?.email || 'Email'}</small>
+                                          <i className="fas fa-envelope" style={{ fontSize: '12px', marginRight: '5px' }}></i>{profile?.email || 'Email'}</small>
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
@@ -4149,7 +4322,7 @@ const MyFollowups = () => {
                                               width: "100vw",
                                               height: "100vh",
                                               backgroundColor: "transparent",
-                                              zIndex: 999,
+                                              zIndex: 8,
                                             }}
                                           ></div>
                                         )}
@@ -4165,7 +4338,7 @@ const MyFollowups = () => {
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                             borderRadius: "4px",
                                             padding: "8px 0",
-                                            zIndex: 1000,
+                                            zIndex: 9,
                                             transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                             transition: "transform 0.3s ease-in-out",
                                             pointerEvents: showPopup ? "auto" : "none",
@@ -4243,6 +4416,27 @@ const MyFollowups = () => {
                                           >
                                             Set Followup
                                           </button>
+                                          {activeFollowupStatus === 'planned' && (
+                                          <button
+                                            className="dropdown-item"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              handleMarkCompleteFollowup(profile);
+                                            }}
+                                            
+                                          >
+                                            Mark Complete Followup
+                                          </button>
+                                          )}
 
 
                                         </div>
@@ -4250,7 +4444,9 @@ const MyFollowups = () => {
 
                                       <button
                                         className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(profileIndex)}
+                                        onClick={() => { 
+                                          toggleLeadDetails(profileIndex, profile)
+                                        }}
                                       >
                                         {leadDetailsVisible === profileIndex ? (
                                           <i className="fas fa-chevron-up"></i>
@@ -4284,7 +4480,7 @@ const MyFollowups = () => {
                                               width: "100vw",
                                               height: "100vh",
                                               backgroundColor: "transparent",
-                                              zIndex: 999,
+                                              zIndex: 8,
                                             }}
                                           ></div>
                                         )}
@@ -4300,7 +4496,7 @@ const MyFollowups = () => {
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                             borderRadius: "4px",
                                             padding: "8px 0",
-                                            zIndex: 1000,
+                                            zIndex: 9,
                                             transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                             transition: "transform 0.3s ease-in-out",
                                             pointerEvents: showPopup === profileIndex ? "auto" : "none",
@@ -4374,7 +4570,28 @@ const MyFollowups = () => {
                                           >
                                             Set Followup
                                           </button>
-
+                                          {activeFollowupStatus === 'planned' && (
+                                          <button
+                                            className="dropdown-item"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              handleMarkCompleteFollowup(profile);
+                                              console.log("mark complete followup");
+                                            }}
+                                            
+                                          >
+                                            Mark Complete Followup
+                                          </button>
+                                          )}
 
                                         </div>
                                       </div>
@@ -4383,7 +4600,9 @@ const MyFollowups = () => {
 
                                       <button
                                         className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => toggleLeadDetails(profileIndex)}
+                                        onClick={() => { 
+                                          toggleLeadDetails(profileIndex, profile)
+                                        }}
                                       >
                                         {leadDetailsVisible === profileIndex ? (
                                           <i className="fas fa-chevron-up"></i>
@@ -4416,84 +4635,91 @@ const MyFollowups = () => {
 
                               {/* Tab Content - Only show if leadDetailsVisible is true */}
                               {leadDetailsVisible === profileIndex && (
-                                <div className="tab-content">
+                                isLoadingProfilesData ? (
+                                  <div className="text-center">
+                                    <div className="spinner-border" role="status">
+                                      <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="tab-content">
 
-                                  {/* Lead Details Tab */}
-                                  {/* {activeTab === 0 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 0 && (
-                                    <div className="tab-pane active" id="lead-details">
-                                      {/* Your lead details content here */}
-                                      <div className="scrollable-container">
-                                        <div className="scrollable-content">
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD AGE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                : 'N/A'}</div>
+                                    {/* Lead Details Tab */}
+                                    {/* {activeTab === 0 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 0 && (
+                                      <div className="tab-pane active" id="lead-details">
+                                        {/* Your lead details content here */}
+                                        <div className="scrollable-container">
+                                          <div className="scrollable-content">
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD AGE</div>
+                                                <div className="info-value">{candidateDetails.createdAt ?
+                                                  Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                  : 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Lead Owner</div>
+                                                <div className="info-value">{candidateDetails.leadOwner || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{candidateDetails._course?.name}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BATCH NAME</div>
+                                                <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
+                                              </div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
-                                              <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">COURSE / JOB NAME</div>
-                                              <div className="info-value">{profile._course?.name}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                            </div>
-                                          </div>
 
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">TYPE OF PROJECT</div>
-                                              <div className="info-value">{profile._course?.typeOfProject}</div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">PROJECT</div>
+                                                <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">SECTOR</div>
+                                                <div className="info-value">{candidateDetails.sector}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">{candidateDetails.createdAt ?
+                                                  new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                              </div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">PROJECT</div>
-                                              <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">SECTOR</div>
-                                              <div className="info-value">{profile.sector}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD CREATION DATE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
 
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._course?.state}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">City</div>
-                                              <div className="info-value">{profile._course?.city}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">PSD Chandauli Center</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD MODIFICATION DATE</div>
-                                              <div className="info-value">{profile.updatedAt ?
-                                                new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">STATE</div>
+                                                <div className="info-value">{candidateDetails._course?.state}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">City</div>
+                                                <div className="info-value">{candidateDetails._course?.city}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BRANCH NAME</div>
+                                                <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">{candidateDetails.updatedAt ?
+                                                  new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
-                                      </div>
 
 
-                                      <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                      <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
 
 
-                                      <div className="desktop-view">
+                                        <div className="desktop-view">
                                         <div className="row g-4">
 
                                           <div className="col-12">
@@ -4502,40 +4728,40 @@ const MyFollowups = () => {
                                                 <div className="info-card">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    <div className="info-value">{candidateDetails.createdAt ?
+                                                      Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
                                                       : 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails.leadOwner?.join(', ') || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
+                                                    <div className="info-value">{candidateDetails._course?.name}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
                                                 <div className="info-card">
                                                   <div className="info-group">
                                                     <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
+                                                    <div className="info-value">{candidateDetails._course?.sectors}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
+                                                    <div className="info-value">{candidateDetails.createdAt ?
                                                       new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                                   </div>
                                                 </div>
@@ -4543,28 +4769,28 @@ const MyFollowups = () => {
                                                 <div className="info-card">
                                                   <div className="info-group">
                                                     <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._course?.state}</div>
+                                                    <div className="info-value">{candidateDetails._course?.state}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._course?.city}</div>
+                                                    <div className="info-value">{candidateDetails._course?.city}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">PSD Chandauli Center</div>
+                                                    <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
+                                                    <div className="info-value">{candidateDetails.updatedAt ?
                                                       new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                    <div className="info-value">{candidateDetails.updatedBy?.name || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile._course?.counslername}</div>
+                                                    <div className="info-value">{candidateDetails._course?.counslername}</div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -4577,8 +4803,8 @@ const MyFollowups = () => {
                                                 <div className="col-xl-3 col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    <div className="info-value">{candidateDetails.createdAt ?
+                                                      Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
                                                       : 'N/A'}</div>
                                                   </div>
                                                 </div>
@@ -4586,60 +4812,60 @@ const MyFollowups = () => {
                                                 <div className="col-xl-3 col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._course?.state}</div>
+                                                    <div className="info-value">{candidateDetails._course?.state}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._course?.city}</div>
+                                                    <div className="info-value">{candidateDetails._course?.city}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">Sector</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
+                                                    <div className="info-value">{candidateDetails._course?.sectors}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
+                                                    <div className="info-value">{candidateDetails._course?.name}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._course?.college || 'N/A'}</div>
+                                                    <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">NEXT ACTION DATE</div>
                                                     <div className="info-value">
-                                                      {profile.followups?.length > 0
+                                                      {candidateDetails.followups?.length > 0
                                                         ?
                                                         (() => {
-                                                          const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                          const dateObj = new Date(candidateDetails.followups[candidateDetails.followups.length - 1].date);
                                                           const datePart = dateObj.toLocaleDateString('en-GB', {
                                                             day: '2-digit',
                                                             month: 'short',
@@ -4661,8 +4887,8 @@ const MyFollowups = () => {
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ? (() => {
-                                                      const dateObj = new Date(profile.createdAt);
+                                                    <div className="info-value">{candidateDetails.createdAt ? (() => {
+                                                      const dateObj = new Date(candidateDetails.createdAt);
                                                       const datePart = dateObj.toLocaleDateString('en-GB', {
                                                         day: '2-digit',
                                                         month: 'short',
@@ -4680,8 +4906,8 @@ const MyFollowups = () => {
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ? (() => {
-                                                      const dateObj = new Date(profile.updatedAt);
+                                                    <div className="info-value">{candidateDetails.updatedAt ? (() => {
+                                                      const dateObj = new Date(candidateDetails.updatedAt);
                                                       const datePart = dateObj.toLocaleDateString('en-GB', {
                                                         day: '2-digit',
                                                         month: 'short',
@@ -4699,20 +4925,20 @@ const MyFollowups = () => {
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                    <div className="info-value">{candidateDetails.logs?.length ? candidateDetails.logs[candidateDetails.logs.length - 1]?.user?.name || '' : ''}
                                                     </div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile._course?.counslername}</div>
+                                                    <div className="info-value">{candidateDetails._course?.counslername}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD OWNER</div>
-                                                    <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
+                                                    <div className="info-value">{candidateDetails.registeredBy?.name || 'Self Registerd'}</div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -4722,714 +4948,719 @@ const MyFollowups = () => {
                                       </div>
                                     </div>
                                   )}
+                                    {/* Profile Tab */}
+                                    {/* {activeTab === 1 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 1 && (
+                                      <div className="tab-pane active" id="profile">
+                                        <div className="resume-preview-body">
+                                          <div id="resume-download" className="resume-document">
 
-                                  {/* Profile Tab */}
-                                  {/* {activeTab === 1 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 1 && (
-                                    <div className="tab-pane active" id="profile">
-                                      <div className="resume-preview-body">
-                                        <div id="resume-download" className="resume-document">
-
-                                          <div className="resume-document-header">
-                                            <div className="resume-profile-section">
-                                              {user?.image ? (
-                                                <img
-                                                  src={`${bucketUrl}/${user.image}`}
-                                                  alt="Profile"
-                                                  className="resume-profile-image"
-                                                />
-                                              ) : (
-                                                <div className="resume-profile-placeholder">
-                                                  <i className="bi bi-person-circle"></i>
-                                                </div>
-                                              )}
-
-                                              <div className="resume-header-content">
-                                                <h1 className="resume-name">
-                                                  {profile._candidate?.name || 'Your Name'}
-                                                </h1>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                </p>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.sex || 'Sex'}
-                                                </p>
-
-                                                <div className="resume-contact-details">
-
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profile._candidate?.mobile}</span>
+                                            <div className="resume-document-header">
+                                              <div className="resume-profile-section">
+                                                {user?.image ? (
+                                                  <img
+                                                    src={`${bucketUrl}/${user.image}`}
+                                                    alt="Profile"
+                                                    className="resume-profile-image"
+                                                  />
+                                                ) : (
+                                                  <div className="resume-profile-placeholder">
+                                                    <i className="bi bi-person-circle"></i>
                                                   </div>
+                                                )}
+
+                                                <div className="resume-header-content">
+                                                  <h1 className="resume-name">
+                                                    {candidateDetails._candidate?.name || 'Your Name'}
+                                                  </h1>
+                                                  <p className="resume-title">
+                                                    {candidateDetails._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                  </p>
+                                                  <p className="resume-title">
+                                                    {candidateDetails._candidate?.sex || 'Sex'}
+                                                  </p>
+
+                                                  <div className="resume-contact-details">
+
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-telephone-fill"></i>
+                                                      <span>{candidateDetails._candidate?.mobile}</span>
+                                                    </div>
 
 
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-envelope-fill"></i>
-                                                    <span>{profile._candidate?.email}</span>
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-envelope-fill"></i>
+                                                      <span>{candidateDetails._candidate?.email}</span>
+                                                    </div>
+
+                                                    {candidateDetails._candidate?.dob && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-calendar-heart-fill"></i>
+                                                        {new Date(candidateDetails._candidate.dob).toLocaleDateString('en-IN', {
+                                                          day: '2-digit',
+                                                          month: 'long',
+                                                          year: 'numeric'
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-geo-alt-fill"></i>
+                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-house-fill"></i>
+                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
                                                   </div>
-
-                                                  {profile._candidate?.dob && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-calendar-heart-fill"></i>
-                                                      {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                        day: '2-digit',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-geo-alt-fill"></i>
-                                                      <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-house-fill"></i>
-                                                      <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
                                                 </div>
+                                              </div>
+
+                                              <div className="resume-summary">
+                                                <h2 className="resume-section-title">Professional Summary</h2>
+                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                               </div>
                                             </div>
 
-                                            <div className="resume-summary">
-                                              <h2 className="resume-section-title">Professional Summary</h2>
-                                              <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                            </div>
-                                          </div>
 
+                                            <div className="resume-document-body">
 
-                                          <div className="resume-document-body">
+                                              <div className="resume-column resume-left-column">
 
-                                            <div className="resume-column resume-left-column">
-
-                                              {profile._candidate?.isExperienced === false ? (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Work Experience</h2>
-                                                  <div className="resume-experience-item">
-                                                    <div className="resume-item-header">
-                                                      <h3 className="resume-item-title">Fresher</h3>
-                                                    </div>
-                                                    <div className="resume-item-content">
-                                                      <p>Looking for opportunities to start my career</p>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                profile._candidate?.experiences?.length > 0 && (
+                                                {profile._candidate?.isExperienced === false ? (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Work Experience</h2>
-                                                    {profile._candidate.experiences.map((exp, index) => (
-                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {exp.jobTitle && (
-                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                          )}
-                                                          {exp.companyName && (
-                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                          )}
-                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                            <p className="resume-item-period">
-                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                              }) : 'Start Date'}
-                                                              {" - "}
-                                                              {exp.currentlyWorking ? 'Present' :
-                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'End Date'}
-                                                            </p>
-                                                          )}
-                                                        </div>
-                                                        {exp.jobDescription && (
-                                                          <div className="resume-item-content">
-                                                            <p>{exp.jobDescription}</p>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )
-                                              )}
-
-                                              {profile._candidate?.qualifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Education</h2>
-                                                  {profile._candidate.qualifications.map((edu, index) => (
-                                                    <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                    <div className="resume-experience-item">
                                                       <div className="resume-item-header">
-                                                        {edu.education && (
-                                                          <h3 className="resume-item-title">{edu.education}</h3>
-                                                        )}
-                                                        {edu.course && (
-                                                          <h3 className="resume-item-title">{edu.course}</h3>
-                                                        )}
-                                                        {edu.universityName && (
-                                                          <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                        )}
-                                                        {edu.schoolName && (
-                                                          <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                        )}
-                                                        {edu.collegeName && (
-                                                          <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                        )}
-                                                        {edu.passingYear && (
-                                                          <p className="resume-item-period">{edu.passingYear}</p>
-                                                        )}
+                                                        <h3 className="resume-item-title">Fresher</h3>
                                                       </div>
                                                       <div className="resume-item-content">
-                                                        {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                        {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        <p>Looking for opportunities to start my career</p>
                                                       </div>
                                                     </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-
-
-                                            <div className="resume-column resume-right-column">
-
-                                              {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Skills</h2>
-                                                  <div className="resume-skills-list">
-                                                    {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                        {skill.skillPercent && (
-                                                          <div className="resume-skill-bar-container">
-                                                            <div
-                                                              className="resume-skill-bar"
-                                                              style={{ width: `${skill.skillPercent}%` }}
-                                                            ></div>
-                                                            <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                  </div>
+                                                ) : (
+                                                  profile._candidate?.experiences?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                      {profile._candidate.experiences.map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'End Date'}
+                                                              </p>
+                                                            )}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-
-
-                                              {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Languages</h2>
-                                                  <div className="resume-languages-list">
-                                                    {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
-                                                        {lang.level && (
-                                                          <div className="resume-language-level">
-                                                            {[1, 2, 3, 4, 5].map(dot => (
-                                                              <span
-                                                                key={`resume-lang-dot-${index}-${dot}`}
-                                                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                              ></span>
-                                                            ))}
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Certifications</h2>
-                                                  <ul className="resume-certifications-list">
-                                                    {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                        <strong>{cert.certificateName || cert.name}</strong>
-                                                        {cert.orgName && (
-                                                          <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                        )}
-                                                        {(cert.month || cert.year) && (
-                                                          <span className="resume-cert-date">
-                                                            {cert.month && cert.year ?
-                                                              ` (${cert.month}/${cert.year})` :
-                                                              cert.month ?
-                                                                ` (${cert.month})` :
-                                                                cert.year ?
-                                                                  ` (${cert.year})` :
-                                                                  ''}
-                                                          </span>
-                                                        )}
-                                                      </li>
-                                                    ))}
-                                                  </ul>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Projects</h2>
-                                                  {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-project-title">
-                                                          {proj.projectName || 'Project'}
-                                                          {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                        </h3>
-                                                      </div>
-                                                      {proj.description && (
-                                                        <div className="resume-item-content">
-                                                          <p>{proj.description}</p>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Interests</h2>
-                                                  <div className="resume-interests-tags">
-                                                    {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                      <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                        {interest}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                            </div>
-                                          </div>
-
-
-                                          {profile._candidate?.personalInfo?.declaration?.text && (
-                                            <div className="resume-declaration">
-                                              <h2 className="resume-section-title">Declaration</h2>
-                                              <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Job History Tab */}
-                                  {/* {activeTab === 2 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 2 && (
-                                    <div className="tab-pane active" id="job-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered job-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Company Name</th>
-                                                <th>Position</th>
-                                                <th>Duration</th>
-                                                <th>Location</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {experiences.map((job, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{job.companyName}</td>
-                                                  <td>{job.jobTitle}</td>
-                                                  <td>
-                                                    {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                    {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                  </td>
-                                                  <td>Remote</td>
-                                                  <td><span className="text-success">Completed</span></td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Course History Tab */}
-                                  {/* {activeTab === 3 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 3 && (
-                                    <div className="tab-pane active" id="course-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered course-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Applied Date</th>
-                                                <th>Course Name</th>
-                                                <th>Lead Added By</th>
-                                                <th>Counsellor</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                profile._candidate._appliedCourses.map((course, index) => (
-                                                  <tr key={index}>
-                                                    <td>{index + 1}</td>
-                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                    <td>{course._course?.name || 'N/A'}</td>
-                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                    <td>{course.month || ''} {course.year || ''}</td>
-                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-                                                  </tr>
-                                                ))
-                                              ) : (
-                                                <tr>
-                                                  <td colSpan={6} className="text-center">No course history available</td>
-                                                </tr>
-                                              )}
-
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Documents Tab */}
-                                  {/* {activeTab === 4 && ( */}
-
-                                  {(activeTab[profileIndex] || 0) === 4 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || [];
-                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
-
-                                        // If no documents are required, show a message
-                                        if (totalRequired === 0) {
-                                          return (
-                                            <div className="col-12 text-center py-5">
-                                              <div className="text-muted">
-                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                <h5 className="text-success">No Documents Required</h5>
-                                                <p>This course does not require any document verification.</p>
-                                              </div>
-                                            </div>
-
-                                          );
-                                        }
-
-                                        // If documents are required, show the full interface
-                                        return (
-                                          <div className="enhanced-documents-panel">
-                                            {/* Enhanced Stats Grid */}
-                                            <div className="stats-grid">
-                                              {(() => {
-                                                // Use backend counts only, remove static document fallback
-                                                const backendCounts = profile?.docCounts || {};
-                                                return (
-                                                  <>
-                                                    <div className="stat-card total-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-file-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.totalRequired || 0}</h4>
-                                                        <p>Total Required</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-list"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card uploaded-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-cloud-upload-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                        <p>Uploaded</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card pending-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-clock"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                        <p>Pending Review</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-exclamation-triangle"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card verified-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-check-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                        <p>Approved</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-thumbs-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card rejected-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-times-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                        <p>Rejected</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-down"></i>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-
-                                            {/* Enhanced Filter Section */}
-                                            <div className="filter-section-enhanced">
-                                              <div className="filter-tabs-container">
-                                                <h5 className="filter-title">
-                                                  <i className="fas fa-filter me-2"></i>
-                                                  Filter Documents
-                                                </h5>
-                                                <div className="filter-tabs">
-                                                  {(() => {
-                                                    const backendCounts = profile?.docCounts || {};
-                                                    return (
-                                                      <>
-                                                        <button
-                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('all')}
-                                                        >
-                                                          <i className="fas fa-list-ul"></i>
-                                                          All Documents
-                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('pending')}
-                                                        >
-                                                          <i className="fas fa-clock"></i>
-                                                          Pending
-                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('verified')}
-                                                        >
-                                                          <i className="fas fa-check-circle"></i>
-                                                          Verified
-                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('rejected')}
-                                                        >
-                                                          <i className="fas fa-times-circle"></i>
-                                                          Rejected
-                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                        </button>
-                                                      </>
-                                                    );
-                                                  })()}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Enhanced Documents Grid */}
-                                            <div className="documents-grid-enhanced">
-                                              {(() => {
-                                                // Filter documents based on status filter
-                                                const filteredDocs = filterDocuments(documentsToDisplay);
-
-                                                if (filteredDocs.length === 0) {
-                                                  return (
-                                                    <div className="col-12 text-center py-5">
-                                                      <div className="text-muted">
-                                                        <i className="fas fa-filter fa-3x mb-3"></i>
-                                                        <h5>No Documents Found</h5>
-                                                        <p>No documents match the current filter criteria.</p>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                }
-
-                                                return filteredDocs.map((doc, index) => {
-                                                  // Check if this is a document with upload data or just uploaded file info
-                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                    ? doc.uploads[doc.uploads.length - 1]
-                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                  return (
-                                                    <div key={doc._id || index} className="document-card-enhanced">
-                                                      <div className="document-image-container">
-                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                          <>
-                                                            {(() => {
-                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                              const fileType = getFileType(fileUrl);
-
-                                                              if (fileType === 'image') {
-                                                                return (
-                                                                  <img
-                                                                    src={fileUrl}
-                                                                    alt="Document Preview"
-                                                                    className="document-image"
-                                                                  />
-                                                                );
-                                                              } else if (fileType === 'pdf') {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                  </div>
-                                                                );
-                                                              } else {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                      {fileType === 'document' ? 'Document' :
-                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                    </p>
-                                                                  </div>
-                                                                );
-                                                              }
-                                                            })()}
-                                                            <div className="image-overlay">
-                                                              <button
-                                                                className="preview-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                              >
-                                                                <i className="fas fa-search-plus"></i>
-                                                                Preview
-                                                              </button>
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
                                                             </div>
-                                                          </>
-                                                        ) : (
-                                                          <div className="no-document-placeholder">
-                                                            <i className="fas fa-file-upload"></i>
-                                                            <p>No Document</p>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )
+                                                )}
+
+                                                {profile._candidate?.qualifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Education</h2>
+                                                    {profile._candidate.qualifications.map((edu, index) => (
+                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          {edu.education && (
+                                                            <h3 className="resume-item-title">{edu.education}</h3>
+                                                          )}
+                                                          {edu.course && (
+                                                            <h3 className="resume-item-title">{edu.course}</h3>
+                                                          )}
+                                                          {edu.universityName && (
+                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                          )}
+                                                          {edu.schoolName && (
+                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                          )}
+                                                          {edu.collegeName && (
+                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                          )}
+                                                          {edu.passingYear && (
+                                                            <p className="resume-item-period">{edu.passingYear}</p>
+                                                          )}
+                                                        </div>
+                                                        <div className="resume-item-content">
+                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+
+
+                                              <div className="resume-column resume-right-column">
+
+                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Skills</h2>
+                                                    <div className="resume-skills-list">
+                                                      {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                          <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                          {skill.skillPercent && (
+                                                            <div className="resume-skill-bar-container">
+                                                              <div
+                                                                className="resume-skill-bar"
+                                                                style={{ width: `${skill.skillPercent}%` }}
+                                                              ></div>
+                                                              <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+
+                                                {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Languages</h2>
+                                                    <div className="resume-languages-list">
+                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                          <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                          {lang.level && (
+                                                            <div className="resume-language-level">
+                                                              {[1, 2, 3, 4, 5].map(dot => (
+                                                                <span
+                                                                  key={`resume-lang-dot-${index}-${dot}`}
+                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                ></span>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Certifications</h2>
+                                                    <ul className="resume-certifications-list">
+                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                          <strong>{cert.certificateName || cert.name}</strong>
+                                                          {cert.orgName && (
+                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                          )}
+                                                          {(cert.month || cert.year) && (
+                                                            <span className="resume-cert-date">
+                                                              {cert.month && cert.year ?
+                                                                ` (${cert.month}/${cert.year})` :
+                                                                cert.month ?
+                                                                  ` (${cert.month})` :
+                                                                  cert.year ?
+                                                                    ` (${cert.year})` :
+                                                                    ''}
+                                                            </span>
+                                                          )}
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Projects</h2>
+                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          <h3 className="resume-project-title">
+                                                            {proj.projectName || 'Project'}
+                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                          </h3>
+                                                        </div>
+                                                        {proj.description && (
+                                                          <div className="resume-item-content">
+                                                            <p>{proj.description}</p>
                                                           </div>
                                                         )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
 
-                                                        {/* Status Badge Overlay */}
-                                                        <div className="status-badge-overlay">
-                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                            <span className="status-badge-new pending">
-                                                              <i className="fas fa-clock"></i>
-                                                              Pending
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                            <span className="status-badge-new verified">
-                                                              <i className="fas fa-check-circle"></i>
-                                                              Verified
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                            <span className="status-badge-new rejected">
-                                                              <i className="fas fa-times-circle"></i>
-                                                              Rejected
-                                                            </span>
-                                                          )}
-                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                            <span className="status-badge-new not-uploaded">
-                                                              <i className="fas fa-upload"></i>
-                                                              Required
-                                                            </span>
-                                                          )}
+
+                                                {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Interests</h2>
+                                                    <div className="resume-interests-tags">
+                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                          {interest}
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                              </div>
+                                            </div>
+
+
+                                            {profile._candidate?.personalInfo?.declaration?.text && (
+                                              <div className="resume-declaration">
+                                                <h2 className="resume-section-title">Declaration</h2>
+                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
+
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Job History Tab */}
+                                    {/* {activeTab === 2 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 2 && (
+                                      <div className="tab-pane active" id="job-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered job-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Company Name</th>
+                                                  <th>Position</th>
+                                                  {/* <th>Duration</th>
+                                                  <th>Location</th>
+                                                  <th>Status</th> */}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {jobHistory?.length > 0 ? (
+                                                  jobHistory?.map((job, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{job._job.displayCompanyName}</td>
+                                                      <td>{job._job.title}</td>
+                                                      {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No job history available</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Course History Tab */}
+                                    {/* {activeTab === 3 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 3 && (
+                                      <div className="tab-pane active" id="course-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered course-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Applied Date</th>
+                                                  <th>Course Name</th>
+                                                  <th>Lead Added By</th>
+                                                  <th>Counsellor</th>
+                                                  <th>Status</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {courseHistory?.length > 0 ? (
+                                                  courseHistory?.map((course, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                      <td>{course._course?.name || 'N/A'}</td>
+                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                      <td>{course.month || ''} {course.year || ''}</td>
+                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No course history available</td>
+                                                  </tr>
+                                                )}
+
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Documents Tab */}
+                                    {/* {activeTab === 4 && ( */}
+
+                                    {(activeTab[profileIndex] || 0) === 4 && (
+                                      <div className="tab-pane active" id='studentsDocuments'>
+                                        {(() => {
+                                          const documentsToDisplay = profile.uploadedDocs || [];
+                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
+
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Documents Required</h5>
+                                                  <p>This course does not require any document verification.</p>
+                                                </div>
+                                              </div>
+
+                                            );
+                                          }
+
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid">
+                                                {(() => {
+                                                  // Use backend counts only, remove static document fallback
+                                                  const backendCounts = profile?.docCounts || {};
+                                                  return (
+                                                    <>
+                                                      <div className="stat-card total-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-file-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.totalRequired || 0}</h4>
+                                                          <p>Total Required</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="document-info-section">
-                                                        <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                          <div className="document-actions">
-                                                            {(!latestUpload) ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                setSelectedProfile(profile); // Set the current profile
-                                                                openUploadModal(doc);        // Open the upload modal
-                                                              }}>
-                                                                <i className="fas fa-cloud-upload-alt"></i>
-                                                                Upload
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn verify-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="Verify Document"
-                                                              >
-                                                                <i className="fas fa-search"></i>
-                                                                PREVIEW
-                                                              </button>
+                                                      <div className="stat-card uploaded-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                          <p>Uploaded</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card pending-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-clock"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                          <p>Pending Review</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-exclamation-triangle"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card verified-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-check-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                          <p>Approved</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-thumbs-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card rejected-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-times-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                          <p>Rejected</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-down"></i>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  );
+                                                })()}
+                                              </div>
+
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced">
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title">
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs">
+                                                    {(() => {
+                                                      const backendCounts = profile?.docCounts || {};
+                                                      return (
+                                                        <>
+                                                          <button
+                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('all')}
+                                                          >
+                                                            <i className="fas fa-list-ul"></i>
+                                                            All Documents
+                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('pending')}
+                                                          >
+                                                            <i className="fas fa-clock"></i>
+                                                            Pending
+                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('verified')}
+                                                          >
+                                                            <i className="fas fa-check-circle"></i>
+                                                            Verified
+                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('rejected')}
+                                                          >
+                                                            <i className="fas fa-times-circle"></i>
+                                                            Rejected
+                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                          </button>
+                                                        </>
+                                                      );
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced">
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    // Check if this is a document with upload data or just uploaded file info
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                      ? doc.uploads[doc.uploads.length - 1]
+                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced">
+                                                        <div className="document-image-container">
+                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            <>
+                                                              {(() => {
+                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                const fileType = getFileType(fileUrl);
+
+                                                                if (fileType === 'image') {
+                                                                  return (
+                                                                    <img
+                                                                      src={fileUrl}
+                                                                      alt="Document Preview"
+                                                                      className="document-image"
+                                                                    />
+                                                                  );
+                                                                } else if (fileType === 'pdf') {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                    </div>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                        {fileType === 'document' ? 'Document' :
+                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                      </p>
+                                                                    </div>
+                                                                  );
+                                                                }
+                                                              })()}
+                                                              <div className="image-overlay">
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder">
+                                                              <i className="fas fa-file-upload"></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay">
+                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                              <span className="status-badge-new pending">
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                              <span className="status-badge-new verified">
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                              <span className="status-badge-new rejected">
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                              <span className="status-badge-new not-uploaded">
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
                                                             )}
                                                           </div>
                                                         </div>
 
-                                                        <div className="document-meta">
-                                                          <div className="meta-item">
-                                                            <i className="fas fa-calendar-alt text-muted"></i>
-                                                            <span className="meta-text">
-                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric'
-                                                                }) :
-                                                                'Not uploaded'
-                                                              }
-                                                            </span>
+                                                        <div className="document-info-section">
+                                                          <div className="document-header">
+                                                            <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {(!latestUpload) ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                  setSelectedProfile(profile); // Set the current profile
+                                                                  openUploadModal(doc);        // Open the upload modal
+                                                                }}>
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="Verify Document"
+                                                                >
+                                                                  <i className="fas fa-search"></i>
+                                                                  PREVIEW
+                                                                </button>
+                                                              )}
+                                                            </div>
                                                           </div>
 
-                                                          {latestUpload && (
+                                                          <div className="document-meta">
                                                             <div className="meta-item">
-                                                              <i className="fas fa-clock text-muted"></i>
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
                                                               <span className="meta-text">
-                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit'
-                                                                })}
+                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
                                                               </span>
                                                             </div>
-                                                          )}
+
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
+                                                          </div>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  );
-                                                });
-                                              })()}
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
+
+                                              <DocumentModal />
+                                              <UploadModal />
                                             </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
 
-                                            <DocumentModal />
-                                            <UploadModal />
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-
-                                </div>
+                                  </div>)
                               )}
                             </div>
                           </div>
@@ -5440,6 +5671,7 @@ const MyFollowups = () => {
 
 
                     </div>
+                    )}
                   </div>
                 </div>
               </div>
