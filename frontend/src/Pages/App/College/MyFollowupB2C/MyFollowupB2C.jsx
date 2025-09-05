@@ -1848,7 +1848,8 @@ const MyFollowups = () => {
         // Prepare the request body
         const data = {
           followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
+          remarks: remarks || '',
+          folloupType: 'update'
         };
 
 
@@ -1866,7 +1867,7 @@ const MyFollowups = () => {
 
         // Send PUT request to backend API
         const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          `${backendUrl}/college/b2c-set-followups/${selectedProfile._id}`,
           data,
           {
             headers: {
@@ -3175,7 +3176,7 @@ const fetchFollowupCounts = async () => {
             </div>
             <h6 className="mb-0 followUp fw-medium">
               {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Set Followup for '}
+              {showFollowupPanel && 'Update Followup for '}
               {selectedProfile?._candidate?.name || 'Unknown'}
             </h6>
           </div>
@@ -3327,7 +3328,7 @@ const fetchFollowupCounts = async () => {
               >
 
                 {showEditPanel && 'UPDATE STATUS'}
-                {showFollowupPanel && 'SET FOLLOWUP '}
+                {showFollowupPanel && 'Update Followup '}
               </button>
             </div>
           </form>
@@ -4071,7 +4072,7 @@ const fetchFollowupCounts = async () => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-6 lastDatepicker">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -4411,12 +4412,11 @@ const fetchFollowupCounts = async () => {
                                             }}
                                             onClick={() => {
                                               openEditPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
                                             }}
                                           >
-                                            Set Followup
+                                            Update Followup
                                           </button>
-                                          {activeFollowupStatus === 'planned' && (
+                                          {/* {activeFollowupStatus === 'planned' && (
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -4436,7 +4436,7 @@ const fetchFollowupCounts = async () => {
                                           >
                                             Mark Complete Followup
                                           </button>
-                                          )}
+                                          )} */}
 
 
                                         </div>
@@ -4565,12 +4565,11 @@ const fetchFollowupCounts = async () => {
                                             }}
                                             onClick={() => {
                                               openEditPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
                                             }}
                                           >
-                                            Set Followup
+                                            Update Followup
                                           </button>
-                                          {activeFollowupStatus === 'planned' && (
+                                          {/* {activeFollowupStatus === 'planned' && (
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -4591,7 +4590,7 @@ const fetchFollowupCounts = async () => {
                                           >
                                             Mark Complete Followup
                                           </button>
-                                          )}
+                                          )} */}
 
                                         </div>
                                       </div>
@@ -8796,7 +8795,16 @@ background: #fd2b5a;
   animation: spin 1s linear infinite;
 }
 
-
+.react-calendar{
+// width:min-content !important;
+  height:min-content !important;
+  width: 250px !important;
+}
+.lastDatepicker .react-calendar {
+  width: 250px !important;
+  height: min-content !important;
+  transform: translateX(-110px)!important;
+}
     `
         }
       </style>

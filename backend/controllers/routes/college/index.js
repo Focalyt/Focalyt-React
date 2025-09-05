@@ -4392,21 +4392,23 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 			doc._leadSubStatus = _leadSubStatus;
 		}
-
-		if (doc.followups?.length > 0) {
-			const lastFollowup = doc.followups[doc.followups.length - 1];
-			if (lastFollowup?.status === 'Planned') {
-				lastFollowup.status = 'Done'
-			}
-		}
+		let lastFollowup = await B2cFollowup.findOne({ appliedCourseId: doc._id, status: 'planned' });
+		if (lastFollowup) {	
+			lastFollowup.status = 'done'}
+						
 		// If followup date and time is set or updated, log the change and update the followup
-		if (followup && doc.followups?.[doc.followups.length - 1]?.date?.toISOString() !== new Date(followup).toISOString()) {
+		if (followup && lastFollowup?.followupDate?.toISOString() !== new Date(followup).toISOString()) {
 			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
 			// Push a new followup object
-			doc.followups.push({
-				date: new Date(followup),
-				status: 'Planned'
+			const newFollowup = new B2cFollowup({
+				appliedCourseId: doc._id,
+				followupDate: new Date(followup),
+				remarks: remarks,
+				status: 'planned',
+				createdBy: userId,
+				collegeId: collegeId
 			});
+			await newFollowup.save();
 		}
 
 
@@ -4803,42 +4805,40 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		const user = req.user;
 
 		const { fromDate, toDate } = req.query;
-		console.log("fromDate", fromDate)
-		console.log("toDate", toDate)
 		const followupCounts = await B2cFollowup.aggregate([
 			{
-			  $match: {
-				createdBy: user._id,
-				createdAt: { $gte: new Date(fromDate), $lte: new Date(toDate) }
-			  }
+				$match: {
+					createdBy: user._id,
+					createdAt: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+				}
 			},
 			{
-			  $group: {
-				_id: "$status",
-				count: { $sum: 1 }
-			  }
+				$group: {
+					_id: "$status",
+					count: { $sum: 1 }
+				}
 			},
 			{
-			  $project: {
-				k: "$_id",
-				v: "$count",
-				_id: 0
-			  }
+				$project: {
+					k: "$_id",
+					v: "$count",
+					_id: 0
+				}
 			},
 			{
-			  $group: {
-				_id: null,
-				counts: { $push: { k: "$k", v: "$v" } }
-			  }
+				$group: {
+					_id: null,
+					counts: { $push: { k: "$k", v: "$v" } }
+				}
 			},
 			{
-			  $replaceRoot: {
-				newRoot: { $arrayToObject: "$counts" }
-			  }
+				$replaceRoot: {
+					newRoot: { $arrayToObject: "$counts" }
+				}
 			},
-		  ]);
-		  
-		console.log("followupCounts", followupCounts[0])
+		]);
+
+		// console.log("followupCounts", followupCounts[0])
 		return res.json({ success: true, data: followupCounts[0] });
 
 
@@ -6421,11 +6421,25 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
 		const collegeId = req.college._id;
-		console.log("req", req.college._id);
-		let { appliedCourseId, followupDate, remarks } = req.body;
+		// console.log("req", req.college._id);
+		let { appliedCourseId, followupDate, remarks , folloupType } = req.body;
+
+		if(!folloupType) {
+			folloupType = 'new';
+		}
+
+		if (folloupType === 'new') {
+
 		if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
 			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
 		}
+		
+		const existingFollowup = await B2cFollowup.findOne({ appliedCourseId, createdBy: user._id , status: 'planned'});
+
+		if (existingFollowup) {
+			return res.status(400).json({ status: false, message: "Followup already exists, Please update the followup" });
+		}
+
 
 		const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
 
@@ -6466,6 +6480,53 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 
 		return res.status(200).json({ status: true, message: "Followup created successfully", data: followup });
+
+	}
+	else if (folloupType === 'update') {
+		const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned'});
+
+		if (!existingFollowup) {
+			return res.status(400).json({ status: false, message: "Followup not found" });
+		}
+
+	
+		existingFollowup.status = 'done';
+		existingFollowup.updatedBy = user._id;
+		existingFollowup.updatedAt = new Date();
+
+		const updatedFollowup = await existingFollowup.save({new:true});
+		const newFollowup = new B2cFollowup({
+			appliedCourseId: appliedCourseId,
+			followupDate: new Date(followupDate),
+			remarks: remarks,
+			status: 'planned',
+			createdBy: user._id,
+			collegeId: collegeId
+		});
+		await newFollowup.save();
+		let actionParts = [];
+		actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
+		if (remarks) {
+			actionParts.push(`Remarks updated`);
+		}
+
+		const newLogEntry = {
+			user: user._id,
+			action: actionParts.join('; '),
+			remarks: remarks || '',
+			timestamp: new Date()
+		};
+
+		const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
+			$set: { remarks: remarks },
+			$push: { logs: newLogEntry }
+		});
+
+		return res.status(200).json({ status: true, message: "Followup updated successfully", data: updatedFollowup });
+		
+
+	}
+		
 
 	} catch (err) {
 		console.log(err);

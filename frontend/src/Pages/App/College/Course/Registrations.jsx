@@ -2421,17 +2421,9 @@ const CRMDashboard = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
-
+         
           // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closePanel();
+                   
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
@@ -2457,6 +2449,16 @@ const CRMDashboard = () => {
         console.error('Error:', error.message);
         alert(`Error: ${error.message}`);
       }
+    }
+    finally {
+      setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+
+          // Refresh data and close panel
+          await fetchProfileData();
     }
   };
 
@@ -4755,7 +4757,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-6 translateX">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -10313,9 +10315,15 @@ background: #fd2b5a;
     height: min-content !important;
     transform: translateX(0px)!important;
 }
+.translateX .react-calendar {
+  height: min-content !important;
+    transform: translateX(-110px) !important;
+    width: 250px !important;
+}
+
 .react-calendar{
     height: min-content !important;
-    transform: translateX(-110px) !important;
+    // transform: translateX(-110px) !important;
     width: 250px !important;
 
 }

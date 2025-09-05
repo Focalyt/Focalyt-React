@@ -420,6 +420,15 @@ appliedCoursesSchema.pre('save', async function(next) {
         this.registeredByModel = "Source";
       }
     }
+
+
+    const B2cFollowup = mongoose.model('B2cFollowup');
+    const existingfollowup = await B2cFollowup.findOne({ appliedCourseId: this._id, status: 'planned' });
+    if (existingfollowup) {
+      this.status = 'done';
+      this.updatedAt = new Date();
+      this.updatedBy = this.registeredBy;
+    }
     next();
   } catch (error) {
     next(error);
