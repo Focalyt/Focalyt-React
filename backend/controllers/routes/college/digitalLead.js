@@ -367,7 +367,7 @@ router.route("/addleaddandcourseapply")
             console.log("Lead received:", req.body.FirstName);
 
             // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks } = req.body;
 
             if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
                 return res.status(200).json({
@@ -500,9 +500,20 @@ router.route("/addleaddandcourseapply")
                 let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: candidate._id,
                     _course: courseId,
-                    _center: selectedCenter
+                    _center: selectedCenter,
+                    remarks:Remarks || ""
                 });
             }
+
+
+            const newLogEntry = {
+                action: "Lead added with default status from digital lead", // Combine all actions in one log message
+                remarks: Remarks || '', // Optional remarks in the log
+                timestamp: new Date() // Add timestamp if your schema supports it
+            };
+
+            appliedCourseEntry.logs.push(newLogEntry);
+            await appliedCourseEntry.save();
 
 
 
