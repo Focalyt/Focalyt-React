@@ -934,9 +934,9 @@ const CRMDashboard = () => {
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
-      setSelectedProfiles(prev => [...prev, profile._id]);
+      setSelectedProfiles(prev => [ ...(Array.isArray(prev) ? prev : []), profile._id ]);
     } else {
-      setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
+      setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== profile._id));
     }
   };
 
@@ -4939,7 +4939,7 @@ const CRMDashboard = () => {
                     <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                     Bulk Action
                   </button>
-
+                  {/* <button> Select</button> */}
 
                 </div>
               </div>

@@ -347,6 +347,11 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
   try {
 
     let body = req.body;
+
+    body.permission = body.permissions;
+    console.log(body, 'body')
+
+
     let user = req.user
     let { userId } = req.params;
     if (!userId) {
@@ -435,21 +440,21 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
 
       switch (body.access_level) {
         case 'admin':
-          body.permission = {}
-          body.permission.permissionType = 'Admin';
-          body.permission.customPermissions = {};
+          body.permissions = {}
+          body.permissions.permission_type = 'Admin';
+          body.permissions.custom_permissions = {};
           break;
 
         case 'view_only': 
-          body.permission = {}
-          body.permission.permissionType = 'View Only';
-          body.permission.customPermissions = {};
+          body.permissions = {}
+          body.permissions.permission_type = 'View Only';
+          body.permissions.custom_permissions = {};
           break;
 
         case 'custom':
-          body.permission = {}
-          body.permission.permissionType = 'Custom';
-          body.permission.customPermissions = body.permissions || {};
+          body.permissions = {}
+          body.permissions.permission_type = 'Custom';
+          body.permissions.custom_permissions = body.permission || {};
           break;
 
         default:
@@ -496,7 +501,6 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
             { new: true }
           );
 
-          console.log('updateMyTeam', updateMyTeam);
 
           return updateMyTeam._id;
         })
@@ -513,8 +517,16 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
       body.userUpdatedby = currentUserId;
     }
 
+
+
+
     // Save user to database
-    const updatedUser = await User.findByIdAndUpdate(userId, body, { new: true });
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: body },
+      { new: true }
+    );
+    
     res.status(200).json({
       status: true,
       message: `User "${body.name}" updated successfully with ${body.permission.permissionType} access`,

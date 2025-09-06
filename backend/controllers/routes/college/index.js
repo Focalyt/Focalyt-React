@@ -1194,7 +1194,7 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Get the specific lead ID from request body
 		let { leadId } = req.query;
 
-		console.log("leadId", leadId)
+		// console.log("leadId", leadId)
 
 		if (!leadId) {
 			return res.status(400).json({
@@ -1578,7 +1578,7 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			};
 		});
 
-		console.log("results", results)
+		// console.log("results", results)
 
 
 		res.status(200).json({
@@ -4757,7 +4757,7 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } }, { new: true }
 		).sort({ createdAt: -1 });
 
-		console.log("b2cFollowup", b2cFollowup)
+		// console.log("b2cFollowup", b2cFollowup)
 
 		if (!b2cFollowup) {
 			return res.status(404).json({ success: false, message: 'Followup not found' });
@@ -4775,7 +4775,7 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 		},
 			{ $push: { logs: newLogEntry } }, { new: true }
 		);
-		console.log("appliedcourse", appliedcourse)
+		// console.log("appliedcourse", appliedcourse)
 
 		// const newStatusLogs = await statusLogHelper(id, {
 		// 	followupCompleted: true
@@ -4801,15 +4801,37 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 
 router.get('/followupcounts', isCollege, async (req, res) => {
 	try {
+		console.log('req.query', req.query)
 
 		const user = req.user;
 
-		const { fromDate, toDate } = req.query;
+		let { fromDate, toDate } = req.query;
+
+		if (fromDate && fromDate !== 'null') {
+			fromDate = new Date(fromDate);
+			if (isNaN(fromDate.getTime())) {
+				console.log('Invalid fromDate format')
+				return res.status(400).json({ error: "Invalid fromDate format" });
+			}
+		} else {
+			fromDate = new Date(new Date().setHours(0, 0, 0, 0));
+		}
+		if (toDate && toDate !== 'null') {
+			toDate = new Date(toDate);
+			if (isNaN(toDate.getTime())) {
+				console.log('Invalid toDate format')
+				return res.status(400).json({ error: "Invalid toDate format" });
+			}
+		} else {
+			toDate = new Date(new Date().setHours(23, 59, 59, 999));
+		}
+
+		
 		const followupCounts = await B2cFollowup.aggregate([
 			{
 				$match: {
 					createdBy: user._id,
-					createdAt: { $gte: new Date(fromDate), $lte: new Date(toDate) }
+					followupDate: { $gte: fromDate, $lte: toDate }
 				}
 			},
 			{
@@ -6422,7 +6444,8 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		const user = req.user;
 		const collegeId = req.college._id;
 		// console.log("req", req.college._id);
-		let { appliedCourseId, followupDate, remarks , folloupType } = req.body;
+		let { appliedCourseId, followupDate, remarks , folloupType, id } = req.body;
+
 
 		if(!folloupType) {
 			folloupType = 'new';
@@ -6495,15 +6518,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		existingFollowup.updatedAt = new Date();
 
 		const updatedFollowup = await existingFollowup.save({new:true});
-		const newFollowup = new B2cFollowup({
+		const newFollowup = await B2cFollowup.create({
 			appliedCourseId: appliedCourseId,
-			followupDate: new Date(followupDate),
+			followupDate: followupDate,
 			remarks: remarks,
 			status: 'planned',
 			createdBy: user._id,
 			collegeId: collegeId
 		});
-		await newFollowup.save();
 		let actionParts = [];
 		actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
 		if (remarks) {
@@ -6533,6 +6555,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		return res.status(500).send({ status: false, message: err.message });
 	}
 });
+
 
 router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
@@ -6613,8 +6636,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 
 
 
-		const followups = await B2cFollowup.aggregate(aggregate);
 
+		const followups = await B2cFollowup.aggregate(aggregate);
 		// const followups = await B2cFollowup.aggregate(aggregate).populate({
 		// 	path: 'appliedCourseId',
 		// 	select: 'name mobile email'
@@ -6648,7 +6671,7 @@ router.get("/lead-history/:leadId", isCollege, async (req, res) => {
 
 
 		const logs = lead.logs;
-		console.log("logs", logs)
+		// console.log("logs", logs)
 
 		// const logsData = logs.map(log => {
 		// 	return {

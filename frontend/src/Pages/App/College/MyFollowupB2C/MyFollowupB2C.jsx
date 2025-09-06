@@ -149,10 +149,8 @@ const MyFollowups = () => {
   const [plannedCount, setPlannedCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [missedCount, setMissedCount] = useState(0);
-  const [showEditPanel, setShowEditPanel] = useState(false);
   const [showCalendarModal, setCalendarModal] = useState(true);
-  const [showFollowupPanel, setShowFollowupPanel] = useState(false);
-  const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+  const [showPanel, setShowPanel] = useState(null);
   const [mainContentClass, setMainContentClass] = useState('col-8');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1187,51 +1185,9 @@ const MyFollowups = () => {
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
-  useEffect(() => {
-    fetchStatus()
-
-  }, []);
-
-  useEffect(() => {
-    fetchSubStatus()
-
-  }, [seletectedStatus]);
-
-  useEffect(() => {
-    console.log('seletectedSubStatus', seletectedSubStatus)
-
-  }, [seletectedSubStatus]);
 
 
-  //Advance filter
 
-  // Format date range for display
-  const formatDateRange = (fromDate, toDate) => {
-    if (!fromDate && !toDate) {
-      return 'Select Date Range';
-    }
-
-    if (fromDate && !toDate) {
-      return `From ${fromDate.toLocaleDateString('en-GB')}`;
-    }
-
-    if (!fromDate && toDate) {
-      return `Until ${toDate.toLocaleDateString('en-GB')}`;
-    }
-
-    if (fromDate && toDate) {
-      const from = fromDate.toLocaleDateString('en-GB');
-      const to = toDate.toLocaleDateString('en-GB');
-
-      if (from === to) {
-        return from;
-      }
-
-      return `${from} - ${to}`;
-    }
-
-    return 'Select Date Range';
-  };
 
 
   // Date range handlers
@@ -1278,61 +1234,9 @@ const MyFollowups = () => {
     setFilterData(newFilterData);
     setTimeout(() => applyFilters(newFilterData), 100);
   };
-  const handleDateChange = (date, fieldName) => {
-    setFilterData(prev => ({
-      ...prev,
-      [fieldName]: date
-    }));
 
-    // Auto-apply filters after short delay
-    setTimeout(() => {
-      const newFilterData = {
-        ...filterData,
-        [fieldName]: date
-      };
-      applyFilters(newFilterData);
-    }, 100);
-  };
 
-  // 4. Clear date functions
-  const clearCreatedDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      createdFromDate: null,
-      createdToDate: null
-    }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      createdFromDate: null,
-      createdToDate: null
-    }), 100);
-  };
 
-  const clearModifiedDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      modifiedFromDate: null,
-      modifiedToDate: null
-    }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      modifiedFromDate: null,
-      modifiedToDate: null
-    }), 100);
-  };
-
-  const clearNextActionDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      nextActionFromDate: null,
-      nextActionToDate: null
-    }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      nextActionFromDate: null,
-      nextActionToDate: null
-    }), 100);
-  };
   // Add after existing functions
 
 
@@ -1519,17 +1423,7 @@ const MyFollowups = () => {
     }
   };
 
-  // Helper function for status icons
-  const getStatusIcon = (statusName) => {
-    const statusName_lower = statusName.toLowerCase();
-    if (statusName_lower.includes('hot') || statusName_lower.includes('urgent')) return '🔥';
-    if (statusName_lower.includes('warm') || statusName_lower.includes('interested')) return '⚡';
-    if (statusName_lower.includes('cold') || statusName_lower.includes('not')) return '❄️';
-    if (statusName_lower.includes('new') || statusName_lower.includes('fresh')) return '🆕';
-    if (statusName_lower.includes('follow') || statusName_lower.includes('pending')) return '⏳';
-    if (statusName_lower.includes('converted') || statusName_lower.includes('success')) return '✅';
-    return '🎯'; // default icon
-  };
+
 
 
   //
@@ -1586,97 +1480,22 @@ const MyFollowups = () => {
 
 
 
-  const handleSubStatusChange = (e) => {
-    const selectedSubStatusId = e.target.value;
-
-    // ID से पूरा object find करें
-    const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
-
-    // पूरा object set करें
-    setSelectedSubStatus(selectedSubStatusObject || null);
-  };
-
-  const fetchStatus = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/college/status`, {
-        headers: { 'x-auth': token }
-      });
-
-      console.log('response', response)
-
-      if (response.data.success) {
-        const status = response.data.data;
-        const allFilter = { _id: 'all', name: 'All', count: status.reduce((acc, cur) => acc + (cur.count || 0), 0) || 15 };
 
 
-        setCrmFilters([allFilter, ...status.map(r => ({
-          _id: r._id,
-          name: r.title,
-          milestone: r.milestone,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
-        }))]);
-
-        setStatuses(status.map(r => ({
-          _id: r._id,
-          name: r.title,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
-        })));
-
-
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      alert('Failed to fetch Status');
-    }
-  };
-
-  const handleMoveToKyc = async (profile) => {
-    console.log('Function called');
-    try {
-
-      console.log('Function in try');
-      // Prepare the request body
-      const updatedData = {
-        kycStage: true
-      };
-
-      // Send PUT request to backend API
-      const response = await axios.put(`${backendUrl}/college/update/${profile._id}`, updatedData, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('API response:', response.data);
-
-      if (response.data.success) {
-        alert('Lead moved to KYC Section successfully!');
-        // Optionally refresh data here
-        fetchProfileData()
-      } else {
-        alert('Failed to update status');
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      // alert('An error occurred while updating status');
-    }
-  };
 
   const handleMarkCompleteFollowup = async (profile) => {
-    console.log('Marking followup complete');
-    console.log("profile", profile)
+
     try {
       setIsLoadingProfiles(true);
-      
+
       const response = await axios.post(`${backendUrl}/college/mark_complete_followup/${profile._id}`, {
-        
+
       }, {
         headers: { 'x-auth': token }
       });
-      
+
       console.log('API response:', response.data);
-      
+
       // if (response.data.success) {
       //   alert('Followup marked as complete successfully!');
       //   await fetchProfileData();
@@ -1692,17 +1511,17 @@ const MyFollowups = () => {
       //     }
       //     return p;
       //   });
-        
+
       //   setAllProfiles(updatedProfiles);
       //   setAllProfilesData(updatedProfiles);
-        
+
       // } else {
       //   alert('Failed to mark followup as complete: ' + (response.data.message || 'Unknown error'));
       // }
-      
+
     } catch (error) {
       console.error('Error marking followup complete:', error);
-      
+
       if (error.response?.data?.message) {
         alert('Error: ' + error.response.data.message);
       } else if (error.response?.status === 404) {
@@ -1738,166 +1557,82 @@ const MyFollowups = () => {
     }
   };
 
-  const handleUpdateStatus = async () => {
-    console.log('Function called');
+  const handleUpdateFollowup = async (e) => {
+    e.preventDefault();
+    console.log('selectedProfile', selectedProfile);
 
     try {
-      if (showEditPanel) {
-        // Validation checks
-        if (!selectedProfile || !selectedProfile._id) {
-          alert('No profile selected');
+
+      let followupDateTime = '';
+      if (followupDate && followupTime) {
+        // Create proper datetime string
+        const dateStr = followupDate instanceof Date
+          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+          : followupDate;
+
+        followupDateTime = new Date(`${dateStr}T${followupTime}`);
+
+        // Validate the datetime
+        if (isNaN(followupDateTime.getTime())) {
+          alert('Invalid date/time combination');
           return;
         }
-
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
       }
-      if (showFollowupPanel) {
 
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || '',
-          folloupType: 'update'
-        };
+      // Prepare the request body
+      const data = {
+        id: selectedProfile._id,
+        appliedCourseId: selectedProfile.appliedCourseId,
+        followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+        remarks: remarks || '',
+        folloupType: 'update'
+      };
 
 
 
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/b2c-set-followups/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
       }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send Post request to backend API
+      const response = await axios.post(
+        `${backendUrl}/college/b2c-set-followups`,
+        data,
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+
+      if (response.data.success) {
+        alert('Status updated successfully!');
+
+        // Reset form
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate('');
+        setFollowupTime('');
+        setRemarks('');
+
+        // Refresh data and close panel
+        await fetchProfileData();
+        closePanel();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to update status');
+      }
+
+
     }
     catch (error) {
       console.error('Error updating status:', error);
@@ -1923,7 +1658,7 @@ const MyFollowups = () => {
 
 
 
-  const [user, setUser] = useState({ });
+  const [user, setUser] = useState({});
 
 
   useEffect(() => {
@@ -1939,44 +1674,22 @@ const MyFollowups = () => {
         console.warn('No token found in session storage.');
         return;
       }
-  
       const queryParams = new URLSearchParams({
-        page: page?.toString(),
-        limit: pageSize.toString(),
-        ...(filters?.name && { name: filters.name }),
-        ...(filters?.courseType && { courseType: filters.courseType }),
-        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
-        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters?.sector && { sector: filters.sector }),
-        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
         // Followup specific date range (if you want to add separate followup date filters)
         // You can add fromDate and toDate here if needed for followup date filtering
         ...(filters?.fromDate && { fromDate: filters.fromDate }),
         ...(filters?.toDate && { toDate: filters.toDate }),
-         followupStatus:activeFollowupStatus,
+        followupStatus: activeFollowupStatus,
       });
-  
+
       // Use the My Followups specific API endpoint
       const response = await axios.get(`${backendUrl}/college/leads/my-followups?${queryParams}`, {
         headers: {
           'x-auth': token,
         },
       });
-      
-      console.log('Backend followups data:', response.data);
-      
+
+
       if (response.data.success && response.data.data) {
         const data = response.data.data;
         setAllProfiles(response.data.data);
@@ -2004,12 +1717,9 @@ const MyFollowups = () => {
 
   useEffect(() => {
     fetchCourseHistory();
-    console.log("courseHistory", courseHistory)
-  }, [selectedProfile]);
-
-  useEffect(() => {
     fetchJobHistory();
   }, [selectedProfile]);
+
 
   const fetchCourseHistory = async () => {
     try {
@@ -2051,99 +1761,93 @@ const MyFollowups = () => {
 
   const [candidateDetails, setCandidateDetails] = useState(null);
 
- 
-    const fetchLeadDetails = async (profile, profileIndex) => {
-      if ((leadDetailsVisible === null || leadDetailsVisible === undefined) && ( profile === null || profile === undefined) && ((activeTab[profileIndex] || 0) === 0)) {
-        return;
-      }
-      try {
-        setIsLoadingProfilesData(true);
-        const leadId = profile.appliedCourseId;
-        console.log('profile', profile)
-        const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
-          headers: { 'x-auth': token }
-        });
-        console.log("leadDetailsVisible", response)
 
-        // if (response.data.success && response.data.data) {
-        //   const data = response.data;
-        //   console.log('data', data)
+  const fetchLeadDetails = async (profile, profileIndex) => {
+    if ((leadDetailsVisible === null || leadDetailsVisible === undefined) && (profile === null || profile === undefined) && ((activeTab[profileIndex] || 0) === 0)) {
+      return;
+    }
+    try {
+      setIsLoadingProfilesData(true);
+      const leadId = profile.appliedCourseId;
+      console.log('profile', profile)
+      const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("leadDetailsVisible", response)
 
-
-        //   // Sirf ek state me data set karo - paginated data
-        //   if (!isLoadingProfiles) {
-        //     allProfiles[leadDetailsVisible] = data.data;
-        //   }
+      // if (response.data.success && response.data.data) {
+      //   const data = response.data;
+      //   console.log('data', data)
 
 
-        // } else {
-        //   console.error('Failed to fetch profile data', response.data.message);
+      //   // Sirf ek state me data set karo - paginated data
+      //   if (!isLoadingProfiles) {
+      //     allProfiles[leadDetailsVisible] = data.data;
+      //   }
+
+
+      // } else {
+      //   console.error('Failed to fetch profile data', response.data.message);
+      // }
+      if (response.data.success && response.data.data) {
+        const data = response.data;
+        console.log('data', data)
+
+        // Properly update state without direct mutation
+        // if (!isLoadingProfiles) {
+        //   setAllProfiles(prevProfiles => {
+        //     const updatedProfiles = [...prevProfiles];
+        //     updatedProfiles[leadDetailsVisible] = {
+        //       ...prevProfiles[leadDetailsVisible], // Keep existing data
+        //       ...data.data // Merge new data
+        //     };
+        //     return updatedProfiles;
+        //   });
         // }
-        if (response.data.success && response.data.data) {
-          const data = response.data;
-          console.log('data', data)
 
-          // Properly update state without direct mutation
-          // if (!isLoadingProfiles) {
-          //   setAllProfiles(prevProfiles => {
-          //     const updatedProfiles = [...prevProfiles];
-          //     updatedProfiles[leadDetailsVisible] = {
-          //       ...prevProfiles[leadDetailsVisible], // Keep existing data
-          //       ...data.data // Merge new data
-          //     };
-          //     return updatedProfiles;
-          //   });
-          // }
-
-          setCandidateDetails(data.data);
-        } else {
-          console.error('Failed to fetch profile data', response.data.message || 'Unknown error');
-        }
-      }
-      catch (error) {
-        console.error('Error fetching profile data:', error);
-      }
-      finally {
-        setIsLoadingProfilesData(false);
+        setCandidateDetails(data.data);
+      } else {
+        console.error('Failed to fetch profile data', response.data.message || 'Unknown error');
       }
     }
-
-
-    useEffect(() => {
-      fetchLeadDetails(selectedProfile, leadDetailsVisible)
-    }, [selectedProfile, leadDetailsVisible, activeTab]);
- 
-
-useEffect(() => {
-  fetchFollowupCounts();
-}, [filterData, activeFollowupStatus]);
-
-const fetchFollowupCounts = async () => {
-  try {
-    const response = await axios.get(`${backendUrl}/college/followupcounts?fromDate=${filterData.fromDate}&toDate=${filterData.toDate}`, {
-      headers: { 'x-auth': token }
-    });
-    console.log("response", response);
-    if (response.data.success && response.data.data) {
-      
-      setDoneCount(response.data.data?.done || 0);
-      setPlannedCount(response.data.data?.planned || 0);
-      setMissedCount(response.data.data?.missed || 0);
+    catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+    finally {
+      setIsLoadingProfilesData(false);
     }
   }
-  catch (error) {
-    console.log("error", error);
-  }
-}
 
-  const [experiences, setExperiences] = useState([{
-    jobTitle: '',
-    companyName: '',
-    from: null,
-    to: null,
-    jobDescription: '',
-    currentlyWorking: false
-  }]);
+
+  useEffect(() => {
+    fetchLeadDetails(selectedProfile, leadDetailsVisible)
+  }, [selectedProfile, leadDetailsVisible, activeTab]);
+
+
+  useEffect(() => {
+    // console.log("activeCrmFilter", activeCrmFilter)
+    fetchFollowupCounts();
+  }, [filterData, activeFollowupStatus, activeCrmFilter]);
+
+  const fetchFollowupCounts = async () => {
+    try {
+
+      // console.log("fromDate", filterData.fromDate, 'toDate', filterData.toDate)
+      const response = await axios.get(`${backendUrl}/college/followupcounts?fromDate=${filterData.fromDate}&toDate=${filterData.toDate}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data.success && response.data.data) {
+
+        setDoneCount(response.data.data?.done || 0);
+        setPlannedCount(response.data.data?.planned || 0);
+        setMissedCount(response.data.data?.missed || 0);
+      }
+    }
+    catch (error) {
+      console.log("error", error);
+    }
+  }
 
 
 
@@ -2231,36 +1935,15 @@ const fetchFollowupCounts = async () => {
   };
 
 
-  const openEditPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
 
-    if (profile) {
-      setSelectedProfile(profile);
-    }
 
-    // Close all panels first
-    setShowEditPanel(false);
-    setCalendarModal(false)
-    setShowFollowupPanel(false);
-    setShowWhatsappPanel(false);
-
-    if (panel === 'StatusChange') {
-      if (profile) {
-        const newStatus = profile?._leadStatus?._id || '';
-        setSelectedStatus(newStatus);
-
-        if (newStatus) {
-          await fetchSubStatus(newStatus);
-        }
-
-        setSelectedSubStatus(profile?.selectedSubstatus || '');
-      }
-      setShowEditPanel(true);
-    }
-    else if (panel === 'SetFollowup') {
-      setShowPopup(null)
-      setShowFollowupPanel(true);
-    }
+  const closePanel = () => {
+    setShowPanel(false);
+    setShowPopup(null)
+    setSelectedProfile(null)
+    setCandidateDetails(null)
+    setLeadDetailsVisible(null)
+    setLeadHistoryPanel(false)
 
     if (!isMobile) {
       setMainContentClass('col-8');
@@ -2269,50 +1952,9 @@ const fetchFollowupCounts = async () => {
 
 
 
-  const closeEditPanel = () => {
-    setShowEditPanel(false);
-    setShowFollowupPanel(false);
-    setCalendarModal(true)
+  const openPanel = async (profile = null, panel = null
 
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
-  const openWhatsappPanel = () => {
-    setCalendarModal(false)
-    setShowEditPanel(false);
-    setShowFollowupPanel(false);
-
-
-
-    setShowWhatsappPanel(true);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
-
-  const closeWhatsappPanel = () => {
-    setShowWhatsappPanel(false);
-    setShowFollowupPanel(false);
-    setShowEditPanel(false);
-
-
-    setCalendarModal(true)
-
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
-
-  const openleadHistoryPanel = async (profile = null) => {
-    setCalendarModal(false)
-    setShowWhatsappPanel(false);
-    setShowEditPanel(false);
-    setShowFollowupPanel(false);
-
-
-
-
+  ) => {
     if (profile) {
       // Set selected profile
       setSelectedProfile(profile);
@@ -2320,10 +1962,7 @@ const fetchFollowupCounts = async () => {
     }
 
     setShowPopup(null)
-
-    setLeadHistoryPanel(true)
-    setShowWhatsappPanel(false);
-    setShowEditPanel(false);
+    setShowPanel(panel)
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2497,68 +2136,12 @@ const fetchFollowupCounts = async () => {
       setIsRangeMode(true);
     };
 
-    useEffect(() => {
-      console.log("filterData", filterData)
-    }, [filterData]);
 
-    const setCustomDaysRange = () => {
-      if (!customDays || customDays < 1) return;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
 
-      const start = new Date(today);
-      const end = new Date(today);
-      end.setDate(today.getDate() + parseInt(customDays) - 1);
-      setFilterData(prev => ({
-        ...prev,
-        fromDate: start,
-        toDate: end
-      }));
 
-      setRangePreset('custom');
-    };
 
-    // Range and filtering functions
-    const getFollowupsInRange = () => {
-      if (!filterData.fromDate || !filterData.toDate) return [];
 
-      return followupDates.filter(followup => {
-        const followupDate = new Date(followup.date);
-        followupDate.setHours(0, 0, 0, 0);
-        const start = new Date(filterData.fromDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(filterData.toDate);
-        end.setHours(0, 0, 0, 0);
-
-        return followupDate >= start && followupDate <= end;
-      });
-    };
-
-    const getFilteredFollowups = () => {
-      const rangeFollowups = getFollowupsInRange();
-
-      switch (selectedFilter) {
-        case 'done':
-          return rangeFollowups.filter(followup => followup.status === 'done');
-        case 'missed':
-          return rangeFollowups.filter(followup => followup.status === 'missed');
-        case 'planned':
-          return rangeFollowups.filter(followup => followup.status === 'planned');
-        default:
-          return rangeFollowups;
-      }
-    };
-
-    const getStatusCounts = () => {
-      const rangeFollowups = getFollowupsInRange();
-      return {
-        all: rangeFollowups.length,
-        done: rangeFollowups.filter(f => f.status === 'done').length,
-        missed: rangeFollowups.filter(f => f.status === 'missed').length,
-        planned: rangeFollowups.filter(f => f.status === 'planned').length,
-      };
-    };
 
     const getRangeDays = () => {
       if (!filterData.fromDate || !filterData.toDate) return 0;
@@ -2661,7 +2244,6 @@ const fetchFollowupCounts = async () => {
     // Generate data for rendering
     const calendarDays = generateCalendarDays();
     const years = generateYears();
-    const statusCounts = getStatusCounts();
 
     const getDayClasses = (date) => {
       const followup = getFollowupForDate(date);
@@ -3145,7 +2727,7 @@ const fetchFollowupCounts = async () => {
           className={`modal ${showCalendarModal ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -3175,13 +2757,12 @@ const fetchFollowupCounts = async () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-              {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Update Followup for '}
+              Update Followup for
               {selectedProfile?._candidate?.name || 'Unknown'}
             </h6>
           </div>
           <div>
-            <button className="btn-close" type="button" onClick={closeEditPanel}>
+            <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
           </div>
@@ -3190,145 +2771,82 @@ const fetchFollowupCounts = async () => {
         <div className="card-body">
           <form>
 
-            {!showFollowupPanel && (
-              <>
-                <div className="mb-1">
-                  <label htmlFor="status" className="form-label small fw-medium text-dark">
-                    Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        id="status"
-                        value={seletectedStatus}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          paddingInline: '10px',
-                          width: '100%',
-                          backgroundColor: '#f1f2f6'
-                        }}
-                        onChange={handleStatusChange}
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.name}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="mb-1">
-                  <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                    Sub-Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        id="subStatus"
-                        value={seletectedSubStatus?._id || ''}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          backgroundColor: '#f1f2f6',
-                          paddingInline: '10px',
-                          width: '100%'
-                        }}
-                        onChange={handleSubStatusChange}
-                      >
-                        <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.title}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup) || showFollowupPanel) && (
-
-              <div className="row mb-1">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    {/* <input
+            <div className="row mb-1">
+              <div className="col-6">
+                <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                  Next Action Date <span className="text-danger">*</span>
+                </label>
+                <div className="input-group">
+                  {/* <input
                     type="date"
                     className="form-control border-0  bgcolor"
                     id="nextActionDate"
                     style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                     onChange={(e) => setFollowupDate(e.target.value)}
                   /> */}
-                    <DatePicker
-                      className="form-control border-0  bgcolor"
-                      onChange={setFollowupDate}
+                  <DatePicker
+                    className="form-control border-0  bgcolor"
+                    onChange={setFollowupDate}
 
-                      value={followupDate}
-                      format="dd/MM/yyyy"
-                      minDate={today}   // Isse past dates disable ho jayengi
+                    value={followupDate}
+                    format="dd/MM/yyyy"
+                    minDate={today}   // Isse past dates disable ho jayengi
 
-                    />
-                  </div>
+                  />
                 </div>
-
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <input
-                      type="time"
-                      className="form-control border-0  bgcolor"
-                      id="actionTime"
-                      onChange={handleTimeChange}
-                      value={followupTime}
-
-
-                      style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                    />
-                  </div>
-                </div>
-              </div>)}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || showFollowupPanel) && (
-
-              <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
-                <textarea
-                  className="form-control border-0 bgcolor"
-                  id="comment"
-                  rows="4"
-                  onChange={(e) => setRemarks(e.target.value)}
-
-                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-
-                ></textarea>
               </div>
-            )}
+
+              <div className="col-6">
+                <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                  Time <span className="text-danger">*</span>
+                </label>
+                <div className="input-group">
+                  <input
+                    type="time"
+                    className="form-control border-0  bgcolor"
+                    id="actionTime"
+                    onChange={handleTimeChange}
+                    value={followupTime}
+
+
+                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+
+
+            <div className="mb-1">
+              <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+              <textarea
+                className="form-control border-0 bgcolor"
+                id="comment"
+                rows="4"
+                onChange={(e) => setRemarks(e.target.value)}
+
+                style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+
+              ></textarea>
+            </div>
+
 
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
                 type="button"
                 className="btn"
                 style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closeEditPanel}
+                onClick={closePanel}
               >
                 CLOSE
               </button>
               <button
-                type="submit"
                 className="btn text-white"
-                onClick={handleUpdateStatus}
+                onClick={(e) => handleUpdateFollowup(e)}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-
-                {showEditPanel && 'UPDATE STATUS'}
-                {showFollowupPanel && 'Update Followup '}
+                Update Followup
               </button>
             </div>
           </form>
@@ -3339,10 +2857,10 @@ const fetchFollowupCounts = async () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal ${showPanel === 'followup' ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -3354,7 +2872,7 @@ const fetchFollowupCounts = async () => {
       );
     }
 
-    return showEditPanel || showFollowupPanel ? (
+    return showPanel === 'followup' ? (
       <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
@@ -3384,7 +2902,7 @@ const fetchFollowupCounts = async () => {
             </a>
             <button
               className="btn btn-sm btn-outline-secondary"
-              onClick={closeWhatsappPanel}
+              onClick={closePanel}
               title="Close WhatsApp"
             >
               <i className="fas fa-times"></i>
@@ -3483,10 +3001,10 @@ const fetchFollowupCounts = async () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal ${showPanel === 'whatsapp' ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeWhatsappPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -3498,7 +3016,7 @@ const fetchFollowupCounts = async () => {
       );
     }
 
-    return showWhatsappPanel ? (
+    return showPanel === 'whatsapp' ? (
       <div className="col-12 transition-col" id="whatsappPanel">
         {panelContent}
       </div>
@@ -3621,10 +3139,10 @@ const fetchFollowupCounts = async () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal ${showPanel === 'history' ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeleadHistoryPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -3636,7 +3154,7 @@ const fetchFollowupCounts = async () => {
       );
     }
 
-    return leadHistoryPanel ? (
+    return showPanel === 'history' ? (
       <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
@@ -4207,44 +3725,44 @@ const fetchFollowupCounts = async () => {
                         </div>
                       </div>
                     ) : (
-                    <div className="card px-3">
-                      <div className="row" id="crm-main-row">
+                      <div className="card px-3">
+                        <div className="row" id="crm-main-row">
 
-                        {allProfiles.map((profile, profileIndex) => (
-                          <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                          {allProfiles.map((profile, profileIndex) => (
+                            <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
-                            {/* Profile Header Card */}
-                            <div className="card border-0 shadow-sm mb-0 mt-2">
-                              <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center justify-content-between">
-                                  <div className="col-md-6">
-                                    <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
-                                        <input className="form-check-input" type="checkbox" />
-                                      </div>
-                                      <div className="me-3">
-                                        {/* <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                              {/* Profile Header Card */}
+                              <div className="card border-0 shadow-sm mb-0 mt-2">
+                                <div className="card-body px-1 py-0 my-2">
+                                  <div className="row align-items-center justify-content-between">
+                                    <div className="col-md-6">
+                                      <div className="d-flex align-items-center">
+                                        <div className="form-check me-3">
+                                          <input className="form-check-input" type="checkbox" />
+                                        </div>
+                                        <div className="me-3">
+                                          {/* <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                           <svg width="40" height="40">
                                             <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                             <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
                                           </svg>
                                           <div className="progress-text"></div>
                                         </div> */}
-                                      </div>
-                                      <div>
-                                        <h6 className="mb-0 fw-bold">{profile?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">
-                                          <i className="fas fa-phone" style={{ fontSize: '12px', marginRight: '5px' }}></i>
-                                          {profile?.mobile || 'Mobile Number'}</small>
-                                        <br />
-                                        <small className="text-muted">
-                                          <i className="fas fa-envelope" style={{ fontSize: '12px', marginRight: '5px' }}></i>{profile?.email || 'Email'}</small>
-                                      </div>
-                                      <div style={{ marginLeft: '15px' }}>
-                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <i className="fas fa-phone"></i>
-                                        </button>
-                                        {/* <button
+                                        </div>
+                                        <div>
+                                          <h6 className="mb-0 fw-bold">{profile?.name || 'Your Name'}</h6>
+                                          <small className="text-muted">
+                                            <i className="fas fa-phone" style={{ fontSize: '12px', marginRight: '5px' }}></i>
+                                            {profile?.mobile || 'Mobile Number'}</small>
+                                          <br />
+                                          <small className="text-muted">
+                                            <i className="fas fa-envelope" style={{ fontSize: '12px', marginRight: '5px' }}></i>{profile?.email || 'Email'}</small>
+                                        </div>
+                                        <div style={{ marginLeft: '15px' }}>
+                                          <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                            <i className="fas fa-phone"></i>
+                                          </button>
+                                          {/* <button
                                         className="btn btn-outline-success btn-sm border-0"
                                         onClick={openWhatsappPanel}
                                         style={{ fontSize: '20px' }}
@@ -4252,11 +3770,11 @@ const fetchFollowupCounts = async () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* <div className="col-md-4">
+                                    {/* <div className="col-md-4">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -4300,123 +3818,112 @@ const fetchFollowupCounts = async () => {
                                     </div>
                                   </div> */}
 
-                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
+                                    <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                      <div className="btn-group">
 
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
+                                        <div style={{ position: "relative", display: "inline-block" }}>
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => togglePopup(profileIndex)}
+                                            aria-label="Options"
+                                          >
+                                            <i className="fas fa-ellipsis-v"></i>
+                                          </button>
 
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
+                                          {/* Overlay for click outside */}
+                                          {showPopup === profileIndex && (
+                                            <div
+                                              onClick={() => setShowPopup(null)}
+                                              style={{
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100vw",
+                                                height: "100vh",
+                                                backgroundColor: "transparent",
+                                                zIndex: 8,
+                                              }}
+                                            ></div>
+                                          )}
+
                                           <div
-                                            onClick={() => setShowPopup(null)}
                                             style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
+                                              position: "absolute",
+                                              top: "28px", // button ke thoda niche
+                                              right: "-100px",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                              borderRadius: "4px",
+                                              padding: "8px 0",
+                                              zIndex: 9,
+                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                              transition: "transform 0.3s ease-in-out",
+                                              pointerEvents: showPopup ? "auto" : "none",
+                                              display: showPopup === profileIndex ? "block" : "none"
                                             }}
-                                          ></div>
-                                        )}
+                                          >
 
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
-                                          >
-                                            Move To KYC List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => alert("Reffer")}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => alert("Reffer")}
+                                            >
+                                              Reffer
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
 
-                                            onClick={() => {
-                                              openleadHistoryPanel(profile);
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
-                                            }}
-                                          >
-                                            Update Followup
-                                          </button>
-                                          {/* {activeFollowupStatus === 'planned' && (
+                                              onClick={() => {
+                                                openPanel(profile, 'history');
+                                                console.log('selectedProfile', profile);
+                                              }}
+                                            >
+                                              History List
+                                            </button>
+
+                                            {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && (
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openPanel(profile, 'followup');
+                                                }}
+                                              >
+                                                Update Followup
+                                              </button>
+                                            )}
+
+                                            {/* {activeFollowupStatus === 'planned' && (
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -4439,137 +3946,126 @@ const fetchFollowupCounts = async () => {
                                           )} */}
 
 
+                                          </div>
                                         </div>
-                                      </div>
 
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => { 
-                                          toggleLeadDetails(profileIndex, profile)
-                                        }}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                    <div className="btn-group">
-
-                                      <div style={{ position: "relative", display: "inline-block" }}>
                                         <button
                                           className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
+                                          onClick={() => {
+                                            toggleLeadDetails(profileIndex, profile)
                                           }}
                                         >
+                                          {leadDetailsVisible === profileIndex ? (
+                                            <i className="fas fa-chevron-up"></i>
+                                          ) : (
+                                            <i className="fas fa-chevron-down"></i>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                      <div className="btn-group">
+
+                                        <div style={{ position: "relative", display: "inline-block" }}>
                                           <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => togglePopup(profileIndex)}
+                                            aria-label="Options"
                                           >
-                                            Move To KYC List
+                                            <i className="fas fa-ellipsis-v"></i>
                                           </button>
-                                          <button
-                                            className="dropdown-item"
+
+                                          {/* Overlay for click outside */}
+                                          {showPopup === profileIndex && (
+                                            <div
+                                              onClick={() => setShowPopup(null)}
+                                              style={{
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100vw",
+                                                height: "100vh",
+                                                backgroundColor: "transparent",
+                                                zIndex: 8,
+                                              }}
+                                            ></div>
+                                          )}
+
+                                          <div
                                             style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => alert("Reffer")}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => openleadHistoryPanel(profile)}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
+                                              position: "absolute",
+                                              top: "28px", // button ke thoda niche
+                                              right: "-100px",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                              borderRadius: "4px",
+                                              padding: "8px 0",
+                                              zIndex: 9,
+                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                              transition: "transform 0.3s ease-in-out",
+                                              pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                              display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
-                                            Update Followup
-                                          </button>
-                                          {/* {activeFollowupStatus === 'planned' && (
+
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => alert("Reffer")}
+                                            >
+                                              Reffer
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => openPanel(profile, 'history')}
+                                            >
+                                              History List
+                                            </button>
+
+                                            {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && (
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openPanel(profile, 'followup');
+                                                }}
+                                              >
+                                                Update Followup
+                                              </button>
+                                            )}
+
+                                            {/* {activeFollowupStatus === 'planned' && (
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -4592,279 +4088,302 @@ const fetchFollowupCounts = async () => {
                                           </button>
                                           )} */}
 
-                                        </div>
-                                      </div>
-
-
-
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => { 
-                                          toggleLeadDetails(profileIndex, profile)
-                                        }}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tab Navigation and Content Card */}
-                            <div className="card border-0 shadow-sm mb-4">
-                              <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul className="nav nav-pills nav-pills-sm">
-                                  {tabs.map((tab, tabIndex) => (
-                                    <li className="nav-item" key={tabIndex}>
-                                      <button
-                                        className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex)}
-                                      >
-                                        {tab}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-
-                              {/* Tab Content - Only show if leadDetailsVisible is true */}
-                              {leadDetailsVisible === profileIndex && (
-                                isLoadingProfilesData ? (
-                                  <div className="text-center">
-                                    <div className="spinner-border" role="status">
-                                      <span className="visually-hidden">Loading...</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="tab-content">
-
-                                    {/* Lead Details Tab */}
-                                    {/* {activeTab === 0 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 0 && (
-                                      <div className="tab-pane active" id="lead-details">
-                                        {/* Your lead details content here */}
-                                        <div className="scrollable-container">
-                                          <div className="scrollable-content">
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD AGE</div>
-                                                <div className="info-value">{candidateDetails.createdAt ?
-                                                  Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                  : 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">Lead Owner</div>
-                                                <div className="info-value">{candidateDetails.leadOwner || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">COURSE / JOB NAME</div>
-                                                <div className="info-value">{candidateDetails._course?.name}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BATCH NAME</div>
-                                                <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">TYPE OF PROJECT</div>
-                                                <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">PROJECT</div>
-                                                <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">SECTOR</div>
-                                                <div className="info-value">{candidateDetails.sector}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD CREATION DATE</div>
-                                                <div className="info-value">{candidateDetails.createdAt ?
-                                                  new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">STATE</div>
-                                                <div className="info-value">{candidateDetails._course?.state}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">City</div>
-                                                <div className="info-value">{candidateDetails._course?.city}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BRANCH NAME</div>
-                                                <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                <div className="info-value">{candidateDetails.updatedAt ?
-                                                  new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                              </div>
-                                            </div>
                                           </div>
                                         </div>
 
 
-                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
 
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          onClick={() => {
+                                            toggleLeadDetails(profileIndex, profile)
+                                          }}
+                                        >
+                                          {leadDetailsVisible === profileIndex ? (
+                                            <i className="fas fa-chevron-up"></i>
+                                          ) : (
+                                            <i className="fas fa-chevron-down"></i>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
 
-                                        <div className="desktop-view">
-                                        <div className="row g-4">
+                              {/* Tab Navigation and Content Card */}
+                              <div className="card border-0 shadow-sm mb-4">
+                                <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                                  <ul className="nav nav-pills nav-pills-sm">
+                                    {tabs.map((tab, tabIndex) => (
+                                      <li className="nav-item" key={tabIndex}>
+                                        <button
+                                          className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
+                                          onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                        >
+                                          {tab}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
 
-                                          <div className="col-12">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{candidateDetails.createdAt ?
-                                                      Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{candidateDetails.leadOwner?.join(', ') || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
-                                                  </div>
+                                {/* Tab Content - Only show if leadDetailsVisible is true */}
+                                {leadDetailsVisible === profileIndex && (
+                                  isLoadingProfilesData ? (
+                                    <div className="text-center">
+                                      <div className="spinner-border" role="status">
+                                        <span className="visually-hidden">Loading...</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="tab-content">
+
+                                      {/* Lead Details Tab */}
+                                      {/* {activeTab === 0 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 0 && (
+                                        <div className="tab-pane active" id="lead-details">
+                                          {/* Your lead details content here */}
+                                          <div className="scrollable-container">
+                                            <div className="scrollable-content">
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD AGE</div>
+                                                  <div className="info-value">{candidateDetails.createdAt ?
+                                                    Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    : 'N/A'}</div>
                                                 </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{candidateDetails._course?.sectors}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{candidateDetails.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">Lead Owner</div>
+                                                  <div className="info-value">{candidateDetails.leadOwner || 'N/A'}</div>
                                                 </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">COURSE / JOB NAME</div>
+                                                  <div className="info-value">{candidateDetails._course?.name}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BATCH NAME</div>
+                                                  <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
+                                                </div>
+                                              </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{candidateDetails._course?.state}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{candidateDetails._course?.city}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{candidateDetails.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">{candidateDetails.updatedBy?.name || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{candidateDetails._course?.counslername}</div>
-                                                  </div>
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">TYPE OF PROJECT</div>
+                                                  <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">PROJECT</div>
+                                                  <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">SECTOR</div>
+                                                  <div className="info-value">{candidateDetails.sector}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD CREATION DATE</div>
+                                                  <div className="info-value">{candidateDetails.createdAt ?
+                                                    new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                </div>
+                                              </div>
+
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">STATE</div>
+                                                  <div className="info-value">{candidateDetails._course?.state}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">City</div>
+                                                  <div className="info-value">{candidateDetails._course?.city}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BRANCH NAME</div>
+                                                  <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                  <div className="info-value">{candidateDetails.updatedAt ?
+                                                    new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
                                             </div>
-                                            <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                            <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+                                          </div>
 
-                                            <div className="desktop-view">
-                                              <div className="row">
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{candidateDetails.createdAt ?
-                                                      Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{candidateDetails._course?.state}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">CITY</div>
-                                                    <div className="info-value">{candidateDetails._course?.city}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Sector</div>
-                                                    <div className="info-value">{candidateDetails._course?.sectors}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.name}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
+                                          <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                          <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
 
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+
+                                          <div className="desktop-view">
+                                            <div className="row g-4">
+
+                                              <div className="col-12">
+                                                <div className="scrollable-container">
+                                                  <div className="scrollable-content">
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{candidateDetails.createdAt ?
+                                                          Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Lead Owner</div>
+                                                        <div className="info-value">{candidateDetails.leadOwner?.join(', ') || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.name}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BATCH NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">TYPE OF PROJECT</div>
+                                                        <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">PROJECT</div>
+                                                        <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">SECTOR</div>
+                                                        <div className="info-value">{candidateDetails._course?.sectors}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{candidateDetails.createdAt ?
+                                                          new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{candidateDetails._course?.state}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">City</div>
+                                                        <div className="info-value">{candidateDetails._course?.city}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{candidateDetails.updatedAt ?
+                                                          new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION By</div>
+                                                        <div className="info-value">{candidateDetails.updatedBy?.name || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{candidateDetails._course?.counslername}</div>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">NEXT ACTION DATE</div>
-                                                    <div className="info-value">
-                                                      {candidateDetails.followups?.length > 0
-                                                        ?
-                                                        (() => {
-                                                          const dateObj = new Date(candidateDetails.followups[candidateDetails.followups.length - 1].date);
+                                                <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                                <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+                                                <div className="desktop-view">
+                                                  <div className="row">
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{candidateDetails.createdAt ?
+                                                          Math.floor((new Date() - new Date(candidateDetails.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{candidateDetails._course?.state}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">CITY</div>
+                                                        <div className="info-value">{candidateDetails._course?.city}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">TYPE OF PROJECT</div>
+                                                        <div className="info-value">{candidateDetails._course?.typeOfProject}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">PROJECT</div>
+                                                        <div className="info-value">{candidateDetails._course?.projectName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">Sector</div>
+                                                        <div className="info-value">{candidateDetails._course?.sectors}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.name}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">BATCH NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.batchName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">NEXT ACTION DATE</div>
+                                                        <div className="info-value">
+                                                          {candidateDetails.followups?.length > 0
+                                                            ?
+                                                            (() => {
+                                                              const dateObj = new Date(candidateDetails.followups[candidateDetails.followups.length - 1].date);
+                                                              const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                              }).replace(/ /g, '-');
+                                                              const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true,
+                                                              });
+                                                              return `${datePart}, ${timePart}`;
+                                                            })()
+                                                            : 'N/A'}
+                                                        </div>
+
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{candidateDetails.createdAt ? (() => {
+                                                          const dateObj = new Date(candidateDetails.createdAt);
                                                           const datePart = dateObj.toLocaleDateString('en-GB', {
                                                             day: '2-digit',
                                                             month: 'short',
@@ -4876,800 +4395,777 @@ const fetchFollowupCounts = async () => {
                                                             hour12: true,
                                                           });
                                                           return `${datePart}, ${timePart}`;
-                                                        })()
-                                                        : 'N/A'}
+                                                        })() : 'N/A'}</div>
+                                                      </div>
                                                     </div>
-
-                                                  </div>
-                                                </div>
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{candidateDetails.createdAt ? (() => {
-                                                      const dateObj = new Date(candidateDetails.createdAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{candidateDetails.updatedAt ? (() => {
-                                                      const dateObj = new Date(candidateDetails.updatedAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">{candidateDetails.logs?.length ? candidateDetails.logs[candidateDetails.logs.length - 1]?.user?.name || '' : ''}
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{candidateDetails.updatedAt ? (() => {
+                                                          const dateObj = new Date(candidateDetails.updatedAt);
+                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                          }).replace(/ /g, '-');
+                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true,
+                                                          });
+                                                          return `${datePart}, ${timePart}`;
+                                                        })() : 'N/A'}</div>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{candidateDetails._course?.counslername}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD OWNER</div>
-                                                    <div className="info-value">{candidateDetails.registeredBy?.name || 'Self Registerd'}</div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION BY</div>
+                                                        <div className="info-value">{candidateDetails.logs?.length ? candidateDetails.logs[candidateDetails.logs.length - 1]?.user?.name || '' : ''}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{candidateDetails._course?.counslername}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD OWNER</div>
+                                                        <div className="info-value">{candidateDetails.registeredBy?.name || 'Self Registerd'}</div>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
                                             </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                    {/* Profile Tab */}
-                                    {/* {activeTab === 1 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 1 && (
-                                      <div className="tab-pane active" id="profile">
-                                        <div className="resume-preview-body">
-                                          <div id="resume-download" className="resume-document">
+                                      )}
+                                      {/* Profile Tab */}
+                                      {/* {activeTab === 1 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 1 && (
+                                        <div className="tab-pane active" id="profile">
+                                          <div className="resume-preview-body">
+                                            <div id="resume-download" className="resume-document">
 
-                                            <div className="resume-document-header">
-                                              <div className="resume-profile-section">
-                                                {user?.image ? (
-                                                  <img
-                                                    src={`${bucketUrl}/${user.image}`}
-                                                    alt="Profile"
-                                                    className="resume-profile-image"
-                                                  />
-                                                ) : (
-                                                  <div className="resume-profile-placeholder">
-                                                    <i className="bi bi-person-circle"></i>
-                                                  </div>
-                                                )}
-
-                                                <div className="resume-header-content">
-                                                  <h1 className="resume-name">
-                                                    {candidateDetails._candidate?.name || 'Your Name'}
-                                                  </h1>
-                                                  <p className="resume-title">
-                                                    {candidateDetails._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                  </p>
-                                                  <p className="resume-title">
-                                                    {candidateDetails._candidate?.sex || 'Sex'}
-                                                  </p>
-
-                                                  <div className="resume-contact-details">
-
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-telephone-fill"></i>
-                                                      <span>{candidateDetails._candidate?.mobile}</span>
+                                              <div className="resume-document-header">
+                                                <div className="resume-profile-section">
+                                                  {user?.image ? (
+                                                    <img
+                                                      src={`${bucketUrl}/${user.image}`}
+                                                      alt="Profile"
+                                                      className="resume-profile-image"
+                                                    />
+                                                  ) : (
+                                                    <div className="resume-profile-placeholder">
+                                                      <i className="bi bi-person-circle"></i>
                                                     </div>
+                                                  )}
+
+                                                  <div className="resume-header-content">
+                                                    <h1 className="resume-name">
+                                                      {candidateDetails._candidate?.name || 'Your Name'}
+                                                    </h1>
+                                                    <p className="resume-title">
+                                                      {candidateDetails._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                    </p>
+                                                    <p className="resume-title">
+                                                      {candidateDetails._candidate?.sex || 'Sex'}
+                                                    </p>
+
+                                                    <div className="resume-contact-details">
+
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-telephone-fill"></i>
+                                                        <span>{candidateDetails._candidate?.mobile}</span>
+                                                      </div>
 
 
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-envelope-fill"></i>
-                                                      <span>{candidateDetails._candidate?.email}</span>
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-envelope-fill"></i>
+                                                        <span>{candidateDetails._candidate?.email}</span>
+                                                      </div>
+
+                                                      {candidateDetails._candidate?.dob && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-calendar-heart-fill"></i>
+                                                          {new Date(candidateDetails._candidate.dob).toLocaleDateString('en-IN', {
+                                                            day: '2-digit',
+                                                            month: 'long',
+                                                            year: 'numeric'
+                                                          })}
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-geo-alt-fill"></i>
+                                                          <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-house-fill"></i>
+                                                          <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
                                                     </div>
-
-                                                    {candidateDetails._candidate?.dob && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-calendar-heart-fill"></i>
-                                                        {new Date(candidateDetails._candidate.dob).toLocaleDateString('en-IN', {
-                                                          day: '2-digit',
-                                                          month: 'long',
-                                                          year: 'numeric'
-                                                        })}
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-geo-alt-fill"></i>
-                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-house-fill"></i>
-                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
                                                   </div>
+                                                </div>
+
+                                                <div className="resume-summary">
+                                                  <h2 className="resume-section-title">Professional Summary</h2>
+                                                  <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                                 </div>
                                               </div>
 
-                                              <div className="resume-summary">
-                                                <h2 className="resume-section-title">Professional Summary</h2>
-                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                              </div>
-                                            </div>
 
+                                              <div className="resume-document-body">
 
-                                            <div className="resume-document-body">
+                                                <div className="resume-column resume-left-column">
 
-                                              <div className="resume-column resume-left-column">
-
-                                                {profile._candidate?.isExperienced === false ? (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Work Experience</h2>
-                                                    <div className="resume-experience-item">
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-item-title">Fresher</h3>
-                                                      </div>
-                                                      <div className="resume-item-content">
-                                                        <p>Looking for opportunities to start my career</p>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                ) : (
-                                                  profile._candidate?.experiences?.length > 0 && (
+                                                  {profile._candidate?.isExperienced === false ? (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Work Experience</h2>
-                                                      {profile._candidate.experiences.map((exp, index) => (
-                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                          <div className="resume-item-header">
-                                                            {exp.jobTitle && (
-                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                            )}
-                                                            {exp.companyName && (
-                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                            )}
-                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                              <p className="resume-item-period">
-                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'Start Date'}
-                                                                {" - "}
-                                                                {exp.currentlyWorking ? 'Present' :
-                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                  }) : 'End Date'}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                          {exp.jobDescription && (
-                                                            <div className="resume-item-content">
-                                                              <p>{exp.jobDescription}</p>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  )
-                                                )}
-
-                                                {profile._candidate?.qualifications?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Education</h2>
-                                                    {profile._candidate.qualifications.map((edu, index) => (
-                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                      <div className="resume-experience-item">
                                                         <div className="resume-item-header">
-                                                          {edu.education && (
-                                                            <h3 className="resume-item-title">{edu.education}</h3>
-                                                          )}
-                                                          {edu.course && (
-                                                            <h3 className="resume-item-title">{edu.course}</h3>
-                                                          )}
-                                                          {edu.universityName && (
-                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                          )}
-                                                          {edu.schoolName && (
-                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                          )}
-                                                          {edu.collegeName && (
-                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                          )}
-                                                          {edu.passingYear && (
-                                                            <p className="resume-item-period">{edu.passingYear}</p>
-                                                          )}
+                                                          <h3 className="resume-item-title">Fresher</h3>
                                                         </div>
                                                         <div className="resume-item-content">
-                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                          <p>Looking for opportunities to start my career</p>
                                                         </div>
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-
-
-                                              <div className="resume-column resume-right-column">
-
-                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Skills</h2>
-                                                    <div className="resume-skills-list">
-                                                      {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                          <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                          {skill.skillPercent && (
-                                                            <div className="resume-skill-bar-container">
-                                                              <div
-                                                                className="resume-skill-bar"
-                                                                style={{ width: `${skill.skillPercent}%` }}
-                                                              ></div>
-                                                              <span className="resume-skill-percent">{skill.skillPercent}%</span>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
                                                     </div>
-                                                  </div>
-                                                )}
-
-
-
-                                                {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Languages</h2>
-                                                    <div className="resume-languages-list">
-                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                          <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
-                                                          {lang.level && (
-                                                            <div className="resume-language-level">
-                                                              {[1, 2, 3, 4, 5].map(dot => (
-                                                                <span
-                                                                  key={`resume-lang-dot-${index}-${dot}`}
-                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                                ></span>
-                                                              ))}
+                                                  ) : (
+                                                    profile._candidate?.experiences?.length > 0 && (
+                                                      <div className="resume-section">
+                                                        <h2 className="resume-section-title">Work Experience</h2>
+                                                        {profile._candidate.experiences.map((exp, index) => (
+                                                          <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                            <div className="resume-item-header">
+                                                              {exp.jobTitle && (
+                                                                <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                              )}
+                                                              {exp.companyName && (
+                                                                <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                              )}
+                                                              {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                <p className="resume-item-period">
+                                                                  {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'Start Date'}
+                                                                  {" - "}
+                                                                  {exp.currentlyWorking ? 'Present' :
+                                                                    exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                      year: 'numeric',
+                                                                      month: 'short',
+                                                                    }) : 'End Date'}
+                                                                </p>
+                                                              )}
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                )}
-
-
-                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Certifications</h2>
-                                                    <ul className="resume-certifications-list">
-                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                          <strong>{cert.certificateName || cert.name}</strong>
-                                                          {cert.orgName && (
-                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                          )}
-                                                          {(cert.month || cert.year) && (
-                                                            <span className="resume-cert-date">
-                                                              {cert.month && cert.year ?
-                                                                ` (${cert.month}/${cert.year})` :
-                                                                cert.month ?
-                                                                  ` (${cert.month})` :
-                                                                  cert.year ?
-                                                                    ` (${cert.year})` :
-                                                                    ''}
-                                                            </span>
-                                                          )}
-                                                        </li>
-                                                      ))}
-                                                    </ul>
-                                                  </div>
-                                                )}
-
-
-                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Projects</h2>
-                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          <h3 className="resume-project-title">
-                                                            {proj.projectName || 'Project'}
-                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                          </h3>
-                                                        </div>
-                                                        {proj.description && (
-                                                          <div className="resume-item-content">
-                                                            <p>{proj.description}</p>
+                                                            {exp.jobDescription && (
+                                                              <div className="resume-item-content">
+                                                                <p>{exp.jobDescription}</p>
+                                                              </div>
+                                                            )}
                                                           </div>
-                                                        )}
+                                                        ))}
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                )}
+                                                    )
+                                                  )}
 
-
-                                                {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Interests</h2>
-                                                    <div className="resume-interests-tags">
-                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                          {interest}
-                                                        </span>
+                                                  {profile._candidate?.qualifications?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Education</h2>
+                                                      {profile._candidate.qualifications.map((edu, index) => (
+                                                        <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {edu.education && (
+                                                              <h3 className="resume-item-title">{edu.education}</h3>
+                                                            )}
+                                                            {edu.course && (
+                                                              <h3 className="resume-item-title">{edu.course}</h3>
+                                                            )}
+                                                            {edu.universityName && (
+                                                              <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                            )}
+                                                            {edu.schoolName && (
+                                                              <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                            )}
+                                                            {edu.collegeName && (
+                                                              <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                            )}
+                                                            {edu.passingYear && (
+                                                              <p className="resume-item-period">{edu.passingYear}</p>
+                                                            )}
+                                                          </div>
+                                                          <div className="resume-item-content">
+                                                            {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                            {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                          </div>
+                                                        </div>
                                                       ))}
                                                     </div>
-                                                  </div>
-                                                )}
+                                                  )}
+                                                </div>
 
+
+                                                <div className="resume-column resume-right-column">
+
+                                                  {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Skills</h2>
+                                                      <div className="resume-skills-list">
+                                                        {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                          <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                            <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                            {skill.skillPercent && (
+                                                              <div className="resume-skill-bar-container">
+                                                                <div
+                                                                  className="resume-skill-bar"
+                                                                  style={{ width: `${skill.skillPercent}%` }}
+                                                                ></div>
+                                                                <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+
+
+                                                  {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Languages</h2>
+                                                      <div className="resume-languages-list">
+                                                        {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                          <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                            <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                            {lang.level && (
+                                                              <div className="resume-language-level">
+                                                                {[1, 2, 3, 4, 5].map(dot => (
+                                                                  <span
+                                                                    key={`resume-lang-dot-${index}-${dot}`}
+                                                                    className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                  ></span>
+                                                                ))}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+
+                                                  {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Certifications</h2>
+                                                      <ul className="resume-certifications-list">
+                                                        {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                          <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                            <strong>{cert.certificateName || cert.name}</strong>
+                                                            {cert.orgName && (
+                                                              <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                            )}
+                                                            {(cert.month || cert.year) && (
+                                                              <span className="resume-cert-date">
+                                                                {cert.month && cert.year ?
+                                                                  ` (${cert.month}/${cert.year})` :
+                                                                  cert.month ?
+                                                                    ` (${cert.month})` :
+                                                                    cert.year ?
+                                                                      ` (${cert.year})` :
+                                                                      ''}
+                                                              </span>
+                                                            )}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+
+
+                                                  {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Projects</h2>
+                                                      {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                        <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            <h3 className="resume-project-title">
+                                                              {proj.projectName || 'Project'}
+                                                              {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                            </h3>
+                                                          </div>
+                                                          {proj.description && (
+                                                            <div className="resume-item-content">
+                                                              <p>{proj.description}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+
+
+                                                  {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Interests</h2>
+                                                      <div className="resume-interests-tags">
+                                                        {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                          <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                            {interest}
+                                                          </span>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                </div>
                                               </div>
+
+
+                                              {profile._candidate?.personalInfo?.declaration?.text && (
+                                                <div className="resume-declaration">
+                                                  <h2 className="resume-section-title">Declaration</h2>
+                                                  <p>{profile._candidate.personalInfo.declaration.text}</p>
+
+                                                </div>
+                                              )}
                                             </div>
-
-
-                                            {profile._candidate?.personalInfo?.declaration?.text && (
-                                              <div className="resume-declaration">
-                                                <h2 className="resume-section-title">Declaration</h2>
-                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                              </div>
-                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {/* Job History Tab */}
-                                    {/* {activeTab === 2 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 2 && (
-                                      <div className="tab-pane active" id="job-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered job-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Company Name</th>
-                                                  <th>Position</th>
-                                                  {/* <th>Duration</th>
+                                      {/* Job History Tab */}
+                                      {/* {activeTab === 2 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 2 && (
+                                        <div className="tab-pane active" id="job-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered job-history-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Company Name</th>
+                                                    <th>Position</th>
+                                                    {/* <th>Duration</th>
                                                   <th>Location</th>
                                                   <th>Status</th> */}
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {jobHistory?.length > 0 ? (
-                                                  jobHistory?.map((job, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{job._job.displayCompanyName}</td>
-                                                      <td>{job._job.title}</td>
-                                                      {/* <td>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {jobHistory?.length > 0 ? (
+                                                    jobHistory?.map((job, index) => (
+                                                      <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{job._job.displayCompanyName}</td>
+                                                        <td>{job._job.title}</td>
+                                                        {/* <td>
                                                                   {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
                                                                   {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
                                                                 </td>
                                                                 <td>Remote</td>
                                                                 <td><span className="text-success">Completed</span></td> */}
+                                                      </tr>
+                                                    ))
+                                                  ) : (
+                                                    <tr>
+                                                      <td colSpan={6} className="text-center">No job history available</td>
                                                     </tr>
-                                                  ))
-                                                ) : (
-                                                  <tr>
-                                                    <td colSpan={6} className="text-center">No job history available</td>
-                                                  </tr>
-                                                )}
-                                              </tbody>
-                                            </table>
+                                                  )}
+                                                </tbody>
+                                              </table>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {/* Course History Tab */}
-                                    {/* {activeTab === 3 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 3 && (
-                                      <div className="tab-pane active" id="course-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered course-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Applied Date</th>
-                                                  <th>Course Name</th>
-                                                  <th>Lead Added By</th>
-                                                  <th>Counsellor</th>
-                                                  <th>Status</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {courseHistory?.length > 0 ? (
-                                                  courseHistory?.map((course, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                      <td>{course._course?.name || 'N/A'}</td>
-                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                      <td>{course.month || ''} {course.year || ''}</td>
-                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-                                                    </tr>
-                                                  ))
-                                                ) : (
+                                      {/* Course History Tab */}
+                                      {/* {activeTab === 3 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 3 && (
+                                        <div className="tab-pane active" id="course-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered course-history-table">
+                                                <thead className="table-light">
                                                   <tr>
-                                                    <td colSpan={6} className="text-center">No course history available</td>
+                                                    <th>S.No</th>
+                                                    <th>Applied Date</th>
+                                                    <th>Course Name</th>
+                                                    <th>Lead Added By</th>
+                                                    <th>Counsellor</th>
+                                                    <th>Status</th>
                                                   </tr>
-                                                )}
+                                                </thead>
+                                                <tbody>
+                                                  {courseHistory?.length > 0 ? (
+                                                    courseHistory?.map((course, index) => (
+                                                      <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                        <td>{course._course?.name || 'N/A'}</td>
+                                                        <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                        <td>{course.month || ''} {course.year || ''}</td>
+                                                        <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                      </tr>
+                                                    ))
+                                                  ) : (
+                                                    <tr>
+                                                      <td colSpan={6} className="text-center">No course history available</td>
+                                                    </tr>
+                                                  )}
 
-                                              </tbody>
-                                            </table>
+                                                </tbody>
+                                              </table>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {/* Documents Tab */}
-                                    {/* {activeTab === 4 && ( */}
+                                      {/* Documents Tab */}
+                                      {/* {activeTab === 4 && ( */}
 
-                                    {(activeTab[profileIndex] || 0) === 4 && (
-                                      <div className="tab-pane active" id='studentsDocuments'>
-                                        {(() => {
-                                          const documentsToDisplay = profile.uploadedDocs || [];
-                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                      {(activeTab[profileIndex] || 0) === 4 && (
+                                        <div className="tab-pane active" id='studentsDocuments'>
+                                          {(() => {
+                                            const documentsToDisplay = profile.uploadedDocs || [];
+                                            const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-                                          // If no documents are required, show a message
-                                          if (totalRequired === 0) {
-                                            return (
-                                              <div className="col-12 text-center py-5">
-                                                <div className="text-muted">
-                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                  <h5 className="text-success">No Documents Required</h5>
-                                                  <p>This course does not require any document verification.</p>
-                                                </div>
-                                              </div>
-
-                                            );
-                                          }
-
-                                          // If documents are required, show the full interface
-                                          return (
-                                            <div className="enhanced-documents-panel">
-                                              {/* Enhanced Stats Grid */}
-                                              <div className="stats-grid">
-                                                {(() => {
-                                                  // Use backend counts only, remove static document fallback
-                                                  const backendCounts = profile?.docCounts || {};
-                                                  return (
-                                                    <>
-                                                      <div className="stat-card total-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-file-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.totalRequired || 0}</h4>
-                                                          <p>Total Required</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-list"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                          <p>Uploaded</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-arrow-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card pending-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-clock"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                          <p>Pending Review</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-exclamation-triangle"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card verified-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-check-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                          <p>Approved</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-thumbs-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-times-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                          <p>Rejected</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-arrow-down"></i>
-                                                        </div>
-                                                      </div>
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-
-                                              {/* Enhanced Filter Section */}
-                                              <div className="filter-section-enhanced">
-                                                <div className="filter-tabs-container">
-                                                  <h5 className="filter-title">
-                                                    <i className="fas fa-filter me-2"></i>
-                                                    Filter Documents
-                                                  </h5>
-                                                  <div className="filter-tabs">
-                                                    {(() => {
-                                                      const backendCounts = profile?.docCounts || {};
-                                                      return (
-                                                        <>
-                                                          <button
-                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('all')}
-                                                          >
-                                                            <i className="fas fa-list-ul"></i>
-                                                            All Documents
-                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('pending')}
-                                                          >
-                                                            <i className="fas fa-clock"></i>
-                                                            Pending
-                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('verified')}
-                                                          >
-                                                            <i className="fas fa-check-circle"></i>
-                                                            Verified
-                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('rejected')}
-                                                          >
-                                                            <i className="fas fa-times-circle"></i>
-                                                            Rejected
-                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                          </button>
-                                                        </>
-                                                      );
-                                                    })()}
+                                            // If no documents are required, show a message
+                                            if (totalRequired === 0) {
+                                              return (
+                                                <div className="col-12 text-center py-5">
+                                                  <div className="text-muted">
+                                                    <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                    <h5 className="text-success">No Documents Required</h5>
+                                                    <p>This course does not require any document verification.</p>
                                                   </div>
                                                 </div>
-                                              </div>
 
-                                              {/* Enhanced Documents Grid */}
-                                              <div className="documents-grid-enhanced">
-                                                {(() => {
-                                                  // Filter documents based on status filter
-                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+                                              );
+                                            }
 
-                                                  if (filteredDocs.length === 0) {
+                                            // If documents are required, show the full interface
+                                            return (
+                                              <div className="enhanced-documents-panel">
+                                                {/* Enhanced Stats Grid */}
+                                                <div className="stats-grid">
+                                                  {(() => {
+                                                    // Use backend counts only, remove static document fallback
+                                                    const backendCounts = profile?.docCounts || {};
                                                     return (
-                                                      <div className="col-12 text-center py-5">
-                                                        <div className="text-muted">
-                                                          <i className="fas fa-filter fa-3x mb-3"></i>
-                                                          <h5>No Documents Found</h5>
-                                                          <p>No documents match the current filter criteria.</p>
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  }
-
-                                                  return filteredDocs.map((doc, index) => {
-                                                    // Check if this is a document with upload data or just uploaded file info
-                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                      ? doc.uploads[doc.uploads.length - 1]
-                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                    return (
-                                                      <div key={doc._id || index} className="document-card-enhanced">
-                                                        <div className="document-image-container">
-                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                            <>
-                                                              {(() => {
-                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                                const fileType = getFileType(fileUrl);
-
-                                                                if (fileType === 'image') {
-                                                                  return (
-                                                                    <img
-                                                                      src={fileUrl}
-                                                                      alt="Document Preview"
-                                                                      className="document-image"
-                                                                    />
-                                                                  );
-                                                                } else if (fileType === 'pdf') {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                    </div>
-                                                                  );
-                                                                } else {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                        {fileType === 'document' ? 'Document' :
-                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                      </p>
-                                                                    </div>
-                                                                  );
-                                                                }
-                                                              })()}
-                                                              <div className="image-overlay">
-                                                                <button
-                                                                  className="preview-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                >
-                                                                  <i className="fas fa-search-plus"></i>
-                                                                  Preview
-                                                                </button>
-                                                              </div>
-                                                            </>
-                                                          ) : (
-                                                            <div className="no-document-placeholder">
-                                                              <i className="fas fa-file-upload"></i>
-                                                              <p>No Document</p>
-                                                            </div>
-                                                          )}
-
-                                                          {/* Status Badge Overlay */}
-                                                          <div className="status-badge-overlay">
-                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                              <span className="status-badge-new pending">
-                                                                <i className="fas fa-clock"></i>
-                                                                Pending
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                              <span className="status-badge-new verified">
-                                                                <i className="fas fa-check-circle"></i>
-                                                                Verified
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                              <span className="status-badge-new rejected">
-                                                                <i className="fas fa-times-circle"></i>
-                                                                Rejected
-                                                              </span>
-                                                            )}
-                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                              <span className="status-badge-new not-uploaded">
-                                                                <i className="fas fa-upload"></i>
-                                                                Required
-                                                              </span>
-                                                            )}
+                                                      <>
+                                                        <div className="stat-card total-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-file-alt"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.totalRequired || 0}</h4>
+                                                            <p>Total Required</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-list"></i>
                                                           </div>
                                                         </div>
 
-                                                        <div className="document-info-section">
-                                                          <div className="document-header">
-                                                            <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                            <div className="document-actions">
-                                                              {(!latestUpload) ? (
-                                                                <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                  setSelectedProfile(profile); // Set the current profile
-                                                                  openUploadModal(doc);        // Open the upload modal
-                                                                }}>
-                                                                  <i className="fas fa-cloud-upload-alt"></i>
-                                                                  Upload
-                                                                </button>
-                                                              ) : (
-                                                                <button
-                                                                  className="action-btn verify-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                  title="Verify Document"
-                                                                >
-                                                                  <i className="fas fa-search"></i>
-                                                                  PREVIEW
-                                                                </button>
+                                                        <div className="stat-card uploaded-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-cloud-upload-alt"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                            <p>Uploaded</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-arrow-up"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card pending-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-clock"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                            <p>Pending Review</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-exclamation-triangle"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card verified-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-check-circle"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                            <p>Approved</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-thumbs-up"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card rejected-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-times-circle"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                            <p>Rejected</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-arrow-down"></i>
+                                                          </div>
+                                                        </div>
+                                                      </>
+                                                    );
+                                                  })()}
+                                                </div>
+
+                                                {/* Enhanced Filter Section */}
+                                                <div className="filter-section-enhanced">
+                                                  <div className="filter-tabs-container">
+                                                    <h5 className="filter-title">
+                                                      <i className="fas fa-filter me-2"></i>
+                                                      Filter Documents
+                                                    </h5>
+                                                    <div className="filter-tabs">
+                                                      {(() => {
+                                                        const backendCounts = profile?.docCounts || {};
+                                                        return (
+                                                          <>
+                                                            <button
+                                                              className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('all')}
+                                                            >
+                                                              <i className="fas fa-list-ul"></i>
+                                                              All Documents
+                                                              <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('pending')}
+                                                            >
+                                                              <i className="fas fa-clock"></i>
+                                                              Pending
+                                                              <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('verified')}
+                                                            >
+                                                              <i className="fas fa-check-circle"></i>
+                                                              Verified
+                                                              <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('rejected')}
+                                                            >
+                                                              <i className="fas fa-times-circle"></i>
+                                                              Rejected
+                                                              <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                            </button>
+                                                          </>
+                                                        );
+                                                      })()}
+                                                    </div>
+                                                  </div>
+                                                </div>
+
+                                                {/* Enhanced Documents Grid */}
+                                                <div className="documents-grid-enhanced">
+                                                  {(() => {
+                                                    // Filter documents based on status filter
+                                                    const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                    if (filteredDocs.length === 0) {
+                                                      return (
+                                                        <div className="col-12 text-center py-5">
+                                                          <div className="text-muted">
+                                                            <i className="fas fa-filter fa-3x mb-3"></i>
+                                                            <h5>No Documents Found</h5>
+                                                            <p>No documents match the current filter criteria.</p>
+                                                          </div>
+                                                        </div>
+                                                      );
+                                                    }
+
+                                                    return filteredDocs.map((doc, index) => {
+                                                      // Check if this is a document with upload data or just uploaded file info
+                                                      const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                        ? doc.uploads[doc.uploads.length - 1]
+                                                        : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                      return (
+                                                        <div key={doc._id || index} className="document-card-enhanced">
+                                                          <div className="document-image-container">
+                                                            {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                              <>
+                                                                {(() => {
+                                                                  const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                  const fileType = getFileType(fileUrl);
+
+                                                                  if (fileType === 'image') {
+                                                                    return (
+                                                                      <img
+                                                                        src={fileUrl}
+                                                                        alt="Document Preview"
+                                                                        className="document-image"
+                                                                      />
+                                                                    );
+                                                                  } else if (fileType === 'pdf') {
+                                                                    return (
+                                                                      <div className="document-preview-icon">
+                                                                        <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
+                                                                        <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                      </div>
+                                                                    );
+                                                                  } else {
+                                                                    return (
+                                                                      <div className="document-preview-icon">
+                                                                        <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                          fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                          }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                        <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                          {fileType === 'document' ? 'Document' :
+                                                                            fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                        </p>
+                                                                      </div>
+                                                                    );
+                                                                  }
+                                                                })()}
+                                                                <div className="image-overlay">
+                                                                  <button
+                                                                    className="preview-btn"
+                                                                    onClick={() => openDocumentModal(doc)}
+                                                                  >
+                                                                    <i className="fas fa-search-plus"></i>
+                                                                    Preview
+                                                                  </button>
+                                                                </div>
+                                                              </>
+                                                            ) : (
+                                                              <div className="no-document-placeholder">
+                                                                <i className="fas fa-file-upload"></i>
+                                                                <p>No Document</p>
+                                                              </div>
+                                                            )}
+
+                                                            {/* Status Badge Overlay */}
+                                                            <div className="status-badge-overlay">
+                                                              {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                                <span className="status-badge-new pending">
+                                                                  <i className="fas fa-clock"></i>
+                                                                  Pending
+                                                                </span>
+                                                              )}
+                                                              {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                                <span className="status-badge-new verified">
+                                                                  <i className="fas fa-check-circle"></i>
+                                                                  Verified
+                                                                </span>
+                                                              )}
+                                                              {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                                <span className="status-badge-new rejected">
+                                                                  <i className="fas fa-times-circle"></i>
+                                                                  Rejected
+                                                                </span>
+                                                              )}
+                                                              {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                                <span className="status-badge-new not-uploaded">
+                                                                  <i className="fas fa-upload"></i>
+                                                                  Required
+                                                                </span>
                                                               )}
                                                             </div>
                                                           </div>
 
-                                                          <div className="document-meta">
-                                                            <div className="meta-item">
-                                                              <i className="fas fa-calendar-alt text-muted"></i>
-                                                              <span className="meta-text">
-                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    year: 'numeric'
-                                                                  }) :
-                                                                  'Not uploaded'
-                                                                }
-                                                              </span>
+                                                          <div className="document-info-section">
+                                                            <div className="document-header">
+                                                              <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
+                                                              <div className="document-actions">
+                                                                {(!latestUpload) ? (
+                                                                  <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                    setSelectedProfile(profile); // Set the current profile
+                                                                    openUploadModal(doc);        // Open the upload modal
+                                                                  }}>
+                                                                    <i className="fas fa-cloud-upload-alt"></i>
+                                                                    Upload
+                                                                  </button>
+                                                                ) : (
+                                                                  <button
+                                                                    className="action-btn verify-btn"
+                                                                    onClick={() => openDocumentModal(doc)}
+                                                                    title="Verify Document"
+                                                                  >
+                                                                    <i className="fas fa-search"></i>
+                                                                    PREVIEW
+                                                                  </button>
+                                                                )}
+                                                              </div>
                                                             </div>
 
-                                                            {latestUpload && (
+                                                            <div className="document-meta">
                                                               <div className="meta-item">
-                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <i className="fas fa-calendar-alt text-muted"></i>
                                                                 <span className="meta-text">
-                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                  })}
+                                                                  {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                    new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                      day: '2-digit',
+                                                                      month: 'short',
+                                                                      year: 'numeric'
+                                                                    }) :
+                                                                    'Not uploaded'
+                                                                  }
                                                                 </span>
                                                               </div>
-                                                            )}
+
+                                                              {latestUpload && (
+                                                                <div className="meta-item">
+                                                                  <i className="fas fa-clock text-muted"></i>
+                                                                  <span className="meta-text">
+                                                                    {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                      hour: '2-digit',
+                                                                      minute: '2-digit'
+                                                                    })}
+                                                                  </span>
+                                                                </div>
+                                                              )}
+                                                            </div>
                                                           </div>
                                                         </div>
-                                                      </div>
-                                                    );
-                                                  });
-                                                })()}
+                                                      );
+                                                    });
+                                                  })()}
+                                                </div>
+
+                                                <DocumentModal />
+                                                <UploadModal />
                                               </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
 
-                                              <DocumentModal />
-                                              <UploadModal />
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    )}
-
-                                  </div>)
-                              )}
+                                    </div>)
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+
+
+                        </div>
 
 
                       </div>
-
-
-                    </div>
                     )}
                   </div>
                 </div>
@@ -8460,12 +7956,16 @@ background: #fd2b5a;
   position: fixed !important;
   
 }
-     #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+    #editFollowupPanel {
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
              .react-date-picker__calendar.react-date-picker__calendar--open{
     inset: 0 !important;
