@@ -2105,8 +2105,19 @@ router.get("/appliedJobs/:candidateId", async (req, res) => {
 	try {
 
 		// console.log('applied jobs...')
-		const { candidateId } = req.params;
+		let { candidateId } = req.params;
 		// console.log("candidateId", candidateId)
+
+		if(!candidateId){
+			return res.json({
+				jobs: []
+			});
+		}
+
+		if(typeof candidateId === 'string' && mongoose.Types.ObjectId.isValid(candidateId)){
+			candidateId = new mongoose.Types.ObjectId(candidateId);
+		}
+
 
 		const jobHistory = await AppliedJobs.find({ _candidate: candidateId }).populate({ path: '_job' })
 		// console.log('jobHistory', jobHistory)
