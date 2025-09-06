@@ -433,6 +433,8 @@ router.route("/addleaddandcourseapply")
 
             if (dob) dob = new Date(dob);
 
+            let appliedData
+
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
                 console.log('existingCandidate:', existingCandidate);
@@ -502,6 +504,8 @@ router.route("/addleaddandcourseapply")
                     _center: selectedCenter,
                     remarks:Remarks || ""
                 });
+
+                appliedData = appliedCourseEntry;
             }
 
 
@@ -511,8 +515,8 @@ router.route("/addleaddandcourseapply")
                 timestamp: new Date() // Add timestamp if your schema supports it
             };
 
-            appliedCourseEntry.logs.push(newLogEntry);
-            await appliedCourseEntry.save();
+            appliedData.logs.push(newLogEntry);
+            await appliedData.save();
 
 
 
