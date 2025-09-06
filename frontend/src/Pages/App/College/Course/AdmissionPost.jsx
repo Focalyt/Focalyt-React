@@ -679,16 +679,27 @@ const CRMDashboard = (profile) => {
                 }
 
                 // Send PUT request to backend API
-                const response = await axios.put(
-                    `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-                    data,
+                // const response = await axios.put(
+                //     `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+                //     data,
+                //     {
+                //         headers: {
+                //             'x-auth': token,
+                //             'Content-Type': 'application/json'
+                //         }
+                //     }
+                // );
+
+                const response = await axios.post(
+                    `${backendUrl}/college/b2c-set-followups`,
+                    { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
                     {
-                        headers: {
-                            'x-auth': token,
-                            'Content-Type': 'application/json'
-                        }
+                      headers: {
+                        'x-auth': token,
+                        'Content-Type': 'application/json'
+                      }
                     }
-                );
+                  );
 
                 console.log('API response:', response.data);
 

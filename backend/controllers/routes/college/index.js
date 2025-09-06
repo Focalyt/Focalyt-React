@@ -1578,13 +1578,19 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			};
 		});
 
-		// console.log("results", results)
+
+		const data = results[0]
+
+		const followup = await B2cFollowup.findOne({ appliedCourseId: data._id, status: 'planned' })
+
+		data.followup = followup
+
+		console.log("data", data)
 
 
 		res.status(200).json({
 			success: true,
-			count: results.length,
-			data: results.length > 0 ? results[0] : null, // Single object instead of array
+			data: data || null, // Single object instead of array
 		});
 
 	} catch (err) {
@@ -6012,6 +6018,13 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		// Apply pagination
 		const paginatedResult = results.slice(skip, skip + limit);
 
+		for (const result of paginatedResult) {
+			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
+			result.followup = followup
+		}
+
+		console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
+
 		res.status(200).json({
 			success: true,
 			count: paginatedResult.length,
@@ -7250,6 +7263,13 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 		const paginatedResult = results.slice(skip, skip + limit);
+		for(const result of paginatedResult)
+		{
+			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
+			result.followup = followup
+		}
+		console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
+	
 		res.status(200).json({
 			success: true,
 			count: paginatedResult.length,

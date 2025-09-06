@@ -673,7 +673,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       const questions = [
         "Is the Candidate Aware of the Course Duration and Placement Benefits?",
         "Is the Candidate Aware of the Course and practicle Module ?",
-        "Currently Work Status / Not Working Status",        
+        "Currently Work Status / Not Working Status",
         "Is Candidate Interested Placement by us?",
         "If we offered a job outside Odisha, would you be interested in the placement?",
         "Parent Confirmation",
@@ -4143,22 +4143,20 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                           <div className="info-group">
                                                             <div className="info-label">NEXT ACTION DATE</div>
                                                             <div className="info-value">
-                                                              {profile.followups.length > 0
-                                                                ? (() => {
-                                                                  const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                                  const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    year: 'numeric',
-                                                                  }).replace(/ /g, '/');
-                                                                  const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                    hour12: true,
-                                                                  });
-                                                                  return `${datePart}, ${timePart}`;
-                                                                })()
-                                                                : 'N/A'}
+                                                              {profile.followup?.followupDate ? (() => {
+                                                                const dateObj = new Date(profile.followup?.followupDate);
+                                                                const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                                  day: '2-digit',
+                                                                  month: 'short',
+                                                                  year: 'numeric',
+                                                                }).replace(/ /g, '-');
+                                                                const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                                  hour: '2-digit',
+                                                                  minute: '2-digit',
+                                                                  hour12: true,
+                                                                });
+                                                                return `${datePart}, ${timePart}`;
+                                                              })() : 'N/A'}
                                                             </div>
 
                                                           </div>
@@ -5233,7 +5231,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           </div>
                         </td>
                       </tr>
-                      
+
                       <tr>
                         <td className="s-no">5</td>
                         <td className="question">If we offered a job outside Odisha, would you be interested in the placement?</td>

@@ -838,7 +838,7 @@ router.put('/update-branch/:profileId', async (req, res) => {
 router.post('/addleadsb2c', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		console.log("API hitting....");
+		// console.log("API hitting....");
 		const { courseId, candidateData, centerId, counselorId, registeredBy } = req.body;
 
 		const existingUser = await User.find({ mobile: candidateData.mobile, role: 3 });
@@ -852,8 +852,8 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 			});
 		}
 	
-		console.log("existingUser", existingUser)
-		console.log("centerId from req.body", req.body)
+		// console.log("existingUser", existingUser)
+		// console.log("centerId from req.body", req.body)
 		const existingCandidate = await Candidate.findOne({ mobile: candidateData.mobile });
 		if (existingCandidate) {
 			return res.status(400).json({
@@ -863,7 +863,7 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 		}
 
 		const candidate = await Candidate.create(candidateData);
-		console.log("candidate", candidate)
+		// console.log("candidate", candidate)
 
 		const counselor = await User.findById(counselorId);
 		const appliedCourse = await AppliedCourses.create({
@@ -880,7 +880,7 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 			}]
 		});
 
-		console.log("appliedCourse", appliedCourse)
+		// console.log("appliedCourse", appliedCourse)
 
 		candidate.appliedCourses.push(appliedCourse._id);
 		await candidate.save();

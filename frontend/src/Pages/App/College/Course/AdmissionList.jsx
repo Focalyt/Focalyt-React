@@ -1235,198 +1235,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     fetchProfileData();
   }, [activeCrmFilter]);
 
-  const handleUpdateStatus = async () => {
-    console.log('Function called');
 
-    try {
-      if (showEditPanel) {
-        // Validation checks
-        if (!selectedProfile || !selectedProfile._id) {
-          alert('No profile selected');
-          return;
-        }
-
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-      if (showFollowupPanel) {
-
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        // const response = await axios.put(
-        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-        //   data,
-        //   {
-        //     headers: {
-        //       'x-auth': token,
-        //       'Content-Type': 'application/json'
-        //     }
-        //   }
-        // );
-
-        const response = await axios.post(
-          `${backendUrl}/college/b2c-set-followups`,
-          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-    }
-    catch (error) {
-      console.error('Error updating status:', error);
-
-      // More detailed error handling
-      if (error.response) {
-        // Server responded with error status
-        console.error('Error Response:', error.response.data);
-        console.error('Error Status:', error.response.status);
-        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-      } else if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', error.request);
-        alert('Network error: Unable to reach server');
-      } else {
-        // Something else happened
-        console.error('Error:', error.message);
-        alert(`Error: ${error.message}`);
-      }
-    }
-  };
 
 
   const fetchBatches = async (profile) => {
@@ -3320,7 +3129,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   setSelectedProfile(profile);
                                                   getBranches(profile);
                                                   setShowBranchModal(true);
-                                                  console.log('change Branch')
+
 
                                                 }}
                                               >
@@ -3516,7 +3325,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   setSelectedProfile(profile);
                                                   getBranches(profile);
                                                   setShowBranchModal(true);
-                                                  console.log('change Branch')
+
 
                                                 }}
                                               >
@@ -3916,22 +3725,20 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       <div className="info-group">
                                                         <div className="info-label">NEXT ACTION DATE</div>
                                                         <div className="info-value">
-                                                          {profile.followups.length > 0
-                                                            ? (() => {
-                                                              const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                              const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric',
-                                                              }).replace(/ /g, '/');
-                                                              const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                                hour12: true,
-                                                              });
-                                                              return `${datePart}, ${timePart}`;
-                                                            })()
-                                                            : 'N/A'}
+                                                          {profile.followup?.followupDate ? (() => {
+                                                            const dateObj = new Date(profile.followup?.followupDate);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '-');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })() : 'N/A'}
                                                         </div>
 
                                                       </div>
@@ -4799,9 +4606,9 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
       </div>
 
 
-        {showBranchModal && (
+      {showBranchModal && (
         <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{margin: 'auto'}}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ margin: 'auto' }}>
             <div className="modal-content p-0">
               <div className="modal-header">
                 <h1 className="modal-title fs-5">Select Branch</h1>
@@ -4853,7 +4660,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
         </div>
       )}
 
-     
+
 
       <style>
         {
@@ -7714,7 +7521,6 @@ background: #fd2b5a;
 .react-calendar{
 // width:min-content !important;
 height:min-content !important;
-transform: translateX(-110px)!important;
     width: 250px !important;
 }
 @media (max-width: 768px) {

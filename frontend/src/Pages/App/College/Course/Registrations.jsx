@@ -934,7 +934,7 @@ const CRMDashboard = () => {
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
-      setSelectedProfiles(prev => [ ...(Array.isArray(prev) ? prev : []), profile._id ]);
+      setSelectedProfiles(prev => [...(Array.isArray(prev) ? prev : []), profile._id]);
     } else {
       setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== profile._id));
     }
@@ -2421,9 +2421,9 @@ const CRMDashboard = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
-         
+
           // Reset form
-                   
+
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
@@ -2452,13 +2452,13 @@ const CRMDashboard = () => {
     }
     finally {
       setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
+      setSelectedSubStatus(null);
+      setFollowupDate('');
+      setFollowupTime('');
+      setRemarks('');
 
-          // Refresh data and close panel
-          await fetchProfileData();
+      // Refresh data and close panel
+      await fetchProfileData();
     }
   };
 
@@ -4798,6 +4798,18 @@ const CRMDashboard = () => {
                         </div>
                       </div>
                     </div>
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Range Count
+                        </h6>
+                      </div>
+
+                     
+                    </div>
+
+                  
 
                     {/* Results Summary */}
                     <div className="row mt-4">
@@ -4939,7 +4951,6 @@ const CRMDashboard = () => {
                     <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                     Bulk Action
                   </button>
-                  {/* <button> Select</button> */}
 
                 </div>
               </div>
@@ -5744,23 +5755,21 @@ const CRMDashboard = () => {
                                                     <div className="info-group">
                                                       <div className="info-label">NEXT ACTION DATE</div>
                                                       <div className="info-value">
-                                                        {profile.followups?.length > 0
-                                                          ?
-                                                          (() => {
-                                                            const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                              day: '2-digit',
-                                                              month: 'short',
-                                                              year: 'numeric',
-                                                            }).replace(/ /g, '-');
-                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                              hour: '2-digit',
-                                                              minute: '2-digit',
-                                                              hour12: true,
-                                                            });
-                                                            return `${datePart}, ${timePart}`;
-                                                          })()
-                                                          : 'N/A'}
+                                                        {profile.followup?.followupDate ? (() => {
+                                                        const dateObj = new Date(profile.followup?.followupDate);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}
+                                                                                          
                                                       </div>
 
                                                     </div>

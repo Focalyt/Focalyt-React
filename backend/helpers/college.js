@@ -46,13 +46,15 @@ module.exports.statusLogHelper = async (_id, updatedData = {}) => {
   try {
 
     const appliedCourse = await AppliedCourses.findById(_id).populate('_course');
+
+    console.log("appliedCourse", appliedCourse)
     const data = {
       _appliedId: appliedCourse._id,
       _collegeId: appliedCourse._course.college,
       _courseId: appliedCourse._course._id,
       vertical: appliedCourse._course.vertical,
       project: appliedCourse._course.project,
-      counsellor: appliedCourse.counsellor,
+      counsellor: appliedCourse.counsellor || appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1]._counsellor,
     }
     Object.keys(updatedData).forEach(key => {
       data[key] = updatedData[key];
@@ -64,7 +66,6 @@ module.exports.statusLogHelper = async (_id, updatedData = {}) => {
       data._centerId = appliedCourse._center._id;
     }
 
-    console.log(data, "data");
 
    
     const newStatusLogs = new StatusLogs(data);
@@ -73,8 +74,8 @@ module.exports.statusLogHelper = async (_id, updatedData = {}) => {
 
 
   } catch (error) {
-    console.error("❌ Error in fetching team members:", error);
-    return allUserIds;
+    console.error("❌ Error adding status logs:", error);
+    return null;
   }
 }
 
