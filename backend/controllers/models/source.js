@@ -6,7 +6,7 @@ const sourceSchema = new Schema({
         type: String, required: true, trim: true,
       },
       mobile: {
-        type: Number, required: true
+        type: Number,
       },
   status: {
     type: Boolean,

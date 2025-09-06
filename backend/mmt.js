@@ -19,6 +19,9 @@ const {v4:uuidv4}=require('uuid');
 const axios = require("axios");
 const AWS = require('aws-sdk');
 
+// cron api 
+const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
+missedFollowupSchedular()
 //upload('
 NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const {

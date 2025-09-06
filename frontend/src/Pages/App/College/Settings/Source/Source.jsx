@@ -17,7 +17,7 @@ function Source() {
     const [editingId, setEditingId] = useState(null);
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
-    // Fetch all users on component mount
+    // Fetch all sources on component mount
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -54,17 +54,13 @@ function Source() {
         e.preventDefault();
 
         // Basic validation
-        if (!formData.name.trim() || !formData.mobile) {
+        if (!formData.name.trim() ) {
             showAlert('Please fill all required fields', 'error');
             return;
         }
 
     
-        // Mobile validation
-        if (formData.mobile.toString().length !== 10) {
-            showAlert('Please enter a valid 10-digit mobile number', 'error');
-            return;
-        }
+    
 
         try {
             setLoading(true);
@@ -177,7 +173,7 @@ function Source() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit User' : 'Add User'}
+                                {isEditing ? 'Edit Source' : 'Add Source'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -185,7 +181,7 @@ function Source() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit User' : 'Add User'}
+                                        {isEditing ? 'Edit Source' : 'Add Source'}
                                     </li>
                                 </ol>
                             </div>
@@ -210,12 +206,12 @@ function Source() {
             <div className="content-body">
                 <section className="list-view">
                     <div className="row">
-                        {/* Add User Form */}
+                        {/* Add Source Form */}
                         <div className="col-6 equal-height-2">
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit User' : 'Add User'}
+                                        {isEditing ? 'Edit Source' : 'Add Source'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -244,7 +240,6 @@ function Source() {
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
                                                         Enter Mobile Number
-                                                        <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
                                                     <input
                                                         className="form-control"
@@ -252,7 +247,6 @@ function Source() {
                                                         value={formData.mobile}
                                                         onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                                                         placeholder="Enter Mobile Number"
-                                                        required
                                                         maxLength={50}
                                                         disabled={loading}
                                                     />
@@ -261,11 +255,11 @@ function Source() {
                                         
 
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
-                                                    <button
+                                                    <bu     tton
                                                         type="button"
                                                         className="btn btn-success font-small-3"
                                                         onClick={handleSubmit}
-                                                        disabled={loading || !formData.name.trim() || !formData.mobile}
+                                                        disabled={loading || !formData.name.trim() }
                                                     >
                                                         {loading ? (
                                                             <>
@@ -275,7 +269,7 @@ function Source() {
                                                         ) : (
                                                             isEditing ? 'Update' : 'Add'
                                                         )}
-                                                    </button>
+                                                    </bu>
 
                                                     {isEditing && (
                                                         <button
@@ -302,7 +296,7 @@ function Source() {
                                     <div className="col-xl-6">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All Users</h4>
+                                                <h4 className="card-title">All Source</h4>
                                             </div>
                                         </div>
                                     </div>

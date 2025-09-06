@@ -838,9 +838,9 @@ router.post("/addSource", isCollege, async (req, res) => {
 	try {
 		console.log("source api called....")
     const { name, mobile } = req.body;
-    console.log("source data" , req.body)
+    // console.log("source data" , req.body)
 		const source = new Source({ name, mobile });
-		console.log("source" , source)
+		// console.log("source" , source)
 		await source.save();
 		res.status(200).json({
 			success: true,
