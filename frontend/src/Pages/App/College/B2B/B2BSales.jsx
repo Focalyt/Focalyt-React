@@ -428,10 +428,10 @@ const B2BSales = () => {
   const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
-  const handleGoogleLogin = async() => {
+  const handleGoogleLogin = async () => {
     try {
       setIsgoogleLoginLoading(true);
-      
+
       const result = await getGoogleAuthCode({
         scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
         user: userData
@@ -443,7 +443,7 @@ const B2BSales = () => {
         user: userData
       });
 
-      
+
       const user = {
         ...userData,
         googleAuthToken: refreshToken.data
@@ -451,11 +451,11 @@ const B2BSales = () => {
       sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
 
       setUserData(user);
-      
+
 
     } catch (error) {
       console.error('❌ Login failed:', error);
-      
+
       // Handle specific popup errors
       if (error.message.includes('Popup blocked')) {
         console.error('Please allow popups for this site and try again.');
@@ -465,7 +465,7 @@ const B2BSales = () => {
         console.error('Login failed: ' + error.message);
       }
 
-    }finally{
+    } finally {
       setIsgoogleLoginLoading(false);
       setShowPanel('followUp');
 
@@ -474,7 +474,7 @@ const B2BSales = () => {
   };
 
   // Simple function to add follow-up to Google Calendar
-    // Function to clear all follow-up form data
+  // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
     setFollowupFormData({
       followupDate: '',
@@ -491,7 +491,7 @@ const B2BSales = () => {
 
   const addFollowUpToGoogleCalendar = async (e) => {
     e.preventDefault();
-    
+
     try {
       // Check if user has Google token
       if (!userData.googleAuthToken?.accessToken) {
@@ -510,9 +510,9 @@ const B2BSales = () => {
       }
 
       // Check if followup is required (either from followup panel or status change with followup)
-      const hasFollowup = (showPanel === 'followUp') || 
-                         (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
-      
+      const hasFollowup = (showPanel === 'followUp') ||
+        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+
       if (hasFollowup && followupFormData.followupDate && followupFormData.followupTime) {
         // Get data from followupFormData
         const scheduledDateTime = new Date(followupFormData.followupDate);
@@ -561,7 +561,7 @@ const B2BSales = () => {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
       alert('❌ Error processing request');
     }
-    finally{
+    finally {
       closePanel();
     }
   };
@@ -781,17 +781,13 @@ const B2BSales = () => {
       const token = userData.token;
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-      const response = await axios.get(`${backendUrl}/college/users`, {
+      const response = await axios.get(`${backendUrl}/college/users/b2b-users`, {
         headers: { 'x-auth': token }
       });
 
       if (response.data.success) {
         // Update users state with detailed access summary
-        setUsers(response.data.data.users.map(user => ({
-          _id: user._id,
-          name: user.name,
-
-        })));
+        setUsers(response.data.data);
       } else {
         console.error('Failed to fetch users:', response.data.message);
       }
@@ -942,12 +938,12 @@ const B2BSales = () => {
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
-  
+
   // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
-  
+
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
@@ -998,7 +994,7 @@ const B2BSales = () => {
   };
 
   const applyFilters = () => {
-    
+
     fetchLeads(selectedStatusFilter);
   };
 
@@ -1020,13 +1016,13 @@ const B2BSales = () => {
     try {
       closePanel();
       setLoadingLeads(true);
-      
+
       // Build query parameters
       const params = {};
       if (statusFilter) {
         params.status = statusFilter;
       }
-      
+
       // Add filter parameters
       if (filters.search) {
         params.search = filters.search;
@@ -1046,9 +1042,9 @@ const B2BSales = () => {
       if (filters.dateRange.end) {
         params.endDate = filters.dateRange.end;
       }
-      
-    
-      
+
+
+
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
         params: params
@@ -1100,22 +1096,22 @@ const B2BSales = () => {
       const currentSubStatus = selectedProfile?.subStatus?.title || 'No Sub-Status';
       const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
       const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
-      
-      
-      
+
+
+
       const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
         headers: { 'x-auth': token }
       });
 
       if (response.data.status) {
         alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
-        
+
         // Refresh the leads list
         fetchLeads(selectedStatusFilter);
-        
+
         // Refresh status counts
         fetchStatusCounts();
-        
+
         // Close the panel
         closePanel();
       } else {
@@ -1555,21 +1551,7 @@ const B2BSales = () => {
     }
 
 
-    const fetchConcernPersons = async () => {
-      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      let concernPersons = [];
-      await response.data.concernPerson.map(person => {
-        if (person._id._id.toString() !== userData._id.toString()) {
-          concernPersons.push(person);
-        }
-      });
-      setConcernPersons(concernPersons);
-    }
-    fetchConcernPersons();
+
   };
 
 
@@ -1577,11 +1559,12 @@ const B2BSales = () => {
     setSelectedConcernPerson(e.target.value);
   }
 
-  const handleReferLead = async () => {
+  const handleReferLead = async (e) => {
+    e.preventDefault();
     try {
-      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
+      const response = await axios.post(`${backendUrl}/college/b2b/refer-lead`, {
         counselorId: selectedConcernPerson,
-        appliedCourseId: selectedProfile._id
+        leadId: selectedProfile._id
       }, {
         headers: {
           'x-auth': token,
@@ -1682,143 +1665,143 @@ const B2BSales = () => {
         <div className="card-body">
           {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
-            {/* Status Selection */}
-            <div className="mb-3">
-              <label htmlFor="status" className="form-label small fw-medium text-dark">
-                Status<span className="text-danger">*</span>
-              </label>
-              <select
-                className="form-select border-0 bgcolor"
-                id="status"
-                value={seletectedStatus}
-                style={{
-                  height: '42px',
-                  paddingTop: '8px',
-                  paddingInline: '10px',
-                  width: '100%',
-                  backgroundColor: '#f1f2f6'
-                }}
-                onChange={handleStatusChange}
-              >
-                <option value="">Select Status</option>
-                {statuses.map((status, index) => (
-                  <option key={status._id} value={status._id}>{status.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sub-Status Selection */}
-            <div className="mb-3">
-              <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                Sub-Status
-              </label>
-              <select
-                className="form-select border-0 bgcolor"
-                id="subStatus"
-                value={seletectedSubStatus?._id || ''}
-                style={{
-                  height: '42px',
-                  paddingTop: '8px',
-                  backgroundColor: '#f1f2f6',
-                  paddingInline: '10px',
-                  width: '100%'
-                }}
-                onChange={handleSubStatusChange}
-              >
-                <option value="">Select Sub-Status</option>
-                {subStatuses.map((subStatus, index) => (
-                  <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Follow-up Section (if substatus has followup) */}
-            {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
+              {/* Status Selection */}
               <div className="mb-3">
-                <h6 className="text-dark mb-2">Follow-up Details</h6>
-                <div className="row">
-                  <div className="col-6">
-                    <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                      Next Action Date <span className="text-danger">*</span>
-                    </label>
-                    <DatePicker
-                      className="form-control border-0 bgcolor"
-                      onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
-                      value={followupFormData.followupDate}
-                      format="dd/MM/yyyy"
-                      minDate={today}
-                    />
-                  </div>
-                  <div className="col-6">
-                    <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                      Time <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      type="time"
-                      className="form-control border-0 bgcolor"
-                      id="actionTime"
-                      onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
-                      value={followupFormData.followupTime}
-                      style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                    />
+                <label htmlFor="status" className="form-label small fw-medium text-dark">
+                  Status<span className="text-danger">*</span>
+                </label>
+                <select
+                  className="form-select border-0 bgcolor"
+                  id="status"
+                  value={seletectedStatus}
+                  style={{
+                    height: '42px',
+                    paddingTop: '8px',
+                    paddingInline: '10px',
+                    width: '100%',
+                    backgroundColor: '#f1f2f6'
+                  }}
+                  onChange={handleStatusChange}
+                >
+                  <option value="">Select Status</option>
+                  {statuses.map((status, index) => (
+                    <option key={status._id} value={status._id}>{status.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub-Status Selection */}
+              <div className="mb-3">
+                <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
+                  Sub-Status
+                </label>
+                <select
+                  className="form-select border-0 bgcolor"
+                  id="subStatus"
+                  value={seletectedSubStatus?._id || ''}
+                  style={{
+                    height: '42px',
+                    paddingTop: '8px',
+                    backgroundColor: '#f1f2f6',
+                    paddingInline: '10px',
+                    width: '100%'
+                  }}
+                  onChange={handleSubStatusChange}
+                >
+                  <option value="">Select Sub-Status</option>
+                  {subStatuses.map((subStatus, index) => (
+                    <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Follow-up Section (if substatus has followup) */}
+              {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
+                <div className="mb-3">
+                  <h6 className="text-dark mb-2">Follow-up Details</h6>
+                  <div className="row">
+                    <div className="col-6">
+                      <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                        Next Action Date <span className="text-danger">*</span>
+                      </label>
+                      <DatePicker
+                        className="form-control border-0 bgcolor"
+                        onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
+                        value={followupFormData.followupDate}
+                        format="dd/MM/yyyy"
+                        minDate={today}
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                        Time <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        className="form-control border-0 bgcolor"
+                        id="actionTime"
+                        onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
+                        value={followupFormData.followupTime}
+                        style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                      />
+                    </div>
                   </div>
                 </div>
+              )}
+
+              {/* Remarks Section - Only show if substatus has hasRemarks: true */}
+              {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
+                <div className="mb-3">
+                  <label htmlFor="remarks" className="form-label small fw-medium text-dark">
+                    Remarks <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-control border-0 bgcolor"
+                    id="remarks"
+                    rows="4"
+                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                    value={followupFormData.remarks}
+                    placeholder="Enter remarks about this status change..."
+                    style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="d-flex justify-content-end gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closePanel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Update Status
+                </button>
               </div>
-            )}
-
-            {/* Remarks Section - Only show if substatus has hasRemarks: true */}
-            {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
-              <div className="mb-3">
-                <label htmlFor="remarks" className="form-label small fw-medium text-dark">
-                  Remarks <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  className="form-control border-0 bgcolor"
-                  id="remarks"
-                  rows="4"
-                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                  value={followupFormData.remarks}
-                  placeholder="Enter remarks about this status change..."
-                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-                  required
-                />
+            </form>
+          ) : !isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <button className="btn btn-primary" onClick={handleGoogleLogin}>
+                  Login with Google to Update Status
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Action Buttons */}
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closePanel}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-              >
-                Update Status
-              </button>
+          {isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <i className="fas fa-spinner fa-spin"></i>
+              </div>
             </div>
-          </form>
-        ) : !isgoogleLoginLoading && (
-          <div className="d-flex justify-content-center align-items-center h-100">
-            <div className="text-center">
-              <button className="btn btn-primary" onClick={handleGoogleLogin}>
-                Login with Google to Update Status
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isgoogleLoginLoading && (
-          <div className="d-flex justify-content-center align-items-center h-100">
-            <div className="text-center">
-              <i className="fas fa-spinner fa-spin"></i>
-            </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
     );
@@ -2091,8 +2074,8 @@ const B2BSales = () => {
                       onChange={handleConcernPersonChange}
                     >
                       <option value="">Select Counselor</option>
-                      {concernPersons.map((counselor, index) => (
-                        <option key={index} value={counselor._id._id}>{counselor._id.name}</option>))}
+                      {users.map((counselor, index) => (
+                        <option key={index} value={counselor._id}>{counselor.name}</option>))}
                     </select>
                   </div>
                 </div>
@@ -2109,9 +2092,8 @@ const B2BSales = () => {
                 CLOSE
               </button>
               <button
-                type="submit"
                 className="btn text-white"
-                onClick={handleReferLead}
+                onClick={(e)=>handleReferLead(e)}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
@@ -2155,7 +2137,7 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
       if (response.data.status) {
-        console.log(response.data.data, 'response.data.data')
+        // console.log(response.data.data, 'response.data.data')
         setLeadLogs(response.data.data);
       }
     } catch (error) {
@@ -2175,122 +2157,122 @@ const B2BSales = () => {
   const renderLeadHistoryPanel = () => {
     const panelContent = (
       <>
-      {leadLogsLoading ? (
-        <div className="d-flex justify-content-center align-items-center h-100">
-          <div className="text-center">
-            <i className="fas fa-spinner fa-spin"></i>
-          </div>
-        </div>
-      ) : (
-      <div className="card border-0 shadow-sm h-100">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-history text-primary"></i>
+        {leadLogsLoading ? (
+          <div className="d-flex justify-content-center align-items-center h-100">
+            <div className="text-center">
+              <i className="fas fa-spinner fa-spin"></i>
             </div>
-            <h6 className="mb-0 fw-medium">Lead History</h6>
           </div>
-          <button className="btn-close" type="button" onClick={closePanel}>
-          </button>
-        </div>
+        ) : (
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+              <div className="d-flex align-items-center">
+                <div className="me-2">
+                  <i className="fas fa-history text-primary"></i>
+                </div>
+                <h6 className="mb-0 fw-medium">Lead History</h6>
+              </div>
+              <button className="btn-close" type="button" onClick={closePanel}>
+              </button>
+            </div>
 
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
-              minHeight: '200px'
-            }}
-          >
-            {leadLogs && leadLogs.logs && leadLogs.logs.length > 0 ? (
-              <div className="timeline">
-                {leadLogs.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
-                      </div>
-                      {index !== leadLogs.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
-
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user || 'Unknown User'}
-                            </small>
+            <div className="card-body p-0 d-flex flex-column h-100">
+              {/* Scrollable Content Area */}
+              <div
+                className="flex-grow-1 overflow-auto px-3 py-2"
+                style={{
+                  maxHeight: isMobile ? '60vh' : '65vh',
+                  minHeight: '200px'
+                }}
+              >
+                {leadLogs && leadLogs.logs && leadLogs.logs.length > 0 ? (
+                  <div className="timeline">
+                    {leadLogs.logs.map((log, index) => (
+                      <div key={index} className="timeline-item mb-4">
+                        <div className="timeline-marker">
+                          <div className="timeline-marker-icon">
+                            <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                           </div>
+                          {index !== leadLogs.logs.length - 1 && (
+                            <div className="timeline-line"></div>
+                          )}
+                        </div>
 
-                          <div className="mb-2">
-                            <strong className="text-dark d-block mb-1">Action:</strong>
-                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                              {log.action ? (
-                                log.action.split(';').map((actionPart, actionIndex) => (
-                                  <div key={actionIndex} className="mb-1">
-                                    • {actionPart.trim()}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted">No action specified</div>
+                        <div className="timeline-content">
+                          <div className="card border-0 shadow-sm">
+                            <div className="card-body p-3">
+                              <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                                <span className="bg-light text-dark border">
+                                  {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }) : 'Unknown Date'}
+                                </span>
+                                <small className="text-muted">
+                                  <i className="fas fa-user me-1"></i>
+                                  Modified By: {log.user || 'Unknown User'}
+                                </small>
+                              </div>
+
+                              <div className="mb-2">
+                                <strong className="text-dark d-block mb-1">Action:</strong>
+                                <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                  {log.action ? (
+                                    log.action.split(';').map((actionPart, actionIndex) => (
+                                      <div key={actionIndex} className="mb-1">
+                                        • {actionPart.trim()}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-muted">No action specified</div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {log.remarks && (
+                                <div>
+                                  <strong className="text-dark d-block mb-1">Remarks:</strong>
+                                  <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                    {log.remarks}
+                                  </p>
+                                </div>
                               )}
                             </div>
                           </div>
-
-                          {log.remarks && (
-                            <div>
-                              <strong className="text-dark d-block mb-1">Remarks:</strong>
-                              <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                {log.remarks}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                    <div className="mb-3">
+                      <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                    </div>
+                    <h6 className="text-muted mb-2">No History Available</h6>
+                    <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                </div>
-                <h6 className="text-muted mb-2">No History Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-              </div>
-            )}
-          </div>
 
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closePanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
+              {/* Fixed Footer */}
+              <div className="border-top px-3 py-3 bg-light">
+                <div className="d-flex justify-content-end">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={closePanel}
+                  >
+                    <i className="fas fa-times me-1"></i>
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          </div>
-        </div>
-      )}
+        )}
       </>
     );
 
@@ -2916,8 +2898,8 @@ const B2BSales = () => {
                                 applyFilters();
                               }
                             }}
-                            style={{ 
-                              width: '200px', 
+                            style={{
+                              width: '200px',
                               paddingRight: '30px',
                               paddingLeft: '12px',
                               paddingTop: '8px',
@@ -2939,10 +2921,10 @@ const B2BSales = () => {
                                 handleFilterChange('search', '');
                                 applyFilters();
                               }}
-                              style={{ 
-                                right: '2px', 
-                                top: '50%', 
-                                transform: 'translateY(-50%)', 
+                              style={{
+                                right: '2px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
                                 padding: '2px 6px',
                                 backgroundColor: '#dc3545',
                                 border: 'none',
@@ -2977,10 +2959,10 @@ const B2BSales = () => {
                           }}
                         >
                           <i className="fas fa-search me-1"></i>
-                         
+
                         </button>
                       </div>
-                      
+
                       <button
                         className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
                         onClick={() => setShowFilters(!showFilters)}
@@ -2996,9 +2978,9 @@ const B2BSales = () => {
                         }}
                       >
                         <i className="fas fa-filter me-1"></i>
-                        
+
                       </button>
-                      
+
                       <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
@@ -3025,10 +3007,10 @@ const B2BSales = () => {
                       ) : (
                         <>
                           {/* Total Leads Card */}
-                          <div 
+                          <div
                             className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
-                            style={{ 
-                              minWidth: '110px', 
+                            style={{
+                              minWidth: '110px',
                               height: '45px',
                               cursor: 'pointer',
                               border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
@@ -3051,32 +3033,32 @@ const B2BSales = () => {
                           {statusCounts.map((status, index) => {
                             const isSelected = selectedStatusFilter === status.statusId;
                             return (
-                            <div 
-                              key={status.statusId || index} 
-                              className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
-                              style={{ 
-                                minWidth: '110px', 
-                                height: '45px',
-                                cursor: 'pointer',
-                                border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                backgroundColor: isSelected ? '#f8f9ff' : 'white'
-                              }}
-                              onClick={() => handleStatusCardClick(status.statusId)}
-                              title={`Click to view ${status.statusName} leads`}
-                            >
-                              <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                                <div className="d-flex align-items-center">
-                                  <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
-                                  <div>
-                                    <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                                    <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                              <div
+                                key={status.statusId || index}
+                                className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
+                                style={{
+                                  minWidth: '110px',
+                                  height: '45px',
+                                  cursor: 'pointer',
+                                  border: isSelected ? '2px solid #007bff' : '1px solid transparent',
+                                  backgroundColor: isSelected ? '#f8f9ff' : 'white'
+                                }}
+                                onClick={() => handleStatusCardClick(status.statusId)}
+                                title={`Click to view ${status.statusName} leads`}
+                              >
+                                <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                                  <div className="d-flex align-items-center">
+                                    <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
+                                    <div>
+                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
+                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
+                            );
                           })}
-                                                </>
+                        </>
                       )}
 
 
@@ -3130,7 +3112,7 @@ const B2BSales = () => {
                               <i className="fas fa-user me-2"></i>
                               {lead.concernPersonName || 'Contact Person Not Available'}
                             </p>
-                            
+
                             {/* Compact Contact Info */}
                             <div className="lead-contact-info">
                               {lead.email && (
@@ -3368,12 +3350,12 @@ const B2BSales = () => {
               transition: 'transform 0.3s ease',
               borderRadius: '8px 0 0 8px'
             }}>
-             
-                {renderStatusChangePanel()}
-                {renderFollowupPanel()}
-                {renderRefferPanel()}
-                {renderLeadHistoryPanel()}
-          
+
+              {renderStatusChangePanel()}
+              {renderFollowupPanel()}
+              {renderRefferPanel()}
+              {renderLeadHistoryPanel()}
+
             </div>
           )
         }

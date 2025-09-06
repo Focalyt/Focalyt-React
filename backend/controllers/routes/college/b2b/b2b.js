@@ -663,7 +663,7 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 //get lead logs by id
 router.get('/leads/:id/logs', isCollege, async (req, res) => {
 	try {
-		console.log(req.params.id, 'req.params.id')
+
 		const logs = await Lead.aggregate([
 			{
 				$match: {
@@ -2134,6 +2134,52 @@ router.post('/add-test-followup/:leadId', isCollege, async (req, res) => {
       message: 'Failed to add test followup',
       error: error.message
     });
+  }
+});
+
+router.post('/refer-lead', isCollege, async (req, res) => {
+  try {
+    const { leadId, counselorId } = req.body;
+
+	const user = req.user;
+    const lead = await Lead.findById(leadId);
+    if(!lead){
+      return res.status(404).json({
+        status: false,
+        message: 'Lead not found'
+      });
+    }
+	const olduser = await User.findById(lead.leadOwner);
+	const newUser = await User.findById(counselorId);
+	lead.previousLeadOwners.push(lead.leadOwner);
+	lead.leadOwner = counselorId;
+	lead.updatedBy = user._id;
+
+	const logEntry = {
+		user: user._id,
+		action: `Lead referred from ${olduser.name} to ${newUser.name}`,
+		timestamp: new Date(),
+		remarks: ''
+	};
+
+
+	lead.logs.push(logEntry);
+
+
+	
+	await lead.save();
+	return res.status(200).json({
+		status: true,
+		message: 'Lead referred successfully'
+	});
+  }
+  catch(err){
+    console.error('Error referring lead:', err);
+	return res.status(500).json({
+		status: false,
+		message: 'Failed to refer lead',
+		error: err.message
+	});
   }
 });
 

@@ -89,16 +89,16 @@ router.get('/', isCollege, async (req, res) => {
       .limit(limit)
       .sort({ createdAt: -1 });
 
-   let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
+    let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
 
-   for (let user of users) {
-    user.my_team = await getAllTeamMembers(user?._id)
-   }
+    for (let user of users) {
+      user.my_team = await getAllTeamMembers(user?._id)
+    }
 
-   totalCount = users.length
-  
-  // Fetch user details
- 
+    totalCount = users.length
+
+    // Fetch user details
+
 
     res.json({
       success: true,
@@ -123,7 +123,7 @@ router.get('/', isCollege, async (req, res) => {
 });
 
 router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
-  console.log('api called add user')
+
   try {
 
     const {
@@ -303,7 +303,7 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       { $push: { _concernPerson: { _id: savedUser._id, defaultAdmin: false } } },
       { new: true }
     )
-    console.log('updatedCollege', updatedCollege)
+    // console.log('updatedCollege', updatedCollege)
 
 
 
@@ -349,7 +349,7 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
     let body = req.body;
 
     body.permission = body.permissions;
-    console.log(body, 'body')
+    // console.log(body, 'body')
 
 
     let user = req.user
@@ -388,8 +388,8 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
     if (body.mobile) {
       // Mobile validation (10 digits)
       if (!/^[0-9]{10}$/.test(body.mobile.toString())) {
-      return res.status(400).json({
-        success: false,
+        return res.status(400).json({
+          success: false,
           message: 'Mobile number must be exactly 10 digits'
         });
       }
@@ -397,41 +397,41 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
 
     // Check if email already exists
 
-    if(body.email && body.email !== editUser.email){
-    const existingUser = await User.findOne({
-      email: body.email.toLowerCase(),
-      role: 2,
-      isDeleted: false,
-      _id: { $ne: userId }
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
+    if (body.email && body.email !== editUser.email) {
+      const existingUser = await User.findOne({
+        email: body.email.toLowerCase(),
+        role: 2,
+        isDeleted: false,
+        _id: { $ne: userId }
       });
-    }
-  }
 
-
-  if(body.mobile && body.mobile !== editUser.mobile){
-    // Check if mobile already exists
-    const existingMobile = await User.findOne({
-      mobile: parseInt(body.mobile),
-      role: 2,
-      isDeleted: false,
-      _id: { $ne: userId }
-    });
-
-    if (existingMobile) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this mobile number already exists'
-      });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this email already exists'
+        });
+      }
     }
 
 
-  }
+    if (body.mobile && body.mobile !== editUser.mobile) {
+      // Check if mobile already exists
+      const existingMobile = await User.findOne({
+        mobile: parseInt(body.mobile),
+        role: 2,
+        isDeleted: false,
+        _id: { $ne: userId }
+      });
+
+      if (existingMobile) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this mobile number already exists'
+        });
+      }
+
+
+    }
 
     // Map access level to permissions (role will always be 2 for college users)
 
@@ -445,7 +445,7 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
           body.permissions.custom_permissions = {};
           break;
 
-        case 'view_only': 
+        case 'view_only':
           body.permissions = {}
           body.permissions.permission_type = 'View Only';
           body.permissions.custom_permissions = {};
@@ -470,11 +470,11 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
       const oldReportingManagers = editUser.reporting_managers.map(manager => manager.toString());
       const newReportingManagers = body.reporting_managers.map(manager => manager.toString());
 
-      const removedManagers = oldReportingManagers.filter(manager => 
+      const removedManagers = oldReportingManagers.filter(manager =>
         !newReportingManagers.includes(manager)  // Ensure you're comparing the correct format (e.g., ObjectId as string)
       );
-      
-      console.log('Removed Managers:', removedManagers);
+
+      // console.log('Removed Managers:', removedManagers);
 
       for (let removedManager of removedManagers) {
         removedManager = new mongoose.Types.ObjectId(removedManager);
@@ -491,8 +491,8 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
             manager = new mongoose.Types.ObjectId(manager);
           }
 
-          console.log('manager', manager)
-          console.log('userId', userId)
+          // console.log('manager', manager)
+          // console.log('userId', userId)
 
           // Update the reporting manager and add userId to their my_team array if it's not already there
           const updateMyTeam = await User.findOneAndUpdate(
@@ -506,14 +506,14 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
         })
       );
     }
-    
+
 
 
 
     // Generate temporary password
     const currentUserId = req.user ? req.user.id : null;
 
-    if(currentUserId){
+    if (currentUserId) {
       body.userUpdatedby = currentUserId;
     }
 
@@ -526,7 +526,7 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
       { $set: body },
       { new: true }
     );
-    
+
     res.status(200).json({
       status: true,
       message: `User "${body.name}" updated successfully with ${body.permission.permissionType} access`,
@@ -647,7 +647,7 @@ router.put('/:userId/status', checkPermission('can_edit_users'), async (req, res
  * @desc    Soft delete user
  * @access  Private (requires can_delete_users permission)
  */
-router.delete('/:userId', [isCollege, checkPermission('can_delete_users'),logUserActivity((req) => `Delete user: ${req.body.name}`)], async (req, res) => {
+router.delete('/:userId', [isCollege, checkPermission('can_delete_users'), logUserActivity((req) => `Delete user: ${req.body.name}`)], async (req, res) => {
   try {
     let { userId } = req.params;
     if (typeof userId === 'string') {
@@ -695,10 +695,10 @@ router.delete('/:userId', [isCollege, checkPermission('can_delete_users'),logUse
   }
 });
 
-router.post('/restore/:userId', [isCollege, checkPermission('can_delete_users'),logUserActivity((req) => `Restore user: ${req.body.name}`)], async (req, res) => {
+router.post('/restore/:userId', [isCollege, checkPermission('can_delete_users'), logUserActivity((req) => `Restore user: ${req.body.name}`)], async (req, res) => {
   try {
     let { userId } = req.params;
-    console.log('userId', userId)
+    // console.log('userId', userId)
     if (typeof userId === 'string') {
       userId = new mongoose.Types.ObjectId(userId);
     }
@@ -786,7 +786,7 @@ router.post('/reset-password', async (req, res) => {
   try {
     const { module, userInput, password } = req.body;
 
-    console.log('userInput', userInput, 'module', module)
+    // console.log('userInput', userInput, 'module', module)
     let user = null;
     const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
 
@@ -824,7 +824,7 @@ router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users
       _id: userId,
     })
     const my_team = await getAllTeamMembers(userId)
-    console.log('my_team', my_team)
+    // console.log('my_team', my_team)
     user.my_team = my_team
     if (!user) {
       return res.status(404).json({
@@ -847,33 +847,33 @@ router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users
 
 
 router.post("/addSource", isCollege, async (req, res) => {
-	try {
-		console.log("source api called....")
+  try {
+  
     const { name, mobile } = req.body;
     // console.log("source data" , req.body)
-		const source = new Source({ name, mobile });
-		// console.log("source" , source)
-		await source.save();
-		res.status(200).json({
-			success: true,
-			message: 'Source added successfully',
-			data: source
-		});
-	} catch (error) {
-		console.log(error);
-	}
+    const source = new Source({ name, mobile });
+    // console.log("source" , source)
+    await source.save();
+    res.status(200).json({
+      success: true,
+      message: 'Source added successfully',
+      data: source
+    });
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 router.get('/sources', isCollege, async (req, res) => {
-	try {
-		const sources = await Source.find({});
-		res.status(200).json({
-			success: true,
-			data: sources
-		});
-	} catch (error) {
-		console.log(error);
-	}
+  try {
+    const sources = await Source.find({});
+    res.status(200).json({
+      success: true,
+      data: sources
+    });
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 router.put('/updateSource/:sourceId', isCollege, async (req, res) => {
@@ -891,4 +891,54 @@ router.put('/updateSource/:sourceId', isCollege, async (req, res) => {
   }
 });
 
+router.get('/b2b-users', isCollege, async (req, res) => {
+
+  try {
+
+    const user = req.user;
+    const aggrigation = [
+      {
+        $match: { "_concernPerson._id": new mongoose.Types.ObjectId(user._id) }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_concernPerson._id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: "$user" },
+      {
+        $match: {
+          "user.permissions.custom_permissions.can_view_leads_b2b": true
+        }
+      },
+      {
+        $project: {
+          _id: "$user._id",
+          name: "$user.name"
+        }
+      }
+    ];
+    
+    const concernPersons = await College.aggregate(aggrigation);
+    // console.log('concernPersons', concernPersons)
+    res.status(200).json({
+      success: true,
+      data: concernPersons
+    });
+
+  }
+
+  catch (err) {
+
+    console.log('error', err)
+
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching b2b users'
+    });
+  }
+})
 module.exports = router;

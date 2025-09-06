@@ -83,7 +83,7 @@ router.put('/edit/:id', async (req, res) => {
   try {
     const { title, description,milestone } = req.body;
     
-    console.log('req.body',req.body)
+    // console.log('req.body',req.body)
     // Find status by id
     const status = await Status.findById(req.params.id);
     
@@ -97,7 +97,7 @@ router.put('/edit/:id', async (req, res) => {
     status.milestone = milestone
     
     const data = await status.save();
-    console.log('data',data)
+    // console.log('data',data)
     return res.status(200).json({
         success: true,
         message: 'Status updated successfully',
