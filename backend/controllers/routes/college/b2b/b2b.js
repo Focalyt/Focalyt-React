@@ -535,12 +535,15 @@ router.get('/leads', isCollege, async (req, res) => {
 			typeOfB2B,
 			search,
 			sortBy = 'createdAt',
-			sortOrder = 'desc'
+			sortOrder = 'desc',
+			subStatus			
 		} = req.query;
+
+console.log(subStatus, 'subStatus')
 
 		let teamMembers = await getAllTeamMembers(req.user._id);
 		const query = {};
-
+  
 		// Ownership Conditions for team members
 		const ownershipConditions = teamMembers.map(member => ({
 			$or: [{ leadAddedBy: member }, { leadOwner: member }]
@@ -568,7 +571,8 @@ router.get('/leads', isCollege, async (req, res) => {
 				// Other filters
 				...(status ? [{ status }] : []),
 				...(leadCategory ? [{ leadCategory }] : []),
-				...(typeOfB2B ? [{ typeOfB2B }] : [])
+				...(typeOfB2B ? [{ typeOfB2B }] : []),
+				...(subStatus ? [{ subStatus }] : [])
 			]
 		};
 

@@ -809,7 +809,6 @@ const CRMDashboard = () => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
-  const [subStatus , setSubStatus] = useState([]);
   const [sources, setSources] = useState([]);
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -1563,10 +1562,6 @@ const CRMDashboard = () => {
       type: "includes",
       values: []
     },
-    subStatus: {
-      type: "includes",
-      values: []
-    }
   });
 
   // Dropdown open state
@@ -1577,7 +1572,8 @@ const CRMDashboard = () => {
     center: false,
     counselor: false,
     sector: false,
-    subStatus: false
+    statuses: false,
+    subStatuses: false
   });
 
 
@@ -1850,6 +1846,8 @@ const CRMDashboard = () => {
     modifiedToDate: null,
     nextActionFromDate: null,
     nextActionToDate: null,
+    subStatuses: null,
+    statuses: null,
 
   });
   // Add dropdown visibility states
@@ -1874,10 +1872,7 @@ const CRMDashboard = () => {
   const [remarks, setRemarks] = useState('');
 
 
-  const [subStatuses, setSubStatuses] = useState([
-
-
-  ]);
+  const [subStatuses, setSubStatuses] = useState([]);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
@@ -1911,10 +1906,10 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (seletectedStatus) {
+    if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus]);
+  }, [seletectedStatus, filterData.statuses]);
 
 
 
@@ -1981,6 +1976,8 @@ const CRMDashboard = () => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
+      subStatuses: null,
+      statuses: null,
     };
 
     setFilterData(clearedFilters);
@@ -1990,7 +1987,7 @@ const CRMDashboard = () => {
       course: { type: "includes", values: [] },
       center: { type: "includes", values: [] },
       counselor: { type: "includes", values: [] },
-      sector: { type: "includes", values: [] }
+      sector: { type: "includes", values: [] },
     });
 
     setCurrentPage(1);
@@ -2121,7 +2118,13 @@ const CRMDashboard = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
+      const status = seletectedStatus || filterData.statuses;
+
+      if(!status){
+        alert('Please select a status');
+        return;
+      }
+      const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
         headers: { 'x-auth': token }
       });
 
@@ -2609,6 +2612,7 @@ const CRMDashboard = () => {
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
       ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
       ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
@@ -2671,6 +2675,7 @@ const CRMDashboard = () => {
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
       ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
       ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
@@ -2831,6 +2836,7 @@ const CRMDashboard = () => {
 
 
   const handleCriteriaChange = (criteria, values) => {
+    
     setFormData((prevState) => ({
       ...prevState,
       [criteria]: {
@@ -2841,6 +2847,8 @@ const CRMDashboard = () => {
     console.log(`Selected ${criteria}:`, values);
     // Reset to first page and fetch with new filters
   };
+
+ 
 
   const handleCrmFilterClick = async (index) => {
     setActiveCrmFilter(index);
@@ -4610,8 +4618,61 @@ const CRMDashboard = () => {
                       </div>
                     </div>
 
-                    {/* sub status filters  */}
+                    {/* status filters  */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Status Filter
+                        </h6>
+                      </div>
 
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                      <select
+                        className="form-select border-0  bgcolor"
+                        id="status"
+                        name="statuses"
+                        value={filterData.statuses}
+                        style={{
+                          height: '42px',
+                          paddingTop: '8px',
+                          paddingInline: '10px',
+                          width: '100%',
+                          backgroundColor: '#f1f2f6'
+                        }}
+                        onChange={(e)=>handleFilterChange(e)}
+
+                      >
+                        <option value="">Select Status</option>
+                        {statuses.map((filter, index) => (
+                          <option value={filter._id}>{filter.name}</option>))}
+                      </select>
+                      </div>
+
+                      <div className="col-md-4">
+                      <select
+                        className="form-select border-0  bgcolor"
+                        name="subStatuses"
+                        id="subStatus"
+                        value={filterData.subStatuses}
+                        style={{
+                          height: '42px',
+                          paddingTop: '8px',
+                          backgroundColor: '#f1f2f6',
+                          paddingInline: '10px',
+                          width: '100%'
+                        }}
+                        onChange={(e)=>handleFilterChange(e)}
+                       
+                      >
+                        <option value="">Select Sub-Status</option>
+                        {subStatuses.map((filter, index) => (
+                          <option value={filter._id}>{filter.title}</option>))}
+                      </select>
+                      </div>
+                     
+                    </div>
                    
 
                     {/* Date Filters Section */}

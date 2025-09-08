@@ -953,7 +953,9 @@ const B2BSales = () => {
     dateRange: {
       start: null,
       end: null
-    }
+    },
+    status: null,
+    subStatus: null
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -1007,7 +1009,9 @@ const B2BSales = () => {
       dateRange: {
         start: null,
         end: null
-      }
+      },
+      status: null,
+      subStatus: null
     });
     fetchLeads(selectedStatusFilter);
   };
@@ -1042,7 +1046,12 @@ const B2BSales = () => {
       if (filters.dateRange.end) {
         params.endDate = filters.dateRange.end;
       }
-
+      if (filters.status) {
+        params.status = filters.status;
+      }
+      if (filters.subStatus) {
+        params.subStatus = filters.subStatus;
+      }
 
 
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -1339,10 +1348,10 @@ const B2BSales = () => {
   }, []);
 
   useEffect(() => {
-    if (seletectedStatus) {
+    if (seletectedStatus || filters.status) {
       fetchSubStatus()
     }
-  }, [seletectedStatus]);
+  }, [seletectedStatus, filters.status]);
 
 
   const handleStatusChange = (e) => {
@@ -1425,7 +1434,12 @@ const B2BSales = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/statusB2b/${seletectedStatus}/substatus`, {
+      const status = seletectedStatus || filters.status;
+      if (!status) {
+        alert('Please select a status');
+        return;
+      }
+      const response = await axios.get(`${backendUrl}/college/statusB2b/${status}/substatus`, {
         headers: { 'x-auth': token }
       });
 
@@ -2093,7 +2107,7 @@ const B2BSales = () => {
               </button>
               <button
                 className="btn text-white"
-                onClick={(e)=>handleReferLead(e)}
+                onClick={(e) => handleReferLead(e)}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
@@ -3471,6 +3485,51 @@ const B2BSales = () => {
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
                       style={{ backgroundColor: '#f8f9fa' }}
                     />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-calendar text-danger me-2"></i>
+                      Status
+                    </label>
+                    <select
+                      className="form-select border-0 bg-light"
+                      value={filters.status}
+                      onChange={(e) => handleFilterChange('status', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    >
+                      <option value="">All Statuses</option>
+                      {statuses.map(status => (
+                        <option key={status._id} value={status._id}>
+                          {status.name}
+                        </option>
+                      ))}
+                    </select>
+
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-calendar text-danger me-2"></i>
+                      Sub Status
+                    </label>
+                    <select
+                      className="form-select border-0  bgcolor"
+                      name="subStatus"
+                      id="subStatus"
+                      value={filters.subStatus}
+                      style={{
+                        height: '42px',
+                        paddingTop: '8px',
+                        backgroundColor: '#f1f2f6',
+                        paddingInline: '10px',
+                        width: '100%'
+                      }}
+                      onChange={(e) => handleFilterChange('subStatus', e.target.value)}
+
+                    >
+                      <option value="">Select Sub-Status</option>
+                      {subStatuses.map((filter, index) => (
+                        <option value={filter._id}>{filter.title}</option>))}
+                    </select>
                   </div>
                 </div>
               </div>
