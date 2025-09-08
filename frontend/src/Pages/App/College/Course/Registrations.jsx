@@ -809,6 +809,7 @@ const CRMDashboard = () => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+  const [subStatus , setSubStatus] = useState([]);
   const [sources, setSources] = useState([]);
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -1561,6 +1562,10 @@ const CRMDashboard = () => {
     sector: {
       type: "includes",
       values: []
+    },
+    subStatus: {
+      type: "includes",
+      values: []
     }
   });
 
@@ -1571,7 +1576,8 @@ const CRMDashboard = () => {
     course: false,
     center: false,
     counselor: false,
-    sector: false
+    sector: false,
+    subStatus: false
   });
 
 
@@ -2613,7 +2619,7 @@ const CRMDashboard = () => {
 
     try {
 
-      console.log('API counselor:', formData.counselor.values);
+      // console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -4604,6 +4610,31 @@ const CRMDashboard = () => {
                       </div>
                     </div>
 
+                    {/* sub status filters  */}
+
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Sub Status Filter
+                        </h6>
+                      </div>
+
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                      <MultiSelectCheckbox
+                          title="Sub Status"
+                          options={subStatus}
+                          selectedValues={formData.subStatus.values}
+                          onChange={(values) => handleCriteriaChange('subStatus', values)}
+                          icon="fas fa-users"
+                          isOpen={dropdownStates.subStatus}
+                          onToggle={() => toggleDropdown('subStatus')}
+                        />
+                      </div>
+
+                    </div>
+
                     {/* Date Filters Section */}
                     <div className="row g-4 mt-3">
                       <div className="col-12">
@@ -4798,6 +4829,7 @@ const CRMDashboard = () => {
                         </div>
                       </div>
                     </div>
+
                     <div className="row g-4 mt-3">
                       <div className="col-12">
                         <h6 className="text-dark fw-bold mb-3">

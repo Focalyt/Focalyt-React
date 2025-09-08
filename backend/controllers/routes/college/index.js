@@ -1585,7 +1585,7 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 
 		data.followup = followup
 
-		console.log("data", data)
+		// console.log("data", data)
 
 
 		res.status(200).json({
@@ -6023,7 +6023,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			result.followup = followup
 		}
 
-		console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
+		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
 
 		res.status(200).json({
 			success: true,
@@ -7268,7 +7268,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
 			result.followup = followup
 		}
-		console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
+		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
 	
 		res.status(200).json({
 			success: true,

@@ -3902,7 +3902,7 @@ const MyFollowups = () => {
                                               History List
                                             </button>
 
-                                            {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && (
+                                            {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
                                               <button
                                                 className="dropdown-item"
                                                 style={{
@@ -3921,7 +3921,7 @@ const MyFollowups = () => {
                                               >
                                                 Update Followup
                                               </button>
-                                            )}
+                                            {/* // )} */}
 
                                             {/* {activeFollowupStatus === 'planned' && (
                                           <button
@@ -4044,7 +4044,7 @@ const MyFollowups = () => {
                                               History List
                                             </button>
 
-                                            {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && (
+                                            {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
                                               <button
                                                 className="dropdown-item"
                                                 style={{
@@ -4063,7 +4063,7 @@ const MyFollowups = () => {
                                               >
                                                 Update Followup
                                               </button>
-                                            )}
+                                            {/* )} */}
 
                                             {/* {activeFollowupStatus === 'planned' && (
                                           <button
@@ -4350,30 +4350,30 @@ const MyFollowups = () => {
                                                     <div className="col-xl- col-3">
                                                       <div className="info-group">
                                                         <div className="info-label">BRANCH NAME</div>
-                                                        <div className="info-value">{candidateDetails._course?.college || 'N/A'}</div>
+                                                        <div className="info-value">
+                                                          {/* {candidateDetails._course?.college || 'N/A'} */}
+                                                          {candidateDetails._center?.name || 'N/A'}
+                                                          </div>
                                                       </div>
                                                     </div>
                                                     <div className="col-xl- col-3">
                                                       <div className="info-group">
                                                         <div className="info-label">NEXT ACTION DATE</div>
                                                         <div className="info-value">
-                                                          {candidateDetails.followups?.length > 0
-                                                            ?
-                                                            (() => {
-                                                              const dateObj = new Date(candidateDetails.followups[candidateDetails.followups.length - 1].date);
-                                                              const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric',
-                                                              }).replace(/ /g, '-');
-                                                              const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                                hour12: true,
-                                                              });
-                                                              return `${datePart}, ${timePart}`;
-                                                            })()
-                                                            : 'N/A'}
+                                                        {candidateDetails.followup?.followupDate ? (() => {
+                                                        const dateObj = new Date(candidateDetails.followup?.followupDate);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}
                                                         </div>
 
                                                       </div>
@@ -4427,7 +4427,7 @@ const MyFollowups = () => {
                                                     <div className="col-xl- col-3">
                                                       <div className="info-group">
                                                         <div className="info-label">Counsellor Name</div>
-                                                        <div className="info-value">{candidateDetails._course?.counslername}</div>
+                                                        <div className="info-value">{candidateDetails.leadAssignment && candidateDetails.leadAssignment.length > 0 ? candidateDetails.leadAssignment[candidateDetails.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
                                                       </div>
                                                     </div>
                                                     <div className="col-xl- col-3">
