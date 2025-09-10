@@ -2120,7 +2120,7 @@ const CRMDashboard = () => {
     try {
       const status = seletectedStatus || filterData.statuses;
 
-      if(!status){
+      if (!status) {
         alert('Please select a status');
         return;
       }
@@ -2653,6 +2653,63 @@ const CRMDashboard = () => {
 
     }
   };
+
+  const downloadLeads = async (filters = filterData, page = currentPage) => {
+
+
+    if (!token) {
+      console.warn('No token found in session storage.');
+      return;
+    }
+
+    // Prepare query parameters
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      leadStatus: crmFilters[activeCrmFilter]._id,
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+    
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      // Multi-select filters
+      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+    });
+
+    try {
+
+      // console.log('API counselor:', formData.counselor.values);
+
+      const response = await axios.get(
+        `${backendUrl}/college/downloadleads?${queryParams}`,
+        {
+          headers: { 'x-auth': token },
+          responseType: "blob"   // 👈 yeh zaroori hai
+        }
+      );
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "leads.csv";
+      a.click();
+      
+
+
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+  };
   const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage) => {
 
     if (!token) {
@@ -2836,7 +2893,7 @@ const CRMDashboard = () => {
 
 
   const handleCriteriaChange = (criteria, values) => {
-    
+
     setFormData((prevState) => ({
       ...prevState,
       [criteria]: {
@@ -2848,7 +2905,7 @@ const CRMDashboard = () => {
     // Reset to first page and fetch with new filters
   };
 
- 
+
 
   const handleCrmFilterClick = async (index) => {
     setActiveCrmFilter(index);
@@ -4629,51 +4686,51 @@ const CRMDashboard = () => {
 
                       {/* Created Date Range */}
                       <div className="col-md-4">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        id="status"
-                        name="statuses"
-                        value={filterData.statuses}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          paddingInline: '10px',
-                          width: '100%',
-                          backgroundColor: '#f1f2f6'
-                        }}
-                        onChange={(e)=>handleFilterChange(e)}
+                        <select
+                          className="form-select border-0  bgcolor"
+                          id="status"
+                          name="statuses"
+                          value={filterData.statuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            paddingInline: '10px',
+                            width: '100%',
+                            backgroundColor: '#f1f2f6'
+                          }}
+                          onChange={(e) => handleFilterChange(e)}
 
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.name}</option>))}
-                      </select>
+                        >
+                          <option value="">Select Status</option>
+                          {statuses.map((filter, index) => (
+                            <option value={filter._id}>{filter.name}</option>))}
+                        </select>
                       </div>
 
                       <div className="col-md-4">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        name="subStatuses"
-                        id="subStatus"
-                        value={filterData.subStatuses}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          backgroundColor: '#f1f2f6',
-                          paddingInline: '10px',
-                          width: '100%'
-                        }}
-                        onChange={(e)=>handleFilterChange(e)}
-                       
-                      >
-                        <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.title}</option>))}
-                      </select>
+                        <select
+                          className="form-select border-0  bgcolor"
+                          name="subStatuses"
+                          id="subStatus"
+                          value={filterData.subStatuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            backgroundColor: '#f1f2f6',
+                            paddingInline: '10px',
+                            width: '100%'
+                          }}
+                          onChange={(e) => handleFilterChange(e)}
+
+                        >
+                          <option value="">Select Sub-Status</option>
+                          {subStatuses.map((filter, index) => (
+                            <option value={filter._id}>{filter.title}</option>))}
+                        </select>
                       </div>
-                     
+
                     </div>
-                   
+
 
                     {/* Date Filters Section */}
                     <div className="row g-4 mt-3">
@@ -4878,10 +4935,10 @@ const CRMDashboard = () => {
                         </h6>
                       </div>
 
-                     
+
                     </div>
 
-                  
+
 
                     {/* Results Summary */}
                     <div className="row mt-4">
@@ -4971,6 +5028,20 @@ const CRMDashboard = () => {
             <section className="list-view">
               <div className="row">
                 <div className="d-flex justify-content-end gap-2">
+
+                  <button className="btn btn-sm btn-outline-primary" style={{
+                    padding: "6px 12px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  onClick={downloadLeads}
+                  >
+                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
+                    Download Leads
+                  </button>
 
                   <button className="btn btn-sm btn-outline-primary" style={{
                     padding: "6px 12px",
@@ -5828,20 +5899,20 @@ const CRMDashboard = () => {
                                                       <div className="info-label">NEXT ACTION DATE</div>
                                                       <div className="info-value">
                                                         {profile.followup?.followupDate ? (() => {
-                                                        const dateObj = new Date(profile.followup?.followupDate);
-                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                          day: '2-digit',
-                                                          month: 'short',
-                                                          year: 'numeric',
-                                                        }).replace(/ /g, '-');
-                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                          hour: '2-digit',
-                                                          minute: '2-digit',
-                                                          hour12: true,
-                                                        });
-                                                        return `${datePart}, ${timePart}`;
-                                                      })() : 'N/A'}
-                                                                                          
+                                                          const dateObj = new Date(profile.followup?.followupDate);
+                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                          }).replace(/ /g, '-');
+                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true,
+                                                          });
+                                                          return `${datePart}, ${timePart}`;
+                                                        })() : 'N/A'}
+
                                                       </div>
 
                                                     </div>
@@ -6959,7 +7030,7 @@ const CRMDashboard = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-             
+
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed',
               width: '-webkit-fill-available'

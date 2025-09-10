@@ -409,6 +409,7 @@ router.route("/addleaddandcourseapply")
             let sex = Gender;
             let dob = DateOfBirth;
             let email = Email;
+            let registeredBy = new mongoose.Types.ObjectId('68c16764eeda1e3f36a329d9');
 
             if (typeof courseId === 'string') {
                 courseId = new mongoose.Types.ObjectId(courseId);
@@ -502,6 +503,7 @@ router.route("/addleaddandcourseapply")
                     _candidate: candidate._id,
                     _course: courseId,
                     _center: selectedCenter,
+                    registeredBy: registeredBy,
                     remarks:Remarks || ""
                 });
 

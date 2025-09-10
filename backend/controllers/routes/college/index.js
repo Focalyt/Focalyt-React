@@ -1,6 +1,7 @@
 const express = require("express");
 const uuid = require('uuid/v1');
 const cron = require('node-cron');
+const { Parser } = require("json2csv");
 
 const { isCollege, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
@@ -2033,6 +2034,457 @@ function calculateSimpleDocCounts(requiredDocs, uploadedDocs) {
 		uploadPercentage
 	};
 }
+
+router.route("/downloadleads").get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+
+		// Extract filter parameters
+		const {
+			name, courseType, status, leadStatus,
+			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
+			nextActionFromDate, nextActionToDate,
+			projects, verticals, course, center, counselor, subStatuses
+		} = req.query;
+
+		// Parse multi-select filters
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		// Get team members
+		let teamMembers = [req.user._id];
+
+		if (projectsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (verticalsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (courseArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+		if (name && name.trim() !== '') {
+			teamMembers = [];
+		}
+		if (counselorArray.length > 0) {
+			teamMembers = counselorArray;
+		}
+
+
+		let teamMemberIds = [];
+		if (teamMembers?.length > 0) {
+			teamMemberIds = teamMembers.map(member =>
+				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+			);
+		}
+
+
+		// Build optimized pipeline with only essential fields
+		const pipeline = downloadPipeline({
+			teamMemberIds,
+			college,
+			filters: {
+				name, courseType, status, leadStatus,
+				createdFromDate, createdToDate,
+				modifiedFromDate, modifiedToDate,
+				nextActionFromDate, nextActionToDate,
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+			}
+		});
+
+
+		// Execute queries in parallel
+		const results = await AppliedCourses.aggregate(pipeline)
+
+		console.log("results", results.length)
+
+		// ✅ CSV fields define karo
+		const fields = [
+			{ label: "Candidate Name", value: "_candidate.name" },
+			{ label: "Email", value: "_candidate.email" },
+			{ label: "Mobile", value: "_candidate.mobile" },
+			{ label: "Course", value: "_course.name" },
+			{ label: "Center", value: "_center.name" },
+
+			{ label: "Status", value: "_leadStatus.title" },
+			{ label: "Sub Status", value: "leadSubStatusTitle" },
+			{ label: "Counsellor", value: "counsellor.name" },
+			{ label: "Registered By", value: "registeredByName" },
+			{ label: "Created At", value: "createdAt" },
+			{ label: "Updated At", value: "updatedAt" }
+		];
+
+		const opts = { fields };
+		const parser = new Parser(opts);
+
+		// ✅ CSV banayo
+		const csv = parser.parse(results);
+
+		// ✅ Response headers set karo
+		res.setHeader("Content-Type", "text/csv");
+		res.setHeader("Content-Disposition", "attachment; filename=leads.csv");
+
+		res.status(200).end(csv);
+
+
+
+
+	} catch (err) {
+		console.error('API Error:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
+function downloadPipeline({ teamMemberIds, college, filters }) {
+	const pipeline = [];
+	let baseMatch = {};
+	filters.leadStatus = String(filters.leadStatus);
+	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
+		baseMatch = {
+			kycStage: { $in: [true] },
+		};
+	}
+
+	else {
+		// Base match with essential filters
+		baseMatch = {
+			kycStage: { $ne: true },
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+		};
+	}
+
+
+
+
+
+	if (teamMemberIds && teamMemberIds.length > 0) {
+		baseMatch.$or = [
+			{ registeredBy: { $in: teamMemberIds } },
+			{ counsellor: { $in: teamMemberIds } }
+		];
+	}
+
+
+	// Add date filters
+	if (filters.createdFromDate || filters.createdToDate) {
+		baseMatch.createdAt = {};
+		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
+		if (filters.createdToDate) {
+			const toDate = new Date(filters.createdToDate);
+			// Add 1 day (24 hours) to the date
+			toDate.setDate(toDate.getDate() + 1);
+			// Set time to 18:30:00.000 (6:30 PM)
+			// Use this modified 'toDate' as the upper limit in the filter
+			baseMatch.createdAt.$lte = toDate;
+		}
+	}
+
+	if (filters.modifiedFromDate || filters.modifiedToDate) {
+		baseMatch.updatedAt = {};
+		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
+		if (filters.modifiedToDate) {
+			const toDate = new Date(filters.modifiedToDate);
+			toDate.setDate(toDate.getDate() + 1);
+
+			baseMatch.updatedAt.$lte = toDate;
+		}
+	}
+
+	if (filters.nextActionFromDate || filters.nextActionToDate) {
+		baseMatch.followupDate = {};
+		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
+		if (filters.nextActionToDate) {
+			const toDate = new Date(filters.nextActionToDate);
+			toDate.setDate(toDate.getDate() + 1);
+
+			baseMatch.followupDate.$lte = toDate;
+		}
+	}
+
+
+	if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
+		// Only set _leadStatus if it's a valid ObjectId string
+		if (mongoose.Types.ObjectId.isValid(filters.leadStatus)) {
+			baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
+		} else {
+			console.log('Invalid leadStatus:', filters.leadStatus);
+		}
+	} else {
+		console.log('leadStatus is undefined or has invalid value.');
+	}
+	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
+
+		baseMatch._leadSubStatus = new mongoose.Types.ObjectId(filters.subStatuses);
+
+	}
+
+	pipeline.push({ $match: baseMatch });
+
+	// Essential lookups only - get minimal required data
+	pipeline.push(
+		{
+			$lookup: {
+				from: 'centers',
+				localField: '_center',
+				foreignField: '_id',
+				as: '_center',
+				pipeline: [
+					{ $match: { college: college._id } },
+					{
+						$project: {
+							name: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+		//counselor lookup
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'counsellor',
+				foreignField: '_id',
+				as: 'counsellor',
+				pipeline: [
+					{
+						$project: {
+							name: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: '$counsellor' },
+
+		//registeredBy lookup
+		// Lookup from users
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'registeredBy',
+				foreignField: '_id',
+				as: 'registeredUser',
+				pipeline: [
+					{ $project: { name: 1 } }
+				]
+			}
+		},
+		// Lookup from sources
+		{
+			$lookup: {
+				from: 'sources',
+				localField: 'registeredBy',
+				foreignField: '_id',
+				as: 'registeredSource',
+				pipeline: [
+					{ $project: { name: 1 } }
+				]
+			}
+		},
+		// Add a common field "registeredByName"
+		{
+			$addFields: {
+				registeredByName: {
+					$cond: {
+						if: { $gt: [{ $size: "$registeredUser" }, 0] },
+						then: { $arrayElemAt: ["$registeredUser.name", 0] },
+						else: { $arrayElemAt: ["$registeredSource.name", 0] }
+					}
+				}
+			}
+		},
+		// Optionally remove extra arrays
+		{
+			$project: {
+				registeredUser: 0,
+				registeredSource: 0
+			}
+		},
+
+
+		// Course lookup with college filter
+		{
+			$lookup: {
+				from: 'courses',
+				localField: '_course',
+				foreignField: '_id',
+				as: '_course',
+				pipeline: [
+					{ $match: { college: college._id } },
+					{
+						$project: {
+							name: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: '$_course' },
+
+		// Candidate lookup - only essential fields
+		{
+			$lookup: {
+				from: 'candidateprofiles',
+				localField: '_candidate',
+				foreignField: '_id',
+				as: '_candidate',
+				pipeline: [
+					{
+						$project: {
+							_id: 1,
+							name: 1,
+							email: 1,
+							mobile: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+		// Status lookup - only title and milestone
+		{
+			$lookup: {
+				from: 'status',
+				localField: '_leadStatus',
+				foreignField: '_id',
+				as: '_leadStatus',
+				pipeline: [
+					{
+						$project: {
+							title: 1,
+							substatuses: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
+	);
+
+	// Apply additional filters
+	const additionalFilters = {};
+
+	if (filters.courseType) {
+		additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
+	}
+	if (filters.projectsArray.length > 0) {
+		additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.verticalsArray.length > 0) {
+		additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.courseArray.length > 0) {
+		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+
+	// Name search
+	if (filters.name && filters.name.trim()) {
+		const searchTerm = filters.name.trim();
+		const searchRegex = new RegExp(filters.name.trim(), 'i');
+		additionalFilters.$or = [
+			{ '_candidate.name': searchRegex },
+			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
+			{ '_candidate.email': searchRegex }
+		];
+	}
+
+	if (Object.keys(additionalFilters).length > 0) {
+		pipeline.push({ $match: additionalFilters });
+	}
+
+	pipeline.push({
+		$addFields: {
+			leadSubStatusTitle: {
+				$let: {
+					vars: {
+						matched: {
+							$first: {
+								$filter: {
+									input: "$_leadStatus.substatuses",
+									cond: { $eq: ["$$this._id", "$_leadSubStatus"] }
+								}
+							}
+						}
+					},
+					in: "$$matched.title"
+				}
+			}
+		}
+	});
+
+
+	pipeline.push({
+		$addFields: {
+			leadSubStatusTitle: {
+				$let: {
+					vars: {
+						matched: {
+							$first: {
+								$filter: {
+									input: "$_leadStatus.substatuses",
+									cond: { $eq: ["$$this._id", "$_leadSubStatus"] }
+								}
+							}
+						}
+					},
+					in: "$$matched.title"
+				}
+			}
+		}
+	});
+
+
+	// Project only essential fields
+	pipeline.push({
+		$project: {
+			_id: 1,
+			_candidate: 1,
+			createdAt: 1,
+			updatedAt: 1,
+			_course: 1,
+			_leadStatus: 1,
+			_center: 1,
+			registeredBy: 1,
+			counsellor: 1,
+			leadSubStatusTitle: 1,
+			registeredByName: 1,
+		}
+	});
+
+	return pipeline;
+}
+
+
 
 
 

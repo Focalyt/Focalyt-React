@@ -1032,7 +1032,7 @@ const B2BSales = () => {
       // Build query parameters
       const params = {
         page: page,           
-        limit: 10,           
+        // limit: 10,           
       };
       
       if (statusFilter) {
