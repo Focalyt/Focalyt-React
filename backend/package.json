@@ -70,6 +70,7 @@
     "razorpay": "^2.8.4",
     "read-excel-file": "^5.3.4",
     "redis": "^5.5.6",
+    "socket.io": "^4.8.1",
     "strip-tags": "^0.1.1",
     "striptags": "^3.2.0",
     "tunnel-ssh": "^4.1.6",

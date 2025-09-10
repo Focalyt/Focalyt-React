@@ -5,6 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import useWebsocket from '../../../../utils/websocket'
 
 const MultiSelectCheckbox = ({
   title,
@@ -139,6 +140,10 @@ const MyFollowups = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+  const { messages, updates } = useWebsocket(userData._id);
+
+  
 
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
@@ -1666,8 +1671,10 @@ const MyFollowups = () => {
 
 
   useEffect(() => {
+    console.log(messages || 'no messages', 'messages');
+    console.log(updates || 'no updates', 'updates');
     fetchProfileData();
-  }, [filterData, activeFollowupStatus]);
+  }, [filterData, activeFollowupStatus, messages, updates]);
 
   const [isLoadingAllProfiles, setIsLoadingAllProfiles] = useState(false);
 
@@ -1831,7 +1838,7 @@ const MyFollowups = () => {
   useEffect(() => {
     // console.log("activeCrmFilter", activeCrmFilter)
     fetchFollowupCounts();
-  }, [filterData, activeFollowupStatus, activeCrmFilter]);
+  }, [filterData, activeFollowupStatus, activeCrmFilter, messages, updates]);
 
   const fetchFollowupCounts = async () => {
     try {

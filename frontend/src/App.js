@@ -2,6 +2,8 @@
 import React from 'react';  // This must be first
 import { useState,useEffect } from 'react';
 
+import Websocket from './utils/websocket'
+
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -145,6 +147,7 @@ const Layout = () => {
     <>
       {/* <FrontHeader /> */}
       <Routes>
+
         <Route exact path="/" element={<HomePage />} />
         <Route exact path="/about" element={<About />} />
         {/* <Route exact path="/about_us" element={<About />} /> */}

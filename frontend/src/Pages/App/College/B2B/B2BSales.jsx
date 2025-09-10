@@ -967,21 +967,21 @@ const B2BSales = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    fetchLeads();
+    fetchLeads(null, 1);
   }, []);
 
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
-
     setSelectedStatusFilter(statusId);
-    fetchLeads(statusId);
+    setCurrentPage(1); 
+    fetchLeads(statusId, 1);
   };
 
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
-
     setSelectedStatusFilter(null);
-    fetchLeads();
+    setCurrentPage(1); 
+    fetchLeads(null, 1);
   };
 
   // Filter handlers
@@ -1003,8 +1003,8 @@ const B2BSales = () => {
   };
 
   const applyFilters = () => {
-
-    fetchLeads(selectedStatusFilter);
+    setCurrentPage(1); 
+    fetchLeads(selectedStatusFilter, 1);
   };
 
   const clearFilters = () => {
@@ -1020,16 +1020,21 @@ const B2BSales = () => {
       status: null,
       subStatus: null
     });
-    fetchLeads(selectedStatusFilter);
+    setCurrentPage(1); 
+    fetchLeads(selectedStatusFilter, 1);
   };
 
-  const fetchLeads = async (statusFilter = null) => {
+  const fetchLeads = async (statusFilter = null, page = 1) => {
     try {
       closePanel();
       setLoadingLeads(true);
 
       // Build query parameters
-      const params = {};
+      const params = {
+        page: page,           
+        limit: 10,           
+      };
+      
       if (statusFilter) {
         params.status = statusFilter;
       }
@@ -1060,15 +1065,19 @@ const B2BSales = () => {
         params.subStatus = filters.subStatus;
       }
 
-
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
         params: params
       });
 
-
       if (response.data.status) {
         setLeads(response.data.data.leads || []);
+        // ✅ Extract pagination data from backend response
+        if (response.data.data.pagination) {
+          setTotalPages(response.data.data.pagination.totalPages || 1);
+          setCurrentPage(response.data.data.pagination.currentPage || 1);
+          setPageSize(response.data.data.pagination.totalLeads || 0);
+        }
       } else {
         console.error('Failed to fetch leads:', response.data.message);
       }
@@ -1123,7 +1132,7 @@ const B2BSales = () => {
         alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
 
         // Refresh the leads list
-        fetchLeads(selectedStatusFilter);
+        fetchLeads(selectedStatusFilter, currentPage);
 
         // Refresh status counts
         fetchStatusCounts();
@@ -1190,7 +1199,7 @@ const B2BSales = () => {
         alert('Lead added successfully!');
 
         // Refresh the leads list and status counts
-        fetchLeads();
+        fetchLeads(null, 1);
         fetchStatusCounts();
 
         // Reset form
@@ -1285,6 +1294,10 @@ const B2BSales = () => {
     return range;
   };
 
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    fetchLeads(selectedStatusFilter, newPage);
+  };
   useEffect(() => {
     getPaginationPages()
   }, [totalPages])
@@ -2328,535 +2341,7 @@ const B2BSales = () => {
 
   return (
     <div className="container-fluid">
-      {/* Inject Google Maps styles */}
-      <style>{mapStyles}</style>
-      <style>{`
-  .modal .pac-container {
-    z-index: 99999 !important;
-    position: fixed !important;
-  }
-  
-  .modal .pac-item {
-    cursor: pointer;
-    padding: 8px 12px;
-    border-bottom: 1px solid #e9ecef;
-  }
-  
-  .modal .pac-item:hover {
-    background-color: #f8f9fa;
-  }
-  
-  .modal .pac-item-selected {
-    background-color: #007bff;
-    color: white;
-  }
-
-  /* Modern Lead Card Styles */
-  .lead-card {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    border: 1px solid #f0f0f0;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-bottom: 0.5rem;
-  }
-
-  .lead-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  }
-
-  /* Header Section */
-  .lead-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 1rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .lead-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 100px;
-    height: 100px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-    transform: translate(30px, -30px);
-  }
-
-  .lead-title-section {
-    position: relative;
-    z-index: 2;
-  }
-
-  .lead-business-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem 0;
-    color: white;
-    line-height: 1.2;
-  }
-
-  .lead-contact-person {
-    font-size: 0.85rem;
-    margin: 0 0 0.5rem 0;
-    opacity: 0.9;
-    display: flex;
-    align-items: center;
-  }
-
-  .lead-contact-info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .lead-contact-item {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.7rem;
-    opacity: 0.9;
-    max-width: 200px;
-  }
-
-  .lead-contact-item i {
-    font-size: 0.65rem;
-    width: 10px;
-    flex-shrink: 0;
-  }
-
-  .lead-contact-item span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Compact Additional Info Section */
-  .compact-info-section {
-    margin-top: 0.5rem;
-  }
-
-  .compact-info-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .compact-info-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-    padding: 0.25rem 0;
-  }
-
-  .compact-info-item i {
-    font-size: 0.7rem;
-    width: 12px;
-    flex-shrink: 0;
-  }
-
-  .compact-info-label {
-    font-weight: 600;
-    color: #6c757d;
-    min-width: 50px;
-    flex-shrink: 0;
-  }
-
-  .compact-info-value {
-    color: #212529;
-    flex: 1;
-    word-break: break-word;
-  }
-
-  .lead-badges {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    display: flex;
-    gap: 0.5rem;
-    z-index: 2;
-  }
-
-  .lead-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .lead-badge.category {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    backdrop-filter: blur(10px);
-  }
-
-  .lead-badge.type {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    backdrop-filter: blur(10px);
-  }
-
-  /* Content Section */
-  .lead-content {
-    padding: 0.75rem;
-  }
-
-  .contact-grid {
-    display: none; /* Hide the large contact grid since we're moving info to header */
-  }
-
-  .contact-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-  }
-
-  .contact-item:hover {
-    background: #e9ecef;
-    transform: translateY(-2px);
-  }
-
-  .contact-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1rem;
-    flex-shrink: 0;
-  }
-
-  .contact-icon:not(.phone):not(.whatsapp):not(.address):not(.owner) {
-    background: linear-gradient(135deg, #6c757d, #495057);
-  }
-
-  .contact-icon.phone {
-    background: linear-gradient(135deg, #28a745, #20c997);
-  }
-
-  .contact-icon.whatsapp {
-    background: linear-gradient(135deg, #25d366, #128c7e);
-  }
-
-  .contact-icon.address {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-  }
-
-  .contact-icon.owner {
-    background: linear-gradient(135deg, #ffc107, #e0a800);
-  }
-
-  .contact-icon.added-by {
-    background: linear-gradient(135deg, #6f42c1, #5a32a3);
-  }
-
-  .contact-details {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .contact-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #6c757d;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.1rem;
-  }
-
-  .contact-value {
-    display: block;
-    font-size: 0.9rem;
-    color: #212529;
-    font-weight: 500;
-    word-break: break-word;
-  }
-
-  .contact-link {
-    color: #007bff;
-    text-decoration: none;
-    font-weight: 600;
-  }
-
-  .contact-link:hover {
-    color: #0056b3;
-    text-decoration: underline;
-  }
-
-  .address-text {
-    line-height: 1.4;
-  }
-
-  .address-section,
-  .owner-section {
-    margin-top: 1rem;
-  }
-
-  /* Action Buttons */
-  .lead-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    background: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-  }
-
-  .action-group {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .action-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
-    color: white;
-  }
-
-  .action-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .action-btn.view {
-    background: linear-gradient(135deg, #007bff, #0056b3);
-  }
-
-  .action-btn.refer {
-    background: linear-gradient(135deg, #6c757d, #495057);
-  }
-
-  .action-btn.history {
-    background: linear-gradient(135deg, #17a2b8, #138496);
-  }
-
-  .action-btn.status {
-    background: linear-gradient(135deg, #ffc107, #e0a800);
-    padding: 0.5rem;
-    min-width: 40px;
-  }
-
-  .action-btn.followup {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    padding: 0.5rem;
-    min-width: 40px;
-  }
-
-  .action-btn span {
-    display: inline-block;
-  }
-
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .contact-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .lead-actions {
-      flex-direction: column;
-      gap: 1rem;
-    }
-    
-    .action-group {
-      width: 100%;
-      justify-content: center;
-    }
-    
-    .lead-badges {
-      position: static;
-      margin-top: 1rem;
-    }
-  }
-
-  /* Status Count Cards Styles */
-  .status-count-card {
-    transition: all 0.3s ease;
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .status-count-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  }
-
-  .status-count-card .card-body {
-    padding: 0.5rem;
-  }
-
-  .status-count-card h4 {
-    font-size: 1.5rem;
-    font-weight: 700;
-  }
-
-  .status-count-card h6 {
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  .status-count-card small {
-    font-size: 0.75rem;
-  }
-
-  /* Status-specific colors */
-  .status-count-card.total {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-  }
-
-  .status-count-card.total h4,
-  .status-count-card.total h6,
-  .status-count-card.total small {
-    color: white;
-  }
-
-  .status-count-card.status {
-    background: white;
-    border: 1px solid #e9ecef;
-  }
-
-  .status-count-card.status:hover {
-    border-color: #007bff;
-  }
-
-  .status-count-card.selected {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
-    border: 2px solid #007bff !important;
-    background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
-  }
-
-  .status-count-card.selected.total {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-  }
-
-  /* Status Section Styles */
-  .status-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 12px;
-    border: 1px solid #e9ecef;
-  }
-
-  .status-section .badge {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-  }
-
-  .status-section .btn {
-    font-size: 0.75rem;
-    padding: 4px 12px;
-  }
-
-  /* Filter Panel Styles */
-  .filter-panel {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e9ecef;
-    transition: all 0.3s ease;
-  }
-
-  .filter-panel:hover {
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  }
-
-  .filter-panel .form-control,
-  .filter-panel .form-select {
-    transition: all 0.2s ease;
-    border-radius: 8px;
-  }
-
-  .filter-panel .form-control:focus,
-  .filter-panel .form-select:focus {
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-    border-color: #007bff;
-  }
-
-  .filter-panel .btn {
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-  }
-
-  .filter-panel .btn:hover {
-    transform: translateY(-1px);
-  }
-
-  /* Global Text Visibility Improvements */
-  .form-control, .form-select {
-    color: #212529 !important;
-    background-color: #ffffff !important;
-    border: 1px solid #ced4da !important;
-  }
-
-  .form-control:focus, .form-select:focus {
-    color: #212529 !important;
-    background-color: #ffffff !important;
-    border-color: #007bff !important;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
-  }
-
-  .btn {
-    font-weight: 500 !important;
-  }
-
-  .text-dark {
-    color: #212529 !important;
-  }
-
-  .text-muted {
-    color: #6c757d !important;
-  }
-
-  .text-primary {
-    color: #007bff !important;
-  }
-
-  .text-success {
-    color: #28a745 !important;
-  }
-
-  .text-warning {
-    color: #ffc107 !important;
-  }
-
-  .text-danger {
-    color: #dc3545 !important;
-  }
-
-  .text-info {
-    color: #17a2b8 !important;
-  }
-
-  /* Override card margin-bottom to reduce spacing */
-  .card {
-    margin-bottom: 0.5rem !important;
-  }
-`}</style>
+     
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass} style={{
           width: !isMobile && showPanel ? 'calc(100% - 350px)' : '100%',
@@ -3307,7 +2792,7 @@ const B2BSales = () => {
                   <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                     <button
                       className="page-link"
-                      onClick={() => setCurrentPage(currentPage - 1)}
+                      onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
                     >
                       &laquo;
@@ -3317,7 +2802,7 @@ const B2BSales = () => {
                   {currentPage > 3 && (
                     <>
                       <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+                        <button className="page-link" onClick={() => handlePageChange(1)}>1</button>
                       </li>
                       {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
                     </>
@@ -3325,7 +2810,7 @@ const B2BSales = () => {
 
                   {getPaginationPages().map((pageNumber) => (
                     <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+                      <button className="page-link" onClick={() => handlePageChange(pageNumber)}>
                         {pageNumber}
                       </button>
                     </li>
@@ -3335,7 +2820,7 @@ const B2BSales = () => {
                     <>
                       {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
                       <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+                        <button className="page-link" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>
                       </li>
                     </>
                   )}
@@ -3343,7 +2828,7 @@ const B2BSales = () => {
                   <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
                     <button
                       className="page-link"
-                      onClick={() => setCurrentPage(currentPage + 1)}
+                      onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
                     >
                       &raquo;
@@ -3925,7 +3410,535 @@ const B2BSales = () => {
           </div>
         )
       }
+ {/* Inject Google Maps styles */}
+ <style>{mapStyles}</style>
+      <style>{`
+  .modal .pac-container {
+    z-index: 99999 !important;
+    position: fixed !important;
+  }
+  
+  .modal .pac-item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .modal .pac-item:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .modal .pac-item-selected {
+    background-color: #007bff;
+    color: white;
+  }
 
+  /* Modern Lead Card Styles */
+  .lead-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f0f0f0;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 0.5rem;
+  }
+
+  .lead-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Header Section */
+  .lead-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lead-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30px, -30px);
+  }
+
+  .lead-title-section {
+    position: relative;
+    z-index: 2;
+  }
+
+  .lead-business-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: white;
+    line-height: 1.2;
+  }
+
+  .lead-contact-person {
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem 0;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+  }
+
+  .lead-contact-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .lead-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    opacity: 0.9;
+    max-width: 200px;
+  }
+
+  .lead-contact-item i {
+    font-size: 0.65rem;
+    width: 10px;
+    flex-shrink: 0;
+  }
+
+  .lead-contact-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Compact Additional Info Section */
+  .compact-info-section {
+    margin-top: 0.5rem;
+  }
+
+  .compact-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .compact-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+  }
+
+  .compact-info-item i {
+    font-size: 0.7rem;
+    width: 12px;
+    flex-shrink: 0;
+  }
+
+  .compact-info-label {
+    font-weight: 600;
+    color: #6c757d;
+    min-width: 50px;
+    flex-shrink: 0;
+  }
+
+  .compact-info-value {
+    color: #212529;
+    flex: 1;
+    word-break: break-word;
+  }
+
+  .lead-badges {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+  }
+
+  .lead-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .lead-badge.category {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    backdrop-filter: blur(10px);
+  }
+
+  .lead-badge.type {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Content Section */
+  .lead-content {
+    padding: 0.75rem;
+  }
+
+  .contact-grid {
+    display: none; /* Hide the large contact grid since we're moving info to header */
+  }
+
+  .contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .contact-item:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+  }
+
+  .contact-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .contact-icon:not(.phone):not(.whatsapp):not(.address):not(.owner) {
+    background: linear-gradient(135deg, #6c757d, #495057);
+  }
+
+  .contact-icon.phone {
+    background: linear-gradient(135deg, #28a745, #20c997);
+  }
+
+  .contact-icon.whatsapp {
+    background: linear-gradient(135deg, #25d366, #128c7e);
+  }
+
+  .contact-icon.address {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+  }
+
+  .contact-icon.owner {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+  }
+
+  .contact-icon.added-by {
+    background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  }
+
+  .contact-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .contact-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.1rem;
+  }
+
+  .contact-value {
+    display: block;
+    font-size: 0.9rem;
+    color: #212529;
+    font-weight: 500;
+    word-break: break-word;
+  }
+
+  .contact-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .contact-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+  }
+
+  .address-text {
+    line-height: 1.4;
+  }
+
+  .address-section,
+  .owner-section {
+    margin-top: 1rem;
+  }
+
+  /* Action Buttons */
+  .lead-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .action-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: white;
+  }
+
+  .action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .action-btn.view {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+  }
+
+  .action-btn.refer {
+    background: linear-gradient(135deg, #6c757d, #495057);
+  }
+
+  .action-btn.history {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+  }
+
+  .action-btn.status {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    padding: 0.5rem;
+    min-width: 40px;
+  }
+
+  .action-btn.followup {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    padding: 0.5rem;
+    min-width: 40px;
+  }
+
+  .action-btn span {
+    display: inline-block;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .contact-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .lead-actions {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .action-group {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .lead-badges {
+      position: static;
+      margin-top: 1rem;
+    }
+  }
+
+  /* Status Count Cards Styles */
+  .status-count-card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .status-count-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .status-count-card .card-body {
+    padding: 0.5rem;
+  }
+
+  .status-count-card h4 {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .status-count-card h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .status-count-card small {
+    font-size: 0.75rem;
+  }
+
+  /* Status-specific colors */
+  .status-count-card.total {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .status-count-card.total h4,
+  .status-count-card.total h6,
+  .status-count-card.total small {
+    color: white;
+  }
+
+  .status-count-card.status {
+    background: white;
+    border: 1px solid #e9ecef;
+  }
+
+  .status-count-card.status:hover {
+    border-color: #007bff;
+  }
+
+  .status-count-card.selected {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+    border: 2px solid #007bff !important;
+    background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+  }
+
+  .status-count-card.selected.total {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  }
+
+  /* Status Section Styles */
+  .status-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #e9ecef;
+  }
+
+  .status-section .badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .status-section .btn {
+    font-size: 0.75rem;
+    padding: 4px 12px;
+  }
+
+  /* Filter Panel Styles */
+  .filter-panel {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+
+  .filter-panel:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .filter-panel .form-control,
+  .filter-panel .form-select {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+  }
+
+  .filter-panel .form-control:focus,
+  .filter-panel .form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #007bff;
+  }
+
+  .filter-panel .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .filter-panel .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Global Text Visibility Improvements */
+  .form-control, .form-select {
+    color: #212529 !important;
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da !important;
+  }
+
+  .form-control:focus, .form-select:focus {
+    color: #212529 !important;
+    background-color: #ffffff !important;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+  }
+
+  .btn {
+    font-weight: 500 !important;
+  }
+
+  .text-dark {
+    color: #212529 !important;
+  }
+
+  .text-muted {
+    color: #6c757d !important;
+  }
+
+  .text-primary {
+    color: #007bff !important;
+  }
+
+  .text-success {
+    color: #28a745 !important;
+  }
+
+  .text-warning {
+    color: #ffc107 !important;
+  }
+
+  .text-danger {
+    color: #dc3545 !important;
+  }
+
+  .text-info {
+    color: #17a2b8 !important;
+  }
+
+  /* Override card margin-bottom to reduce spacing */
+  .card {
+    margin-bottom: 0.5rem !important;
+  }
+`}</style>
 
     </div >
   );

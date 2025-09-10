@@ -50,6 +50,7 @@
     "reactflow": "^11.11.4",
     "recharts": "^3.0.0",
     "slick-carousel": "^1.8.1",
+    "socket.io-client": "^4.8.1",
     "swiper": "^11.2.6",
     "web-vitals": "^2.1.4",
     "ws": "^8.18.3",

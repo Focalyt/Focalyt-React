@@ -1,4 +1,4 @@
-const promisify=require('util');
+const promisify = require('util');
 const express = require("express");
 const bodyParser = require("body-parser");
 const compression = require("compression");
@@ -14,10 +14,12 @@ const expSanitizer = require("express-sanitizer");
 const path = require("path");
 const http = require("http");
 const fileupload = require("express-fileupload");
-const tunnel=require('tunnel-ssh');
-const {v4:uuidv4}=require('uuid');
+const tunnel = require('tunnel-ssh');
+const { v4: uuidv4 } = require('uuid');
 const axios = require("axios");
 const AWS = require('aws-sdk');
+const { Server } = require("socket.io");
+
 
 // cron api 
 const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
@@ -33,17 +35,42 @@ const {
 	msg91AuthKey,
 	blackListIps
 } = require("./config");
- 
+
 const app = express();
 const server = http.createServer(app);
 
-// Initialize WebSocket server
-const WebSocketServer = require('./websocket');
-const wsServer = new WebSocketServer(server);
+// Socket.io connection
 
-// Make WebSocket server globally available
-global.wsServer = wsServer;
-global.websocketServer = wsServer;
+const io = new Server(server, {
+	cors: {
+	  origin: "*", // sab frontends allow
+	  methods: ["GET", "POST"]
+	}
+  });
+  
+  const userSockets = {}; // { userId: [socketId1, socketId2] }
+
+  io.on("connection", (socket) => {
+	let userId = socket.handshake.query.userId; // frontend se aaya hua
+
+	if(!userId){
+		userId = 'guestUser'
+	}
+  
+	if (!userSockets[userId]) userSockets[userId] = [];
+	userSockets[userId].push(socket.id);
+  
+	// console.log(`✅ User ${userId} connected with socket ${socket.id}`);
+  
+	socket.on("disconnect", () => {
+	  userSockets[userId] = userSockets[userId].filter(id => id !== socket.id);
+	  if (userSockets[userId].length === 0) delete userSockets[userId];
+	//   console.log(`❌ User ${userId} disconnected`);
+	});
+  });
+  
+
+
 const sess = {
 	maxAge: 1000 * 60 * 60 * 24 * 30,
 	keys: [cookieSecret]
@@ -84,15 +111,15 @@ process.on("SIGINT", () => {
 // Middleware to block a specific IP address
 const blockIPMiddleware = (req, res, next) => {
 	const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress || req.ipAddress;
-	let blacklist =  blackListIps?.split(',')
-	if(blacklist?.includes(ipAddress)){
+	let blacklist = blackListIps?.split(',')
+	if (blacklist?.includes(ipAddress)) {
 		console.log('blacklist=== ', blacklist, ipAddress)
-    // IP address is blocked, 
-    return res.status(200).send('');
-  }
+		// IP address is blocked, 
+		return res.status(200).send('');
+	}
 
-  // IP address is not blocked, proceed to the next middleware or route handler
-  next();
+	// IP address is not blocked, proceed to the next middleware or route handler
+	next();
 };
 
 
@@ -143,7 +170,7 @@ app.use(helmet());
 app.use(cors());
 app.use(flash());
 app.use(fileupload());
-app.use((req, res, next) => {		
+app.use((req, res, next) => {
 	res.locals.currentUser = req.session.user;
 	res.locals.companyUser = req.session.company;
 	res.locals.collegeUser = req.session.college;
@@ -202,3 +229,7 @@ app.use(express.static(path.join(__dirname, "/angular-app/")));
 app.get("*", (req, res) =>
 	res.status(200).send({ status: false, message: "Page not found!" })
 );
+
+
+global.io = io;
+global.userSockets = userSockets;
