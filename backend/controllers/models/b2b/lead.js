@@ -14,9 +14,10 @@ const B2BLeadSchema = new mongoose.Schema({
   },
   concernPersonName: { type: String, required: true },
   designation: { type: String },
-  email: { type: String, required: true },
+  email: { type: String},
   mobile: { type: String, required: true },
   whatsapp: { type: String },
+  landlineNumber: { type: String },
   leadOwner: { type: ObjectId, ref: 'User' }, // Could be ref to user in future
   previousLeadOwners: { type: [ObjectId], ref: 'User' },
   leadAddedBy: { type: ObjectId, ref: 'User' },

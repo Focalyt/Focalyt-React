@@ -1652,6 +1652,10 @@ const MyFollowups = () => {
         console.error('Error:', error.message);
         alert(`Error: ${error.message}`);
       }
+    }finally{
+      setIsLoadingProfiles(false);
+      closePanel()
+      fetchProfileData();
     }
   };
 

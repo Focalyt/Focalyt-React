@@ -910,13 +910,13 @@ const B2BSales = () => {
     if (!leadFormData.typeOfB2B) errors.typeOfB2B = 'B2B type is required';
     if (!leadFormData.businessName) errors.businessName = 'Business name is required';
     if (!leadFormData.concernPersonName) errors.concernPersonName = 'Concern person name is required';
-
+    // if (!leadFormData.landlineNumber) errors.landlineNumber = 'Landline number is required';
     // Email validation
-    if (!leadFormData.email) {
-      errors.email = 'Email is required';
-    } else if (!validateEmail(leadFormData.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
+    // if (!leadFormData.email) {
+    //   errors.email = 'Email is required';
+    // } else if (!validateEmail(leadFormData.email)) {
+    //   errors.email = 'Please enter a valid email address';
+    // }
 
     // Mobile validation
     if (!leadFormData.mobile) {
@@ -929,6 +929,13 @@ const B2BSales = () => {
     if (leadFormData.whatsapp && !validateMobileNumber(leadFormData.whatsapp)) {
       errors.whatsapp = 'Please enter a valid 10-digit WhatsApp number';
     }
+
+    // Landline number validation
+    // if (!leadFormData.landlineNumber) {
+    //   errors.landlineNumber = 'Landline number is required';
+    // } else if (!validateMobileNumber(leadFormData.landlineNumber)) {
+    //   errors.landlineNumber = 'Please enter a valid 10-digit landline number';
+    // }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -1153,6 +1160,7 @@ const B2BSales = () => {
         email: leadFormData.email,
         mobile: leadFormData.mobile,
         whatsapp: leadFormData.whatsapp,
+        landlineNumber: leadFormData.landlineNumber,
         leadOwner: leadFormData.leadOwner,
         remark: leadFormData.remark
       };
@@ -1168,7 +1176,6 @@ const B2BSales = () => {
           coordinates: [leadFormData.longitude, leadFormData.latitude] // [longitude, latitude]
         };
       }
-
 
       // Send data to backend API
       const response = await axios.post(`${backendUrl}/college/b2b/add-lead`, leadData, {
@@ -1200,6 +1207,7 @@ const B2BSales = () => {
           email: '',
           mobile: '',
           whatsapp: '',
+          landlineNumber: '',
           leadOwner: '',
           remark: ''
         });
@@ -1242,6 +1250,7 @@ const B2BSales = () => {
       email: '',
       mobile: '',
       whatsapp: '',
+      landlineNumber: '',
       leadOwner: '',
       remark: ''
     });
@@ -3762,7 +3771,7 @@ const B2BSales = () => {
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
                         <i className="fas fa-envelope text-primary me-1"></i>
-                        Email <span className="text-danger">*</span>
+                        Email 
                       </label>
                       <input
                         type="email"
@@ -3819,6 +3828,28 @@ const B2BSales = () => {
                       {formErrors.whatsapp && (
                         <div className="invalid-feedback">
                           {formErrors.whatsapp}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Landline Number */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-phone text-primary me-1"></i>
+                        Landline Number
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        className={`form-control ${formErrors.landlineNumber ? 'is-invalid' : ''}`}
+                        name="landlineNumber"
+                        value={leadFormData.landlineNumber}
+                        onChange={handleLeadMobileChange}
+                        placeholder="Landline number"
+                      />
+                      {formErrors.landlineNumber && (
+                        <div className="invalid-feedback">
+                          {formErrors.landlineNumber}
                         </div>
                       )}
                     </div>

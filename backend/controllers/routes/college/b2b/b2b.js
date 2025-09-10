@@ -442,7 +442,7 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 router.get('/leads/status-count', isCollege, async (req, res) => {
 	try {
 		let teamMembers = await getAllTeamMembers(req.user._id);
-		
+
 		// Ownership Conditions for team members
 		const ownershipConditions = teamMembers.map(member => ({
 			$or: [{ leadAddedBy: member }, { leadOwner: member }]
@@ -458,19 +458,19 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Get all statuses for the college
 		const StatusB2b = require("../../../models/statusB2b");
 		const College = require("../../../models/college");
-		
+
 		// Find the college that has this user as a concern person
 		const college = await College.findOne({
 			'_concernPerson._id': req.user._id
 		});
-		
+
 		if (!college) {
 			return res.status(400).json({
 				status: false,
 				message: 'College not found for this user'
 			});
 		}
-		
+
 		const statuses = await StatusB2b.find({ college: college._id }).sort({ index: 1 });
 
 		// Get total count
@@ -536,14 +536,14 @@ router.get('/leads', isCollege, async (req, res) => {
 			search,
 			sortBy = 'createdAt',
 			sortOrder = 'desc',
-			subStatus			
+			subStatus
 		} = req.query;
 
-console.log(subStatus, 'subStatus')
+
 
 		let teamMembers = await getAllTeamMembers(req.user._id);
 		const query = {};
-  
+
 		// Ownership Conditions for team members
 		const ownershipConditions = teamMembers.map(member => ({
 			$or: [{ leadAddedBy: member }, { leadOwner: member }]
@@ -576,7 +576,7 @@ console.log(subStatus, 'subStatus')
 			]
 		};
 
-	
+
 
 		// Sorting options
 		const sortOptions = {};
@@ -673,35 +673,35 @@ router.get('/leads/:id/logs', isCollege, async (req, res) => {
 				$match: {
 					_id: new mongoose.Types.ObjectId(req.params.id),
 				}
-			},{ $project: { logs: 1 } },
+			}, { $project: { logs: 1 } },
 
 			// work per-log
 			{ $unwind: "$logs" },
-		  
+
 			// join the user for this log
 			{
-			  $lookup: {
-				from: "users",                 // <-- your users collection name
-				localField: "logs.user",
-				foreignField: "_id",
-				as: "u"
-			  }
-			  
+				$lookup: {
+					from: "users",                 // <-- your users collection name
+					localField: "logs.user",
+					foreignField: "_id",
+					as: "u"
+				}
+
 			},
-		  { $unwind: "$u" },
+			{ $unwind: "$u" },
 			{
-			  $set:{
-				"logs.user": "$u.name"
-			  }
+				$set: {
+					"logs.user": "$u.name"
+				}
 			},
 			{
-			  $group: {
-				_id: "$_id",
-				logs: { $push: "$logs"}
-			  }
+				$group: {
+					_id: "$_id",
+					logs: { $push: "$logs" }
+				}
 			}
 		])
-			
+
 
 		if (!logs) {
 			return res.status(404).json({
@@ -744,15 +744,23 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
-			remark
+			remark,
+			landlineNumber
 		} = req.body;
 
+		const requiredFields = [leadCategory, typeOfB2B, businessName, concernPersonName, mobile];
 
-		// Validate required fields
-		if (!leadCategory || !typeOfB2B || !businessName || !concernPersonName || !email || !mobile) {
+		let missingFields = [];
+		requiredFields.forEach(field => {
+			if (!field) {
+				missingFields.push(field);
+			}
+		});
+
+		if (missingFields.length > 0) {
 			return res.status(400).json({
 				status: false,
-				message: 'Required fields missing: leadCategory, typeOfB2B, businessName, concernPersonName, email, mobile'
+				message: `Required fields missing: ${missingFields.join(", ")}`
 			});
 		}
 
@@ -786,6 +794,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			leadOwner,
 			leadAddedBy: req.user._id,
 			remark,
+			landlineNumber
 		});
 
 
@@ -831,8 +840,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { status, subStatus, remarks } = req.body;
-		
-	
+
+
 
 		// Validate required fields
 		if (!status) {
@@ -844,7 +853,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Find the lead
 		const lead = await Lead.findById(id);
-		
+
 		if (!lead) {
 			return res.status(404).json({
 				status: false,
@@ -854,13 +863,13 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Check ownership
 		let teamMembers = await getAllTeamMembers(req.user._id);
-	
-		
-		const isOwner = teamMembers.some(member => 
-			lead.leadAddedBy.toString() === member.toString() || 
+
+
+		const isOwner = teamMembers.some(member =>
+			lead.leadAddedBy.toString() === member.toString() ||
 			lead.leadOwner.toString() === member.toString()
 		);
-		
+
 
 		if (!isOwner) {
 			return res.status(403).json({
@@ -912,7 +921,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		lead.subStatus = subStatus;
 		lead.updatedBy = req.user._id;
 
-		
+
 
 		// Add to logs with detailed status change information
 		lead.logs.push({
@@ -961,7 +970,8 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			email,
 			mobile,
 			whatsapp,
-			leadOwner
+			leadOwner,
+			landlineNumber
 		} = req.body;
 
 		const user = req.user;
@@ -1010,6 +1020,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 				mobile,
 				whatsapp,
 				leadOwner,
+				landlineNumber,
 				leadAddedBy: user._id
 			},
 			{ new: true, runValidators: true }
@@ -1177,7 +1188,7 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		if (googleCalendarEvent && req.user.googleAuthToken?.accessToken) {
 			try {
 				const { createGoogleCalendarEvent } = require('../../services/googleservice');
-				
+
 				const event = {
 					summary: `B2B Follow-up: ${lead.businessName}`,
 					description: `Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\n\nRemarks: ${remarks || 'No remarks'}`,
@@ -1286,13 +1297,13 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 // Change lead status with optional follow-up
 router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
-		const { 
-			status, 
-			subStatus, 
-			followUpDate, 
-			followUpTime, 
+		const {
+			status,
+			subStatus,
+			followUpDate,
+			followUpTime,
 			remarks,
-			googleCalendarEvent = false 
+			googleCalendarEvent = false
 		} = req.body;
 
 		if (!status) {
@@ -1377,7 +1388,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		if (googleCalendarEvent && followUp && req.user.googleAuthToken?.accessToken) {
 			try {
 				const { createGoogleCalendarEvent } = require('../../services/googleservice');
-				
+
 				const event = {
 					summary: `B2B Follow-up: ${lead.businessName}`,
 					description: `Status Change Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\nStatus: ${status}\n\nRemarks: ${remarks || 'No remarks'}`,
@@ -1656,535 +1667,535 @@ router.get('/leads/stats/overview', isCollege, async (req, res) => {
 
 // Get B2B Dashboard Analytics
 router.get('/dashboard', isCollege, async (req, res) => {
-  try {
-    const { startDate, endDate, period = 'last30' } = req.query;
-    
-    let teamMembers = await getAllTeamMembers(req.user._id);
-    
-    // Ownership Conditions for team members
-    const ownershipConditions = teamMembers.map(member => ({
-      $or: [{ leadAddedBy: member }, { leadOwner: member }]
-    }));
+	try {
+		const { startDate, endDate, period = 'last30' } = req.query;
 
-    // Base query with ownership conditions
-    const baseQuery = {
-      $and: [
-        ...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
-      ]
-    };
+		let teamMembers = await getAllTeamMembers(req.user._id);
 
-    // Date range filter
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    } else {
-      // Default to last 30 days if no date range provided
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      dateFilter.createdAt = {
-        $gte: thirtyDaysAgo,
-        $lte: new Date()
-      };
-    }
+		// Ownership Conditions for team members
+		const ownershipConditions = teamMembers.map(member => ({
+			$or: [{ leadAddedBy: member }, { leadOwner: member }]
+		}));
 
-    const finalQuery = {
-      $and: [baseQuery, dateFilter]
-    };
+		// Base query with ownership conditions
+		const baseQuery = {
+			$and: [
+				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
+			]
+		};
 
-    // Get overview statistics
-    const overviewStats = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $group: {
-          _id: null,
-          totalLeads: { $sum: 1 },
-          activeLeads: {
-            $sum: {
-              $cond: [
-                { $in: ['$status', [null, undefined]] },
-                1,
-                0
-              ]
-            }
-          },
-          convertedLeads: {
-            $sum: {
-              $cond: [
-                { $eq: ['$status', 'Converted'] },
-                1,
-                0
-              ]
-            }
-          }
-        }
-      }
-    ]);
+		// Date range filter
+		let dateFilter = {};
+		if (startDate && endDate) {
+			dateFilter.createdAt = {
+				$gte: new Date(startDate),
+				$lte: new Date(endDate)
+			};
+		} else {
+			// Default to last 30 days if no date range provided
+			const thirtyDaysAgo = new Date();
+			thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+			dateFilter.createdAt = {
+				$gte: thirtyDaysAgo,
+				$lte: new Date()
+			};
+		}
 
-    // Get pending followups count
-    const pendingFollowupsCount = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'followups',
-          localField: 'followUp',
-          foreignField: '_id',
-          as: 'followupInfo'
-        }
-      },
-      {
-        $unwind: {
-          path: '$followupInfo',
-          preserveNullAndEmptyArrays: false
-        }
-      },
-      {
-        $match: {
-          'followupInfo.status': 'Pending'
-        }
-      },
-      {
-        $count: 'count'
-      }
-    ]);
+		const finalQuery = {
+			$and: [baseQuery, dateFilter]
+		};
 
-    // Get status distribution
-    const statusDistribution = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'statusb2bs',
-          localField: 'status',
-          foreignField: '_id',
-          as: 'statusInfo'
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          statusName: { $first: { $arrayElemAt: ['$statusInfo.title', 0] } }
-        }
-      },
-      {
-        $project: {
-          statusName: { $ifNull: ['$statusName', 'No Status'] },
-          count: 1,
-          color: {
-            $switch: {
-              branches: [
-                { case: { $eq: ['$statusName', 'Converted'] }, then: '#10b981' },
-                { case: { $eq: ['$statusName', 'Active'] }, then: '#3b82f6' },
-                { case: { $eq: ['$statusName', 'Pending'] }, then: '#f59e0b' },
-                { case: { $eq: ['$statusName', 'Rejected'] }, then: '#ef4444' }
-              ],
-              default: '#6b7280'
-            }
-          }
-        }
-      }
-    ]);
+		// Get overview statistics
+		const overviewStats = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$group: {
+					_id: null,
+					totalLeads: { $sum: 1 },
+					activeLeads: {
+						$sum: {
+							$cond: [
+								{ $in: ['$status', [null, undefined]] },
+								1,
+								0
+							]
+						}
+					},
+					convertedLeads: {
+						$sum: {
+							$cond: [
+								{ $eq: ['$status', 'Converted'] },
+								1,
+								0
+							]
+						}
+					}
+				}
+			}
+		]);
 
-    // Get monthly trends (last 6 months)
-    const monthlyTrends = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          leads: { $sum: 1 },
-          conversions: {
-            $sum: {
-              $cond: [
-                { $eq: ['$status', 'Converted'] },
-                1,
-                0
-              ]
-            }
-          }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      },
-      {
-        $limit: 6
-      },
-      {
-        $project: {
-          month: {
-            $concat: [
-              { $toString: '$_id.month' },
-              '/',
-              { $toString: '$_id.year' }
-            ]
-          },
-          leads: 1,
-          conversions: 1,
-          revenue: { $multiply: ['$conversions', 15000] } // Assuming 15000 per conversion
-        }
-      }
-    ]);
+		// Get pending followups count
+		const pendingFollowupsCount = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: 'followUp',
+					foreignField: '_id',
+					as: 'followupInfo'
+				}
+			},
+			{
+				$unwind: {
+					path: '$followupInfo',
+					preserveNullAndEmptyArrays: false
+				}
+			},
+			{
+				$match: {
+					'followupInfo.status': 'Pending'
+				}
+			},
+			{
+				$count: 'count'
+			}
+		]);
 
-    // Get lead categories distribution
-    const leadCategories = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'leadcategories',
-          localField: 'leadCategory',
-          foreignField: '_id',
-          as: 'categoryInfo'
-        }
-      },
-      {
-        $group: {
-          _id: '$leadCategory',
-          count: { $sum: 1 },
-          categoryName: { $first: { $arrayElemAt: ['$categoryInfo.name', 0] } }
-        }
-      },
-      {
-        $project: {
-          categoryName: { $ifNull: ['$categoryName', 'Unknown'] },
-          count: 1,
-          color: {
-            $switch: {
-              branches: [
-                { case: { $eq: ['$categoryName', 'Website'] }, then: '#3b82f6' },
-                { case: { $eq: ['$categoryName', 'Referral'] }, then: '#10b981' },
-                { case: { $eq: ['$categoryName', 'Social Media'] }, then: '#8b5cf6' },
-                { case: { $eq: ['$categoryName', 'Cold Call'] }, then: '#f59e0b' },
-                { case: { $eq: ['$categoryName', 'Direct'] }, then: '#ef4444' },
-                { case: { $eq: ['$categoryName', 'Partner'] }, then: '#8b5cf6' }
-              ],
-              default: '#6b7280'
-            }
-          }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ]);
+		// Get status distribution
+		const statusDistribution = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'statusb2bs',
+					localField: 'status',
+					foreignField: '_id',
+					as: 'statusInfo'
+				}
+			},
+			{
+				$group: {
+					_id: '$status',
+					count: { $sum: 1 },
+					statusName: { $first: { $arrayElemAt: ['$statusInfo.title', 0] } }
+				}
+			},
+			{
+				$project: {
+					statusName: { $ifNull: ['$statusName', 'No Status'] },
+					count: 1,
+					color: {
+						$switch: {
+							branches: [
+								{ case: { $eq: ['$statusName', 'Converted'] }, then: '#10b981' },
+								{ case: { $eq: ['$statusName', 'Active'] }, then: '#3b82f6' },
+								{ case: { $eq: ['$statusName', 'Pending'] }, then: '#f59e0b' },
+								{ case: { $eq: ['$statusName', 'Rejected'] }, then: '#ef4444' }
+							],
+							default: '#6b7280'
+						}
+					}
+				}
+			}
+		]);
 
-    // Get B2B types distribution
-    const b2bTypes = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'typeofb2bs',
-          localField: 'typeOfB2B',
-          foreignField: '_id',
-          as: 'typeInfo'
-        }
-      },
-      {
-        $group: {
-          _id: '$typeOfB2B',
-          count: { $sum: 1 },
-          typeName: { $first: { $arrayElemAt: ['$typeInfo.name', 0] } }
-        }
-      },
-      {
-        $project: {
-          typeName: { $ifNull: ['$typeName', 'Unknown'] },
-          count: 1,
-          color: {
-            $switch: {
-              branches: [
-                { case: { $eq: ['$typeName', 'Corporate'] }, then: '#3b82f6' },
-                { case: { $eq: ['$typeName', 'Startup'] }, then: '#10b981' },
-                { case: { $eq: ['$typeName', 'SME'] }, then: '#f59e0b' },
-                { case: { $eq: ['$typeName', 'Enterprise'] }, then: '#8b5cf6' },
-                { case: { $eq: ['$typeName', 'Government'] }, then: '#ef4444' }
-              ],
-              default: '#6b7280'
-            }
-          }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ]);
+		// Get monthly trends (last 6 months)
+		const monthlyTrends = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$group: {
+					_id: {
+						year: { $year: '$createdAt' },
+						month: { $month: '$createdAt' }
+					},
+					leads: { $sum: 1 },
+					conversions: {
+						$sum: {
+							$cond: [
+								{ $eq: ['$status', 'Converted'] },
+								1,
+								0
+							]
+						}
+					}
+				}
+			},
+			{
+				$sort: { '_id.year': 1, '_id.month': 1 }
+			},
+			{
+				$limit: 6
+			},
+			{
+				$project: {
+					month: {
+						$concat: [
+							{ $toString: '$_id.month' },
+							'/',
+							{ $toString: '$_id.year' }
+						]
+					},
+					leads: 1,
+					conversions: 1,
+					revenue: { $multiply: ['$conversions', 15000] } // Assuming 15000 per conversion
+				}
+			}
+		]);
 
-    // Get top performers (counselors)
-    const topPerformers = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'leadOwner',
-          foreignField: '_id',
-          as: 'ownerInfo'
-        }
-      },
-      {
-        $group: {
-          _id: '$leadOwner',
-          leads: { $sum: 1 },
-          conversions: {
-            $sum: {
-              $cond: [
-                { $eq: ['$status', 'Converted'] },
-                1,
-                0
-              ]
-            }
-          },
-          name: { $first: { $arrayElemAt: ['$ownerInfo.name', 0] } }
-        }
-      },
-      {
-        $project: {
-          name: { $ifNull: ['$name', 'Unknown'] },
-          leads: 1,
-          conversions: 1,
-          rate: {
-            $round: [
-              {
-                $multiply: [
-                  { $divide: ['$conversions', '$leads'] },
-                  100
-                ]
-              },
-              1
-            ]
-          }
-        }
-      },
-      {
-        $sort: { rate: -1 }
-      },
-      {
-        $limit: 5
-      }
-    ]);
+		// Get lead categories distribution
+		const leadCategories = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'leadcategories',
+					localField: 'leadCategory',
+					foreignField: '_id',
+					as: 'categoryInfo'
+				}
+			},
+			{
+				$group: {
+					_id: '$leadCategory',
+					count: { $sum: 1 },
+					categoryName: { $first: { $arrayElemAt: ['$categoryInfo.name', 0] } }
+				}
+			},
+			{
+				$project: {
+					categoryName: { $ifNull: ['$categoryName', 'Unknown'] },
+					count: 1,
+					color: {
+						$switch: {
+							branches: [
+								{ case: { $eq: ['$categoryName', 'Website'] }, then: '#3b82f6' },
+								{ case: { $eq: ['$categoryName', 'Referral'] }, then: '#10b981' },
+								{ case: { $eq: ['$categoryName', 'Social Media'] }, then: '#8b5cf6' },
+								{ case: { $eq: ['$categoryName', 'Cold Call'] }, then: '#f59e0b' },
+								{ case: { $eq: ['$categoryName', 'Direct'] }, then: '#ef4444' },
+								{ case: { $eq: ['$categoryName', 'Partner'] }, then: '#8b5cf6' }
+							],
+							default: '#6b7280'
+						}
+					}
+				}
+			},
+			{
+				$sort: { count: -1 }
+			}
+		]);
 
-    // Get recent leads
-    const recentLeads = await Lead.find(finalQuery)
-      .populate('leadCategory', 'name')
-      .populate('status', 'title')
-      .populate('leadAddedBy', 'name')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
+		// Get B2B types distribution
+		const b2bTypes = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'typeofb2bs',
+					localField: 'typeOfB2B',
+					foreignField: '_id',
+					as: 'typeInfo'
+				}
+			},
+			{
+				$group: {
+					_id: '$typeOfB2B',
+					count: { $sum: 1 },
+					typeName: { $first: { $arrayElemAt: ['$typeInfo.name', 0] } }
+				}
+			},
+			{
+				$project: {
+					typeName: { $ifNull: ['$typeName', 'Unknown'] },
+					count: 1,
+					color: {
+						$switch: {
+							branches: [
+								{ case: { $eq: ['$typeName', 'Corporate'] }, then: '#3b82f6' },
+								{ case: { $eq: ['$typeName', 'Startup'] }, then: '#10b981' },
+								{ case: { $eq: ['$typeName', 'SME'] }, then: '#f59e0b' },
+								{ case: { $eq: ['$typeName', 'Enterprise'] }, then: '#8b5cf6' },
+								{ case: { $eq: ['$typeName', 'Government'] }, then: '#ef4444' }
+							],
+							default: '#6b7280'
+						}
+					}
+				}
+			},
+			{
+				$sort: { count: -1 }
+			}
+		]);
 
-    // Get upcoming followups
-    const upcomingFollowups = await Lead.aggregate([
-      { $match: finalQuery },
-      {
-        $lookup: {
-          from: 'followups',
-          localField: 'followUp',
-          foreignField: '_id',
-          as: 'followupInfo'
-        }
-      },
-      {
-        $unwind: {
-          path: '$followupInfo',
-          preserveNullAndEmptyArrays: false
-        }
-      },
-      {
-        $match: {
-          'followupInfo.scheduledDate': {
-            $gte: new Date(),
-            $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Next 7 days
-          },
-          'followupInfo.status': 'Pending'
-        }
-      },
-      {
-        $project: {
-          businessName: 1,
-          concernPersonName: 1,
-          mobile: 1,
-          scheduledDate: '$followupInfo.scheduledDate',
-          priority: {
-            $switch: {
-              branches: [
-                { case: { $lt: ['$followupInfo.scheduledDate', new Date(Date.now() + 24 * 60 * 60 * 1000)] }, then: 'High' },
-                { case: { $lt: ['$followupInfo.scheduledDate', new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)] }, then: 'Medium' }
-              ],
-              default: 'Low'
-            }
-          }
-        }
-      },
-      {
-        $sort: { scheduledDate: 1 }
-      },
-      {
-        $limit: 5
-      }
-    ]);
+		// Get top performers (counselors)
+		const topPerformers = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'leadOwner',
+					foreignField: '_id',
+					as: 'ownerInfo'
+				}
+			},
+			{
+				$group: {
+					_id: '$leadOwner',
+					leads: { $sum: 1 },
+					conversions: {
+						$sum: {
+							$cond: [
+								{ $eq: ['$status', 'Converted'] },
+								1,
+								0
+							]
+						}
+					},
+					name: { $first: { $arrayElemAt: ['$ownerInfo.name', 0] } }
+				}
+			},
+			{
+				$project: {
+					name: { $ifNull: ['$name', 'Unknown'] },
+					leads: 1,
+					conversions: 1,
+					rate: {
+						$round: [
+							{
+								$multiply: [
+									{ $divide: ['$conversions', '$leads'] },
+									100
+								]
+							},
+							1
+						]
+					}
+				}
+			},
+			{
+				$sort: { rate: -1 }
+			},
+			{
+				$limit: 5
+			}
+		]);
 
-    // Calculate total revenue
-    const totalRevenue = overviewStats[0]?.convertedLeads * 15000 || 0;
+		// Get recent leads
+		const recentLeads = await Lead.find(finalQuery)
+			.populate('leadCategory', 'name')
+			.populate('status', 'title')
+			.populate('leadAddedBy', 'name')
+			.sort({ createdAt: -1 })
+			.limit(10)
+			.lean();
 
-    const dashboardData = {
-      overview: {
-        totalLeads: overviewStats[0]?.totalLeads || 0,
-        activeLeads: overviewStats[0]?.activeLeads || 0,
-        convertedLeads: overviewStats[0]?.convertedLeads || 0,
-        pendingFollowups: pendingFollowupsCount[0]?.count || 0,
-        totalRevenue: totalRevenue
-      },
-      statusDistribution,
-      monthlyTrends,
-      leadCategories,
-      b2bTypes,
-      topPerformers,
-      recentLeads: recentLeads.map(lead => ({
-        businessName: lead.businessName,
-        concernPersonName: lead.concernPersonName,
-        designation: lead.designation,
-        leadCategory: lead.leadCategory?.name || 'Unknown',
-        status: lead.status?.title || 'No Status',
-        createdAt: lead.createdAt
-      })),
-      upcomingFollowups
-    };
+		// Get upcoming followups
+		const upcomingFollowups = await Lead.aggregate([
+			{ $match: finalQuery },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: 'followUp',
+					foreignField: '_id',
+					as: 'followupInfo'
+				}
+			},
+			{
+				$unwind: {
+					path: '$followupInfo',
+					preserveNullAndEmptyArrays: false
+				}
+			},
+			{
+				$match: {
+					'followupInfo.scheduledDate': {
+						$gte: new Date(),
+						$lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Next 7 days
+					},
+					'followupInfo.status': 'Pending'
+				}
+			},
+			{
+				$project: {
+					businessName: 1,
+					concernPersonName: 1,
+					mobile: 1,
+					scheduledDate: '$followupInfo.scheduledDate',
+					priority: {
+						$switch: {
+							branches: [
+								{ case: { $lt: ['$followupInfo.scheduledDate', new Date(Date.now() + 24 * 60 * 60 * 1000)] }, then: 'High' },
+								{ case: { $lt: ['$followupInfo.scheduledDate', new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)] }, then: 'Medium' }
+							],
+							default: 'Low'
+						}
+					}
+				}
+			},
+			{
+				$sort: { scheduledDate: 1 }
+			},
+			{
+				$limit: 5
+			}
+		]);
 
-    res.json({
-      status: true,
-      data: dashboardData,
-      message: 'Dashboard data retrieved successfully'
-    });
+		// Calculate total revenue
+		const totalRevenue = overviewStats[0]?.convertedLeads * 15000 || 0;
 
-  } catch (error) {
-    console.error('Error getting dashboard data:', error);
-    res.status(500).json({
-      status: false,
-      message: 'Failed to retrieve dashboard data',
-      error: error.message
-    });
-  }
+		const dashboardData = {
+			overview: {
+				totalLeads: overviewStats[0]?.totalLeads || 0,
+				activeLeads: overviewStats[0]?.activeLeads || 0,
+				convertedLeads: overviewStats[0]?.convertedLeads || 0,
+				pendingFollowups: pendingFollowupsCount[0]?.count || 0,
+				totalRevenue: totalRevenue
+			},
+			statusDistribution,
+			monthlyTrends,
+			leadCategories,
+			b2bTypes,
+			topPerformers,
+			recentLeads: recentLeads.map(lead => ({
+				businessName: lead.businessName,
+				concernPersonName: lead.concernPersonName,
+				designation: lead.designation,
+				leadCategory: lead.leadCategory?.name || 'Unknown',
+				status: lead.status?.title || 'No Status',
+				createdAt: lead.createdAt
+			})),
+			upcomingFollowups
+		};
+
+		res.json({
+			status: true,
+			data: dashboardData,
+			message: 'Dashboard data retrieved successfully'
+		});
+
+	} catch (error) {
+		console.error('Error getting dashboard data:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve dashboard data',
+			error: error.message
+		});
+	}
 });
 
 // Get followups for a lead
 router.get('/leads/:leadId/followups', isCollege, async (req, res) => {
-  try {
-    const { leadId } = req.params;
+	try {
+		const { leadId } = req.params;
 
-    const followups = await FollowUp.find({ leadId })
-      .populate('addedBy', 'name email')
-      .sort({ scheduledDate: 1 });
+		const followups = await FollowUp.find({ leadId })
+			.populate('addedBy', 'name email')
+			.sort({ scheduledDate: 1 });
 
-    res.json({
-      status: true,
-      data: followups,
-      message: 'Followups retrieved successfully'
-    });
+		res.json({
+			status: true,
+			data: followups,
+			message: 'Followups retrieved successfully'
+		});
 
-  } catch (error) {
-    console.error('Error getting followups:', error);
-    res.status(500).json({
-      status: false,
-      message: 'Failed to retrieve followups',
-      error: error.message
-    });
-  }
+	} catch (error) {
+		console.error('Error getting followups:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve followups',
+			error: error.message
+		});
+	}
 });
 
 // Add test followup for a lead (for testing purposes)
 router.post('/add-test-followup/:leadId', isCollege, async (req, res) => {
-  try {
-    const { leadId } = req.params;
-    const { scheduledDate, description = 'Test followup' } = req.body;
+	try {
+		const { leadId } = req.params;
+		const { scheduledDate, description = 'Test followup' } = req.body;
 
-    // Check if lead exists
-    const lead = await Lead.findById(leadId);
-    if (!lead) {
-      return res.status(404).json({
-        status: false,
-        message: 'Lead not found'
-      });
-    }
+		// Check if lead exists
+		const lead = await Lead.findById(leadId);
+		if (!lead) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead not found'
+			});
+		}
 
-    // Create followup
-    const followup = new FollowUp({
-      leadId: leadId,
-      followUpType: 'Call',
-      description: description,
-      status: 'Pending',
-      scheduledDate: scheduledDate || new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow by default
-      addedBy: req.user._id
-    });
+		// Create followup
+		const followup = new FollowUp({
+			leadId: leadId,
+			followUpType: 'Call',
+			description: description,
+			status: 'Pending',
+			scheduledDate: scheduledDate || new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow by default
+			addedBy: req.user._id
+		});
 
-    await followup.save();
+		await followup.save();
 
-    // Update lead with followup reference
-    lead.followUp = followup._id;
-    await lead.save();
+		// Update lead with followup reference
+		lead.followUp = followup._id;
+		await lead.save();
 
-    res.json({
-      status: true,
-      data: followup,
-      message: 'Test followup added successfully'
-    });
+		res.json({
+			status: true,
+			data: followup,
+			message: 'Test followup added successfully'
+		});
 
-  } catch (error) {
-    console.error('Error adding test followup:', error);
-    res.status(500).json({
-      status: false,
-      message: 'Failed to add test followup',
-      error: error.message
-    });
-  }
+	} catch (error) {
+		console.error('Error adding test followup:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to add test followup',
+			error: error.message
+		});
+	}
 });
 
 router.post('/refer-lead', isCollege, async (req, res) => {
-  try {
-    const { leadId, counselorId } = req.body;
+	try {
+		const { leadId, counselorId } = req.body;
 
-	const user = req.user;
-    const lead = await Lead.findById(leadId);
-    if(!lead){
-      return res.status(404).json({
-        status: false,
-        message: 'Lead not found'
-      });
-    }
-	const olduser = await User.findById(lead.leadOwner);
-	const newUser = await User.findById(counselorId);
-	lead.previousLeadOwners.push(lead.leadOwner);
-	lead.leadOwner = counselorId;
-	lead.updatedBy = user._id;
+		const user = req.user;
+		const lead = await Lead.findById(leadId);
+		if (!lead) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead not found'
+			});
+		}
+		const olduser = await User.findById(lead.leadOwner);
+		const newUser = await User.findById(counselorId);
+		lead.previousLeadOwners.push(lead.leadOwner);
+		lead.leadOwner = counselorId;
+		lead.updatedBy = user._id;
 
-	const logEntry = {
-		user: user._id,
-		action: `Lead referred from ${olduser.name} to ${newUser.name}`,
-		timestamp: new Date(),
-		remarks: ''
-	};
-
-
-	lead.logs.push(logEntry);
+		const logEntry = {
+			user: user._id,
+			action: `Lead referred from ${olduser.name} to ${newUser.name}`,
+			timestamp: new Date(),
+			remarks: ''
+		};
 
 
-	
-	await lead.save();
-	return res.status(200).json({
-		status: true,
-		message: 'Lead referred successfully'
-	});
-  }
-  catch(err){
-    console.error('Error referring lead:', err);
-	return res.status(500).json({
-		status: false,
-		message: 'Failed to refer lead',
-		error: err.message
-	});
-  }
+		lead.logs.push(logEntry);
+
+
+
+		await lead.save();
+		return res.status(200).json({
+			status: true,
+			message: 'Lead referred successfully'
+		});
+	}
+	catch (err) {
+		console.error('Error referring lead:', err);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to refer lead',
+			error: err.message
+		});
+	}
 });
 
 module.exports = router;

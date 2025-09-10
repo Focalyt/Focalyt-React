@@ -110,7 +110,7 @@ import Attendance from './Pages/App/College/Attendance/Attendance';
 import CalenderFolowupB2C from './Pages/App/College/Course/CalenderFolowupB2C';
 import Source from './Pages/App/College/Settings/Source/Source';
 import MisReport from './Pages/App/College/MisReport/MisReport';
-
+import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -242,6 +242,7 @@ const Layout = () => {
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
           <Route path='misreport/:batchId' element={<MisReport/>}/>
+          <Route path='dripmarketing' element={<DripMarketing/>}/>
         </Route>
 
         {/* company  */}

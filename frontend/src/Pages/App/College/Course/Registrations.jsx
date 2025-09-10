@@ -6959,7 +6959,7 @@ const CRMDashboard = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-              zIndex: 13,
+             
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed',
               width: '-webkit-fill-available'

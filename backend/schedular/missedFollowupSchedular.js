@@ -3,18 +3,18 @@ const b2cFollowup = require("../controllers/models/b2cFollowup");
 
 function missedFollowupSchedular() {
     cron.schedule("* * * * *", async () => {
-        try {
-          console.log("[Cron] Checking missed followups...");
+        try { 
       
           const result = await b2cFollowup.updateMany(
             { 
-              status: "pending", 
+              status: "planned", 
               followupDate: { $lt: new Date() }  // followup time already passed
             },
             { 
               $set: { status: "missed", statusUpdatedAt: new Date() } 
             }
           );
+
       
           if (result.modifiedCount > 0) {
             console.log(`[Cron] Marked ${result.modifiedCount} followups as missed`);
