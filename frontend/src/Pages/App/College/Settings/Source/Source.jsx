@@ -485,13 +485,150 @@ function Source() {
         }
         
         @media (max-width: 768px) {
-        
-          
           .content-header {
             display: none;
           }
           
+          /* Mobile layout adjustments */
+          .row {
+            margin: 0;
+          }
           
+          .col-6 {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 0 0 100% !important;
+            margin-bottom: 1rem;
+          }
+          
+          .equal-height-2 {
+            height: auto !important;
+          }
+          
+          /* Card adjustments */
+          .card {
+            margin-bottom: 1rem;
+          }
+          
+          .card-header {
+            padding: 0.75rem;
+          }
+          
+          .card-body {
+            padding: 1rem;
+          }
+          
+          /* Form adjustments */
+        //   .col-xl-8 {
+        //     width: 100% !important;
+        //     max-width: 100% !important;
+        //     flex: 0 0 100% !important;
+        //     margin-bottom: 1rem;
+        //   }
+          
+        //   .col-xl-4 {
+        //     width: 100% !important;
+        //     max-width: 100% !important;
+        //     flex: 0 0 100% !important;
+        //   }
+          
+          /* Button adjustments */
+          .d-flex.gap-2 {
+            flex-direction: column;
+            gap: 0.5rem !important;
+          }
+          
+          .btn {
+            width: 100%;
+            margin-bottom: 0.5rem;
+          }
+          
+          /* Table adjustments */
+          .table-responsive {
+            font-size: 0.875rem;
+          }
+          
+          .table th,
+          .table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.75rem;
+          }
+          
+          .table th {
+            font-size: 0.7rem !important;
+          }
+          
+          /* Button in table */
+          .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+          }
+          
+          /* Form control adjustments */
+          .form-control {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+          }
+          
+          /* Label adjustments */
+          label {
+            font-size: 0.75rem !important;
+            margin-bottom: 0.25rem;
+          }
+          
+          /* Card title adjustments */
+          .card-title {
+            font-size: 0.9rem !important;
+          }
+          
+          /* Alert adjustments */
+          .alert {
+            font-size: 0.875rem;
+            padding: 0.75rem;
+          }
+          
+          /* Spinner adjustments */
+          .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+          }
+          
+          .spinner-border-sm {
+            width: 0.8rem;
+            height: 0.8rem;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          
+          
+          .card-body {
+            padding: 0.75rem;
+          }
+          
+          .table th,
+          .table td {
+            padding: 0.25rem 0.125rem;
+            font-size: 0.7rem;
+          }
+          
+          .btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+          }
+          
+          .form-control {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.6rem;
+          }
+          
+          label {
+            font-size: 0.7rem !important;
+          }
+          
+          .card-title {
+            font-size: 0.85rem !important;
+          }
         }
       `}</style>
         </div>

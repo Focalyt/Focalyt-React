@@ -36,6 +36,7 @@ const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
+const dripmarketingRoutes = require("./dripmarketing");
 
 
 
@@ -69,6 +70,7 @@ router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
+router.use("/dripmarketing", isCollege, dripmarketingRoutes);
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -6109,7 +6111,16 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			},
 			{ $unwind: '$_course' },
+			{
+				$lookup:{
+					from: 'users',
+					localField: 'counsellor',
+					foreignField: '_id',
+					as: 'counsellor'
 
+				}
+			},
+			{ $unwind: { path: '$counsellor', preserveNullAndEmptyArrays: true } },
 			// Lead Status lookup
 			{
 				$lookup: {

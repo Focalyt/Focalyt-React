@@ -4088,12 +4088,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                           </div>
                                                           <div className="info-group">
                                                             <div className="info-label">LEAD MODIFICATION By</div>
-                                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                            <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}</div>
                                                           </div>
                                                           <div className="col-xl- col-3">
                                                             <div className="info-group">
                                                               <div className="info-label">Counsellor Name</div>
-                                                              <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                              <div className="info-value"> {profile.counsellor?.name || 'N/A'}</div>
                                                             </div>
                                                           </div>
                                                         </div>
@@ -4192,7 +4192,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         <div className="col-xl- col-3">
                                                           <div className="info-group">
                                                             <div className="info-label">Counsellor Name</div>
-                                                            <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                            {/* <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div> */}
+                                                            <div className="info-value"> {profile.counsellor?.name || 'N/A'}</div>
                                                           </div>
                                                         </div>
                                                         <div className="col-xl- col-3">

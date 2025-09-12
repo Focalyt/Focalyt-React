@@ -5,10 +5,105 @@ import axios from 'axios';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 
+// Add CSS styles for multiselect
+const multiselectStyles = `
+    .multiselect-dropdown .dropdown-arrow {
+        transition: transform 0.2s ease;
+        font-size: 12px;
+    }
+    .multiselect-dropdown .dropdown-arrow.open {
+        transform: rotate(180deg);
+    }
+    .multiselect-option:hover {
+        background-color: #f8f9fa;
+    }
+    .multiselect-options {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = multiselectStyles;
+    document.head.appendChild(styleSheet);
+}
+
+// Multiselect Component
+const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select options" }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedValues, setSelectedValues] = useState(value || []);
+
+    useEffect(() => {
+        setSelectedValues(value || []);
+    }, [value]);
+
+    const handleToggle = (optionValue) => {
+        const newValues = selectedValues.includes(optionValue)
+            ? selectedValues.filter(val => val !== optionValue)
+            : [...selectedValues, optionValue];
+
+        setSelectedValues(newValues);
+        onChange(newValues);
+    };
+
+    const getSelectedLabels = () => {
+        return selectedValues.map(val => {
+            const option = options.find(opt => opt.value === val);
+            return option ? option.label : val;
+        });
+    };
+
+    return (
+        <div className="multiselect-dropdown position-relative">
+            <div
+                className="form-select d-flex align-items-center justify-content-between"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span>
+                    {selectedValues.length === 0
+                        ? placeholder
+                        : selectedValues.length === 1
+                            ? getSelectedLabels()[0]
+                            : `${selectedValues.length} selected`
+                    }
+                </span>
+                <span className={`dropdown-arrow ${isOpen ? 'open' : ''}`}>▼</span>
+            </div>
+
+            {isOpen && (
+                <div className="multiselect-options position-absolute w-100 bg-white border rounded shadow" style={{ zIndex: 10, top: '100%' }}>
+                    {options.map((option) => (
+                        <div
+                            key={option.value}
+                            className="multiselect-option p-2 d-flex align-items-center"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => handleToggle(option.value)}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={selectedValues.includes(option.value)}
+                                onChange={() => { }} 
+                                className="me-2"
+                            />
+                            <span>{option.label}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const DripMarketing = () => {
-
-
+    // Backend configuration
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
 
     const [showPopup, setShowPopup] = useState(false);
     const [popupIndex, setPopupIndex] = useState(null);
@@ -17,9 +112,270 @@ const DripMarketing = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
+    
+    const [statuses, setStatuses] = useState([]);
+    const [subStatuses, setSubStatuses] = useState([]);
+    const [selectedStatus, setSelectedStatus] = useState('');
+    const [selectedSubStatus, setSelectedSubStatus] = useState('');
+    const [verticals, setVerticals] = useState([]);
+    const [projects , setProjects] = useState([]);
+    const [selectedVertical, setSelectedVertical] = useState(null);
+    const [selectedProject, setSelectedProject] = useState(null);
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+
+
     useEffect(() => {
         fetchRules();
+        fetchStatuses();
     }, []);
+
+    // Clear sub-statuses when statuses change
+    useEffect(() => {
+        setSubStatuses([]);
+        setSelectedSubStatus('');
+    }, [statuses]);
+
+    useEffect(() => {
+        fetchVerticals();
+    }, [token]);
+
+ const [dropdownStates, setDropdownStates] = useState({
+  verticals: false,
+  projects: false,
+  statuses: false,
+  subStatuses: false
+ });
+
+  // Add this useEffect to handle clicking outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any multi-select dropdown
+      const isMultiSelectClick = event.target.closest('.multiselect-dropdown');
+
+      if (!isMultiSelectClick) {
+        // Close all dropdowns
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+
+    useEffect(() => {
+        // Only fetch projects if we have verticals loaded and a token
+        if (verticals.length > 0 && token) {
+            // Initially fetch all projects (no vertical selected)
+            fetchProjects();
+        }
+    }, [verticals, token]);
+
+
+    const handleVerticalChange = (verticalId) => {
+        console.log('handleVerticalChange called with verticalId:', verticalId);
+        
+        const selectedVertical = verticals.find(v => v.id === verticalId);
+        setSelectedVertical(selectedVertical);
+        
+        // Clear current projects and fetch new ones for the selected vertical
+        setProjects([]);
+        if (verticalId) {
+            fetchProjects(verticalId);
+        } else {
+            // If no vertical selected, fetch all projects
+            fetchProjects();
+        }
+    };
+
+    // Function to clear vertical selection and fetch all projects
+    const clearVerticalSelection = () => {
+        setSelectedVertical(null);
+        setProjects([]);
+        fetchProjects(); // Fetch all projects
+    };
+
+    
+    const fetchVerticals = async () => {
+        try {
+            if (!token) {
+                console.warn('No token found in session storage.');
+                return;
+            }
+
+            const newVertical = await axios.get(`${backendUrl}/college/dripmarketing/getVerticals`, { headers: { 'x-auth': token } });
+    
+    
+            // Check if data exists and is an array
+            if (newVertical.data && newVertical.data.data && Array.isArray(newVertical.data.data)) {
+                const verticalList = newVertical.data.data.map(v => ({
+                    id: v._id,
+                    name: v.name,
+                    status: v.status === true ? 'active' : 'inactive',
+                    code: v.description,
+                    projects: v.projects, 
+                    createdAt: v.createdAt
+                }));
+    
+                setVerticals(verticalList);
+            } else {
+                console.warn('No verticals data found or data is not an array');
+                setVerticals([]);
+            }
+        } catch (error) {
+            console.error('Error fetching verticals:', error);
+            setVerticals([]);
+        }
+    };
+
+    const fetchProjects = async (selectedVerticalId = null) => {
+              
+        // Use the passed parameter or fall back to selectedVertical
+        let verticalId = selectedVerticalId || selectedVertical?.id;
+        
+        console.log('Using verticalId:', verticalId);
+        
+        if (!token) {
+            console.warn('No authentication token available');
+            setError('Authentication required');
+            return;
+        }
+    
+        setLoading(true);
+        setError(null);
+    
+        try {
+            let url = `${backendUrl}/college/dripmarketing/list-projects`;
+
+            // Only add vertical parameter if a specific vertical is selected
+            if (verticalId) {
+                url += `?vertical=${verticalId}`;
+            }
+           
+            
+            console.log('Fetching projects from URL:', url);
+            
+            const response = await axios.get(url, {
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('Projects API response:', response.data);
+            
+            if (response.data && response.data.success && Array.isArray(response.data.data)) {
+                setProjects(response.data.data);
+                console.log(`Projects set successfully: ${response.data.data.length} projects found`);
+            } else {
+                console.warn('Unexpected response format:', response.data);
+                setProjects([]);
+                setError('No projects found');
+            }
+        } catch (err) {
+            console.error('Fetch projects error:', err);
+            setError(err.response?.data?.message || err.message || 'Failed to load projects');
+            setProjects([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // const fetchCenters = async () => {
+    //     // Get projectId from selectedProject prop or URL (for refresh cases)
+    //     const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
+        
+    //     if (!projectId) {
+    //         console.warn('No projectId available from selectedProject or URL');
+    //         setCenters([]);
+    //         setError('No project context available');
+    //         return;
+    //     }
+
+    //     setLoading(true);
+    //     setError(null);
+    //     try {
+    //         const response = await fetch(`${backendUrl}/college/list-centers?projectId=${projectId}`, {
+    //             headers: {
+    //                 'x-auth': token,
+    //             },
+    //         });
+    //         if (!response.ok) throw new Error('Failed to fetch centers');
+
+    //         const data = await response.json();
+    //         if (data.success) {
+    //             setCenters(data.data);
+    //         } else {
+    //             setError('Failed to load centers');
+    //         }
+    //     } catch (err) {
+    //         setError(err.message);
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // }
+
+    // Fetch all statuses
+   
+    const fetchStatuses = async () => {
+        try {
+            if (!token) {
+                console.warn('No token found in session storage.');
+                return;
+            }
+
+            const response = await axios.get(`${backendUrl}/college/status`, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+                setStatuses(response.data.data);
+                console.log('Statuses fetched:', response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching statuses:', error);
+        }
+    };
+
+    // Fetch sub-statuses based on selected status
+    const fetchSubStatuses = async (statusId) => {
+        try {
+            if (!statusId || !token) {
+                setSubStatuses([]);
+                return;
+            }
+
+            const response = await axios.get(`${backendUrl}/college/status/${statusId}/substatus`, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+                setSubStatuses(response.data.data);
+                console.log('Sub-statuses fetched:', response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching sub-statuses:', error);
+        }
+    };
+
+    // Handle status change
+    const handleStatusChange = (statusId) => {
+        setSelectedStatus(statusId);
+        setSelectedSubStatus(''); 
+        fetchSubStatuses(statusId);
+    };
 
     const fetchRules = async () => {
         setRules([
@@ -52,15 +408,19 @@ const DripMarketing = () => {
         setPopupIndex(index);
 
     }
-    
+
     const [activetab, setActivetab] = useState('rule');
     const [logicOperator, setLogicOperator] = useState('and');
 
     const [subLogicOperator, setSubLogicOperator] = useState('and');
     const [conditionSelections, setConditionSelections] = useState([]);
+    const [conditionOperators, setConditionOperators] = useState([]);
+    const [conditionValues, setConditionValues] = useState([]);
     const [subConditionSelections, setSubConditionSelections] = useState([]);
+    const [subConditionOperators, setSubConditionOperators] = useState([]);
+    const [subConditionValues, setSubConditionValues] = useState([]);
     const [thenFirst, setThenFirst] = useState('');
-    const [thenShouldBe, setThenShouldBe] = useState('');
+    const [thenShouldBe, setThenShouldBe] = useState([]);
     const [thenExecType, setThenExecType] = useState('');
     const [thenMode, setThenMode] = useState('');
     const [thenCount, setThenCount] = useState('');
@@ -71,6 +431,156 @@ const DripMarketing = () => {
 
     const [startDate, setStartDate] = useState(null);
     const [startTime, setStartTime] = useState('');
+
+    // Mapping of activity types to their corresponding value options
+    const activityTypeValueOptions = {
+        campaign: [
+            { value: "nursing_campaign", label: "Nursing Campaign" },
+            { value: "healthcare_campaign", label: "Healthcare Campaign" },
+            { value: "education_campaign", label: "Education Campaign" }
+        ],
+        channels: [
+            { value: "facebook", label: "Facebook" },
+            { value: "instagram", label: "Instagram" },
+            { value: "google_ads", label: "Google Ads" },
+            { value: "whatsapp", label: "WhatsApp" },
+            { value: "email", label: "Email" }
+        ],
+        city: [
+            { value: "mumbai", label: "Mumbai" },
+            { value: "delhi", label: "Delhi" },
+            { value: "bangalore", label: "Bangalore" },
+            { value: "chennai", label: "Chennai" },
+            { value: "kolkata", label: "Kolkata" }
+        ],
+        state: [
+            { value: "maharashtra", label: "Maharashtra" },
+            { value: "delhi", label: "Delhi" },
+            { value: "karnataka", label: "Karnataka" },
+            { value: "tamil_nadu", label: "Tamil Nadu" },
+            { value: "west_bengal", label: "West Bengal" }
+        ],
+        status: [],
+        subStatus: [], 
+        leadOwner: [
+            { value: "john_doe", label: "John Doe" },
+            { value: "jane_smith", label: "Jane Smith" },
+            { value: "mike_johnson", label: "Mike Johnson" }
+        ],
+        registeredBy: [
+            { value: "website", label: "Website" },
+            { value: "mobile_app", label: "Mobile App" },
+            { value: "walk_in", label: "Walk In" },
+            { value: "referral", label: "Referral" }
+        ],
+        courseName: [
+            { value: "nursing_course", label: "Nursing Course" },
+            { value: "healthcare_course", label: "Healthcare Course" },
+            { value: "medical_course", label: "Medical Course" }
+        ],
+        jobName: [
+            { value: "nurse", label: "Nurse" },
+            { value: "doctor", label: "Doctor" },
+            { value: "pharmacist", label: "Pharmacist" },
+            { value: "lab_technician", label: "Lab Technician" }
+        ],
+        email: [
+            { value: "has_email", label: "Has Email" },
+            { value: "no_email", label: "No Email" },
+            { value: "verified_email", label: "Verified Email" }
+        ],
+        mobile: [
+            { value: "has_mobile", label: "Has Mobile" },
+            { value: "no_mobile", label: "No Mobile" },
+            { value: "verified_mobile", label: "Verified Mobile" }
+        ],
+        createdDate: [
+            { value: "today", label: "Today" },
+            { value: "yesterday", label: "Yesterday" },
+            { value: "this_week", label: "This Week" },
+            { value: "this_month", label: "This Month" }
+        ],
+        modificationDate: [
+            { value: "today", label: "Today" },
+            { value: "yesterday", label: "Yesterday" },
+            { value: "this_week", label: "This Week" },
+            { value: "this_month", label: "This Month" }
+        ],
+        project: [],
+        vertical: [],
+        batch: [
+            { value: "batch_1", label: "Batch 1" },
+            { value: "batch_2", label: "Batch 2" },
+            { value: "batch_3", label: "Batch 3" }
+        ]
+    };
+
+    // Function to get value options based on selected activity type
+    const getValueOptions = (activityType) => {
+        if (activityType === 'status') {
+            return statuses.map(status => ({
+                value: status._id,
+                label: status.title
+            }));
+        } else if (activityType === 'subStatus') {
+            return subStatuses.map(subStatus => ({
+                value: subStatus._id,
+                label: subStatus.title
+            }));
+        } else if (activityType === 'vertical') {
+            return verticals.map(vertical => ({
+                value: vertical.id,
+                label: vertical.name
+            }));
+        } else if (activityType === 'project') {
+            return projects.map(project => ({
+                value: project._id,
+                label: project.name
+            }));
+        }
+        return activityTypeValueOptions[activityType] || [];
+    };
+
+    // Mapping for THEN section value options
+    const thenValueOptions = {
+        campaign: [ // Campaign
+            { value: "bulk_upload", label: "Bulk Upload" },
+            { value: "digital_organic", label: "Digital Organic" },
+            { value: "social_media", label: "Social Media" },
+            { value: "email_marketing", label: "Email Marketing" }
+        ],
+        channel: [ // Channel
+            { value: "facebook_ads", label: "Facebook Ads" },
+            { value: "google_ads", label: "Google Ads" },
+            { value: "instagram", label: "Instagram" },
+            { value: "whatsapp", label: "WhatsApp" },
+            { value: "sms", label: "SMS" }
+        ]
+    };
+
+    // Function to get THEN value options
+    const getThenValueOptions = (activityType) => {
+        return thenValueOptions[activityType] || [];
+    };
+
+    const thenFirstValueOptions = {
+        campaign: [
+            { value: "nursing_campaign", label: "Nursing Campaign" },
+            { value: "healthcare_campaign", label: "Healthcare Campaign" },
+            { value: "education_campaign", label: "Education Campaign" }
+        ],
+        channels: [
+            { value: "Bulk Upload" },
+            { value: "Digital Organic" }
+        ]
+
+
+    };
+
+    const getThenFirstValueOptions = (activityType) => {
+        return thenFirstValueOptions[activityType] || [];
+    };
+
 
     const tabs = [
         'IF',
@@ -90,20 +600,38 @@ const DripMarketing = () => {
         setCondition(prev => [...prev, {}]);
         setConditions(prev => [...prev, [{}]]);
         setConditionSelections(prev => [...prev, ['']]);
+        setConditionOperators(prev => [...prev, ['']]);
+        setConditionValues(prev => [...prev, ['']]);
         setSubConditionSelections(prev => [...prev, []]);
     }
 
     const handleAddThenCondition = () => {
-        setThenCondition(prev => [...prev, {}]);
+        // Add a new then condition with default values
+        setThenCondition(prev => [...prev, { activityType: '', values: [] }]);
         setThenConditions(prev => [...prev, [{}]]);
         setThenConditionSelections(prev => [...prev, ['']]);
         setThenSubConditionSelections(prev => [...prev, []]);
+    }
+
+    const handleRemoveThenCondition = (indexToRemove) => {
+        setThenCondition(prev => prev.filter((_, i) => i !== indexToRemove));
+        setThenConditions(prev => prev.filter((_, i) => i !== indexToRemove));
+        setThenConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
+        setThenSubConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
+    }
+
+    const handleThenConditionChange = (index, field, value) => {
+        setThenCondition(prev => prev.map((condition, i) =>
+            i === index ? { ...condition, [field]: value } : condition
+        ));
     }
 
     const handleRemoveCondition = (indexToRemove) => {
         setCondition(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditions(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
+        setConditionOperators(prev => prev.filter((_, i) => i !== indexToRemove));
+        setConditionValues(prev => prev.filter((_, i) => i !== indexToRemove));
         setSubConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
     };
 
@@ -115,6 +643,20 @@ const DripMarketing = () => {
             return next;
         });
         setSubConditionSelections(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            rows.push(['']);
+            next[blockIndex] = rows;
+            return next;
+        });
+        setSubConditionOperators(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            rows.push(['']);
+            next[blockIndex] = rows;
+            return next;
+        });
+        setSubConditionValues(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
             rows.push(['']);
@@ -145,10 +687,74 @@ const DripMarketing = () => {
             }
             return next;
         });
+        setSubConditionOperators(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            if (rows.length > subIndex) {
+                rows.splice(subIndex, 1);
+                next[blockIndex] = rows;
+            }
+            return next;
+        });
+        setSubConditionValues(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            if (rows.length > subIndex) {
+                rows.splice(subIndex, 1);
+                next[blockIndex] = rows;
+            }
+            return next;
+        });
     };
 
     const handleSelectChange = (blockIndex, selectIndex, value) => {
         setConditionSelections(prev => {
+            const next = [...prev];
+            const current = [...(next[blockIndex] || [''])];
+
+            current[selectIndex] = value;
+
+            const isLast = selectIndex === current.length - 1;
+            const canAddMore = current.length < 3;
+
+            if (isLast && value !== '' && canAddMore) {
+                current.push('');
+            }
+
+            // Trim trailing empties to keep only one empty tail
+            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
+                current.pop();
+            }
+
+
+            if (current.length === 0) {
+                current.push('');
+            }
+
+            next[blockIndex] = current;
+            return next;
+        });
+
+        // Clear subsequent dropdowns when Activity Type changes
+        setConditionOperators(prev => {
+            const next = [...prev];
+            next[blockIndex] = [''];
+            return next;
+        });
+        setConditionValues(prev => {
+            const next = [...prev];
+            next[blockIndex] = [''];
+            return next;
+        });
+
+        // If status is selected, fetch sub-statuses
+        if (selectIndex === 0 && value === 'status') {
+            // This will be handled when user selects a specific status value
+        }
+    };
+
+    const handleOperatorChange = (blockIndex, selectIndex, value) => {
+        setConditionOperators(prev => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
 
@@ -174,6 +780,81 @@ const DripMarketing = () => {
             next[blockIndex] = current;
             return next;
         });
+
+        // Clear Value dropdown when Operator changes
+        if (value === '') {
+            setConditionValues(prev => {
+                const next = [...prev];
+                next[blockIndex] = [''];
+                return next;
+            });
+        }
+    };
+
+    const handleValueChange = (blockIndex, selectIndex, value) => {
+        setConditionValues(prev => {
+            const next = [...prev];
+            const current = [...(next[blockIndex] || [''])];
+
+            // Handle both single values and arrays (for multiselect)
+            current[selectIndex] = value;
+
+            const isLast = selectIndex === current.length - 1;
+            const canAddMore = current.length < 3;
+
+            // For multiselect, check if it's an array and has values
+            const hasValue = Array.isArray(value) ? value.length > 0 : value !== '';
+
+            if (isLast && hasValue && canAddMore) {
+                current.push('');
+            }
+
+            // Trim trailing empties to keep only one empty tail
+            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
+                current.pop();
+            }
+
+            // Ensure at least one select exists
+            if (current.length === 0) {
+                current.push('');
+            }
+
+            next[blockIndex] = current;
+            return next;
+        });
+
+        // Check if this is a status value selection and fetch sub-statuses
+        const activityType = (conditionSelections[blockIndex] || [''])[0];
+        if (activityType === 'status' && value && !Array.isArray(value)) {
+            // If a specific status is selected, fetch its sub-statuses
+            fetchSubStatuses(value);
+        }
+        
+        // Check if this is a vertical value selection
+        if (activityType === 'vertical' && value) {
+            if (Array.isArray(value)) {
+                // Handle multiselect for vertical
+                if (value.includes('all') || value.length === 0) {
+                    // If "All Verticals" is selected or no selection, clear vertical selection and fetch all projects
+                    clearVerticalSelection();
+                } else if (value.length === 1) {
+                    // If only one vertical is selected, use that vertical
+                    handleVerticalChange(value[0]);
+                } else {
+                    // If multiple verticals are selected, clear selection and fetch all projects
+                    clearVerticalSelection();
+                }
+            } else {
+                // Handle single select for vertical
+                if (value === 'all') {
+                    // If "All Verticals" is selected, clear vertical selection and fetch all projects
+                    clearVerticalSelection();
+                } else {
+                    // If a specific vertical is selected, update vertical selection and fetch its projects
+                    handleVerticalChange(value);
+                }
+            }
+        }
     };
 
     const handleSubSelectChange = (blockIndex, rowIndex, selectIndex, value) => {
@@ -202,6 +883,124 @@ const DripMarketing = () => {
             next[blockIndex] = rows;
             return next;
         });
+
+        // Clear subsequent dropdowns when Activity Type changes (selectIndex 0)
+        if (selectIndex === 0) {
+            setSubConditionOperators(prev => {
+                const next = [...prev];
+                const rows = [...(next[blockIndex] || [])];
+                rows[rowIndex] = [''];
+                next[blockIndex] = rows;
+                return next;
+            });
+            setSubConditionValues(prev => {
+                const next = [...prev];
+                const rows = [...(next[blockIndex] || [])];
+                rows[rowIndex] = [''];
+                next[blockIndex] = rows;
+                return next;
+            });
+        }
+    };
+
+    const handleSubOperatorChange = (blockIndex, rowIndex, selectIndex, value) => {
+        setSubConditionOperators(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            const current = [...(rows[rowIndex] || [''])];
+
+            current[selectIndex] = value;
+
+            const isLast = selectIndex === current.length - 1;
+            const canAddMore = current.length < 3;
+            if (isLast && value !== '' && canAddMore) {
+                current.push('');
+            }
+
+            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
+                current.pop();
+            }
+
+            if (current.length === 0) {
+                current.push('');
+            }
+
+            rows[rowIndex] = current;
+            next[blockIndex] = rows;
+            return next;
+        });
+
+        // Clear Value dropdown when Operator changes
+        if (value === '') {
+            setSubConditionValues(prev => {
+                const next = [...prev];
+                const rows = [...(next[blockIndex] || [])];
+                rows[rowIndex] = [''];
+                next[blockIndex] = rows;
+                return next;
+            });
+        }
+    };
+
+    const handleSubValueChange = (blockIndex, rowIndex, selectIndex, value) => {
+        setSubConditionValues(prev => {
+            const next = [...prev];
+            const rows = [...(next[blockIndex] || [])];
+            const current = [...(rows[rowIndex] || [''])];
+
+            current[selectIndex] = value;
+
+            const isLast = selectIndex === current.length - 1;
+            const canAddMore = current.length < 3;
+            if (isLast && value !== '' && canAddMore) {
+                current.push('');
+            }
+
+            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
+                current.pop();
+            }
+
+            if (current.length === 0) {
+                current.push('');
+            }
+
+            rows[rowIndex] = current;
+            next[blockIndex] = rows;
+            return next;
+        });
+
+        // Check if this is a status value selection in sub-condition and fetch sub-statuses
+        const activityType = (subConditionSelections[blockIndex]?.[rowIndex] || [''])[0];
+        if (activityType === 'status' && value && !Array.isArray(value)) {
+            // If a specific status is selected, fetch its sub-statuses
+            fetchSubStatuses(value);
+        }
+        
+        // Check if this is a vertical value selection in sub-condition
+        if (activityType === 'vertical' && value) {
+            if (Array.isArray(value)) {
+                // Handle multiselect for vertical
+                if (value.includes('all') || value.length === 0) {
+                    // If "All Verticals" is selected or no selection, clear vertical selection and fetch all projects
+                    clearVerticalSelection();
+                } else if (value.length === 1) {
+                    // If only one vertical is selected, use that vertical
+                    handleVerticalChange(value[0]);
+                } else {
+                    // If multiple verticals are selected, clear selection and fetch all projects
+                    clearVerticalSelection();
+                }
+            } else {
+                // Handle single select for vertical
+                if (value === 'all') {
+                    // If "All Verticals" is selected, clear vertical selection and fetch all projects
+                    clearVerticalSelection();
+                } else {
+                    // If a specific vertical is selected, update vertical selection and fetch its projects
+                    handleVerticalChange(value);
+                }
+            }
+        }
     };
 
 
@@ -216,26 +1015,27 @@ const DripMarketing = () => {
                     </div>
                 </div>
                 <div className="col-6">
-                    <div className="input-group" style={{ maxWidth: '300px', float: 'right' }}>
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                            <i className="fas fa-search text-muted"></i>
-                        </span>
-                        <input
-                            type="text"
-                            name="name"
-                            className="form-control border-start-0 m-0"
-                            placeholder="Quick search..."
-
-                        />
-
-                        <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-
-                        >
-                            <i className="fas fa-times"></i>
-                        </button>
-
+                    <div className="d-flex gap-3 justify-content-end align-items-center">
+                        
+                        
+                        {/* Search Input */}
+                        <div className="input-group" style={{ maxWidth: '300px' }}>
+                            <span className="input-group-text bg-white border-end-0 input-height">
+                                <i className="fas fa-search text-muted"></i>
+                            </span>
+                            <input
+                                type="text"
+                                name="name"
+                                className="form-control border-start-0 m-0"
+                                placeholder="Quick search..."
+                            />
+                            <button
+                                className="btn btn-outline-secondary border-start-0"
+                                type="button"
+                            >
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -344,6 +1144,7 @@ const DripMarketing = () => {
                 </div>
             </div>
 
+           
 
             <div className="btn_add_segement">
                 <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => { setModalMode('add'); setIsEditing(false); setEditingId(null); }}><i className="fa-solid fa-plus"></i></a>
@@ -362,10 +1163,10 @@ const DripMarketing = () => {
                                     <div className="col-12">
                                         <p className='ruleInfo'>{modalMode === 'edit' ? 'Do you want to update the rule?' : 'A new rule can be added using this dialog, you need to select Rules and actions to be performed based on the Rules'}</p>
                                         <div className="row">
-                                            <div className="col-6">
+                                            <div className="col-md-6 col-12">
                                                 <input type="text" name='ruleName' placeholder='Name of the Rule' />
                                             </div>
-                                            <div className="col-6">
+                                            <div className="col-md-6 col-12">
                                                 <div className="row">
                                                     <div className="col-6">
                                                         <div className="datePickerSection">
@@ -381,7 +1182,7 @@ const DripMarketing = () => {
                                                     <div className="col-6">
                                                         <div className="timePickerSection">
                                                             <input
-                                                            name="startTime"
+                                                                name="startTime"
                                                                 type="time"
                                                                 className={`form-control border-0 bgcolor`}
                                                                 id="actionTime"
@@ -446,7 +1247,14 @@ const DripMarketing = () => {
                                                     {condition.map((_, index) => (
                                                         <React.Fragment key={index}>
                                                             {index > 0 && (
-                                                                <div className='mb-2'>
+                                                                <div className='mb-2' style={{
+                                                                    backgroundColor: '#ff6b35',
+                                                                    color: '#fff',
+                                                                    display: 'inline',
+                                                                    padding: '5px 10px',
+                                                                    fontSize: '14px'
+                                                                  }}
+                                                                  >
                                                                     {logicOperator}
                                                                 </div>
                                                             )}
@@ -478,15 +1286,90 @@ const DripMarketing = () => {
                                                                 <div className="row mb-3 pb-3">
                                                                     <div className="col-10">
                                                                         <div className="row">
-                                                                            {(conditionSelections[index] || ['']).map((val, selIdx) => (
-                                                                                <div className="col-4" key={`sel-${index}-${selIdx}`}>
-                                                                                    <select value={val} onChange={(e) => handleSelectChange(index, selIdx, e.target.value)}>
-                                                                                        <option value="">Select...</option>
-                                                                                        <option value="1">1</option>
-                                                                                        <option value="2">2</option>
+                                                                            {/* Activity Type Dropdown - Always visible */}
+                                                                            <div className="col-4">
+                                                                                <select
+                                                                                    className='form-select'
+                                                                                    value={(conditionSelections[index] || [''])[0] || ''}
+                                                                                    onChange={(e) => handleSelectChange(index, 0, e.target.value)}
+                                                                                >
+                                                                                    <option value="">Activity type</option>
+                                                                                    <option value="campaign">Campaign</option>
+                                                                                    <option value="channels">Channels</option>
+                                                                                    <option value="city">City</option>
+                                                                                    <option value="state">State</option>
+                                                                                    <option value="status">Status</option>
+                                                                                    <option value="subStatus">Sub Status</option>
+                                                                                    <option value="leadOwner">Lead Owner</option>
+                                                                                    <option value="registeredBy">Registered By</option>
+                                                                                    <option value="courseName">Course Name</option>
+                                                                                    <option value="jobName">Job Name</option>
+                                                                                    <option value="email">Email</option>
+                                                                                    <option value="mobile">Mobile</option>
+                                                                                    <option value="createdDate">Created Date</option>
+                                                                                    <option value="modificationDate">Modification Date</option>
+                                                                                    <option value="project">Project</option>
+                                                                                    <option value="vertical">Vertical</option>
+                                                                                    <option value="batch">Batch</option>
+                                                                                </select>
+                                                                            </div>
+
+                                                                            {/* Operator Dropdown - Only show if Activity Type is selected */}
+                                                                            {(conditionSelections[index] || [''])[0] && (
+                                                                                <div className="col-4">
+                                                                                    <select
+                                                                                        className='form-select'
+                                                                                        value={(conditionOperators[index] || [''])[0] || ''}
+                                                                                        onChange={(e) => handleOperatorChange(index, 0, e.target.value)}
+                                                                                    >
+                                                                                        <option value="">Select Operator</option>
+                                                                                        <option value="equals">Equals</option>
+                                                                                        <option value="not_equals">Not Equals</option>
                                                                                     </select>
                                                                                 </div>
-                                                                            ))}
+                                                                            )}
+
+                                                                            {/* Value Dropdown - Only show if Operator is selected */}
+                                                                            {(conditionOperators[index] || [''])[0] && (conditionSelections[index] || [''])[0] && (
+                                                                                <div className="col-4">
+                                                                                    {(() => {
+                                                                                        const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
+                                                                                        const activityType = (conditionSelections[index] || [''])[0] || '';
+                                                                                        const isMultiselect = multiValues.includes('all')
+                                                                                            ? true
+                                                                                            : multiValues.includes(activityType);
+                                                                                        const valueOptions = getValueOptions(activityType);
+                                                                                        const currentValue = (conditionValues[index] || [''])[0] || '';
+
+                                                                                        if (isMultiselect) {
+                                                                                            return (
+                                                                                                <MultiselectDropdown
+                                                                                                    options={valueOptions}
+                                                                                                    value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
+                                                                                                    onChange={(values) => handleValueChange(index, 0, values)}
+                                                                                                    placeholder="Select values"
+                                                                                                    
+                                                                                                />
+                                                                                            );
+                                                                                        } else {
+                                                                                            return (
+                                                                                                <select
+                                                                                                    className='form-select'
+                                                                                                    value={Array.isArray(currentValue) ? '' : currentValue}
+                                                                                                    onChange={(e) => handleValueChange(index, 0, e.target.value)}
+                                                                                                >
+                                                                                                    <option value="">Select value</option>
+                                                                                                    {valueOptions.map((option) => (
+                                                                                                        <option key={option.value} value={option.value}>
+                                                                                                            {option.label}
+                                                                                                        </option>
+                                                                                                    ))}
+                                                                                                </select>
+                                                                                            );
+                                                                                        }
+                                                                                    })()}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                     <div className="col-2">
@@ -505,28 +1388,117 @@ const DripMarketing = () => {
 
 
 
-                                                                {(subConditionSelections[index]?.length || 0) > 0 && (conditions[index] || []).slice(1).map((_, subIdx) => (
-
-                                                                    <>
-
-                                                                        {
-                                                                            <div className="mb-2">
+                                                                {(conditions[index] || []).length > 1 && (conditions[index] || []).slice(1).map((_, subIdx) => (
+                                                                    <div key={`sub-${index}-${subIdx}`}>
+                                                                        {/* AND/OR Logic Button */}
+                                                                        <div className="mb-2">
+                                                                            <button 
+                                                                                className="btn btn-sm me-2"
+                                                                                style={{
+                                                                                    backgroundColor: '#ff6b35',
+                                                                                    color: '#fff',
+                                                                                    border: 'none',
+                                                                                    padding: '5px 10px',
+                                                                                    fontSize: '14px',
+                                                                                    borderRadius: '4px'
+                                                                                }}
+                                                                                onClick={() => {
+                                                                                    // Toggle between 'and' and 'or'
+                                                                                    const newOperator = subLogicOperator === 'and' ? 'or' : 'and';
+                                                                                    setSubLogicOperator(newOperator);
+                                                                                }}
+                                                                            >
                                                                                 {subLogicOperator}
-                                                                            </div>
-                                                                        }
-                                                                        <div className="row mb-3 pb-3" key={`sub-${index}-${subIdx}`}>
+                                                                            </button>
+                                                                        </div>
+
+                                                                        {/* Sub-condition Row */}
+                                                                        <div className="row mb-3 pb-3">
                                                                             <div className="col-10">
                                                                                 <div className="row">
-                                                                                    {(subConditionSelections[index]?.[subIdx] || ['']).map((val, selIdx) => (
-                                                                                        <div className="col-4" key={`subsel-${index}-${subIdx}-${selIdx}`}>
-                                                                                            <select value={val} onChange={(e) => handleSubSelectChange(index, subIdx, selIdx, e.target.value)}>
-                                                                                                <option value="">Select...</option>
-                                                                                                <option value="1">1</option>
-                                                                                                <option value="2">2</option>
-                                                                                                <option value="3">3</option>
+                                                                                    {/* Sub-condition Activity Type Dropdown - Always visible */}
+                                                                                    <div className="col-4">
+                                                                                        <select
+                                                                                            className='form-select'
+                                                                                            value={(subConditionSelections[index]?.[subIdx] || [''])[0] || ''}
+                                                                                            onChange={(e) => handleSubSelectChange(index, subIdx, 0, e.target.value)}
+                                                                                        >
+                                                                                            <option value="">Activity type</option>
+                                                                                            <option value="campaign">Campaign</option>
+                                                                                            <option value="channels">Channels</option>
+                                                                                            <option value="city">City</option>
+                                                                                            <option value="state">State</option>
+                                                                                            <option value="status">Status</option>
+                                                                                            <option value="subStatus">Sub Status</option>
+                                                                                            <option value="leadOwner">Lead Owner</option>
+                                                                                            <option value="registeredBy">Registered By</option>
+                                                                                            <option value="courseName">Course Name</option>
+                                                                                            <option value="jobName">Job Name</option>
+                                                                                            <option value="email">Email</option>
+                                                                                            <option value="mobile">Mobile</option>
+                                                                                            <option value="createdDate">Created Date</option>
+                                                                                            <option value="modificationDate">Modification Date</option>
+                                                                                            <option value="project">Project</option>
+                                                                                            <option value="vertical">Vertical</option>
+                                                                                            <option value="batch">Batch</option>
+                                                                                        </select>
+                                                                                    </div>
+
+                                                                                    {/* Sub-condition Operator Dropdown - Only show if Activity Type is selected */}
+                                                                                    {(subConditionSelections[index]?.[subIdx] || [''])[0] && (
+                                                                                        <div className="col-4">
+                                                                                            <select
+                                                                                                className='form-select'
+                                                                                                value={(subConditionOperators[index]?.[subIdx] || [''])[0] || ''}
+                                                                                                onChange={(e) => handleSubOperatorChange(index, subIdx, 0, e.target.value)}
+                                                                                            >
+                                                                                                <option value="">Select Operator</option>
+                                                                                                <option value="equals">Equals</option>
+                                                                                                <option value="not_equals">Not Equals</option>
                                                                                             </select>
                                                                                         </div>
-                                                                                    ))}
+                                                                                    )}
+
+                                                                                    {/* Sub-condition Value Dropdown - Only show if Operator is selected */}
+                                                                                    {(subConditionOperators[index]?.[subIdx] || [''])[0] && (subConditionSelections[index]?.[subIdx] || [''])[0] && (
+                                                                                        <div className="col-4">
+                                                                                            {(() => {
+                                                                                                const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
+                                                                                                const activityType = (subConditionSelections[index]?.[subIdx] || [''])[0] || '';
+                                                                                                const isMultiselect = multiValues.includes('all')
+                                                                                                    ? true
+                                                                                                    : multiValues.includes(activityType);
+                                                                                                const valueOptions = getValueOptions(activityType);
+                                                                                                const currentValue = (subConditionValues[index]?.[subIdx] || [''])[0] || '';
+
+                                                                                                if (isMultiselect) {
+                                                                                                    return (
+                                                                                                        <MultiselectDropdown
+                                                                                                            options={valueOptions}
+                                                                                                            value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
+                                                                                                            onChange={(values) => handleSubValueChange(index, subIdx, 0, values)}
+                                                                                                            placeholder="Select values"
+                                                                                                        />
+                                                                                                    );
+                                                                                                } else {
+                                                                                                    return (
+                                                                                                        <select
+                                                                                                            className='form-select'
+                                                                                                            value={Array.isArray(currentValue) ? '' : currentValue}
+                                                                                                            onChange={(e) => handleSubValueChange(index, subIdx, 0, e.target.value)}
+                                                                                                        >
+                                                                                                            <option value="">Select value</option>
+                                                                                                            {valueOptions.map((option) => (
+                                                                                                                <option key={option.value} value={option.value}>
+                                                                                                                    {option.label}
+                                                                                                                </option>
+                                                                                                            ))}
+                                                                                                        </select>
+                                                                                                    );
+                                                                                                }
+                                                                                            })()}
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                             <div className="col-2">
@@ -540,7 +1512,7 @@ const DripMarketing = () => {
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                    </>
+                                                                    </div>
                                                                 ))}
                                                             </div>
 
@@ -562,51 +1534,114 @@ const DripMarketing = () => {
                                                             <div className="row my-3 border p-3">
                                                                 <div className="col-10">
                                                                     <div className="row">
+
+
+
                                                                         <div className="col-4">
-                                                                            <select value={thenFirst} onChange={(e) => setThenFirst(e.target.value)}>
-                                                                                <option value="">Select...</option>
-                                                                                <option value="1">1</option>
-                                                                                <option value="2">2</option>
+                                                                            <select className='form-select' value={thenFirst} onChange={(e) => {
+                                                                                setThenFirst(e.target.value);
+                                                                                setThenShouldBe([]); // Clear multiselect when activity type changes
+                                                                            }}>
+                                                                                <option value="">Activity Type</option>
+                                                                                <option value="campaign">Campaign</option>
+                                                                                <option value="channel">Channel</option>
                                                                             </select>
                                                                         </div>
                                                                         {thenFirst !== '' && (
-                                                                            <div className="col-4">
-                                                                                <label className="me-2">Should be</label>
-                                                                                <select value={thenShouldBe} onChange={(e) => setThenShouldBe(e.target.value)}>
-                                                                                    <option value="">Select...</option>
-                                                                                    <option value="1">1</option>
-                                                                                    <option value="2">2</option>
-                                                                                </select>
+                                                                            <div className="col-6">
+                                                                                <div className="d-flex align-items-center">
+                                                                                    <label className="me-2">Should be</label>
+                                                                                    <div className="flex-grow-1">
+                                                                                        <MultiselectDropdown
+                                                                                            options={getThenValueOptions(thenFirst)}
+                                                                                            value={Array.isArray(thenShouldBe) ? thenShouldBe : (thenShouldBe ? [thenShouldBe] : [])}
+                                                                                            onChange={(values) => setThenShouldBe(values)}
+                                                                                            placeholder="Select options"
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
                                                                             </div>
                                                                         )}
                                                                     </div>
 
                                                                 </div>
                                                                 <div className="col-2">
-                                                                    <button onClick={() => handleAddThenCondition()}><i className="fa-solid fa-plus"></i></button>
+                                                                    <div className='d-flex gap-2'>
+                                                                        <button
+                                                                            onClick={() => handleAddThenCondition()}
+                                                                            className="btn btn-outline-success btn-sm"
+                                                                            title="Add new condition"
+                                                                        >
+                                                                            <i className="fa-solid fa-plus"></i>
+                                                                        </button>
+
+                                                                        {/* <button
+                                                                            onClick={() => handleRemoveThenCondition(index)}
+                                                                            className="btn btn-outline-danger btn-sm"
+                                                                            title="Remove condition"
+                                                                        >
+                                                                            <i className="fa-solid fa-trash"></i>
+                                                                        </button> */}
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
-                                                            {
-                                                                thenCondition.map((_, index) => (
-                                                                    <div className="row my-3 border p-3" key={`then-${index}`}>
-                                                                        <div className="col-10">
-                                                                            <div className="row">
-                                                                                <div className="col-4">
-                                                                                    <select value={thenCondition[index]} onChange={(e) => setThenCondition(index, e.target.value)}>
-                                                                                        <option value="">Select...</option>
-                                                                                        <option value="1">1</option>
-                                                                                        <option value="2">2</option>
-                                                                                    </select>
-                                                                                </div>
+                                                            {thenCondition.map((condition, index) => (
+                                                                <div className="row my-3 border p-3" key={`then-${index}`}>
+                                                                    <div className="col-10">
+                                                                        <div className="row">
+                                                                            <div className="col-4">
+                                                                                <select
+                                                                                    className='form-select'
+                                                                                    value={condition.activityType || ''}
+                                                                                    onChange={(e) => {
+                                                                                        handleThenConditionChange(index, 'activityType', e.target.value);
+                                                                                        handleThenConditionChange(index, 'values', []); // Clear values when activity type changes
+                                                                                    }}
+                                                                                >
+                                                                                    <option value="">Activity Type</option>
+                                                                                    <option value="campaign">Campaign</option>
+                                                                                    <option value="channel">Channel</option>
+                                                                                </select>
                                                                             </div>
-                                                                        </div>
-                                                                        <div className="col-2">
-                                                                            <button onClick={() => handleAddThenCondition()}><i className="fa-solid fa-plus"></i></button>
+                                                                            {condition.activityType && (
+                                                                                <div className="col-6">
+                                                                                    <div className="d-flex align-items-center">
+                                                                                        <label className="me-2">Should be</label>
+                                                                                        <div className="flex-grow-1">
+                                                                                            <MultiselectDropdown
+                                                                                                options={getThenValueOptions(condition.activityType)}
+                                                                                                value={Array.isArray(condition.values) ? condition.values : (condition.values ? [condition.values] : [])}
+                                                                                                onChange={(values) => handleThenConditionChange(index, 'values', values)}
+                                                                                                placeholder="Select options"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     </div>
-                                                                ))
-                                                            }
+                                                                    <div className="col-2">
+                                                                        <div className='d-flex gap-2'>
+                                                                            <button
+                                                                                onClick={() => handleAddThenCondition()}
+                                                                                className="btn btn-outline-success btn-sm"
+                                                                                title="Add new condition"
+                                                                            >
+                                                                                <i className="fa-solid fa-plus"></i>
+                                                                            </button>
+
+                                                                            <button
+                                                                                onClick={() => handleRemoveThenCondition(index)}
+                                                                                className="btn btn-outline-danger btn-sm"
+                                                                                title="Remove condition"
+                                                                            >
+                                                                                <i className="fa-solid fa-trash"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
 
                                                             <div className="toggle-container-then my-3" id="toggleButtonthen">
 
@@ -619,7 +1654,7 @@ const DripMarketing = () => {
 
                                                                         <>
                                                                             <div className="col-4">
-                                                                                <select
+                                                                                <select className='form-select'
                                                                                     value={thenExecType}
                                                                                     onChange={(e) => {
                                                                                         const v = e.target.value;
@@ -637,9 +1672,9 @@ const DripMarketing = () => {
                                                                             </div>
                                                                             {thenExecType === 'immediate' && (
                                                                                 <div className="col-4">
-                                                                                    <select value={thenMode} onChange={(e) => setThenMode(e.target.value)}>
+                                                                                    <select className='form-select' value={thenMode} onChange={(e) => setThenMode(e.target.value)}>
                                                                                         <option value="">Select Communication Mode</option>
-                                                                                        <option value="sms">SMS</option>
+                                                                                        {/* <option value="sms">SMS</option> */}
                                                                                         <option value="email">Email</option>
                                                                                         <option value="whatsapp">Whatapp</option>
                                                                                     </select>
@@ -1158,19 +2193,252 @@ flex-wrap: nowrap;
 
 }
 
+/* Mobile Responsive Styles */
 @media (max-width: 768px) {
+
+    
+    .input-group {
+        max-width: 100% !important;
+        float: none !important;
+    }
+    
+    /* Table responsive */
+    table {
+        font-size: 12px;
+        overflow-x: auto;
+        display: block;
+        white-space: nowrap;
+    }
+    
+    table thead,
+    table tbody,
+    table tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+    
+    table td {
+        padding: 8px 6px !important;
+        font-size: 11px;
+        word-wrap: break-word;
+        white-space: normal;
+    }
+    
+    table td:first-child {
+        width: 40% !important;
+    }
+    
+    table td:nth-child(2) {
+        width: 20% !important;
+    }
+    
+    table td:nth-child(3),
+    table td:nth-child(4) {
+        width: 15% !important;
+    }
+    
+    table td:nth-child(5) {
+        width: 10% !important;
+    }
+    
+    /* Floating add button */
+    .btn_add_segement {
+        position: fixed !important;
+        bottom: 20px !important;
+        right: 20px !important;
+        width: 50px !important;
+        height: 50px !important;
+        z-index: 1000;
+    }
+    
+    /* Modal responsive */
     #staticBackdropRuleModel .modal-dialog {
-        width: 95%;
-        margin: 1rem auto;
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 1rem auto !important;
     }
     
     #staticBackdropRuleModel .modal-body {
-        padding: 20px;
+        padding: 15px !important;
     }
     
     #staticBackdropRuleModel .modal-header,
     #staticBackdropRuleModel .modal-footer {
-        padding: 15px 20px;
+        padding: 15px !important;
+    }
+    
+    /* Form inputs mobile */
+    #staticBackdropRuleModel input[type="text"] {
+        font-size: 14px;
+        padding: 10px 12px;
+        height: 38px;
+    }
+    
+    /* Date and time picker mobile */
+    #staticBackdropRuleModel .datePickerSection,
+    #staticBackdropRuleModel .timePickerSection {
+        margin-bottom: 10px;
+    }
+    
+    #staticBackdropRuleModel .datePickerSection .react-date-picker,
+    #staticBackdropRuleModel input[type="time"] {
+        height: 38px;
+        font-size: 14px;
+    }
+    
+    /* Tab navigation mobile */
+    #staticBackdropRuleModel .nav-tabs .nav-link {
+        padding: 12px 20px;
+        font-size: 14px;
+    }
+    
+    /* Tab content mobile */
+    #staticBackdropRuleModel .tab-content {
+        padding: 15px;
+    }
+    
+    /* IF/THEN blocks mobile */
+    #staticBackdropRuleModel .ifBlock {
+        padding: 15px;
+        margin-top: 15px;
+    }
+    
+    /* Form rows mobile */
+    #staticBackdropRuleModel .row {
+        margin-left: -8px;
+        margin-right: -8px;
+    }
+    
+    #staticBackdropRuleModel .row > [class*="col-"] {
+        padding-left: 8px;
+        padding-right: 8px;
+        margin-bottom: 10px;
+    }
+    
+    /* Select dropdowns mobile */
+    #staticBackdropRuleModel .form-select {
+        font-size: 14px;
+        padding: 8px 12px;
+        height: 38px;
+    }
+    
+    /* Buttons mobile */
+    #staticBackdropRuleModel .tab-pane button {
+        padding: 8px 15px;
+        font-size: 13px;
+    }
+    
+    #staticBackdropRuleModel .addMore button {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+    
+    /* Toggle switches mobile */
+    .toggle-container,
+    .toggle-container-then {
+        font-size: 12px;
+        margin-left:30px;
+    }
+    
+    .toggle-option {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    /* Multiselect dropdown mobile */
+    .multiselect-dropdown .form-select {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    .multiselect-options {
+        max-height: 150px;
+        font-size: 14px;
+    }
+    
+    .multiselect-option {
+        padding: 8px 12px !important;
+        font-size: 13px;
+    }
+    
+    /* Modal footer buttons mobile */
+    #staticBackdropRuleModel .modal-footer .btn {
+        padding: 8px 20px;
+        font-size: 14px;
+    }
+    
+    /* THEN section mobile adjustments */
+    #staticBackdropRuleModel .thenBlock .row {
+        margin-bottom: 15px;
+    }
+    
+    #staticBackdropRuleModel .thenBlock .border {
+        padding: 15px !important;
+    }
+    
+    /* Logic operator badges mobile */
+    .mb-2[style*="background-color: #ff6b35"] {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+    }
+    
+    /* Search input mobile */
+    .input-group-text {
+        padding: 8px 12px;
+    }
+    
+    .input-group input {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    /* Title mobile */
+    .display-5 {
+        font-size: 1.5rem !important;
+    }
+}
+
+/* Extra small devices (phones, 480px and down) */
+@media (max-width: 480px) {
+   
+    table td {
+        padding: 6px 4px !important;
+        font-size: 10px;
+    }
+    
+    .display-5 {
+        font-size: 1.3rem !important;
+    }
+    
+    #staticBackdropRuleModel .modal-dialog {
+        width: 98% !important;
+        margin: 0.5rem auto !important;
+    }
+    
+    #staticBackdropRuleModel .modal-body {
+        padding: 10px !important;
+    }
+    
+    #staticBackdropRuleModel .nav-tabs .nav-link {
+        padding: 10px 15px;
+        font-size: 13px;
+    }
+    
+    #staticBackdropRuleModel .tab-content {
+        padding: 10px;
+    }
+    
+    #staticBackdropRuleModel .ifBlock {
+        padding: 10px;
+    }
+    
+    .btn_add_segement {
+        width: 45px !important;
+        height: 45px !important;
+        bottom: 15px !important;
+        right: 15px !important;
     }
 }
 

@@ -688,6 +688,14 @@ const CRMDashboard = () => {
   // Refs
   const addressInputRef = useRef(null);
 
+  // 1. State
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+  const [sources, setSources] = useState([]);
+
   // Google Maps initialization
 
 
@@ -701,6 +709,29 @@ const CRMDashboard = () => {
       console.log('candidateRef.current is null - this is the problem!');
     }
   };
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
 
 
   const handleSaveCV = async () => {
@@ -803,13 +834,7 @@ const CRMDashboard = () => {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
-  // 1. State
-  const [verticalOptions, setVerticalOptions] = useState([]);
-  const [projectOptions, setProjectOptions] = useState([]);
-  const [courseOptions, setCourseOptions] = useState([]);
-  const [centerOptions, setCenterOptions] = useState([]);
-  const [counselorOptions, setCounselorOptions] = useState([]);
-  const [sources, setSources] = useState([]);
+
   // Fetch filter options from backend API on mount
   useEffect(() => {
     const initMap = () => {
@@ -905,28 +930,7 @@ const CRMDashboard = () => {
   useEffect(() => {
     console.log('CandidateRef current changed:', candidateRef.current);
   }, [candidateRef.current]);
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
-        }
-      } catch (err) {
-        console.error('Failed to fetch filter options:', err);
-      }
-    };
-    fetchFilterOptions();
-  }, []);
+
 
   useEffect(() => {
     console.log(counselorOptions, 'counselorOptions')
@@ -1022,7 +1026,7 @@ const CRMDashboard = () => {
       console.log('response', response)
 
       if (response.data.status) {
-
+        fetchLeadDetails()
         alert('Document uploaded successfully! Status: Pending Review');
 
         // Optionally refresh data here
@@ -2764,44 +2768,45 @@ const CRMDashboard = () => {
   };
 
   useEffect(() => {
-    const fetchLeadDetails = async () => {
-      if (leadDetailsVisible === null || leadDetailsVisible === undefined) {
-        return;
-      }
-      try {
-        setIsLoadingProfilesData(true);
-        const leadId = allProfiles[leadDetailsVisible]._id;
-        console.log('leadId', leadId)
-        const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
-          headers: { 'x-auth': token }
-        });
-        console.log("leadDetailsVisible", response)
-
-        if (response.data.success && response.data.data) {
-          const data = response.data;
-          console.log('data', data)
-
-
-          // Sirf ek state me data set karo - paginated data
-          if (!isLoadingProfiles) {
-            allProfiles[leadDetailsVisible] = data.data;
-          }
-
-
-        } else {
-          console.error('Failed to fetch profile data', response.data.message);
-        }
-      }
-      catch (error) {
-        console.error('Error fetching profile data:', error);
-      }
-      finally {
-        setIsLoadingProfilesData(false);
-      }
-    }
+    
     fetchLeadDetails();
   }, [leadDetailsVisible]);
 
+  const fetchLeadDetails = async () => {
+    if (leadDetailsVisible === null || leadDetailsVisible === undefined) {
+      return;
+    }
+    try {
+      setIsLoadingProfilesData(true);
+      const leadId = allProfiles[leadDetailsVisible]._id;
+      console.log('leadId', leadId)
+      const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("leadDetailsVisible", response)
+
+      if (response.data.success && response.data.data) {
+        const data = response.data;
+        console.log('data', data)
+
+
+        // Sirf ek state me data set karo - paginated data
+        if (!isLoadingProfiles) {
+          allProfiles[leadDetailsVisible] = data.data;
+        }
+
+
+      } else {
+        console.error('Failed to fetch profile data', response.data.message);
+      }
+    }
+    catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+    finally {
+      setIsLoadingProfilesData(false);
+    }
+  }
   const fetchJobs = async () => {
     const response = await axios.get(`${backendUrl}/college/appliedJobs`, {
       headers: { 'x-auth': token }

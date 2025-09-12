@@ -1388,3 +1388,278 @@ const WhatsAppTemplate = () => {
 };
 
 export default WhatsAppTemplate;
+
+// Media Query CSS for Mobile Responsiveness
+const mobileStyles = `
+  @media (max-width: 768px) {
+    .container-fluid {
+      padding: 0.5rem !important;
+    }
+    
+    /* Header adjustments */
+    .d-flex.justify-content-between {
+      flex-direction: column !important;
+      gap: 1rem;
+    }
+    
+    .d-flex.align-items-center {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    /* Search input responsive */
+    .input-group {
+      width: 100% !important;
+      max-width: 100%;
+    }
+    
+    /* Table responsive */
+    .table-responsive {
+      font-size: 0.875rem;
+    }
+    
+    .table th,
+    .table td {
+      padding: 0.5rem 0.25rem !important;
+      font-size: 0.75rem;
+    }
+    
+    /* Action buttons in table */
+    .d-flex.gap-2 {
+      flex-direction: column;
+      gap: 0.25rem !important;
+    }
+    
+    .btn-sm {
+      width: 100% !important;
+      height: 28px !important;
+      font-size: 12px;
+    }
+    
+    /* Enterprise Template Layout */
+    .row.g-0 .col-3,
+    .row.g-0 .col-6 {
+      width: 100% !important;
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Stack columns vertically on mobile */
+    .row.g-0 {
+      flex-direction: column !important;
+    }
+    
+    /* Basic Fields Section */
+    .col-3[style*="background-color: #f5f5f5"] {
+      border-right: none !important;
+      border-bottom: 1px solid #e0e0e0 !important;
+      margin-bottom: 1rem;
+    }
+    
+    /* Template Section */
+    .col-6[style*="background-color: white"] {
+      border-right: none !important;
+      border-bottom: 1px solid #e0e0e0 !important;
+      margin-bottom: 1rem;
+    }
+    
+    /* Preview Section */
+    .col-3[style*="background-color: #f5f5f5"]:last-child {
+      border-bottom: none !important;
+    }
+    
+    /* Form controls responsive */
+    .form-control,
+    .form-select {
+      font-size: 0.875rem;
+    }
+    
+    /* Dropdown positioning */
+    .position-absolute {
+      position: relative !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      right: auto !important;
+      left: auto !important;
+      top: auto !important;
+      margin-top: 0.5rem;
+    }
+    
+    /* Token dropdown */
+    .position-absolute[style*="minWidth: 300px"] {
+      min-width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Textarea responsive */
+    textarea {
+      min-height: 120px !important;
+    }
+    
+    /* Button groups responsive */
+    .d-flex.gap-2:not(.table .d-flex.gap-2) {
+      flex-wrap: wrap;
+      gap: 0.5rem !important;
+    }
+    
+    /* Call to Action fields */
+    .row .col-md-6 {
+      width: 100% !important;
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Quick Reply buttons */
+    .btn-outline-primary.btn-sm {
+      width: 100% !important;
+    }
+    
+    /* Action buttons at bottom */
+    .d-flex.justify-content-between:last-child {
+      flex-direction: column !important;
+      gap: 1rem;
+    }
+    
+    .d-flex.gap-2:last-child {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .btn.px-4 {
+      width: 100% !important;
+      padding: 0.75rem 1rem !important;
+    }
+    
+    /* Header buttons responsive */
+    .btn-outline-primary,
+    .btn-outline-warning,
+    .btn-outline-success {
+      padding: 0.5rem !important;
+      font-size: 0.875rem;
+    }
+    
+    /* Dropdown menu responsive */
+    .dropdown-menu {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Badge responsive */
+    .badge {
+      font-size: 0.7rem !important;
+      padding: 0.25rem 0.5rem !important;
+    }
+    
+    /* Small text responsive */
+    small {
+      font-size: 0.75rem;
+    }
+    
+    /* Form labels */
+    .form-label {
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    /* Card responsive */
+    .card {
+      margin: 0 !important;
+      border-radius: 8px !important;
+    }
+    
+    /* Preview section adjustments */
+    .bg-white.rounded.p-3.shadow-sm {
+      padding: 1rem !important;
+    }
+    
+    /* Emoji buttons responsive */
+    .btn[style*="width: 32px"] {
+      width: 28px !important;
+      height: 28px !important;
+      font-size: 12px !important;
+    }
+    
+    .btn[style*="width: 36px"] {
+      width: 32px !important;
+      height: 28px !important;
+      font-size: 10px !important;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    /* Extra small devices */
+    .container-fluid {
+      padding: 0.25rem !important;
+    }
+    
+    .p-4 {
+      padding: 1rem !important;
+    }
+    
+    .p-3 {
+      padding: 0.75rem !important;
+    }
+    
+    .mb-4 {
+      margin-bottom: 1rem !important;
+    }
+    
+    .mb-3 {
+      margin-bottom: 0.75rem !important;
+    }
+    
+    /* Table font size smaller */
+    .table th,
+    .table td {
+      font-size: 0.7rem !important;
+      padding: 0.25rem !important;
+    }
+    
+    /* Hide less important columns on very small screens */
+    .table th:nth-child(2),
+    .table td:nth-child(2) {
+      display: none;
+    }
+    
+    /* Form controls smaller */
+    .form-control,
+    .form-select {
+      font-size: 0.8rem;
+      padding: 0.5rem;
+    }
+    
+    /* Buttons smaller */
+    .btn {
+      font-size: 0.8rem;
+      padding: 0.5rem 0.75rem;
+    }
+    
+    /* Textarea smaller */
+    textarea {
+      min-height: 100px !important;
+      font-size: 0.8rem;
+    }
+    
+    /* Headers smaller */
+    h5 {
+      font-size: 1.1rem;
+    }
+    
+    h6 {
+      font-size: 1rem;
+    }
+    
+    /* Icons smaller */
+    .fs-4 {
+      font-size: 1.5rem !important;
+    }
+  }
+`;
+
+// Inject styles into the document
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = mobileStyles;
+  document.head.appendChild(styleSheet);
+}
