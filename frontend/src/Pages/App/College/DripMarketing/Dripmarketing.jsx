@@ -76,7 +76,8 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
 
             {isOpen && (
                 <div className="multiselect-options position-absolute w-100 bg-white border rounded shadow" style={{ zIndex: 10, top: '100%' }}>
-                    {options.map((option) => (
+                    {options?.length > 0 &&
+                    options?.map((option) => (
                         <div
                             key={option.value}
                             className="multiselect-option p-2 d-flex align-items-center"
@@ -123,19 +124,22 @@ const DripMarketing = () => {
     const [selectedProject, setSelectedProject] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
-
-
+    const [centers, setCenters] = useState([]);
+    const [courseName, setCourseName] = useState([]);
+    const [batches, setBatches] = useState([]);
+    const [leadOwner, setLeadOwner] = useState([]);
+    const [registeredBy, setRegisteredBy] = useState([]);
+    const [jobName , setJobName] = useState([]);
 
     useEffect(() => {
         fetchRules();
         fetchStatuses();
+        fetchCourses();
+        fetchBatches();
+        fetchleadOwnwer();
+        fetchJobData();
     }, []);
 
-    // Clear sub-statuses when statuses change
-    useEffect(() => {
-        setSubStatuses([]);
-        setSelectedSubStatus('');
-    }, [statuses]);
 
     useEffect(() => {
         fetchVerticals();
@@ -183,28 +187,22 @@ const DripMarketing = () => {
         }
     }, [verticals, token]);
 
-
+useEffect(()=>{
+    fetchCenters();
+},[])
     const handleVerticalChange = (verticalId) => {
-        console.log('handleVerticalChange called with verticalId:', verticalId);
-        
+      
         const selectedVertical = verticals.find(v => v.id === verticalId);
         setSelectedVertical(selectedVertical);
-        
-        // Clear current projects and fetch new ones for the selected vertical
-        setProjects([]);
-        if (verticalId) {
-            fetchProjects(verticalId);
-        } else {
-            // If no vertical selected, fetch all projects
-            fetchProjects();
-        }
+       
     };
 
     // Function to clear vertical selection and fetch all projects
     const clearVerticalSelection = () => {
         setSelectedVertical(null);
         setProjects([]);
-        fetchProjects(); // Fetch all projects
+        fetchProjects();
+        setCenters([]); 
     };
 
     
@@ -245,7 +243,6 @@ const DripMarketing = () => {
         // Use the passed parameter or fall back to selectedVertical
         let verticalId = selectedVerticalId || selectedVertical?.id;
         
-        console.log('Using verticalId:', verticalId);
         
         if (!token) {
             console.warn('No authentication token available');
@@ -257,15 +254,16 @@ const DripMarketing = () => {
         setError(null);
     
         try {
-            let url = `${backendUrl}/college/dripmarketing/list-projects`;
+            // let url = `${backendUrl}/college/dripmarketing/list-projects`;
+            let url = `${backendUrl}/college/dripmarketing/list_all_projects`;
 
-            // Only add vertical parameter if a specific vertical is selected
+
             if (verticalId) {
                 url += `?vertical=${verticalId}`;
             }
            
             
-            console.log('Fetching projects from URL:', url);
+         
             
             const response = await axios.get(url, {
                 headers: {
@@ -274,13 +272,13 @@ const DripMarketing = () => {
                 }
             });
             
-            console.log('Projects API response:', response.data);
+            
             
             if (response.data && response.data.success && Array.isArray(response.data.data)) {
                 setProjects(response.data.data);
-                console.log(`Projects set successfully: ${response.data.data.length} projects found`);
+               
             } else {
-                console.warn('Unexpected response format:', response.data);
+               
                 setProjects([]);
                 setError('No projects found');
             }
@@ -293,39 +291,118 @@ const DripMarketing = () => {
         }
     };
     
-    // const fetchCenters = async () => {
-    //     // Get projectId from selectedProject prop or URL (for refresh cases)
-    //     const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-        
-    //     if (!projectId) {
-    //         console.warn('No projectId available from selectedProject or URL');
-    //         setCenters([]);
-    //         setError('No project context available');
-    //         return;
-    //     }
+    const fetchCenters = async () => {
+        // Get projectId from selectedProject prop or URL (for refresh cases)
+        const projectId = selectedProject?._id ;
 
-    //     setLoading(true);
-    //     setError(null);
-    //     try {
-    //         const response = await fetch(`${backendUrl}/college/list-centers?projectId=${projectId}`, {
-    //             headers: {
-    //                 'x-auth': token,
-    //             },
-    //         });
-    //         if (!response.ok) throw new Error('Failed to fetch centers');
+        setLoading(true);
+        setError(null);
+        try {
+           
+            const response = await fetch(`${backendUrl}/college/dripmarketing/list-centers`, {
+                headers: {
+                    'x-auth': token,
+                },
+            });
+            if (!response.ok) throw new Error('Failed to fetch centers');
 
-    //         const data = await response.json();
-    //         if (data.success) {
-    //             setCenters(data.data);
-    //         } else {
-    //             setError('Failed to load centers');
-    //         }
-    //     } catch (err) {
-    //         setError(err.message);
-    //     } finally {
-    //         setLoading(false);
-    //     }
-    // }
+            const data = await response.json();
+            
+            if (data.success) {
+                setCenters(data.data);
+               
+            } else {
+                setError('Failed to load centers');
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const fetchCourses = async () => {
+        try {
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/all_courses`, {
+                headers: { 'x-auth': token }
+            });
+            if (response.data.success) {
+                setCourseName(response.data.data);
+            
+            }
+        }
+        catch (error) {
+            console.error('Error fetching courses:', error);
+        }
+    }
+    const fetchBatches = async () => {
+        setLoading(true);
+        setError('');
+  
+        try {
+          const response = await axios.get(`${backendUrl}/college/dripmarketing/get_batches`, {
+           
+            headers: {
+              'x-auth': token  // Pass the token in the headers for authentication
+            }
+          });
+  
+          if (response.data.success) {
+            setBatches(response.data.data);
+          } else {
+            setError('Failed to fetch batches');
+          }
+        } catch (err) {
+          console.error('Error fetching batches:', err);
+          setError('Server error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+    const fetchleadOwnwer = async () => {
+        try {
+            if (!token) {
+                console.warn('No token found in session storage.');
+                return;
+            }
+
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/leadowner`, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+                setLeadOwner(response.data.concernPersons);
+                setRegisteredBy(response.data.concernPersons);
+             
+            } else {
+                console.error('Failed to fetch concern persons:', response.data.message);
+            }
+        } catch (error) {
+            console.error('Error fetching concern persons:', error);
+        }
+    };
+
+    const fetchJobData = async () => {
+        try {
+
+
+
+            if (!token) {
+                console.warn('No token found in session storage.');
+                return;
+            }
+
+          const response = await axios.get(`${backendUrl}/college/dripmarketing/joblisting`, {
+            headers: { 'x-auth': token }
+          });
+
+          setJobName(response.data.data);
+       
+        } catch (error) {
+          console.error("Error fetching course data:", error);
+        }
+      };
 
     // Fetch all statuses
    
@@ -336,34 +413,33 @@ const DripMarketing = () => {
                 return;
             }
 
-            const response = await axios.get(`${backendUrl}/college/status`, {
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/status`, {
                 headers: { 'x-auth': token }
             });
 
             if (response.data.success) {
                 setStatuses(response.data.data);
-                console.log('Statuses fetched:', response.data.data);
+                
             }
         } catch (error) {
             console.error('Error fetching statuses:', error);
         }
     };
-
+useEffect(() => {
+    fetchSubStatuses();
+}, []);
     // Fetch sub-statuses based on selected status
-    const fetchSubStatuses = async (statusId) => {
+    const fetchSubStatuses = async () => {
         try {
-            if (!statusId || !token) {
-                setSubStatuses([]);
-                return;
-            }
+           
 
-            const response = await axios.get(`${backendUrl}/college/status/${statusId}/substatus`, {
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/substatus`, {
                 headers: { 'x-auth': token }
             });
 
             if (response.data.success) {
                 setSubStatuses(response.data.data);
-                console.log('Sub-statuses fetched:', response.data.data);
+               
             }
         } catch (error) {
             console.error('Error fetching sub-statuses:', error);
@@ -373,9 +449,9 @@ const DripMarketing = () => {
     // Handle status change
     const handleStatusChange = (statusId) => {
         setSelectedStatus(statusId);
-        setSelectedSubStatus(''); 
-        fetchSubStatuses(statusId);
+       
     };
+
 
     const fetchRules = async () => {
         setRules([
@@ -434,85 +510,59 @@ const DripMarketing = () => {
 
     // Mapping of activity types to their corresponding value options
     const activityTypeValueOptions = {
-        campaign: [
-            { value: "nursing_campaign", label: "Nursing Campaign" },
-            { value: "healthcare_campaign", label: "Healthcare Campaign" },
-            { value: "education_campaign", label: "Education Campaign" }
-        ],
-        channels: [
-            { value: "facebook", label: "Facebook" },
-            { value: "instagram", label: "Instagram" },
-            { value: "google_ads", label: "Google Ads" },
-            { value: "whatsapp", label: "WhatsApp" },
-            { value: "email", label: "Email" }
-        ],
-        city: [
-            { value: "mumbai", label: "Mumbai" },
-            { value: "delhi", label: "Delhi" },
-            { value: "bangalore", label: "Bangalore" },
-            { value: "chennai", label: "Chennai" },
-            { value: "kolkata", label: "Kolkata" }
-        ],
+              
         state: [
-            { value: "maharashtra", label: "Maharashtra" },
+            { value: "andaman-nicobar", label: "Andaman and Nicobar Islands" },
+            { value: "andhra-pradesh", label: "Andhra Pradesh" },
+            { value: "arunachal-pradesh", label: "Arunachal Pradesh" },
+            { value: "assam", label: "Assam" },
+            { value: "bihar", label: "Bihar" },
+            { value: "chandigarh", label: "Chandigarh" },
+            { value: "chhattisgarh", label: "Chhattisgarh" },
+            { value: "dadra-nagar-haveli", label: "Dadra and Nagar Haveli" },
+            { value: "daman-diu", label: "Daman and Diu" },
             { value: "delhi", label: "Delhi" },
+            { value: "goa", label: "Goa" },
+            { value: "gujarat", label: "Gujarat" },
+            { value: "haryana", label: "Haryana" },
+            { value: "himachal-pradesh", label: "Himachal Pradesh" },
+            { value: "jammu-kashmir", label: "Jammu and Kashmir" },
+            { value: "jharkhand", label: "Jharkhand" },
             { value: "karnataka", label: "Karnataka" },
-            { value: "tamil_nadu", label: "Tamil Nadu" },
-            { value: "west_bengal", label: "West Bengal" }
+            { value: "kerala", label: "Kerala" },
+            { value: "ladakh", label: "Ladakh" },
+            { value: "lakshadweep", label: "Lakshadweep" },
+            { value: "madhya-pradesh", label: "Madhya Pradesh" },
+            { value: "maharashtra", label: "Maharashtra" },
+            { value: "manipur", label: "Manipur" },
+            { value: "meghalaya", label: "Meghalaya" },
+            { value: "mizoram", label: "Mizoram" },
+            { value: "nagaland", label: "Nagaland" },
+            { value: "odisha", label: "Odisha" },
+            { value: "puducherry", label: "Puducherry" },
+            { value: "punjab", label: "Punjab" },
+            { value: "rajasthan", label: "Rajasthan" },
+            { value: "sikkim", label: "Sikkim" },
+            { value: "tamil-nadu", label: "Tamil Nadu" },
+            { value: "telangana", label: "Telangana" },
+            { value: "tripura", label: "Tripura" },
+            { value: "uttar-pradesh", label: "Uttar Pradesh" },
+            { value: "uttarakhand", label: "Uttarakhand" },
+            { value: "west-bengal", label: "West Bengal" }
         ],
         status: [],
         subStatus: [], 
-        leadOwner: [
-            { value: "john_doe", label: "John Doe" },
-            { value: "jane_smith", label: "Jane Smith" },
-            { value: "mike_johnson", label: "Mike Johnson" }
-        ],
-        registeredBy: [
-            { value: "website", label: "Website" },
-            { value: "mobile_app", label: "Mobile App" },
-            { value: "walk_in", label: "Walk In" },
-            { value: "referral", label: "Referral" }
-        ],
-        courseName: [
-            { value: "nursing_course", label: "Nursing Course" },
-            { value: "healthcare_course", label: "Healthcare Course" },
-            { value: "medical_course", label: "Medical Course" }
-        ],
-        jobName: [
-            { value: "nurse", label: "Nurse" },
-            { value: "doctor", label: "Doctor" },
-            { value: "pharmacist", label: "Pharmacist" },
-            { value: "lab_technician", label: "Lab Technician" }
-        ],
-        email: [
-            { value: "has_email", label: "Has Email" },
-            { value: "no_email", label: "No Email" },
-            { value: "verified_email", label: "Verified Email" }
-        ],
-        mobile: [
-            { value: "has_mobile", label: "Has Mobile" },
-            { value: "no_mobile", label: "No Mobile" },
-            { value: "verified_mobile", label: "Verified Mobile" }
-        ],
-        createdDate: [
-            { value: "today", label: "Today" },
-            { value: "yesterday", label: "Yesterday" },
-            { value: "this_week", label: "This Week" },
-            { value: "this_month", label: "This Month" }
-        ],
-        modificationDate: [
-            { value: "today", label: "Today" },
-            { value: "yesterday", label: "Yesterday" },
-            { value: "this_week", label: "This Week" },
-            { value: "this_month", label: "This Month" }
-        ],
+        leadOwner: [],
+        registeredBy: [],
+        courseName: [],
+        jobName: [],
+        // email: [],
+        // mobile: [],
         project: [],
         vertical: [],
-        batch: [
-            { value: "batch_1", label: "Batch 1" },
-            { value: "batch_2", label: "Batch 2" },
-            { value: "batch_3", label: "Batch 3" }
-        ]
+        center: [],
+        course: [],
+        batch: []
     };
 
     // Function to get value options based on selected activity type
@@ -536,6 +586,36 @@ const DripMarketing = () => {
             return projects.map(project => ({
                 value: project._id,
                 label: project.name
+            }));
+        } else if(activityType === 'batch'){
+            return batches.map(batch => ({
+                value: batch._id,
+                label: batch.name
+            }));
+        } else if (activityType === 'center') {
+            return centers.map(center => ({
+                value: center._id,
+                label: center.name
+            }));
+        } else if (activityType === 'course') {
+            return courseName.map(course => ({
+                value: course._id,
+                label: course.name
+            }));
+        } else if (activityType === 'leadOwner') {
+            return leadOwner.map(owner => ({
+                value: owner._id,
+                label: owner.name
+            }));
+        } else if (activityType === 'registeredBy') {
+            return registeredBy.map(registeredBy => ({
+                value: registeredBy._id,
+                label: registeredBy.name
+            }));
+        } else if (activityType === 'jobName') {
+            return jobName?.map(job => ({
+                value: job?._id,
+                label: job?.title
             }));
         }
         return activityTypeValueOptions[activityType] || [];
@@ -825,10 +905,7 @@ const DripMarketing = () => {
 
         // Check if this is a status value selection and fetch sub-statuses
         const activityType = (conditionSelections[blockIndex] || [''])[0];
-        if (activityType === 'status' && value && !Array.isArray(value)) {
-            // If a specific status is selected, fetch its sub-statuses
-            fetchSubStatuses(value);
-        }
+       
         
         // Check if this is a vertical value selection
         if (activityType === 'vertical' && value) {
@@ -971,10 +1048,7 @@ const DripMarketing = () => {
 
         // Check if this is a status value selection in sub-condition and fetch sub-statuses
         const activityType = (subConditionSelections[blockIndex]?.[rowIndex] || [''])[0];
-        if (activityType === 'status' && value && !Array.isArray(value)) {
-            // If a specific status is selected, fetch its sub-statuses
-            fetchSubStatuses(value);
-        }
+        
         
         // Check if this is a vertical value selection in sub-condition
         if (activityType === 'vertical' && value) {
@@ -1294,23 +1368,20 @@ const DripMarketing = () => {
                                                                                     onChange={(e) => handleSelectChange(index, 0, e.target.value)}
                                                                                 >
                                                                                     <option value="">Activity type</option>
-                                                                                    <option value="campaign">Campaign</option>
-                                                                                    <option value="channels">Channels</option>
-                                                                                    <option value="city">City</option>
+                
+                                                                              
                                                                                     <option value="state">State</option>
                                                                                     <option value="status">Status</option>
                                                                                     <option value="subStatus">Sub Status</option>
                                                                                     <option value="leadOwner">Lead Owner</option>
                                                                                     <option value="registeredBy">Registered By</option>
-                                                                                    <option value="courseName">Course Name</option>
+            
                                                                                     <option value="jobName">Job Name</option>
-                                                                                    <option value="email">Email</option>
-                                                                                    <option value="mobile">Mobile</option>
-                                                                                    <option value="createdDate">Created Date</option>
-                                                                                    <option value="modificationDate">Modification Date</option>
-                                                                                    <option value="project">Project</option>
+                                                                      <option value="project">Project</option>
                                                                                     <option value="vertical">Vertical</option>
                                                                                     <option value="batch">Batch</option>
+                                                                                    <option value="center">Center</option>
+                                                                                    <option value="course">Course</option>
                                                                                 </select>
                                                                             </div>
 
@@ -1424,9 +1495,7 @@ const DripMarketing = () => {
                                                                                             onChange={(e) => handleSubSelectChange(index, subIdx, 0, e.target.value)}
                                                                                         >
                                                                                             <option value="">Activity type</option>
-                                                                                            <option value="campaign">Campaign</option>
-                                                                                            <option value="channels">Channels</option>
-                                                                                            <option value="city">City</option>
+                                                                                   
                                                                                             <option value="state">State</option>
                                                                                             <option value="status">Status</option>
                                                                                             <option value="subStatus">Sub Status</option>
@@ -1434,13 +1503,10 @@ const DripMarketing = () => {
                                                                                             <option value="registeredBy">Registered By</option>
                                                                                             <option value="courseName">Course Name</option>
                                                                                             <option value="jobName">Job Name</option>
-                                                                                            <option value="email">Email</option>
-                                                                                            <option value="mobile">Mobile</option>
-                                                                                            <option value="createdDate">Created Date</option>
-                                                                                            <option value="modificationDate">Modification Date</option>
                                                                                             <option value="project">Project</option>
                                                                                             <option value="vertical">Vertical</option>
                                                                                             <option value="batch">Batch</option>
+                                                                                            <option value="center">Center</option>
                                                                                         </select>
                                                                                     </div>
 
@@ -1543,8 +1609,7 @@ const DripMarketing = () => {
                                                                                 setThenShouldBe([]); // Clear multiselect when activity type changes
                                                                             }}>
                                                                                 <option value="">Activity Type</option>
-                                                                                <option value="campaign">Campaign</option>
-                                                                                <option value="channel">Channel</option>
+               
                                                                             </select>
                                                                         </div>
                                                                         {thenFirst !== '' && (
@@ -1600,8 +1665,7 @@ const DripMarketing = () => {
                                                                                     }}
                                                                                 >
                                                                                     <option value="">Activity Type</option>
-                                                                                    <option value="campaign">Campaign</option>
-                                                                                    <option value="channel">Channel</option>
+                                                                                    
                                                                                 </select>
                                                                             </div>
                                                                             {condition.activityType && (

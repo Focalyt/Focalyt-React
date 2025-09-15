@@ -1392,18 +1392,15 @@ export default WhatsAppTemplate;
 // Media Query CSS for Mobile Responsiveness
 const mobileStyles = `
   @media (max-width: 768px) {
-    .container-fluid {
-      padding: 0.5rem !important;
-    }
-    
+   
     /* Header adjustments */
     .d-flex.justify-content-between {
-      flex-direction: column !important;
+      // flex-direction: column;
       gap: 1rem;
     }
     
     .d-flex.align-items-center {
-      flex-wrap: wrap;
+      // flex-wrap: wrap;
       gap: 0.5rem;
     }
     
@@ -1516,7 +1513,7 @@ const mobileStyles = `
     
     /* Action buttons at bottom */
     .d-flex.justify-content-between:last-child {
-      flex-direction: column !important;
+      // flex-direction: column !important;
       gap: 1rem;
     }
     

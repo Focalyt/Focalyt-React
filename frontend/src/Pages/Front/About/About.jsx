@@ -11,15 +11,15 @@ function About() {
     const location = useLocation();
 
     useEffect(() => {
-      if (location.hash) {
-        const id = location.hash.replace("#", "");
-        const element = document.getElementById(id);
-        if (element) {
-          setTimeout(() => {
-            element.scrollIntoView({ behavior: "smooth", block: "start" });
-          }, 100);
+        if (location.hash) {
+            const id = location.hash.replace("#", "");
+            const element = document.getElementById(id);
+            if (element) {
+                setTimeout(() => {
+                    element.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+            }
         }
-      }
     }, [location]);
     const [seniorManagement, setSeniorManagement] = useState([]);
     const [management, setManagement] = useState([]);
@@ -138,7 +138,7 @@ function About() {
         return () => {
             // Cleanup: Destroy sliders when unmounting
             try {
-                $(".slick-initialized").each(function() {
+                $(".slick-initialized").each(function () {
                     if ($(this).hasClass('slick-initialized')) {
                         $(this).slick("unslick");
                     }
@@ -202,7 +202,7 @@ function About() {
                 </section>
 
                 <section className="bg-black">
-                    <div className="container-fluid">
+                    <div className="container">
                         {/* <!-- key Areas  --> */}
                         <div className="workingArea">
                             <h2 className="key_area text-center text-white pb-4">Key Areas of Working</h2>
@@ -265,7 +265,7 @@ function About() {
 
                 <section>
                     {/* <!-- training_partners --> */}
-                    <div className="container-fluid bg-white">
+                    <div className="container bg-white">
                         <div className="Partners">
                             <h3 className="affiliated_partner bg-white">Affiliated Training Partner</h3>
                             <div className="row">
@@ -298,7 +298,7 @@ function About() {
 
                 {/* <!-- vision --> */}
                 <section id="vision">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="row justify-content-center align-items-center g-3 py-5" id="vission">
                             <div className="col-md-6">
                                 <div className="vision">
@@ -328,7 +328,7 @@ function About() {
 
                 </section>
                 <section id="partners">
-                    <div className="container-fluid bg-white">
+                    <div className="container bg-white">
                         <div className="main_partners">
                             <h3 className="affiliated_partner bg-white">Our Partners</h3>
 
@@ -344,9 +344,27 @@ function About() {
                         </div>
                     </div>
                 </section>
+
+                <section className="bg-white">
+                    <div className="skill-Tech-Brand">
+                        <div className="container">
+                            <div className="row">
+
+                                <div className="col-12">
+                                    <p className="globalLearning text-black py-3">
+                                        Partnered with Telecom Sector Skill Council to establish Samsung Innovation Campus in Private and Govt Universities.
+                                        <br />
+                                        The Samsung Innovation Campus is a global CSR (Corporate Social Responsibility) program that equips youth with essential skills in advanced technologies like AI, IoT, Big Data, and coding, as well as crucial soft skills for the Fourth Industrial Revolution.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* <!-- focalyt Team  --> */}
                 <section className="bg-black" id="focalytTeam">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="FSD" id="fsd">
                             <div className="row g-3">
                                 <div className="col-md-12">
@@ -434,7 +452,7 @@ function About() {
                 </section>
                 {/* <!-- projects  --> */}
                 <section>
-                    <div className="container-fluid bg-white">
+                    <div className="container bg-white">
                         <div className="Partners">
                             <h3 className="affiliated_partner bg-white">Key Govt. Project and Clients</h3>
                             <div className="row">
@@ -458,7 +476,7 @@ function About() {
                 </section>
                 {/* <!-- trainig centers  --> */}
                 <section>
-                    <div className="container-fluid training-centres">
+                    <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Training Centres</h3>
                         </div>
@@ -490,10 +508,10 @@ function About() {
                         </div>
                     </div>
                 </section>
-                
+
                 {/* <!-- mobilization  --> */}
                 <section>
-                    <div className="container-fluid training-centres">
+                    <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Mobilization</h3>
                         </div>
@@ -558,7 +576,7 @@ function About() {
                 </section>
                 {/* <!-- hostel --> */}
                 <section className="bg-white">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="text-center">
                             <h3 className="section-title">Hostel Facilities</h3>
                         </div>
@@ -602,7 +620,7 @@ function About() {
                 </section>
                 {/* <!-- Training Facilities --> */}
                 <section className="bg-white">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="text-center">
                             <h3 className="section-title">Training Facilities</h3>
                         </div>
@@ -648,7 +666,7 @@ function About() {
                 </section>
                 {/* <!-- Placement --> */}
                 <section>
-                    <div className="container-fluid training-centres">
+                    <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Placement and Entrepreneurship</h3>
                         </div>
@@ -685,7 +703,7 @@ function About() {
                 </section>
                 {/* <!-- Media Coverage  --> */}
                 <section>
-                    <div className="container-fluid training-centres">
+                    <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title text-white">Media Coverage</h3>
                         </div>
@@ -737,7 +755,7 @@ function About() {
                 </section>
                 {/* <!-- Extra curricular Activity  --> */}
                 <section className="bg-white">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="text-center">
                             <h3 className="section-title">Extra Curricular Activity</h3>
                         </div>
@@ -775,7 +793,7 @@ function About() {
                 </section>
                 {/* <!-- Project Launches  --> */}
                 <section className="bg-white">
-                    <div className="container-fluid">
+                    <div className="container">
                         <div className="text-center">
                             <h3 className="section-title">Project Launches</h3>
                         </div>
@@ -828,7 +846,7 @@ function About() {
                 </section>
                 {/* <!-- Awards and Recognition  --> */}
                 <section>
-                    <div className="container-fluid training-centres">
+                    <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Awards and Recognition</h3>
                         </div>
@@ -1073,9 +1091,9 @@ font-size: 21px;}
                     }
                 </style>
 
-<style>
-    {
-        `
+                <style>
+                    {
+                        `
         
 /* .section-padding-60{
     padding-block: 60px;
@@ -1269,11 +1287,11 @@ font-size: 21px;}
 }
         
         `
-    }
-</style>
-<style>
-    {
-        `
+                    }
+                </style>
+                <style>
+                    {
+                        `
         .training-centres {
     background-color: #000; 
     padding-bottom:20px;
@@ -1393,8 +1411,8 @@ font-size: 21px;}
   }
   
         `
-    }
-</style>
+                    }
+                </style>
 
             </FrontLayout>
         </>
