@@ -5274,11 +5274,10 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 
 router.get('/followupcounts', isCollege, async (req, res) => {
 	try {
-		console.log('req.query', req.query)
 
 		const user = req.user;
 
-		let { fromDate, toDate } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor } = req.query;
 
 		if (fromDate && fromDate !== 'null') {
 			fromDate = new Date(fromDate);
@@ -5300,41 +5299,242 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		}
 
 
-		const followupCounts = await B2cFollowup.aggregate([
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+
+		let aggregate = []
+
+		let baseMatch = {}
+
+		if(counselorArray.length > 0){
+			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}else{
+			baseMatch.createdBy = user._id;
+		}
+
+		let group =[{
+			$group: {
+				_id: "$status",
+				count: { $sum: 1 }
+			}
+		},
+		{
+			$project: {
+				k: "$_id",
+				v: "$count",
+				_id: 0
+			}
+		},
+		{
+			$group: {
+				_id: null,
+				counts: { $push: { k: "$k", v: "$v" } }
+			}
+		},
+		{
+			$replaceRoot: {
+				newRoot: { $arrayToObject: "$counts" }
+			}
+		}]
+
+
+
+
+
+		aggregate.push(
 			{
 				$match: {
-					createdBy: user._id,
-					followupDate: { $gte: fromDate, $lte: toDate }
+					followupDate: { $gte: fromDate, $lte: toDate },
+					...baseMatch
 				}
 			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: 'appliedCourseId',
+					foreignField: '_id',
+					as: "appliedCourseId"
+				}
+			},
+			{
+				$unwind: {
+					path: '$appliedCourseId',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'candidateprofiles',
+					localField: 'appliedCourseId._candidate',
+					foreignField: '_id',
+					as: 'candidate'
+				}
+			},
+			{
+				$unwind: {
+					path: '$candidate',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'courses',
+					localField: 'appliedCourseId._course',
+					foreignField: '_id',
+					as: 'courseData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$courseData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'verticals',
+					localField: 'courseData.vertical',
+					foreignField: '_id',
+					as: 'verticalData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$verticalData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'projects',
+					localField: 'courseData.project',
+					foreignField: '_id',
+					as: 'projectData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$projectData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'centers',
+					localField: 'appliedCourseId._center',
+					foreignField: '_id',
+					as: 'centerData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$centerData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'appliedCourseId._counsellor',
+					foreignField: '_id',
+					as: 'counselorData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$counselorData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			
 			{
 				$group: {
-					_id: "$status",
-					count: { $sum: 1 }
+					_id: '$_id',
+					appliedCourseId: { $first: '$appliedCourseId._id' },
+					followupDate: { $first: '$followupDate' },
+					remarks: { $first: '$remarks' },
+					_course: { $first: '$courseData' },
+					center: { $first: '$centerData._id' },
+					status: { $first: '$status' },
 				}
-			},
-			{
-				$project: {
-					k: "$_id",
-					v: "$count",
-					_id: 0
-				}
-			},
-			{
-				$group: {
-					_id: null,
-					counts: { $push: { k: "$k", v: "$v" } }
-				}
-			},
-			{
-				$replaceRoot: {
-					newRoot: { $arrayToObject: "$counts" }
-				}
-			},
-		]);
+			}
+			
+		)
+
+		let additionalMatches = {}
+
+		// Sector filter (multi-select - using projects array)
+		if (projectsArray.length > 0) {
+			additionalMatches['_course.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Verticals filter (multi-select)
+		if (verticalsArray.length > 0) {
+			additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Course filter (multi-select)
+		if (courseArray.length > 0) {
+			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Center filter (multi-select)
+		if (centerArray.length > 0) {
+			additionalMatches['center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (Object.keys(additionalMatches).length > 0) {
+			aggregate.push({ $match: additionalMatches });
+		}
+
+	
+
+		
+
+
+
+		const followupCounts = await B2cFollowup.aggregate(aggregate
+		);
+
+		let doneCount = 0
+		let plannedCount = 0
+		let missedCount = 0
+
+		followupCounts.forEach(item => {
+			if(item.status == 'done'){
+				doneCount++
+			}
+			if(item.status == 'planned'){
+				plannedCount++
+			}
+			if(item.status == 'missed'){
+				missedCount++
+			}
+		})
+
+		let count = {
+			'done':doneCount,
+			'planned':plannedCount,
+			'missed':missedCount
+		}
+
 
 		// console.log("followupCounts", followupCounts[0])
-		return res.json({ success: true, data: followupCounts[0] });
+		return res.json({ success: true, data: count });
 
 
 	}
@@ -6379,11 +6579,16 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
 			});
 
+			console.log("requiredDocs", requiredDocs)
+
+			console.log("uploadedDocsMap", uploadedDocsMap)
+
 			let combinedDocs = [];
 
 			if (requiredDocs) {
 				// Create a merged array with both required docs and uploaded docs info
 				combinedDocs = requiredDocs.map(reqDoc => {
+
 					// Convert Mongoose document to plain object
 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
 
@@ -6391,6 +6596,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 					// Find matching uploaded docs for this required doc
 					const matchingUploads = uploadedDocs.filter(
+
+						
 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
 					)
 
@@ -6404,6 +6611,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					};
 				});
 			}
+
 
 			// Prepare combined docs array for legacy compatibility
 			const allDocs = requiredDocs.map(reqDoc => {
@@ -7045,13 +7253,112 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 	}
 });
 
+// router.get("/leads/my-followups", isCollege, async (req, res) => {
+// 	try {
+// 		const user = req.user;
+
+// 		const { fromDate, toDate, page = 1, limit = 10, followupStatus } = req.query;
+
+// 		// Add date validation
+// 		let from, to;
+
+// 		if (fromDate) {
+// 			from = new Date(fromDate);
+// 			if (isNaN(from.getTime())) {
+// 				return res.status(400).json({ error: "Invalid fromDate format" });
+// 			}
+// 		} else {
+// 			from = new Date(new Date().setHours(0, 0, 0, 0));
+// 		}
+
+// 		if (toDate) {
+// 			to = new Date(toDate);
+// 			if (isNaN(to.getTime())) {
+// 				return res.status(400).json({ error: "Invalid toDate format" });
+// 			}
+// 		} else {
+// 			to = new Date(new Date().setHours(23, 59, 59, 999));
+// 		}
+
+// 		const aggregate = [
+// 			{
+// 				$match: {
+// 					createdBy: user._id,
+// 					status: followupStatus,
+// 					followupDate: { $gte: from, $lte: to }
+// 				}
+// 			},
+// 			{
+// 				$lookup: {
+// 					from: 'appliedcourses',
+// 					localField: 'appliedCourseId',
+// 					foreignField: '_id',
+// 					as: "appliedCourseId"
+// 				}
+// 			},
+// 			{
+// 				$unwind: {
+// 					path: '$appliedCourseId',
+// 					preserveNullAndEmptyArrays: true
+// 				}
+// 			},
+// 			{
+// 				$lookup: {
+// 					from: 'candidateprofiles',
+// 					localField: 'appliedCourseId._candidate',
+// 					foreignField: '_id',
+// 					as: 'candidate'
+// 				}
+// 			},
+// 			{
+// 				$unwind: {
+// 					path: '$candidate',
+// 					preserveNullAndEmptyArrays: true
+// 				}
+// 			},
+// 			{
+// 				$group: {
+// 					_id: '$_id',
+// 					name: { $first: '$candidate.name' },
+// 					email: { $first: '$candidate.email' },
+// 					mobile: { $first: '$candidate.mobile' },
+// 					appliedCourseId: { $first: '$appliedCourseId._id' },
+// 					followupDate: { $first: '$followupDate' },
+// 					remarks: { $first: '$remarks' }
+
+// 				}
+// 			}
+// 		]
+
+
+
+
+// 		const followups = await B2cFollowup.aggregate(aggregate);
+// 		// const followups = await B2cFollowup.aggregate(aggregate).populate({
+// 		// 	path: 'appliedCourseId',
+// 		// 	select: 'name mobile email'
+// 		// });	
+
+
+
+// 		if (!followups) {
+// 			return res.status(400).json({ error: "No followups found" });
+// 		}
+
+// 		return res.status(200).json({ success: true, data: followups });
+
+// 	} catch (err) {
+// 		console.error(err);
+// 		res.status(500).json({ error: "Server Error" });
+// 	}
+// });
 
 router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus } = req.query;
-
+		let filter = {};
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus , projects, verticals, course, center, counselor } = req.query;
+		
 		// Add date validation
 		let from, to;
 
@@ -7073,12 +7380,31 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
 
+		
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+
 		const aggregate = [
 			{
 				$match: {
 					createdBy: user._id,
 					status: followupStatus,
-					followupDate: { $gte: from, $lte: to }
+					followupDate: { $gte: from, $lte: to },
+					
 				}
 			},
 			{
@@ -7110,6 +7436,77 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 				}
 			},
 			{
+				$lookup: {
+					from: 'courses',
+					localField: 'appliedCourseId._course',
+					foreignField: '_id',
+					as: 'courseData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$courseData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'verticals',
+					localField: 'courseData.vertical',
+					foreignField: '_id',
+					as: 'verticalData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$verticalData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'projects',
+					localField: 'courseData.project',
+					foreignField: '_id',
+					as: 'projectData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$projectData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'centers',
+					localField: 'appliedCourseId._center',
+					foreignField: '_id',
+					as: 'centerData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$centerData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'appliedCourseId._counsellor',
+					foreignField: '_id',
+					as: 'counselorData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$counselorData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			
+			{
 				$group: {
 					_id: '$_id',
 					name: { $first: '$candidate.name' },
@@ -7117,13 +7514,52 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 					mobile: { $first: '$candidate.mobile' },
 					appliedCourseId: { $first: '$appliedCourseId._id' },
 					followupDate: { $first: '$followupDate' },
-					remarks: { $first: '$remarks' }
-
+					remarks: { $first: '$remarks' },
+					courseName: { $first: '$courseData.name' },
+					verticalName: { $first: '$verticalData.name' },
+					projectName: { $first: '$projectData.name' },
+					centerName: { $first: '$centerData.name' },
+					counselorName: { $first: '$counselorData.name' },
+					_course: { $first: '$courseData' },
+					center: { $first: '$centerData._id' },
 				}
 			}
 		]
 
+		// Apply additional filters based on populated data
+		let additionalMatches = {};
 
+		// Course type filter
+		
+
+		// Sector filter (multi-select - using projects array)
+		if (projectsArray.length > 0) {
+			additionalMatches['_course.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Verticals filter (multi-select)
+		if (verticalsArray.length > 0) {
+			additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Course filter (multi-select)
+		if (courseArray.length > 0) {
+			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		// Center filter (multi-select)
+		if (centerArray.length > 0) {
+			additionalMatches['center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		
+
+		// Add additional match stage if any filters are applied
+		if (Object.keys(additionalMatches).length > 0) {
+			aggregate.push({ $match: additionalMatches });
+		}
+
+		
 
 
 		const followups = await B2cFollowup.aggregate(aggregate);
@@ -7132,7 +7568,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		// 	select: 'name mobile email'
 		// });	
 
-
+		
 
 		if (!followups) {
 			return res.status(400).json({ error: "No followups found" });
