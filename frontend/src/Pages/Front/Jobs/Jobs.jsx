@@ -479,14 +479,24 @@ function Jobs() {
                               >
                                 ({course.displayCompanyName})
                               </h5>
-                              {((course.isFixed && course.fixedSalary) || (!course.isFixed && course.min && course.max)) && (
-                                <p class="text-center digi-price mb-3 mt-3">
-                                  <span class="rupee text-white">₹ &nbsp;</span>
-                                  <span class="r-price text-white">
-                                    {course.isFixed ? course.fixedSalary : `${course.min}-${course.max}`}
+                              {(
+                                (course.isFixed && course.fixedSalary) ||
+                                (!course.isFixed && course.min && course.max)
+                              ) ? (
+                                <p className="text-center digi-price mb-3 mt-3">
+                                  <span className="rupee text-white">₹ &nbsp;</span>
+                                  <span className="r-price text-white">
+                                    {course.isFixed
+                                      ? (course.fixedSalary || "--")
+                                      : ((course.min && course.max) ? `${course.min}-${course.max}` : "--")}
                                   </span>
                                 </p>
+                              ) : (
+                                <p className="text-center digi-price mb-3 mt-3">
+                                  <span className="r-price text-white">--</span>
+                                </p>
                               )}
+
 
                               <div className="row" id="course_height">
                                 <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
@@ -506,7 +516,7 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
 
-                                            <p className="mb-0 text-white">
+                                            <p className="mb-0 text-white" title={course._qualification?.name || 'N/A'}>
                                               {course._qualification?.name || 'N/A'}
                                             </p>
 
@@ -527,8 +537,10 @@ function Jobs() {
                                             </figure>
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">
-                                              {(course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths )
+                                            <p className="mb-0 text-white" title={((course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths)
+                                                ? "Fresher"
+                                                : `${course.experience > 0 ? `${course.experience} ${course.experience === 1 ? 'Year' : 'Years'}` : ''} ${course.experienceMonths > 0 ? `${course.experienceMonths} ${course.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim())}>
+                                              {(course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths)
                                                 ? "Fresher"
                                                 : `${course.experience > 0 ? `${course.experience} ${course.experience === 1 ? 'Year' : 'Years'}` : ''} ${course.experienceMonths > 0 ? `${course.experienceMonths} ${course.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
                                             </p>
@@ -581,7 +593,7 @@ function Jobs() {
 
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
 
-                                            <p className="mb-0 text-white">
+                                            <p className="mb-0 text-white" title={course.work || 'N/A'}>
                                               {course.work}
 
                                             </p>
@@ -778,6 +790,10 @@ img.group1 {
 .courses_features p {
     line-height: normal;
     font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 .color-yellow {
     color: #FFD542;
@@ -1216,10 +1232,10 @@ button.close span {
         </style>
 
 
-<style>
-  {
+        <style>
+          {
 
-`
+            `
 .filter-buttonss {
     display: flex;
     overflow-y: hidden;
@@ -1296,8 +1312,8 @@ button.close span {
   }
 `
 
-  }
-</style>
+          }
+        </style>
       </FrontLayout>
 
     </>

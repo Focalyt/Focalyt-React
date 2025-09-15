@@ -143,7 +143,7 @@ const MyFollowups = () => {
 
   const { messages, updates } = useWebsocket(userData._id);
 
-  
+
 
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
@@ -247,6 +247,30 @@ const MyFollowups = () => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -1445,7 +1469,19 @@ const MyFollowups = () => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
+
     });
+
+    setFormData({
+      projects: { type: "includes", values: [] },
+      verticals: { type: "includes", values: [] },
+      course: { type: "includes", values: [] },
+      center: { type: "includes", values: [] },
+      counselor: { type: "includes", values: [] },
+      sector: { type: "includes", values: [] }
+    })
+    fetchProfileData()
+    setCurrentPage(1);
     setAllProfiles(allProfilesData);
   };
 
@@ -1657,7 +1693,7 @@ const MyFollowups = () => {
         console.error('Error:', error.message);
         alert(`Error: ${error.message}`);
       }
-    }finally{
+    } finally {
       setIsLoadingProfiles(false);
       closePanel()
       fetchProfileData();
@@ -1690,9 +1726,26 @@ const MyFollowups = () => {
         // You can add fromDate and toDate here if needed for followup date filtering
         ...(filters?.fromDate && { fromDate: filters.fromDate }),
         ...(filters?.toDate && { toDate: filters.toDate }),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.status && { status: filters.status }),
+        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters.sector && { sector: filters.sector }),
+        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate }),
+        ...(filters.createdToDate && { createdToDate: filters.createdToDate }),
+        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate }),
+        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate }),
+        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate }),
+        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate }),
+
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
         followupStatus: activeFollowupStatus,
       });
-
+      // console.log('queryParams', queryParams)
       // Use the My Followups specific API endpoint
       const response = await axios.get(`${backendUrl}/college/leads/my-followups?${queryParams}`, {
         headers: {
@@ -1840,14 +1893,35 @@ const MyFollowups = () => {
     fetchFollowupCounts();
   }, [filterData, activeFollowupStatus, activeCrmFilter, messages, updates]);
 
-  const fetchFollowupCounts = async () => {
+  const fetchFollowupCounts = async (filters = filterData) => {
     try {
 
       // console.log("fromDate", filterData.fromDate, 'toDate', filterData.toDate)
-      const response = await axios.get(`${backendUrl}/college/followupcounts?fromDate=${filterData.fromDate}&toDate=${filterData.toDate}`, {
+
+      if (!token) {
+        return;
+      }
+      
+      const queryParams = new URLSearchParams({
+        // Followup specific date range (if you want to add separate followup date filters)
+        // You can add fromDate and toDate here if needed for followup date filtering
+        ...(filters?.fromDate && { fromDate: filters.fromDate }),
+        ...(filters?.toDate && { toDate: filters.toDate }),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+       
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
+        followupStatus: activeFollowupStatus,
+      });
+
+      const response = await axios.get(`${backendUrl}/college/followupcounts?${queryParams}`, {
         headers: { 'x-auth': token }
       });
-      // console.log("response", response);
+      console.log("response", response);
       if (response.data.success && response.data.data) {
 
         setDoneCount(response.data.data?.done || 0);
@@ -3208,7 +3282,16 @@ const MyFollowups = () => {
                         value={filterData.name}
                         onChange={handleFilterChange}
                       />
-                      {filterData.name && (
+                      <button
+                          onClick={() => fetchProfileData(filterData) }
+                          className={`btn btn-outline-primary`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          Search
+
+                        </button>
+                      {/* {filterData.name && (
                         <button
                           className="btn btn-outline-secondary border-start-0"
                           type="button"
@@ -3219,7 +3302,7 @@ const MyFollowups = () => {
                         >
                           <i className="fas fa-times"></i>
                         </button>
-                      )}
+                      )} */}
                     </div>
                     <button
                       onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -3448,200 +3531,6 @@ const MyFollowups = () => {
                       </div>
                     </div>
 
-                    {/* Date Filters Section */}
-                    <div className="row g-4 mt-3">
-                      <div className="col-12">
-                        <h6 className="text-dark fw-bold mb-3">
-                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
-                          Date Range Filters
-                        </h6>
-                      </div>
-
-                      {/* Created Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-plus me-1 text-success"></i>
-                          Lead Creation Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-                                value={filterData.createdFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                maxDate={filterData.createdToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-                                value={filterData.createdToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                minDate={filterData.createdFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.createdFromDate || filterData.createdToDate) && (
-                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-                              <small className="text-success">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('created')}
-                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Created Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Modified Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                          Lead Modification Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                                value={filterData.modifiedFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                maxDate={filterData.modifiedToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                                value={filterData.modifiedToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                minDate={filterData.modifiedFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                              <small className="text-warning">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('modified')}
-                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Next Action Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-check me-1 text-info"></i>
-                          Next Action Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                                value={filterData.nextActionFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                maxDate={filterData.nextActionToDate}
-                              />
-                            </div>
-                            <div className="col-6 lastDatepicker">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                                value={filterData.nextActionToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                minDate={filterData.nextActionFromDate}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                              <small className="text-info">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('nextAction')}
-                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
 
                     {/* Results Summary */}
                     <div className="row mt-4">
@@ -3914,24 +3803,24 @@ const MyFollowups = () => {
                                             </button>
 
                                             {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  openPanel(profile, 'followup');
-                                                }}
-                                              >
-                                                Update Followup
-                                              </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openPanel(profile, 'followup');
+                                              }}
+                                            >
+                                              Update Followup
+                                            </button>
                                             {/* // )} */}
 
                                             {/* {activeFollowupStatus === 'planned' && (
@@ -4056,24 +3945,24 @@ const MyFollowups = () => {
                                             </button>
 
                                             {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  openPanel(profile, 'followup');
-                                                }}
-                                              >
-                                                Update Followup
-                                              </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openPanel(profile, 'followup');
+                                              }}
+                                            >
+                                              Update Followup
+                                            </button>
                                             {/* )} */}
 
                                             {/* {activeFollowupStatus === 'planned' && (
@@ -4364,27 +4253,27 @@ const MyFollowups = () => {
                                                         <div className="info-value">
                                                           {/* {candidateDetails._course?.college || 'N/A'} */}
                                                           {candidateDetails._center?.name || 'N/A'}
-                                                          </div>
+                                                        </div>
                                                       </div>
                                                     </div>
                                                     <div className="col-xl- col-3">
                                                       <div className="info-group">
                                                         <div className="info-label">NEXT ACTION DATE</div>
                                                         <div className="info-value">
-                                                        {candidateDetails.followup?.followupDate ? (() => {
-                                                        const dateObj = new Date(candidateDetails.followup?.followupDate);
-                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                          day: '2-digit',
-                                                          month: 'short',
-                                                          year: 'numeric',
-                                                        }).replace(/ /g, '-');
-                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                          hour: '2-digit',
-                                                          minute: '2-digit',
-                                                          hour12: true,
-                                                        });
-                                                        return `${datePart}, ${timePart}`;
-                                                      })() : 'N/A'}
+                                                          {candidateDetails.followup?.followupDate ? (() => {
+                                                            const dateObj = new Date(candidateDetails.followup?.followupDate);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '-');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })() : 'N/A'}
                                                         </div>
 
                                                       </div>

@@ -404,8 +404,8 @@ function About() {
                             <div className="row g-3">
                                 <div className="col-md-12">
                                     <div className="text-center pt-3 pb-5">
-                                        <h2 className="focalyt_Team text-white">Focalyt Team</h2>
-                                    </div>``
+                                        <h2 className="focalyt_Team" style={{color: '#FF3366'}}>Focalyt Team</h2>
+                                    </div>
                                 </div>
                                 <div class="col-md-12">
                                     <div class="row justify-content-evenly ">
@@ -500,6 +500,20 @@ function About() {
                                     <div className="affilated_partner_image">
                                         <figure>
                                             <img src="/Assets/public_assets/images/brand4.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/odisha.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/skilledinodisha.png" alt="" />
                                         </figure>
                                     </div>
                                 </div>
@@ -740,7 +754,7 @@ function About() {
                 <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
-                            <h3 className="section-title text-white">Media Coverage</h3>
+                            <h3 className="section-title ">Media Coverage</h3>
                         </div>
                         <div className="row justify-content-center">
                             <div className="col-md-4 col-sm-6 mb-4">
@@ -1446,7 +1460,8 @@ font-size: 21px;}
       .affilated_partner_image {
     width: 100%;
     padding: 5px 0 25px 0;
-    margin: 0 40px;
+    text-align: center;
+    // margin: 0 40px;
 }
       .affilated_partner_image figure img{
       width:70%;

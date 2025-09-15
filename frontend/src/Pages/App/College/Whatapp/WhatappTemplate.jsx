@@ -1500,11 +1500,7 @@ const mobileStyles = `
     }
     
     /* Call to Action fields */
-    .row .col-md-6 {
-      width: 100% !important;
-      flex: 0 0 100% !important;
-      max-width: 100% !important;
-    }
+   
     
     /* Quick Reply buttons */
     .btn-outline-primary.btn-sm {
