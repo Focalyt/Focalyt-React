@@ -1,7 +1,6 @@
 const express = require("express");
 const uuid = require('uuid/v1');
 const cron = require('node-cron');
-const { Parser } = require("json2csv");
 
 const { isCollege, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
@@ -36,7 +35,6 @@ const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
-const dripmarketingRoutes = require("./dripmarketing");
 
 
 
@@ -70,7 +68,6 @@ router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
-router.use("/dripmarketing", isCollege, dripmarketingRoutes);
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -1197,7 +1194,7 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Get the specific lead ID from request body
 		let { leadId } = req.query;
 
-		// console.log("leadId", leadId)
+		console.log("leadId", leadId)
 
 		if (!leadId) {
 			return res.status(400).json({
@@ -1581,19 +1578,13 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			};
 		});
 
-
-		const data = results[0]
-
-		const followup = await B2cFollowup.findOne({ appliedCourseId: data._id, status: 'planned' })
-
-		data.followup = followup
-
-		// console.log("data", data)
+		console.log("results", results)
 
 
 		res.status(200).json({
 			success: true,
-			data: data || null, // Single object instead of array
+			count: results.length,
+			data: results.length > 0 ? results[0] : null, // Single object instead of array
 		});
 
 	} catch (err) {
@@ -1621,10 +1612,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor
 		} = req.query;
 
-		console.log("substautes", subStatuses)
+
 		// Parse multi-select filters
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -1685,7 +1676,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray
 			},
 			pagination: { skip, limit }
 		});
@@ -1847,11 +1838,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	} else {
 		console.log('leadStatus is undefined or has invalid value.');
-	}
-	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
-
-		baseMatch._leadSubStatus = new mongoose.Types.ObjectId(filters.subStatuses);
-
 	}
 
 	pipeline.push({ $match: baseMatch });
@@ -2037,457 +2023,6 @@ function calculateSimpleDocCounts(requiredDocs, uploadedDocs) {
 	};
 }
 
-router.route("/downloadleads").get(isCollege, async (req, res) => {
-	try {
-		const user = req.user;
-		const college = await College.findOne({
-			'_concernPerson._id': user._id
-		});
-
-
-		// Extract filter parameters
-		const {
-			name, courseType, status, leadStatus,
-			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
-			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
-		} = req.query;
-
-		// Parse multi-select filters
-		let projectsArray = [];
-		let verticalsArray = [];
-		let courseArray = [];
-		let centerArray = [];
-		let counselorArray = [];
-
-		try {
-			if (projects) projectsArray = JSON.parse(projects);
-			if (verticals) verticalsArray = JSON.parse(verticals);
-			if (course) courseArray = JSON.parse(course);
-			if (center) centerArray = JSON.parse(center);
-			if (counselor) counselorArray = JSON.parse(counselor);
-		} catch (parseError) {
-			console.error('Error parsing filter arrays:', parseError);
-		}
-
-		// Get team members
-		let teamMembers = [req.user._id];
-
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
-
-
-		let teamMemberIds = [];
-		if (teamMembers?.length > 0) {
-			teamMemberIds = teamMembers.map(member =>
-				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
-			);
-		}
-
-
-		// Build optimized pipeline with only essential fields
-		const pipeline = downloadPipeline({
-			teamMemberIds,
-			college,
-			filters: {
-				name, courseType, status, leadStatus,
-				createdFromDate, createdToDate,
-				modifiedFromDate, modifiedToDate,
-				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
-			}
-		});
-
-
-		// Execute queries in parallel
-		const results = await AppliedCourses.aggregate(pipeline)
-
-		console.log("results", results.length)
-
-		// ✅ CSV fields define karo
-		const fields = [
-			{ label: "Candidate Name", value: "_candidate.name" },
-			{ label: "Email", value: "_candidate.email" },
-			{ label: "Mobile", value: "_candidate.mobile" },
-			{ label: "Course", value: "_course.name" },
-			{ label: "Center", value: "_center.name" },
-
-			{ label: "Status", value: "_leadStatus.title" },
-			{ label: "Sub Status", value: "leadSubStatusTitle" },
-			{ label: "Counsellor", value: "counsellor.name" },
-			{ label: "Registered By", value: "registeredByName" },
-			{ label: "Created At", value: "createdAt" },
-			{ label: "Updated At", value: "updatedAt" }
-		];
-
-		const opts = { fields };
-		const parser = new Parser(opts);
-
-		// ✅ CSV banayo
-		const csv = parser.parse(results);
-
-		// ✅ Response headers set karo
-		res.setHeader("Content-Type", "text/csv");
-		res.setHeader("Content-Disposition", "attachment; filename=leads.csv");
-
-		res.status(200).end(csv);
-
-
-
-
-	} catch (err) {
-		console.error('API Error:', err);
-		res.status(500).json({
-			success: false,
-			message: "Server Error"
-		});
-	}
-});
-
-function downloadPipeline({ teamMemberIds, college, filters }) {
-	const pipeline = [];
-	let baseMatch = {};
-	filters.leadStatus = String(filters.leadStatus);
-	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
-		baseMatch = {
-			kycStage: { $in: [true] },
-		};
-	}
-
-	else {
-		// Base match with essential filters
-		baseMatch = {
-			kycStage: { $ne: true },
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-		};
-	}
-
-
-
-
-
-	if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } }
-		];
-	}
-
-
-	// Add date filters
-	if (filters.createdFromDate || filters.createdToDate) {
-		baseMatch.createdAt = {};
-		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
-		if (filters.createdToDate) {
-			const toDate = new Date(filters.createdToDate);
-			// Add 1 day (24 hours) to the date
-			toDate.setDate(toDate.getDate() + 1);
-			// Set time to 18:30:00.000 (6:30 PM)
-			// Use this modified 'toDate' as the upper limit in the filter
-			baseMatch.createdAt.$lte = toDate;
-		}
-	}
-
-	if (filters.modifiedFromDate || filters.modifiedToDate) {
-		baseMatch.updatedAt = {};
-		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
-		if (filters.modifiedToDate) {
-			const toDate = new Date(filters.modifiedToDate);
-			toDate.setDate(toDate.getDate() + 1);
-
-			baseMatch.updatedAt.$lte = toDate;
-		}
-	}
-
-	if (filters.nextActionFromDate || filters.nextActionToDate) {
-		baseMatch.followupDate = {};
-		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
-		if (filters.nextActionToDate) {
-			const toDate = new Date(filters.nextActionToDate);
-			toDate.setDate(toDate.getDate() + 1);
-
-			baseMatch.followupDate.$lte = toDate;
-		}
-	}
-
-
-	if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
-		// Only set _leadStatus if it's a valid ObjectId string
-		if (mongoose.Types.ObjectId.isValid(filters.leadStatus)) {
-			baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
-		} else {
-			console.log('Invalid leadStatus:', filters.leadStatus);
-		}
-	} else {
-		console.log('leadStatus is undefined or has invalid value.');
-	}
-	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
-
-		baseMatch._leadSubStatus = new mongoose.Types.ObjectId(filters.subStatuses);
-
-	}
-
-	pipeline.push({ $match: baseMatch });
-
-	// Essential lookups only - get minimal required data
-	pipeline.push(
-		{
-			$lookup: {
-				from: 'centers',
-				localField: '_center',
-				foreignField: '_id',
-				as: '_center',
-				pipeline: [
-					{ $match: { college: college._id } },
-					{
-						$project: {
-							name: 1
-						}
-					}
-				]
-			}
-		},
-		{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
-
-		//counselor lookup
-		{
-			$lookup: {
-				from: 'users',
-				localField: 'counsellor',
-				foreignField: '_id',
-				as: 'counsellor',
-				pipeline: [
-					{
-						$project: {
-							name: 1
-						}
-					}
-				]
-			}
-		},
-		{ $unwind: '$counsellor' },
-
-		//registeredBy lookup
-		// Lookup from users
-		{
-			$lookup: {
-				from: 'users',
-				localField: 'registeredBy',
-				foreignField: '_id',
-				as: 'registeredUser',
-				pipeline: [
-					{ $project: { name: 1 } }
-				]
-			}
-		},
-		// Lookup from sources
-		{
-			$lookup: {
-				from: 'sources',
-				localField: 'registeredBy',
-				foreignField: '_id',
-				as: 'registeredSource',
-				pipeline: [
-					{ $project: { name: 1 } }
-				]
-			}
-		},
-		// Add a common field "registeredByName"
-		{
-			$addFields: {
-				registeredByName: {
-					$cond: {
-						if: { $gt: [{ $size: "$registeredUser" }, 0] },
-						then: { $arrayElemAt: ["$registeredUser.name", 0] },
-						else: { $arrayElemAt: ["$registeredSource.name", 0] }
-					}
-				}
-			}
-		},
-		// Optionally remove extra arrays
-		{
-			$project: {
-				registeredUser: 0,
-				registeredSource: 0
-			}
-		},
-
-
-		// Course lookup with college filter
-		{
-			$lookup: {
-				from: 'courses',
-				localField: '_course',
-				foreignField: '_id',
-				as: '_course',
-				pipeline: [
-					{ $match: { college: college._id } },
-					{
-						$project: {
-							name: 1
-						}
-					}
-				]
-			}
-		},
-		{ $unwind: '$_course' },
-
-		// Candidate lookup - only essential fields
-		{
-			$lookup: {
-				from: 'candidateprofiles',
-				localField: '_candidate',
-				foreignField: '_id',
-				as: '_candidate',
-				pipeline: [
-					{
-						$project: {
-							_id: 1,
-							name: 1,
-							email: 1,
-							mobile: 1
-						}
-					}
-				]
-			}
-		},
-		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
-
-		// Status lookup - only title and milestone
-		{
-			$lookup: {
-				from: 'status',
-				localField: '_leadStatus',
-				foreignField: '_id',
-				as: '_leadStatus',
-				pipeline: [
-					{
-						$project: {
-							title: 1,
-							substatuses: 1
-						}
-					}
-				]
-			}
-		},
-		{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
-	);
-
-	// Apply additional filters
-	const additionalFilters = {};
-
-	if (filters.courseType) {
-		additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
-	}
-	if (filters.projectsArray.length > 0) {
-		additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-	if (filters.verticalsArray.length > 0) {
-		additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-	if (filters.courseArray.length > 0) {
-		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-
-	// Name search
-	if (filters.name && filters.name.trim()) {
-		const searchTerm = filters.name.trim();
-		const searchRegex = new RegExp(filters.name.trim(), 'i');
-		additionalFilters.$or = [
-			{ '_candidate.name': searchRegex },
-			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-			{ '_candidate.email': searchRegex }
-		];
-	}
-
-	if (Object.keys(additionalFilters).length > 0) {
-		pipeline.push({ $match: additionalFilters });
-	}
-
-	pipeline.push({
-		$addFields: {
-			leadSubStatusTitle: {
-				$let: {
-					vars: {
-						matched: {
-							$first: {
-								$filter: {
-									input: "$_leadStatus.substatuses",
-									cond: { $eq: ["$$this._id", "$_leadSubStatus"] }
-								}
-							}
-						}
-					},
-					in: "$$matched.title"
-				}
-			}
-		}
-	});
-
-
-	pipeline.push({
-		$addFields: {
-			leadSubStatusTitle: {
-				$let: {
-					vars: {
-						matched: {
-							$first: {
-								$filter: {
-									input: "$_leadStatus.substatuses",
-									cond: { $eq: ["$$this._id", "$_leadSubStatus"] }
-								}
-							}
-						}
-					},
-					in: "$$matched.title"
-				}
-			}
-		}
-	});
-
-
-	// Project only essential fields
-	pipeline.push({
-		$project: {
-			_id: 1,
-			_candidate: 1,
-			createdAt: 1,
-			updatedAt: 1,
-			_course: 1,
-			_leadStatus: 1,
-			_center: 1,
-			registeredBy: 1,
-			counsellor: 1,
-			leadSubStatusTitle: 1,
-			registeredByName: 1,
-		}
-	});
-
-	return pipeline;
-}
-
-
-
 
 
 router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => {
@@ -2500,8 +2035,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor,
-			subStatuses
+			projects, verticals, course, center, counselor
 		} = req.query;
 
 
@@ -2527,8 +2061,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			createdFromDate, createdToDate,
 			modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projectsArray, verticalsArray, courseArray, centerArray,
-			subStatuses
+			projectsArray, verticalsArray, courseArray, centerArray
 		}
 
 
@@ -2666,11 +2199,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 				toDate.setDate(toDate.getDate() + 1);
 				dateFilters.followupDate.$lte = toDate;
 			}
-		}
-
-		if (appliedFilters.subStatuses && appliedFilters.subStatuses !== 'undefined') {
-			basePipeline[0].$match._leadSubStatus = new mongoose.Types.ObjectId(appliedFilters.subStatuses);
-			movedInKYCPipeline[0].$match._leadSubStatus = new mongoose.Types.ObjectId(appliedFilters.subStatuses);
 		}
 
 		if (Object.keys(dateFilters).length > 0) {
@@ -4865,10 +4393,9 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			doc._leadSubStatus = _leadSubStatus;
 		}
 		let lastFollowup = await B2cFollowup.findOne({ appliedCourseId: doc._id, status: 'planned' });
-		if (lastFollowup) {
-			lastFollowup.status = 'done'
-		}
-
+		if (lastFollowup) {	
+			lastFollowup.status = 'done'}
+						
 		// If followup date and time is set or updated, log the change and update the followup
 		if (followup && lastFollowup?.followupDate?.toISOString() !== new Date(followup).toISOString()) {
 			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
@@ -5230,7 +4757,7 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } }, { new: true }
 		).sort({ createdAt: -1 });
 
-		// console.log("b2cFollowup", b2cFollowup)
+		console.log("b2cFollowup", b2cFollowup)
 
 		if (!b2cFollowup) {
 			return res.status(404).json({ success: false, message: 'Followup not found' });
@@ -5248,7 +4775,7 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 		},
 			{ $push: { logs: newLogEntry } }, { new: true }
 		);
-		// console.log("appliedcourse", appliedcourse)
+		console.log("appliedcourse", appliedcourse)
 
 		// const newStatusLogs = await statusLogHelper(id, {
 		// 	followupCompleted: true
@@ -5274,37 +4801,15 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 
 router.get('/followupcounts', isCollege, async (req, res) => {
 	try {
-		console.log('req.query', req.query)
 
 		const user = req.user;
 
-		let { fromDate, toDate } = req.query;
-
-		if (fromDate && fromDate !== 'null') {
-			fromDate = new Date(fromDate);
-			if (isNaN(fromDate.getTime())) {
-				console.log('Invalid fromDate format')
-				return res.status(400).json({ error: "Invalid fromDate format" });
-			}
-		} else {
-			fromDate = new Date(new Date().setHours(0, 0, 0, 0));
-		}
-		if (toDate && toDate !== 'null') {
-			toDate = new Date(toDate);
-			if (isNaN(toDate.getTime())) {
-				console.log('Invalid toDate format')
-				return res.status(400).json({ error: "Invalid toDate format" });
-			}
-		} else {
-			toDate = new Date(new Date().setHours(23, 59, 59, 999));
-		}
-
-
+		const { fromDate, toDate } = req.query;
 		const followupCounts = await B2cFollowup.aggregate([
 			{
 				$match: {
 					createdBy: user._id,
-					followupDate: { $gte: fromDate, $lte: toDate }
+					createdAt: { $gte: new Date(fromDate), $lte: new Date(toDate) }
 				}
 			},
 			{
@@ -6111,16 +5616,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			},
 			{ $unwind: '$_course' },
-			{
-				$lookup:{
-					from: 'users',
-					localField: 'counsellor',
-					foreignField: '_id',
-					as: 'counsellor'
 
-				}
-			},
-			{ $unwind: { path: '$counsellor', preserveNullAndEmptyArrays: true } },
 			// Lead Status lookup
 			{
 				$lookup: {
@@ -6493,13 +5989,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		// Apply pagination
 		const paginatedResult = results.slice(skip, skip + limit);
-
-		for (const result of paginatedResult) {
-			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
-			result.followup = followup
-		}
-
-		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
 
 		res.status(200).json({
 			success: true,
@@ -6933,118 +6422,117 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		const user = req.user;
 		const collegeId = req.college._id;
 		// console.log("req", req.college._id);
-		let { appliedCourseId, followupDate, remarks, folloupType, id } = req.body;
+		let { appliedCourseId, followupDate, remarks , folloupType } = req.body;
 
-
-		if (!folloupType) {
+		if(!folloupType) {
 			folloupType = 'new';
 		}
 
 		if (folloupType === 'new') {
 
-			if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
-				appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
-			}
-
-			const existingFollowup = await B2cFollowup.findOne({ appliedCourseId, createdBy: user._id, status: 'planned' });
-
-			if (existingFollowup) {
-				return res.status(400).json({ status: false, message: "Followup already exists, Please update the followup" });
-			}
-
-
-			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
-
-			if (!followup) {
-				return res.status(400).json({ status: false, message: "Followup not created" });
-			}
-
-			let actionParts = [];
-			actionParts.push(`Followup added to ${new Date(followupDate).toLocaleString()}`);
-
-
-			if (remarks) {
-				//   actionParts.push(`Remarks updated: "${remarks}"`);
-				actionParts.push(`Remarks updated`);  // Remarks included 
-
-			}
-
-
-			const newLogEntry = {
-				user: user._id,
-				action: actionParts.join('; '), // Combine all actions in one log message
-				remarks: remarks || '', // Optional remarks in the log
-				timestamp: new Date() // Add timestamp if your schema supports it
-			};
-
-			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks },
-				$push: { logs: newLogEntry }
-			});
-
-			if (!updateAppliedRemarks) {
-				return res.status(400).json({ status: false, message: "Applied course remarks not updated" });
-			}
-
-
-
-
-
-
-			return res.status(200).json({ status: true, message: "Followup created successfully", data: followup });
-
+		if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
+			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
 		}
-		else if (folloupType === 'update') {
-			const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned' });
+		
+		const existingFollowup = await B2cFollowup.findOne({ appliedCourseId, createdBy: user._id , status: 'planned'});
 
-			if (!existingFollowup) {
-				return res.status(400).json({ status: false, message: "Followup not found" });
-			}
+		if (existingFollowup) {
+			return res.status(400).json({ status: false, message: "Followup already exists, Please update the followup" });
+		}
 
 
-			existingFollowup.status = 'done';
-			existingFollowup.updatedBy = user._id;
-			existingFollowup.updatedAt = new Date();
+		const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
 
-			const updatedFollowup = await existingFollowup.save({ new: true });
-			const newFollowup = await B2cFollowup.create({
-				appliedCourseId: appliedCourseId,
-				followupDate: followupDate,
-				remarks: remarks,
-				status: 'planned',
-				createdBy: user._id,
-				collegeId: collegeId
-			});
-			let actionParts = [];
-			actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
-			if (remarks) {
-				actionParts.push(`Remarks updated`);
-			}
+		if (!followup) {
+			return res.status(400).json({ status: false, message: "Followup not created" });
+		}
 
-			const newLogEntry = {
-				user: user._id,
-				action: actionParts.join('; '),
-				remarks: remarks || '',
-				timestamp: new Date()
-			};
+		let actionParts = [];
+		actionParts.push(`Followup added to ${new Date(followupDate).toLocaleString()}`);
 
-			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks },
-				$push: { logs: newLogEntry }
-			});
 
-			return res.status(200).json({ status: true, message: "Followup updated successfully", data: updatedFollowup });
-
+		if (remarks) {
+			//   actionParts.push(`Remarks updated: "${remarks}"`);
+			actionParts.push(`Remarks updated`);  // Remarks included 
 
 		}
 
+
+		const newLogEntry = {
+			user: user._id,
+			action: actionParts.join('; '), // Combine all actions in one log message
+			remarks: remarks || '', // Optional remarks in the log
+			timestamp: new Date() // Add timestamp if your schema supports it
+		};
+
+		const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
+			$set: { remarks: remarks },
+			$push: { logs: newLogEntry }
+		});
+
+		if (!updateAppliedRemarks) {
+			return res.status(400).json({ status: false, message: "Applied course remarks not updated" });
+		}
+
+
+
+
+
+
+		return res.status(200).json({ status: true, message: "Followup created successfully", data: followup });
+
+	}
+	else if (folloupType === 'update') {
+		const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned'});
+
+		if (!existingFollowup) {
+			return res.status(400).json({ status: false, message: "Followup not found" });
+		}
+
+	
+		existingFollowup.status = 'done';
+		existingFollowup.updatedBy = user._id;
+		existingFollowup.updatedAt = new Date();
+
+		const updatedFollowup = await existingFollowup.save({new:true});
+		const newFollowup = new B2cFollowup({
+			appliedCourseId: appliedCourseId,
+			followupDate: new Date(followupDate),
+			remarks: remarks,
+			status: 'planned',
+			createdBy: user._id,
+			collegeId: collegeId
+		});
+		await newFollowup.save();
+		let actionParts = [];
+		actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
+		if (remarks) {
+			actionParts.push(`Remarks updated`);
+		}
+
+		const newLogEntry = {
+			user: user._id,
+			action: actionParts.join('; '),
+			remarks: remarks || '',
+			timestamp: new Date()
+		};
+
+		const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
+			$set: { remarks: remarks },
+			$push: { logs: newLogEntry }
+		});
+
+		return res.status(200).json({ status: true, message: "Followup updated successfully", data: updatedFollowup });
+		
+
+	}
+		
 
 	} catch (err) {
 		console.log(err);
 		return res.status(500).send({ status: false, message: err.message });
 	}
 });
-
 
 router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
@@ -7125,8 +6613,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 
 
 
-
 		const followups = await B2cFollowup.aggregate(aggregate);
+
 		// const followups = await B2cFollowup.aggregate(aggregate).populate({
 		// 	path: 'appliedCourseId',
 		// 	select: 'name mobile email'
@@ -7160,7 +6648,7 @@ router.get("/lead-history/:leadId", isCollege, async (req, res) => {
 
 
 		const logs = lead.logs;
-		// console.log("logs", logs)
+		console.log("logs", logs)
 
 		// const logsData = logs.map(log => {
 		// 	return {
@@ -7739,12 +7227,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 		const paginatedResult = results.slice(skip, skip + limit);
-		for (const result of paginatedResult) {
-			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
-			result.followup = followup
-		}
-		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
-
 		res.status(200).json({
 			success: true,
 			count: paginatedResult.length,

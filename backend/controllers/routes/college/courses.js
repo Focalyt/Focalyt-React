@@ -393,7 +393,6 @@ router
 			const courseId = req.params.id;
 			const { files } = req;
 			let body = req.body;
-			console.log(body, 'body')
 			if (Array.isArray(body.sectors)) {
 				// If the first element is a string (ObjectId in string format), convert each element in the array to an ObjectId
 				body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
@@ -420,7 +419,6 @@ router
 
 			const courseName = body.name || existingCourse.name || 'unnamed';
 
-			console.log(body, 'body 2');
 
 
 			// Parse JSON fields (if present in body)
@@ -505,7 +503,6 @@ router
 				body.brochure = existingCourse.brochure;
 			}
 
-			console.log(body, 'body2');
 
 			// Update the course
 			const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true });
