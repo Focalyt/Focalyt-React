@@ -268,11 +268,39 @@ function About() {
                     <div className="container bg-white">
                         <div className="Partners">
                             <h3 className="affiliated_partner bg-white">Affiliated Training Partner</h3>
-                            <div className="row">
-                                <div className="col-md-12">
+                            <div className="row align-items-center justify-content-center gap-2">
+                                <div className="col-md-2">
                                     <div className="affilated_partner_image">
                                         <figure>
-                                            <img src="/Assets/public_assets/images/brand.png" alt="" />
+                                            <img src="/Assets/public_assets/images/bfsi.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/ess.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/mesc.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/thsc.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                                <div className="col-md-2">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/telecom.jpg" alt="" />
                                         </figure>
                                     </div>
                                 </div>
@@ -357,6 +385,13 @@ function About() {
                                         The Samsung Innovation Campus is a global CSR (Corporate Social Responsibility) program that equips youth with essential skills in advanced technologies like AI, IoT, Big Data, and coding, as well as crucial soft skills for the Fourth Industrial Revolution.
                                     </p>
                                 </div>
+                                <div className="col-md-5 mx-auto">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/college.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -370,7 +405,7 @@ function About() {
                                 <div className="col-md-12">
                                     <div className="text-center pt-3 pb-5">
                                         <h2 className="focalyt_Team text-white">Focalyt Team</h2>
-                                    </div>
+                                    </div>``
                                 </div>
                                 <div class="col-md-12">
                                     <div class="row justify-content-evenly ">
@@ -475,7 +510,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- trainig centers  --> */}
-                <section>
+                <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Training Centres</h3>
@@ -510,7 +545,7 @@ function About() {
                 </section>
 
                 {/* <!-- mobilization  --> */}
-                <section>
+                <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Mobilization</h3>
@@ -665,7 +700,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- Placement --> */}
-                <section>
+                <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Placement and Entrepreneurship</h3>
@@ -702,7 +737,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- Media Coverage  --> */}
-                <section>
+                <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title text-white">Media Coverage</h3>
@@ -792,7 +827,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- Project Launches  --> */}
-                <section className="bg-white">
+                <section className="bg-white" style={{backgroundColor: '#000'}} >
                     <div className="container">
                         <div className="text-center">
                             <h3 className="section-title">Project Launches</h3>
@@ -845,7 +880,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- Awards and Recognition  --> */}
-                <section>
+                <section style={{backgroundColor: '#000'}}>
                     <div className="container training-centres">
                         <div className="text-center">
                             <h3 className="section-title">Awards and Recognition</h3>
@@ -1408,6 +1443,14 @@ font-size: 21px;}
     .mainArea {
       margin-bottom: 20px; 
     }
+      .affilated_partner_image {
+    width: 100%;
+    padding: 5px 0 25px 0;
+    margin: 0 40px;
+}
+      .affilated_partner_image figure img{
+      width:70%;
+      }
   }
   
         `
