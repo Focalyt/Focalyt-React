@@ -304,7 +304,31 @@ const MyFollowups = () => {
     });
   };
 
+  // Add this useEffect to handle clicking outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any multi-select dropdown
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
 
+      if (!isMultiSelectClick) {
+        // Close all dropdowns
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -3271,9 +3295,9 @@ const MyFollowups = () => {
                 <div className="col-md-6">
                   <div className="d-flex justify-content-end align-items-center gap-2">
                     <div className="input-group" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height">
+                      {/* <span className="input-group-text bg-white border-end-0 input-height">
                         <i className="fas fa-search text-muted"></i>
-                      </span>
+                      </span> */}
                       <input
                         type="text"
                         name="name"
@@ -3283,7 +3307,7 @@ const MyFollowups = () => {
                         onChange={handleFilterChange}
                       />
                       <button
-                          onClick={() => fetchProfileData(filterData) }
+                          onClick={() => fetchProfileData() }
                           className={`btn btn-outline-primary`}
                           style={{ whiteSpace: 'nowrap' }}
                         >
@@ -3317,7 +3341,7 @@ const MyFollowups = () => {
                         </span>
                       )}
                     </button>
-                    <div className="btn-group">
+                    {/* <div className="btn-group">
                       <button
                         onClick={() => setViewMode('grid')}
                         className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -3330,7 +3354,7 @@ const MyFollowups = () => {
                       >
                         <i className="fas fa-list"></i>
                       </button>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 

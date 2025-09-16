@@ -89,6 +89,7 @@ module.exports.CandidateVisitCalender = require("./candidateVisitCalender");
 module.exports.AttendanceTracking = require("./attendanceTracking");
 module.exports.StatusLogs = require("./statusLogs");
 module.exports.B2cFollowup = require("./b2cFollowup");
+module.exports.DripMarketingRule = require("./dripMarkettingRule");
 // module.exports.Manager = required("");
 
 

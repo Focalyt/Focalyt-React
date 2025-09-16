@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import DatePicker from 'react-date-picker';
 import axios from 'axios';
 
@@ -35,10 +35,28 @@ if (typeof document !== 'undefined') {
 const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select options" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [selectedValues, setSelectedValues] = useState(value || []);
+    const dropdownRef = useRef(null);
 
     useEffect(() => {
         setSelectedValues(value || []);
     }, [value]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
 
     const handleToggle = (optionValue) => {
         const newValues = selectedValues.includes(optionValue)
@@ -57,7 +75,7 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
     };
 
     return (
-        <div className="multiselect-dropdown position-relative">
+        <div className="multiselect-dropdown position-relative" ref={dropdownRef}>
             <div
                 className="form-select d-flex align-items-center justify-content-between"
                 style={{ cursor: 'pointer' }}
@@ -77,22 +95,22 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
             {isOpen && (
                 <div className="multiselect-options position-absolute w-100 bg-white border rounded shadow" style={{ zIndex: 10, top: '100%' }}>
                     {options?.length > 0 &&
-                    options?.map((option) => (
-                        <div
-                            key={option.value}
-                            className="multiselect-option p-2 d-flex align-items-center"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => handleToggle(option.value)}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedValues.includes(option.value)}
-                                onChange={() => { }} 
-                                className="me-2"
-                            />
-                            <span>{option.label}</span>
-                        </div>
-                    ))}
+                        options?.map((option) => (
+                            <div
+                                key={option.value}
+                                className="multiselect-option p-2 d-flex align-items-center"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => handleToggle(option.value)}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedValues.includes(option.value)}
+                                    onChange={() => { }}
+                                    className="me-2"
+                                />
+                                <span>{option.label}</span>
+                            </div>
+                        ))}
                 </div>
             )}
         </div>
@@ -113,13 +131,13 @@ const DripMarketing = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
-    
+
     const [statuses, setStatuses] = useState([]);
     const [subStatuses, setSubStatuses] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedSubStatus, setSelectedSubStatus] = useState('');
     const [verticals, setVerticals] = useState([]);
-    const [projects , setProjects] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [selectedVertical, setSelectedVertical] = useState(null);
     const [selectedProject, setSelectedProject] = useState(null);
     const [error, setError] = useState(null);
@@ -129,7 +147,7 @@ const DripMarketing = () => {
     const [batches, setBatches] = useState([]);
     const [leadOwner, setLeadOwner] = useState([]);
     const [registeredBy, setRegisteredBy] = useState([]);
-    const [jobName , setJobName] = useState([]);
+    const [jobName, setJobName] = useState([]);
 
     useEffect(() => {
         fetchRules();
@@ -145,38 +163,38 @@ const DripMarketing = () => {
         fetchVerticals();
     }, [token]);
 
- const [dropdownStates, setDropdownStates] = useState({
-  verticals: false,
-  projects: false,
-  statuses: false,
-  subStatuses: false
- });
+    const [dropdownStates, setDropdownStates] = useState({
+        verticals: false,
+        projects: false,
+        statuses: false,
+        subStatuses: false
+    });
 
-  // Add this useEffect to handle clicking outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multiselect-dropdown');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+    const [ruleData, setRuleData] = useState({
+        startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
+        description: '',
+        name: '',
+        conditionBlocks: [],
+        interBlockLogicOperator: 'and',
+        primaryAction: {
+            activityType: '',
+            values: [],
+        },
+        additionalActions: [
+            {
+                activityType: '',
+                values: [],
+            },
+        ],
+        communication: {
+            executionType: '',
+            mode: '',
+            occurrenceCount: '',
+        },
+    });
 
 
     useEffect(() => {
@@ -187,14 +205,14 @@ const DripMarketing = () => {
         }
     }, [verticals, token]);
 
-useEffect(()=>{
-    fetchCenters();
-},[])
+    useEffect(() => {
+        fetchCenters();
+    }, [])
     const handleVerticalChange = (verticalId) => {
-      
+
         const selectedVertical = verticals.find(v => v.id === verticalId);
         setSelectedVertical(selectedVertical);
-       
+
     };
 
     // Function to clear vertical selection and fetch all projects
@@ -202,10 +220,10 @@ useEffect(()=>{
         setSelectedVertical(null);
         setProjects([]);
         fetchProjects();
-        setCenters([]); 
+        setCenters([]);
     };
 
-    
+
     const fetchVerticals = async () => {
         try {
             if (!token) {
@@ -214,8 +232,8 @@ useEffect(()=>{
             }
 
             const newVertical = await axios.get(`${backendUrl}/college/dripmarketing/getVerticals`, { headers: { 'x-auth': token } });
-    
-    
+
+
             // Check if data exists and is an array
             if (newVertical.data && newVertical.data.data && Array.isArray(newVertical.data.data)) {
                 const verticalList = newVertical.data.data.map(v => ({
@@ -223,10 +241,10 @@ useEffect(()=>{
                     name: v.name,
                     status: v.status === true ? 'active' : 'inactive',
                     code: v.description,
-                    projects: v.projects, 
+                    projects: v.projects,
                     createdAt: v.createdAt
                 }));
-    
+
                 setVerticals(verticalList);
             } else {
                 console.warn('No verticals data found or data is not an array');
@@ -239,20 +257,20 @@ useEffect(()=>{
     };
 
     const fetchProjects = async (selectedVerticalId = null) => {
-              
+
         // Use the passed parameter or fall back to selectedVertical
         let verticalId = selectedVerticalId || selectedVertical?.id;
-        
-        
+
+
         if (!token) {
             console.warn('No authentication token available');
             setError('Authentication required');
             return;
         }
-    
+
         setLoading(true);
         setError(null);
-    
+
         try {
             // let url = `${backendUrl}/college/dripmarketing/list-projects`;
             let url = `${backendUrl}/college/dripmarketing/list_all_projects`;
@@ -261,24 +279,24 @@ useEffect(()=>{
             if (verticalId) {
                 url += `?vertical=${verticalId}`;
             }
-           
-            
-         
-            
+
+
+
+
             const response = await axios.get(url, {
                 headers: {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 }
             });
-            
-            
-            
+
+
+
             if (response.data && response.data.success && Array.isArray(response.data.data)) {
                 setProjects(response.data.data);
-               
+
             } else {
-               
+
                 setProjects([]);
                 setError('No projects found');
             }
@@ -290,15 +308,15 @@ useEffect(()=>{
             setLoading(false);
         }
     };
-    
+
     const fetchCenters = async () => {
         // Get projectId from selectedProject prop or URL (for refresh cases)
-        const projectId = selectedProject?._id ;
+        const projectId = selectedProject?._id;
 
         setLoading(true);
         setError(null);
         try {
-           
+
             const response = await fetch(`${backendUrl}/college/dripmarketing/list-centers`, {
                 headers: {
                     'x-auth': token,
@@ -307,10 +325,10 @@ useEffect(()=>{
             if (!response.ok) throw new Error('Failed to fetch centers');
 
             const data = await response.json();
-            
+
             if (data.success) {
                 setCenters(data.data);
-               
+
             } else {
                 setError('Failed to load centers');
             }
@@ -328,7 +346,7 @@ useEffect(()=>{
             });
             if (response.data.success) {
                 setCourseName(response.data.data);
-            
+
             }
         }
         catch (error) {
@@ -338,27 +356,27 @@ useEffect(()=>{
     const fetchBatches = async () => {
         setLoading(true);
         setError('');
-  
+
         try {
-          const response = await axios.get(`${backendUrl}/college/dripmarketing/get_batches`, {
-           
-            headers: {
-              'x-auth': token  // Pass the token in the headers for authentication
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/get_batches`, {
+
+                headers: {
+                    'x-auth': token  // Pass the token in the headers for authentication
+                }
+            });
+
+            if (response.data.success) {
+                setBatches(response.data.data);
+            } else {
+                setError('Failed to fetch batches');
             }
-          });
-  
-          if (response.data.success) {
-            setBatches(response.data.data);
-          } else {
-            setError('Failed to fetch batches');
-          }
         } catch (err) {
-          console.error('Error fetching batches:', err);
-          setError('Server error');
+            console.error('Error fetching batches:', err);
+            setError('Server error');
         } finally {
-          setLoading(false);
+            setLoading(false);
         }
-      };
+    };
 
     const fetchleadOwnwer = async () => {
         try {
@@ -374,7 +392,7 @@ useEffect(()=>{
             if (response.data.success) {
                 setLeadOwner(response.data.concernPersons);
                 setRegisteredBy(response.data.concernPersons);
-             
+
             } else {
                 console.error('Failed to fetch concern persons:', response.data.message);
             }
@@ -393,19 +411,19 @@ useEffect(()=>{
                 return;
             }
 
-          const response = await axios.get(`${backendUrl}/college/dripmarketing/joblisting`, {
-            headers: { 'x-auth': token }
-          });
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/joblisting`, {
+                headers: { 'x-auth': token }
+            });
 
-          setJobName(response.data.data);
-       
+            setJobName(response.data.data);
+
         } catch (error) {
-          console.error("Error fetching course data:", error);
+            console.error("Error fetching course data:", error);
         }
-      };
+    };
 
     // Fetch all statuses
-   
+
     const fetchStatuses = async () => {
         try {
             if (!token) {
@@ -419,19 +437,19 @@ useEffect(()=>{
 
             if (response.data.success) {
                 setStatuses(response.data.data);
-                
+
             }
         } catch (error) {
             console.error('Error fetching statuses:', error);
         }
     };
-useEffect(() => {
-    fetchSubStatuses();
-}, []);
+    useEffect(() => {
+        fetchSubStatuses();
+    }, []);
     // Fetch sub-statuses based on selected status
     const fetchSubStatuses = async () => {
         try {
-           
+
 
             const response = await axios.get(`${backendUrl}/college/dripmarketing/substatus`, {
                 headers: { 'x-auth': token }
@@ -439,7 +457,7 @@ useEffect(() => {
 
             if (response.data.success) {
                 setSubStatuses(response.data.data);
-               
+
             }
         } catch (error) {
             console.error('Error fetching sub-statuses:', error);
@@ -449,7 +467,7 @@ useEffect(() => {
     // Handle status change
     const handleStatusChange = (statusId) => {
         setSelectedStatus(statusId);
-       
+
     };
 
 
@@ -474,6 +492,94 @@ useEffect(() => {
         ]);
     }
 
+
+    const handleAddRule = async () => {
+        try {
+           
+            const requestData = {
+                name: ruleData.name,
+                description: ruleData.description,
+                startDate: ruleData.startDate,
+                startTime: ruleData.startTime,
+                endDate: ruleData.endDate,
+                endTime: ruleData.endTime,
+                conditionBlocks: ruleData.conditionBlocks.map(block => ({
+                    conditions: block.conditions.filter(condition => 
+                        condition.activityType && condition.operator && condition.values.length > 0
+                    ).map(condition => ({
+                        activityType: condition.activityType,
+                        operator: condition.operator,
+                        values: condition.values,
+                    })),
+                    intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
+                })).filter(block => block.conditions.length > 0),
+                interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
+                primaryAction: {
+                    activityType: ruleData.primaryAction.activityType,
+                    values: ruleData.primaryAction.values,
+                },
+                additionalActions: ruleData.additionalActions.filter(action => 
+                    action.activityType && action.values.length > 0
+                ).map(action => ({
+                    activityType: action.activityType,
+                    values: action.values,
+                })),
+                communication: {
+                    executionType: ruleData.communication.executionType,
+                    mode: ruleData.communication.mode,
+                    occurrenceCount: ruleData.communication.occurrenceCount,
+                },
+            };
+           
+            console.log(requestData, 'requestData')
+
+
+
+            const responseData = await axios.post(`${backendUrl}/college/dripmarketing/create-dripmarketing-rule`, requestData, {
+                headers: {
+                    'x-auth': token
+                }
+            });
+
+            if (responseData.data.success) {
+                alert('Rule created successfully!');
+                setRuleData({
+                    startDate: '',
+                    endDate: '',
+                    startTime: '',
+                    endTime: '',
+                    description: '',
+                    name: '',
+                    conditionBlocks: [],
+                    interBlockLogicOperator: 'and',
+                    primaryAction: {
+                        activityType: '',
+                        values: [],
+                    },
+                    additionalActions: [
+                        {
+                            activityType: '',
+                            values: [],
+                        },
+                    ],
+                    communication: {
+                        executionType: '',
+                        mode: '',
+                        occurrenceCount: '',
+                    },
+                });
+            }
+
+            console.log('responseData', responseData)
+
+        }
+        catch (error) {
+            console.error('Error adding rule:', error);
+            setError('Error creating rule. Please try again.');
+        }
+
+
+    }
 
     const [activeTab, setActiveTab] = useState({});
     const [condition, setCondition] = useState([]);
@@ -507,10 +613,18 @@ useEffect(() => {
 
     const [startDate, setStartDate] = useState(null);
     const [startTime, setStartTime] = useState('');
+    const [endDate, setEndDate] = useState(null);
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [conditionBlocks, setConditionBlocks] = useState([]);
+    const [interBlockLogicOperator, setInterBlockLogicOperator] = useState('and');
+    const [primaryAction, setPrimaryAction] = useState({});
+    const [additionalActions, setAdditionalActions] = useState([]);
+    const [communication, setCommunication] = useState({});
 
     // Mapping of activity types to their corresponding value options
     const activityTypeValueOptions = {
-              
+
         state: [
             { value: "andaman-nicobar", label: "Andaman and Nicobar Islands" },
             { value: "andhra-pradesh", label: "Andhra Pradesh" },
@@ -551,7 +665,7 @@ useEffect(() => {
             { value: "west-bengal", label: "West Bengal" }
         ],
         status: [],
-        subStatus: [], 
+        subStatus: [],
         leadOwner: [],
         registeredBy: [],
         courseName: [],
@@ -587,7 +701,7 @@ useEffect(() => {
                 value: project._id,
                 label: project.name
             }));
-        } else if(activityType === 'batch'){
+        } else if (activityType === 'batch') {
             return batches.map(batch => ({
                 value: batch._id,
                 label: batch.name
@@ -623,41 +737,219 @@ useEffect(() => {
 
     // Mapping for THEN section value options
     const thenValueOptions = {
-        campaign: [ // Campaign
-            { value: "bulk_upload", label: "Bulk Upload" },
-            { value: "digital_organic", label: "Digital Organic" },
-            { value: "social_media", label: "Social Media" },
-            { value: "email_marketing", label: "Email Marketing" }
+        state: [
+            { value: "andaman-nicobar", label: "Andaman and Nicobar Islands" },
+            { value: "andhra-pradesh", label: "Andhra Pradesh" },
+            { value: "arunachal-pradesh", label: "Arunachal Pradesh" },
+            { value: "assam", label: "Assam" },
+            { value: "bihar", label: "Bihar" },
+            { value: "chandigarh", label: "Chandigarh" },
+            { value: "chhattisgarh", label: "Chhattisgarh" },
+            { value: "dadra-nagar-haveli", label: "Dadra and Nagar Haveli" },
+            { value: "daman-diu", label: "Daman and Diu" },
+            { value: "delhi", label: "Delhi" },
+            { value: "goa", label: "Goa" },
+            { value: "gujarat", label: "Gujarat" },
+            { value: "haryana", label: "Haryana" },
+            { value: "himachal-pradesh", label: "Himachal Pradesh" },
+            { value: "jammu-kashmir", label: "Jammu and Kashmir" },
+            { value: "jharkhand", label: "Jharkhand" },
+            { value: "karnataka", label: "Karnataka" },
+            { value: "kerala", label: "Kerala" },
+            { value: "ladakh", label: "Ladakh" },
+            { value: "lakshadweep", label: "Lakshadweep" },
+            { value: "madhya-pradesh", label: "Madhya Pradesh" },
+            { value: "maharashtra", label: "Maharashtra" },
+            { value: "manipur", label: "Manipur" },
+            { value: "meghalaya", label: "Meghalaya" },
+            { value: "mizoram", label: "Mizoram" },
+            { value: "nagaland", label: "Nagaland" },
+            { value: "odisha", label: "Odisha" },
+            { value: "puducherry", label: "Puducherry" },
+            { value: "punjab", label: "Punjab" },
+            { value: "rajasthan", label: "Rajasthan" },
+            { value: "sikkim", label: "Sikkim" },
+            { value: "tamil-nadu", label: "Tamil Nadu" },
+            { value: "telangana", label: "Telangana" },
+            { value: "tripura", label: "Tripura" },
+            { value: "uttar-pradesh", label: "Uttar Pradesh" },
+            { value: "uttarakhand", label: "Uttarakhand" },
+            { value: "west-bengal", label: "West Bengal" }
         ],
-        channel: [ // Channel
-            { value: "facebook_ads", label: "Facebook Ads" },
-            { value: "google_ads", label: "Google Ads" },
-            { value: "instagram", label: "Instagram" },
-            { value: "whatsapp", label: "WhatsApp" },
-            { value: "sms", label: "SMS" }
-        ]
+        status: [],
+        subStatus: [],
+        leadOwner: [],
+        registeredBy: [],
+        courseName: [],
+        jobName: [],
+        project: [],
+        vertical: [],
+        center: [],
+        course: [],
+        batch: []
     };
 
     // Function to get THEN value options
     const getThenValueOptions = (activityType) => {
+        if (activityType === 'status') {
+            return statuses.map(status => ({
+                value: status._id,
+                label: status.title
+            }));
+        } else if (activityType === 'subStatus') {
+            return subStatuses.map(subStatus => ({
+                value: subStatus._id,
+                label: subStatus.title
+            }));
+        } else if (activityType === 'vertical') {
+            return verticals.map(vertical => ({
+                value: vertical.id,
+                label: vertical.name
+            }));
+        } else if (activityType === 'project') {
+            return projects.map(project => ({
+                value: project._id,
+                label: project.name
+            }));
+        } else if (activityType === 'batch') {
+            return batches.map(batch => ({
+                value: batch._id,
+                label: batch.name
+            }));
+        } else if (activityType === 'center') {
+            return centers.map(center => ({
+                value: center._id,
+                label: center.name
+            }));
+        } else if (activityType === 'course') {
+            return courseName.map(course => ({
+                value: course._id,
+                label: course.name
+            }));
+        } else if (activityType === 'leadOwner') {
+            return leadOwner.map(owner => ({
+                value: owner._id,
+                label: owner.name
+            }));
+        } else if (activityType === 'registeredBy') {
+            return registeredBy.map(registeredBy => ({
+                value: registeredBy._id,
+                label: registeredBy.name
+            }));
+        } else if (activityType === 'jobName') {
+            return jobName?.map(job => ({
+                value: job?._id,
+                label: job?.title
+            }));
+        }
         return thenValueOptions[activityType] || [];
     };
 
     const thenFirstValueOptions = {
-        campaign: [
-            { value: "nursing_campaign", label: "Nursing Campaign" },
-            { value: "healthcare_campaign", label: "Healthcare Campaign" },
-            { value: "education_campaign", label: "Education Campaign" }
+        state: [
+            { value: "andaman-nicobar", label: "Andaman and Nicobar Islands" },
+            { value: "andhra-pradesh", label: "Andhra Pradesh" },
+            { value: "arunachal-pradesh", label: "Arunachal Pradesh" },
+            { value: "assam", label: "Assam" },
+            { value: "bihar", label: "Bihar" },
+            { value: "chandigarh", label: "Chandigarh" },
+            { value: "chhattisgarh", label: "Chhattisgarh" },
+            { value: "dadra-nagar-haveli", label: "Dadra and Nagar Haveli" },
+            { value: "daman-diu", label: "Daman and Diu" },
+            { value: "delhi", label: "Delhi" },
+            { value: "goa", label: "Goa" },
+            { value: "gujarat", label: "Gujarat" },
+            { value: "haryana", label: "Haryana" },
+            { value: "himachal-pradesh", label: "Himachal Pradesh" },
+            { value: "jammu-kashmir", label: "Jammu and Kashmir" },
+            { value: "jharkhand", label: "Jharkhand" },
+            { value: "karnataka", label: "Karnataka" },
+            { value: "kerala", label: "Kerala" },
+            { value: "ladakh", label: "Ladakh" },
+            { value: "lakshadweep", label: "Lakshadweep" },
+            { value: "madhya-pradesh", label: "Madhya Pradesh" },
+            { value: "maharashtra", label: "Maharashtra" },
+            { value: "manipur", label: "Manipur" },
+            { value: "meghalaya", label: "Meghalaya" },
+            { value: "mizoram", label: "Mizoram" },
+            { value: "nagaland", label: "Nagaland" },
+            { value: "odisha", label: "Odisha" },
+            { value: "puducherry", label: "Puducherry" },
+            { value: "punjab", label: "Punjab" },
+            { value: "rajasthan", label: "Rajasthan" },
+            { value: "sikkim", label: "Sikkim" },
+            { value: "tamil-nadu", label: "Tamil Nadu" },
+            { value: "telangana", label: "Telangana" },
+            { value: "tripura", label: "Tripura" },
+            { value: "uttar-pradesh", label: "Uttar Pradesh" },
+            { value: "uttarakhand", label: "Uttarakhand" },
+            { value: "west-bengal", label: "West Bengal" }
         ],
-        channels: [
-            { value: "Bulk Upload" },
-            { value: "Digital Organic" }
-        ]
-
-
+        status: [],
+        subStatus: [],
+        leadOwner: [],
+        registeredBy: [],
+        courseName: [],
+        jobName: [],
+        project: [],
+        vertical: [],
+        center: [],
+        course: [],
+        batch: []
     };
 
     const getThenFirstValueOptions = (activityType) => {
+        if (activityType === 'status') {
+            return statuses.map(status => ({
+                value: status._id,
+                label: status.title
+            }));
+        } else if (activityType === 'subStatus') {
+            return subStatuses.map(subStatus => ({
+                value: subStatus._id,
+                label: subStatus.title
+            }));
+        } else if (activityType === 'vertical') {
+            return verticals.map(vertical => ({
+                value: vertical.id,
+                label: vertical.name
+            }));
+        } else if (activityType === 'project') {
+            return projects.map(project => ({
+                value: project._id,
+                label: project.name
+            }));
+        } else if (activityType === 'batch') {
+            return batches.map(batch => ({
+                value: batch._id,
+                label: batch.name
+            }));
+        } else if (activityType === 'center') {
+            return centers.map(center => ({
+                value: center._id,
+                label: center.name
+            }));
+        } else if (activityType === 'course') {
+            return courseName.map(course => ({
+                value: course._id,
+                label: course.name
+            }));
+        } else if (activityType === 'leadOwner') {
+            return leadOwner.map(owner => ({
+                value: owner._id,
+                label: owner.name
+            }));
+        } else if (activityType === 'registeredBy') {
+            return registeredBy.map(registeredBy => ({
+                value: registeredBy._id,
+                label: registeredBy.name
+            }));
+        } else if (activityType === 'jobName') {
+            return jobName?.map(job => ({
+                value: job?._id,
+                label: job?.title
+            }));
+        }
         return thenFirstValueOptions[activityType] || [];
     };
 
@@ -683,6 +975,22 @@ useEffect(() => {
         setConditionOperators(prev => [...prev, ['']]);
         setConditionValues(prev => [...prev, ['']]);
         setSubConditionSelections(prev => [...prev, []]);
+        
+        // Add new condition block to ruleData
+        setRuleData(prev => ({
+            ...prev,
+            conditionBlocks: [
+                ...prev.conditionBlocks,
+                {
+                    conditions: [{
+                        activityType: '',
+                        operator: '',
+                        values: []
+                    }],
+                    intraBlockLogicOperator: 'and'
+                }
+            ]
+        }));
     }
 
     const handleAddThenCondition = () => {
@@ -713,6 +1021,12 @@ useEffect(() => {
         setConditionOperators(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditionValues(prev => prev.filter((_, i) => i !== indexToRemove));
         setSubConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
+        
+        // Remove condition block from ruleData
+        setRuleData(prev => ({
+            ...prev,
+            conditionBlocks: prev.conditionBlocks.filter((_, i) => i !== indexToRemove)
+        }));
     };
 
     const handleAddSubCondition = (blockIndex) => {
@@ -742,6 +1056,25 @@ useEffect(() => {
             rows.push(['']);
             next[blockIndex] = rows;
             return next;
+        });
+        
+        // Add new condition to existing block in ruleData
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    ...newRuleData.conditionBlocks[blockIndex],
+                    conditions: [
+                        ...newRuleData.conditionBlocks[blockIndex].conditions,
+                        {
+                            activityType: '',
+                            operator: '',
+                            values: []
+                        }
+                    ]
+                };
+            }
+            return newRuleData;
         });
     };
 
@@ -785,7 +1118,18 @@ useEffect(() => {
             }
             return next;
         });
+        
+        // Remove condition from ruleData
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
+                newRuleData.conditionBlocks[blockIndex].conditions = newRuleData.conditionBlocks[blockIndex].conditions.filter((_, i) => i !== subIndex);
+            }
+            return newRuleData;
+        });
     };
+
+
 
     const handleSelectChange = (blockIndex, selectIndex, value) => {
         setConditionSelections(prev => {
@@ -813,6 +1157,29 @@ useEffect(() => {
 
             next[blockIndex] = current;
             return next;
+        });
+
+        // Update ruleData conditionBlocks
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [{ activityType: '', operator: '', values: [] }],
+                    intraBlockLogicOperator: 'and'
+                };
+            }
+            
+            if (selectIndex === 0) {
+                // Main condition
+                if (!newRuleData.conditionBlocks[blockIndex].conditions) {
+                    newRuleData.conditionBlocks[blockIndex].conditions = [{ activityType: '', operator: '', values: [] }];
+                }
+                newRuleData.conditionBlocks[blockIndex].conditions[0].activityType = value;
+                newRuleData.conditionBlocks[blockIndex].conditions[0].operator = '';
+                newRuleData.conditionBlocks[blockIndex].conditions[0].values = [];
+            }
+            
+            return newRuleData;
         });
 
         // Clear subsequent dropdowns when Activity Type changes
@@ -861,6 +1228,18 @@ useEffect(() => {
             return next;
         });
 
+        // Update ruleData conditionBlocks
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
+                newRuleData.conditionBlocks[blockIndex].conditions[0].operator = value;
+                if (value === '') {
+                    newRuleData.conditionBlocks[blockIndex].conditions[0].values = [];
+                }
+            }
+            return newRuleData;
+        });
+
         // Clear Value dropdown when Operator changes
         if (value === '') {
             setConditionValues(prev => {
@@ -903,10 +1282,19 @@ useEffect(() => {
             return next;
         });
 
+        // Update ruleData conditionBlocks
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
+                newRuleData.conditionBlocks[blockIndex].conditions[0].values = Array.isArray(value) ? value : [value];
+            }
+            return newRuleData;
+        });
+
         // Check if this is a status value selection and fetch sub-statuses
         const activityType = (conditionSelections[blockIndex] || [''])[0];
-       
-        
+
+
         // Check if this is a vertical value selection
         if (activityType === 'vertical' && value) {
             if (Array.isArray(value)) {
@@ -958,7 +1346,30 @@ useEffect(() => {
 
             rows[rowIndex] = current;
             next[blockIndex] = rows;
+
             return next;
+
+        });
+
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [],
+                    intraBlockLogicOperator: 'and'
+                };
+            }
+            
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+            }
+            
+            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].activityType = value;
+            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].operator = '';
+            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
+            
+            return newRuleData;
         });
 
         // Clear subsequent dropdowns when Activity Type changes (selectIndex 0)
@@ -1007,6 +1418,23 @@ useEffect(() => {
             return next;
         });
 
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [],
+                    intraBlockLogicOperator: 'and'
+                };
+            }
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+            }
+            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].operator = value;
+           
+            return newRuleData;
+        });
+        
+
         // Clear Value dropdown when Operator changes
         if (value === '') {
             setSubConditionValues(prev => {
@@ -1015,6 +1443,14 @@ useEffect(() => {
                 rows[rowIndex] = [''];
                 next[blockIndex] = rows;
                 return next;
+            });
+            setRuleData(prev => {
+                const newRuleData = { ...prev };
+                if (newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
+                    newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
+                }
+                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
+                return newRuleData;
             });
         }
     };
@@ -1046,10 +1482,49 @@ useEffect(() => {
             return next;
         });
 
+        setRuleData(prev => {
+            const newRuleData = { ...prev };
+            
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [],
+                    intraBlockLogicOperator: 'and'
+                };
+            }
+            
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+            }
+        
+            let updatedValues = [];
+        
+            if (Array.isArray(value)) {
+                // Multiselect dropdown already gives you the full list (after add/remove)
+                updatedValues = value;
+            } else {
+                // Single select
+                if (value === "") {
+                    // Handle "deselect" → clear values
+                    updatedValues = [];
+                } else {
+                    // Update the single value
+                    updatedValues = [value];
+                }
+            }
+        
+            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = {
+                ...newRuleData.conditionBlocks[blockIndex].conditions[rowIndex],
+                values: updatedValues
+            };
+        
+            return newRuleData;
+        });
+        
+
         // Check if this is a status value selection in sub-condition and fetch sub-statuses
         const activityType = (subConditionSelections[blockIndex]?.[rowIndex] || [''])[0];
-        
-        
+
+
         // Check if this is a vertical value selection in sub-condition
         if (activityType === 'vertical' && value) {
             if (Array.isArray(value)) {
@@ -1090,8 +1565,8 @@ useEffect(() => {
                 </div>
                 <div className="col-6">
                     <div className="d-flex gap-3 justify-content-end align-items-center">
-                        
-                        
+
+
                         {/* Search Input */}
                         <div className="input-group" style={{ maxWidth: '300px' }}>
                             <span className="input-group-text bg-white border-end-0 input-height">
@@ -1218,7 +1693,7 @@ useEffect(() => {
                 </div>
             </div>
 
-           
+
 
             <div className="btn_add_segement">
                 <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => { setModalMode('add'); setIsEditing(false); setEditingId(null); }}><i className="fa-solid fa-plus"></i></a>
@@ -1238,7 +1713,13 @@ useEffect(() => {
                                         <p className='ruleInfo'>{modalMode === 'edit' ? 'Do you want to update the rule?' : 'A new rule can be added using this dialog, you need to select Rules and actions to be performed based on the Rules'}</p>
                                         <div className="row">
                                             <div className="col-md-6 col-12">
-                                                <input type="text" name='ruleName' placeholder='Name of the Rule' />
+                                                <input 
+                                                    type="text" 
+                                                    name='ruleName' 
+                                                    placeholder='Name of the Rule' 
+                                                    value={ruleData.name}
+                                                    onChange={(e) => setRuleData(prev => ({ ...prev, name: e.target.value }))}
+                                                />
                                             </div>
                                             <div className="col-md-6 col-12">
                                                 <div className="row">
@@ -1248,8 +1729,8 @@ useEffect(() => {
                                                                 className={`form-control border-0 bgcolor `}
                                                                 name="startDate"
                                                                 format="dd/MM/yyyy"
-                                                                value={startDate}
-                                                                onChange={(date) => setStartDate(date)}
+                                                                value={ruleData.startDate}
+                                                                onChange={(date) => setRuleData(prev => ({ ...prev, startDate: date }))}
                                                             />
                                                         </div>
                                                     </div>
@@ -1261,8 +1742,8 @@ useEffect(() => {
                                                                 className={`form-control border-0 bgcolor`}
                                                                 id="actionTime"
                                                                 style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                                                                value={startTime}
-                                                                onChange={(e) => setStartTime(e.target.value)}
+                                                                value={ruleData.startTime}
+                                                                onChange={(e) => setRuleData(prev => ({ ...prev, startTime: e.target.value }))}
                                                             />
                                                         </div>
                                                     </div>
@@ -1298,19 +1779,19 @@ useEffect(() => {
                                                             </button>
                                                         </div>
                                                         <div className="col-1">
-                                                            <div className={`toggle-container ${logicOperator === 'or' ? 'or-active' : ''}`} id="toggleButton">
+                                                            <div className={`toggle-container ${ruleData.interBlockLogicOperator === 'or' ? 'or-active' : ''}`} id="toggleButton">
                                                                 <div className="toggle-slider"></div>
                                                                 <div
-                                                                    className={`toggle-option ${logicOperator === 'and' ? 'active' : ''}`}
+                                                                    className={`toggle-option ${ruleData.interBlockLogicOperator === 'and' ? 'active' : ''}`}
                                                                     data-value="and"
-                                                                    onClick={() => setLogicOperator('and')}
+                                                                    onClick={() => setRuleData(prev => ({ ...prev, interBlockLogicOperator: 'and' }))}
                                                                 >
                                                                     And
                                                                 </div>
                                                                 <div
-                                                                    className={`toggle-option ${logicOperator === 'or' ? 'active' : ''}`}
+                                                                    className={`toggle-option ${ruleData.interBlockLogicOperator === 'or' ? 'active' : ''}`}
                                                                     data-value="or"
-                                                                    onClick={() => setLogicOperator('or')}
+                                                                    onClick={() => setRuleData(prev => ({ ...prev, interBlockLogicOperator: 'or' }))}
                                                                 >
                                                                     Or
                                                                 </div>
@@ -1327,9 +1808,9 @@ useEffect(() => {
                                                                     display: 'inline',
                                                                     padding: '5px 10px',
                                                                     fontSize: '14px'
-                                                                  }}
-                                                                  >
-                                                                    {logicOperator}
+                                                                }}
+                                                                >
+                                                                    {ruleData.interBlockLogicOperator}
                                                                 </div>
                                                             )}
 
@@ -1342,14 +1823,37 @@ useEffect(() => {
                                                                         <div
                                                                             className={`toggle-option ${subLogicOperator === 'and' ? 'active' : ''}`}
                                                                             data-value="and"
-                                                                            onClick={() => setSubLogicOperator('and')}
+                                                                            onClick={() => {
+                                                                                setSubLogicOperator('and');
+                                                                                setRuleData(prev => ({
+                                                                                  ...prev,
+                                                                                  conditionBlocks: prev.conditionBlocks.map((block, i) =>
+                                                                                    i === index
+                                                                                      ? { ...block, intraBlockLogicOperator: 'and' }
+                                                                                      : block
+                                                                                  ),
+                                                                                }));
+                                                                              }}
+                                                                              
                                                                         >
                                                                             And
                                                                         </div>
                                                                         <div
                                                                             className={`toggle-option ${subLogicOperator === 'or' ? 'active' : ''}`}
                                                                             data-value="or"
-                                                                            onClick={() => setSubLogicOperator('or')}
+                                                                            onClick={() => {
+                                                                                setSubLogicOperator('or');
+                                                                           
+                                                                            setRuleData(prev => ({
+                                                                                ...prev,
+                                                                                conditionBlocks: prev.conditionBlocks.map((block, i) =>
+                                                                                  i === index
+                                                                                    ? { ...block, intraBlockLogicOperator: 'or' }
+                                                                                    : block
+                                                                                ),
+                                                                            }));
+                                                                          }}
+                                                                              
                                                                         >
                                                                             Or
                                                                         </div>
@@ -1368,16 +1872,16 @@ useEffect(() => {
                                                                                     onChange={(e) => handleSelectChange(index, 0, e.target.value)}
                                                                                 >
                                                                                     <option value="">Activity type</option>
-                
-                                                                              
+
+
                                                                                     <option value="state">State</option>
                                                                                     <option value="status">Status</option>
                                                                                     <option value="subStatus">Sub Status</option>
                                                                                     <option value="leadOwner">Lead Owner</option>
                                                                                     <option value="registeredBy">Registered By</option>
-            
+
                                                                                     <option value="jobName">Job Name</option>
-                                                                      <option value="project">Project</option>
+                                                                                    <option value="project">Project</option>
                                                                                     <option value="vertical">Vertical</option>
                                                                                     <option value="batch">Batch</option>
                                                                                     <option value="center">Center</option>
@@ -1419,7 +1923,7 @@ useEffect(() => {
                                                                                                     value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
                                                                                                     onChange={(values) => handleValueChange(index, 0, values)}
                                                                                                     placeholder="Select values"
-                                                                                                    
+
                                                                                                 />
                                                                                             );
                                                                                         } else {
@@ -1463,7 +1967,7 @@ useEffect(() => {
                                                                     <div key={`sub-${index}-${subIdx}`}>
                                                                         {/* AND/OR Logic Button */}
                                                                         <div className="mb-2">
-                                                                            <button 
+                                                                            <button
                                                                                 className="btn btn-sm me-2"
                                                                                 style={{
                                                                                     backgroundColor: '#ff6b35',
@@ -1495,7 +1999,7 @@ useEffect(() => {
                                                                                             onChange={(e) => handleSubSelectChange(index, subIdx, 0, e.target.value)}
                                                                                         >
                                                                                             <option value="">Activity type</option>
-                                                                                   
+
                                                                                             <option value="state">State</option>
                                                                                             <option value="status">Status</option>
                                                                                             <option value="subStatus">Sub Status</option>
@@ -1551,7 +2055,7 @@ useEffect(() => {
                                                                                                         <select
                                                                                                             className='form-select'
                                                                                                             value={Array.isArray(currentValue) ? '' : currentValue}
-                                                                                                            onChange={(e) => handleSubValueChange(index, subIdx, 0, e.target.value)}
+                                                                                                            onChange={(e) => handleSubValueChange(index, subIdx,0, e.target.value)}
                                                                                                         >
                                                                                                             <option value="">Select value</option>
                                                                                                             {valueOptions.map((option) => (
@@ -1604,23 +2108,46 @@ useEffect(() => {
 
 
                                                                         <div className="col-4">
-                                                                            <select className='form-select' value={thenFirst} onChange={(e) => {
-                                                                                setThenFirst(e.target.value);
-                                                                                setThenShouldBe([]); // Clear multiselect when activity type changes
+                                                                            <select className='form-select' value={ruleData.primaryAction.activityType} onChange={(e) => {
+                                                                                setRuleData(prev => ({ 
+                                                                                    ...prev, 
+                                                                                    primaryAction: { 
+                                                                                        ...prev.primaryAction, 
+                                                                                        activityType: e.target.value,
+                                                                                        values: []
+                                                                                    }
+                                                                                }));
                                                                             }}>
                                                                                 <option value="">Activity Type</option>
-               
+                                                                                <option value="state">State</option>
+                                                                                <option value="status">Status</option>
+                                                                                <option value="subStatus">Sub Status</option>
+                                                                                <option value="leadOwner">Lead Owner</option>
+                                                                                <option value="registeredBy">Registered By</option>
+
+                                                                                <option value="jobName">Job Name</option>
+                                                                                <option value="project">Project</option>
+                                                                                <option value="vertical">Vertical</option>
+                                                                                <option value="batch">Batch</option>
+                                                                                <option value="center">Center</option>
+                                                                                <option value="course">Course</option>
                                                                             </select>
                                                                         </div>
-                                                                        {thenFirst !== '' && (
+                                                                        {ruleData.primaryAction.activityType !== '' && (
                                                                             <div className="col-6">
                                                                                 <div className="d-flex align-items-center">
                                                                                     <label className="me-2">Should be</label>
                                                                                     <div className="flex-grow-1">
                                                                                         <MultiselectDropdown
-                                                                                            options={getThenValueOptions(thenFirst)}
-                                                                                            value={Array.isArray(thenShouldBe) ? thenShouldBe : (thenShouldBe ? [thenShouldBe] : [])}
-                                                                                            onChange={(values) => setThenShouldBe(values)}
+                                                                                            options={getThenValueOptions(ruleData.primaryAction.activityType)}
+                                                                                            value={Array.isArray(ruleData.primaryAction.values) ? ruleData.primaryAction.values : (ruleData.primaryAction.values ? [ruleData.primaryAction.values] : [])}
+                                                                                            onChange={(values) => setRuleData(prev => ({ 
+                                                                                                ...prev, 
+                                                                                                primaryAction: { 
+                                                                                                    ...prev.primaryAction, 
+                                                                                                    values: values
+                                                                                                }
+                                                                                            }))}
                                                                                             placeholder="Select options"
                                                                                         />
                                                                                     </div>
@@ -1665,7 +2192,18 @@ useEffect(() => {
                                                                                     }}
                                                                                 >
                                                                                     <option value="">Activity Type</option>
-                                                                                    
+                                                                                    <option value="state">State</option>
+                                                                                    <option value="status">Status</option>
+                                                                                    <option value="subStatus">Sub Status</option>
+                                                                                    <option value="leadOwner">Lead Owner</option>
+                                                                                    <option value="registeredBy">Registered By</option>
+
+                                                                                    <option value="jobName">Job Name</option>
+                                                                                    <option value="project">Project</option>
+                                                                                    <option value="vertical">Vertical</option>
+                                                                                    <option value="batch">Batch</option>
+                                                                                    <option value="center">Center</option>
+                                                                                    <option value="course">Course</option>
                                                                                 </select>
                                                                             </div>
                                                                             {condition.activityType && (
@@ -1719,24 +2257,33 @@ useEffect(() => {
                                                                         <>
                                                                             <div className="col-4">
                                                                                 <select className='form-select'
-                                                                                    value={thenExecType}
+                                                                                    value={ruleData.communication.executionType}
                                                                                     onChange={(e) => {
                                                                                         const v = e.target.value;
-                                                                                        setThenExecType(v);
-                                                                                        if (v === 'immediate') {
-                                                                                            setThenCount('');
-                                                                                        } else if (v === 'occurrences') {
-                                                                                            setThenMode('');
-                                                                                        }
+                                                                                        setRuleData(prev => ({ 
+                                                                                            ...prev, 
+                                                                                            communication: { 
+                                                                                                ...prev.communication, 
+                                                                                                executionType: v,
+                                                                                                mode: v === 'immediate' ? prev.communication.mode : '',
+                                                                                                occurrenceCount: v === 'occurrences' ? prev.communication.occurrenceCount : ''
+                                                                                            }
+                                                                                        }));
                                                                                     }}
                                                                                 >
                                                                                     <option value="immediate">Immediate</option>
                                                                                     <option value="occurrences">No of Occurences</option>
                                                                                 </select>
                                                                             </div>
-                                                                            {thenExecType === 'immediate' && (
+                                                                            {ruleData.communication.executionType === 'immediate' && (
                                                                                 <div className="col-4">
-                                                                                    <select className='form-select' value={thenMode} onChange={(e) => setThenMode(e.target.value)}>
+                                                                                    <select className='form-select' value={ruleData.communication.mode} onChange={(e) => setRuleData(prev => ({ 
+                                                                                        ...prev, 
+                                                                                        communication: { 
+                                                                                            ...prev.communication, 
+                                                                                            mode: e.target.value
+                                                                                        }
+                                                                                    }))}>
                                                                                         <option value="">Select Communication Mode</option>
                                                                                         {/* <option value="sms">SMS</option> */}
                                                                                         <option value="email">Email</option>
@@ -1744,10 +2291,16 @@ useEffect(() => {
                                                                                     </select>
                                                                                 </div>
                                                                             )}
-                                                                            {thenExecType === 'occurrences' && (
+                                                                            {ruleData.communication.executionType === 'occurrences' && (
                                                                                 <div className="col-4 d-flex">
                                                                                     <label htmlFor="">No. Of Communication</label>
-                                                                                    <input type="number" min="1" value={thenCount} onChange={(e) => setThenCount(e.target.value)} />
+                                                                                    <input type="number" min="1" value={ruleData.communication.occurrenceCount} onChange={(e) => setRuleData(prev => ({ 
+                                                                                        ...prev, 
+                                                                                        communication: { 
+                                                                                            ...prev.communication, 
+                                                                                            occurrenceCount: e.target.value
+                                                                                        }
+                                                                                    }))} />
                                                                                 </div>
                                                                             )}
                                                                         </>
@@ -1771,7 +2324,7 @@ useEffect(() => {
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" className="btn btn-primary">Understood</button>
+                                <button type="button" className="btn btn-primary" onClick={handleAddRule}>Understood</button>
                             </div>
                         </div>
                     </div>

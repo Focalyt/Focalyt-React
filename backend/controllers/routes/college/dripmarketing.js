@@ -3,7 +3,7 @@ const router = express.Router();
 const moment = require('moment');
 const { isCollege } = require('../../../helpers');
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -348,4 +348,40 @@ router.get('/leadowner', [isCollege], async (req, res) => {
 		data: recentJobs,
 	});
 });
+
+router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
+	try {
+		const {name, description, startDate, startTime, endDate, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication} = req.body;
+		const collegeId = req.user.college._id;
+		const user = req.user;
+
+
+		if(!name || !description || !startDate || !startTime || !endDate || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication || !config) {
+			return res.status(400).json({ success: false, message: 'All fields are required' });
+		}
+		
+		const dripMarketingRule = new DripMarketingRule({
+			name,
+			description,
+			startDate,
+			startTime,
+			endDate,
+			conditionBlocks,
+			interBlockLogicOperator,
+			primaryAction,
+			additionalActions,
+			communication,
+			collegeId: collegeId,
+			createdBy: user._id,
+			
+		});
+
+		console.log("dripMarketingRule",dripMarketingRule)
+
+	} catch (error) {
+		console.error('Error creating drip marketing rule:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
 module.exports = router; 

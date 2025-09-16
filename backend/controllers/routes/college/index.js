@@ -1624,7 +1624,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor, subStatuses
 		} = req.query;
 
-		console.log("substautes", subStatuses)
+		// console.log("substautes", subStatuses)
 		// Parse multi-select filters
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -2121,7 +2121,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		// Execute queries in parallel
 		const results = await AppliedCourses.aggregate(pipeline)
 
-		console.log("results", results.length)
+		// console.log("results", results.length)
 
 		// ✅ CSV fields define karo
 		const fields = [
@@ -6579,9 +6579,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
 			});
 
-			console.log("requiredDocs", requiredDocs)
+			// console.log("requiredDocs", requiredDocs)
 
-			console.log("uploadedDocsMap", uploadedDocsMap)
+			// console.log("uploadedDocsMap", uploadedDocsMap)
 
 			let combinedDocs = [];
 
