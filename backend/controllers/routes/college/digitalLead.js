@@ -366,9 +366,10 @@ router.route("/addleaddandcourseapply")
         try {
 
             // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks, status,subStatus } = req.body;
 
-            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4) {
+
+            if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4 || !status || !subStatus) {
                 return res.status(200).json({
                     status: false,
                     msg: "All fields are required"
@@ -380,7 +381,6 @@ router.route("/addleaddandcourseapply")
             if (MobileNumber) {
                 MobileNumber = MobileNumber.toString();
 
-                console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber);
 
                 if (MobileNumber.startsWith('+91')) {
                     MobileNumber = MobileNumber.slice(3);
@@ -427,7 +427,6 @@ router.route("/addleaddandcourseapply")
             }
 
             let selectedCenter = selectedCenterName._id;
-            console.log('selectedCenter:', selectedCenter);
 
             if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
             if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
@@ -435,6 +434,30 @@ router.route("/addleaddandcourseapply")
             if (dob) dob = new Date(dob);
 
             let appliedData
+
+            
+
+            let statusId = await Status.findOne({ title: status });
+            let subStatusId;
+
+            if (statusId) {
+                subStatusId = statusId.substatuses.find(sub => sub.title === subStatus);
+                if (!subStatusId) {
+                    console.log('Substatus not found.');
+                    return res.status(200).json({
+                      status: false,
+                      msg: "Substatus not found"                
+                    });
+                }
+              } else {
+                
+                console.log('Status not found.');
+                return res.status(200).json({
+                    status: false,
+                    msg: "Status not found"
+                });
+              }
+        
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
@@ -453,7 +476,9 @@ router.route("/addleaddandcourseapply")
                     let appliedCourseEntry = await AppliedCourses.create({
                         _candidate: existingCandidate._id,
                         _course: courseId,
-                        _center: selectedCenter
+                        _center: selectedCenter,
+                        _leadStatus: statusId._id,
+                        _leadSubStatus: subStatusId._id
                     });
 
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
@@ -496,7 +521,6 @@ router.route("/addleaddandcourseapply")
                     source
                 });
 
-                console.log('selectedCenter', typeof selectedCenter)
 
                 // Insert AppliedCourses Record
                 let appliedCourseEntry = await AppliedCourses.create({
@@ -504,7 +528,10 @@ router.route("/addleaddandcourseapply")
                     _course: courseId,
                     _center: selectedCenter,
                     registeredBy: registeredBy,
-                    remarks:Remarks || ""
+                    remarks:Remarks || "",
+                    _leadStatus: statusId._id,
+                    _leadSubStatus: subStatusId._id
+
                 });
 
                 appliedData = appliedCourseEntry;
@@ -512,7 +539,7 @@ router.route("/addleaddandcourseapply")
 
 
             const newLogEntry = {
-                action: "Lead added with default status from digital lead", // Combine all actions in one log message
+                action: `Lead added with ${status.title} and ${subStatus.title} from digital lead`, // Combine all actions in one log message
                 remarks: Remarks || '', // Optional remarks in the log
                 timestamp: new Date() // Add timestamp if your schema supports it
             };
@@ -523,6 +550,8 @@ router.route("/addleaddandcourseapply")
 
 
             // Immediate response - NO DATABASE OPERATIONS HERE!
+           
+           
             return res.json({
                 status: true,
                 msg: "Lead added successfully"
