@@ -351,35 +351,156 @@ router.get('/leadowner', [isCollege], async (req, res) => {
 
 router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 	try {
-		const {name, description, startDate, startTime, endDate, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication} = req.body;
+		let {name, startDate, startTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState} = req.body;
+		
+		if(!name  || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication) {
+			return res.status(400).json({ success: false, message: 'All fields are required' });
+		}
+		
+
+
 		const collegeId = req.user.college._id;
 		const user = req.user;
 
 
-		if(!name || !description || !startDate || !startTime || !endDate || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication || !config) {
-			return res.status(400).json({ success: false, message: 'All fields are required' });
-		}
-		
+		const datePart = startDate.split("T")[0];  // "2025-09-20"
+	const startDateTimeString = `${datePart}T${startTime}`;
+	const startDateTime = new Date(startDateTimeString);
+
+
+
 		const dripMarketingRule = new DripMarketingRule({
 			name,
-			description,
-			startDate,
-			startTime,
-			endDate,
+			
+			startDate: startDateTime,
+			
 			conditionBlocks,
 			interBlockLogicOperator,
 			primaryAction,
 			additionalActions,
 			communication,
 			collegeId: collegeId,
+			
 			createdBy: user._id,
 			
 		});
 
 		console.log("dripMarketingRule",dripMarketingRule)
 
+		await dripMarketingRule.save();
+
+		res.status(201).json({
+			success: true,
+			message: 'Drip Marketing Rule created successfully',
+			dripMarketingRule,
+		});
+
 	} catch (error) {
 		console.error('Error creating drip marketing rule:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.put('/status-update/:id', [isCollege], async (req, res) => {
+	try {
+		
+	const {status}=req.body;
+
+	const id = req.params.id;
+
+		const collegeId = req.user.college._id;
+		const user = req.user._id;
+
+		const updateRule = await DripMarketingRule.findByIdAndUpdate(id, {isActive: status , updatedBy: user}, {new: true});
+
+
+		res.status(201).json({
+			success: true,
+			message: 'Drip Marketing Rule status updated successfully',
+			updateRule,
+		});
+
+	} catch (error) {
+		console.error('Error updating drip marketing rule status:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.put('/update-dripmarketing-rule/:id', [isCollege], async (req, res) => {
+try{
+	let {name, startDate, startTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState} = req.body;
+
+	console.log("req.body",req.body)
+	const collegeId = req.user.college._id;
+	const user = req.user;
+
+	
+
+	
+	const datePart = startDate.split("T")[0];  // "2025-09-20"
+	const startDateTimeString = `${datePart}T${startTime}`;
+	const startDateTime = new Date(startDateTimeString);
+
+	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, {name, startDate: startDateTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication, uiState, collegeId: collegeId, updatedBy: user._id}, {new: true});
+	console.log("dripMarketingRule",dripMarketingRule)
+
+	return res.status(200).json({ success: true, message: 'Drip Marketing Rule updated successfully', data: dripMarketingRule });
+}
+catch(err){
+	console.error('Error updating drip marketing rule:', err);
+	res.status(500).json({ success: false, message: 'Server error' });
+}
+})
+
+router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
+	try {
+		// console.log("edit rules")
+		const collegeId = req.user.college._id;
+		const dripMarketingRule = await DripMarketingRule.find({ collegeId: collegeId }).populate('createdBy');
+		
+		// console.log("dripMarketingRule",dripMarketingRule[0])
+		res.status(200).json({ success: true, data: dripMarketingRule });
+	}
+	catch (error) {
+		console.error('Error fetching drip marketing rule:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.get('/whatsapp-templates', [isCollege], async (req, res) => {
+	try {
+		const { page = 1, pageSize = 10 } = req.query;
+		
+		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/getTemplates', {
+			pagination: {
+				current: parseInt(page),
+				pageSize: parseInt(pageSize)
+			},
+			order: [
+				{
+					fieldName: "creationTime",
+					dir: "desc"
+				}
+			],
+			search: []
+		}, {
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID ,
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.WHATSAPP_API_TOKEN 
+			}
+		});
+		
+// console.log("response",response.data)
+
+		res.json({
+			success: true,
+			message: 'Templates fetched successfully',
+			data: response.data.results || []
+		});
+	} catch (err) {
+		console.error('Error fetching whatsapp templates:', err);
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import DatePicker from 'react-date-picker';
 import axios from 'axios';
+import * as bootstrap from 'bootstrap';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -123,13 +124,77 @@ const DripMarketing = () => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+    
+    // Modal refs
+    const modalRef = useRef(null);
+    
+    // Helper function to close modal
+    const closeModal = () => {
+        // Use a more reliable approach
+        try {
+            // Trigger the modal close event
+            const modal = document.getElementById('staticBackdropRuleModel');
+            if (modal) {
+                // Remove show class and add fade class
+                modal.classList.remove('show');
+                modal.classList.add('fade');
+                modal.style.display = 'none';
+                
+                // Remove backdrop
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => {
+                    if (backdrop && backdrop.parentNode) {
+                        backdrop.remove();
+                    }
+                });
+                
+                // Clean up body
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }
+        } catch (error) {
+            console.warn('Error closing modal:', error);
+            // Fallback to force close
+            forceCloseModal();
+        }
+    };
+    
+    // Function to force close modal and clean up
+    const forceCloseModal = () => {
+        try {
+            // Remove all modal backdrops
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => {
+                if (backdrop && backdrop.parentNode) {
+                    backdrop.remove();
+                }
+            });
+            
+            // Remove modal-open class from body
+            if (document.body) {
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }
+            
+            // Hide modal if it exists
+            const modal = document.getElementById('staticBackdropRuleModel');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
+        } catch (error) {
+            console.warn('Error in forceCloseModal:', error);
+        }
+    };
 
     const [showPopup, setShowPopup] = useState(false);
     const [popupIndex, setPopupIndex] = useState(null);
     const [rules, setRules] = useState([]);
     const [modalMode, setModalMode] = useState('add');
     const [isEditing, setIsEditing] = useState(false);
-    const [editingId, setEditingId] = useState(null);
+    const [editRule, setEditRule] = useState({});
 
 
     const [statuses, setStatuses] = useState([]);
@@ -149,6 +214,9 @@ const DripMarketing = () => {
     const [registeredBy, setRegisteredBy] = useState([]);
     const [jobName, setJobName] = useState([]);
 
+    const [whatappTemplateField, setWhatappTemplateField] = useState(false);
+    const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+
     useEffect(() => {
         fetchRules();
         fetchStatuses();
@@ -156,6 +224,14 @@ const DripMarketing = () => {
         fetchBatches();
         fetchleadOwnwer();
         fetchJobData();
+        fetchWhatsappTemplates();
+    }, []);
+
+    // Cleanup modal on component unmount
+    useEffect(() => {
+        return () => {
+            forceCloseModal();
+        };
     }, []);
 
 
@@ -170,31 +246,69 @@ const DripMarketing = () => {
         subStatuses: false
     });
 
-    const [ruleData, setRuleData] = useState({
+    const [ruleData, setRuleData] = useState(
+        {
+        _id: null,
         startDate: '',
-        endDate: '',
         startTime: '',
         endTime: '',
-        description: '',
         name: '',
         conditionBlocks: [],
         interBlockLogicOperator: 'and',
+        // actionsPerformed: {
         primaryAction: {
             activityType: '',
             values: [],
         },
-        additionalActions: [
-            {
-                activityType: '',
-                values: [],
-            },
-        ],
+        additionalActions: []
+        ,
         communication: {
             executionType: '',
             mode: '',
             occurrenceCount: '',
+            communications: [
+                {
+                    templateId: '',
+                    timing: '',
+                    order: 1
+                }
+            ],
+            recipient: '',
         },
     });
+
+    const clearRuleData = () => {
+        setRuleData(
+            {
+                _id: null,
+                startDate: '',
+                startTime: '',
+                endTime: '',
+                name: '',
+                conditionBlocks: [],
+                interBlockLogicOperator: 'and',
+                // actionsPerformed: {
+                primaryAction: {
+                    activityType: '',
+                    values: [],
+                },
+                additionalActions: []
+                ,
+                communication: {
+                    executionType: '',
+                    mode: '',
+                    occurrenceCount: '',
+                    communications: [
+                        {
+                            templateId: '',
+                            timing: '',
+                            order: 1
+                        }
+                    ],
+                    recipient: '',
+                },
+            });
+    }
 
 
     useEffect(() => {
@@ -223,6 +337,42 @@ const DripMarketing = () => {
         setCenters([]);
     };
 
+    // Function to handle occurrence count change and create communication blocks
+    const handleOccurrenceCountChange = (count) => {
+        const numCount = parseInt(count) || 1;
+        const newCommunications = [];
+
+        for (let i = 1; i <= numCount; i++) {
+            newCommunications.push({
+                templateId: '',
+                timing: '',
+                order: i
+            });
+        }
+
+        setRuleData(prev => ({
+            ...prev,
+            communication: {
+                ...prev.communication,
+                occurrenceCount: count,
+                communications: newCommunications
+            }
+        }));
+    };
+
+    // Function to update individual communication
+    const updateCommunication = (index, field, value) => {
+        setRuleData(prev => ({
+            ...prev,
+            communication: {
+                ...prev.communication,
+                communications: prev.communication.communications.map((comm, i) =>
+                    i === index ? { ...comm, [field]: value } : comm
+                )
+            }
+        }));
+    };
+
 
     const fetchVerticals = async () => {
         try {
@@ -240,7 +390,7 @@ const DripMarketing = () => {
                     id: v._id,
                     name: v.name,
                     status: v.status === true ? 'active' : 'inactive',
-                    code: v.description,
+                    code: v.code,
                     projects: v.projects,
                     createdAt: v.createdAt
                 }));
@@ -422,6 +572,27 @@ const DripMarketing = () => {
         }
     };
 
+    const fetchWhatsappTemplates = async () => {
+        try {
+            if (!token) {
+                console.warn('No token found in session storage.');
+                return;
+            }
+
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/whatsapp-templates`, {
+                headers: { 'x-auth': token }
+            });
+
+
+
+            if (response.data.success) {
+                setWhatsappTemplates(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching WhatsApp templates:', error);
+        }
+    };
+
     // Fetch all statuses
 
     const fetchStatuses = async () => {
@@ -471,40 +642,15 @@ const DripMarketing = () => {
     };
 
 
-    const fetchRules = async () => {
-        setRules([
-            {
-                id: 0,
-                description: "Webinar for International Nursing Jobs",
-                createdBy: "Mr. Parveen Bansal",
-                createdOn: "Aug 8, 2024 5:51 PM",
-                startTime: "Aug 8, 2024 6:30 PM",
-                active: true
-            },
-            {
-                id: 1,
-                description: "Webinar for International Nursing Jobs",
-                createdBy: "Mr. Parveen Bansal",
-                createdOn: "Aug 8, 2024 5:51 PM",
-                startTime: "Aug 8, 2024 6:30 PM",
-                active: true
-            }
-        ]);
-    }
-
-
     const handleAddRule = async () => {
         try {
-           
+
             const requestData = {
                 name: ruleData.name,
-                description: ruleData.description,
                 startDate: ruleData.startDate,
                 startTime: ruleData.startTime,
-                endDate: ruleData.endDate,
-                endTime: ruleData.endTime,
                 conditionBlocks: ruleData.conditionBlocks.map(block => ({
-                    conditions: block.conditions.filter(condition => 
+                    conditions: block.conditions.filter(condition =>
                         condition.activityType && condition.operator && condition.values.length > 0
                     ).map(condition => ({
                         activityType: condition.activityType,
@@ -514,26 +660,34 @@ const DripMarketing = () => {
                     intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
                 })).filter(block => block.conditions.length > 0),
                 interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
+
                 primaryAction: {
                     activityType: ruleData.primaryAction.activityType,
                     values: ruleData.primaryAction.values,
                 },
-                additionalActions: ruleData.additionalActions.filter(action => 
+                additionalActions: ruleData.additionalActions.filter(action =>
                     action.activityType && action.values.length > 0
                 ).map(action => ({
                     activityType: action.activityType,
                     values: action.values,
-                })),
+                }))
+                ,
                 communication: {
                     executionType: ruleData.communication.executionType,
                     mode: ruleData.communication.mode,
                     occurrenceCount: ruleData.communication.occurrenceCount,
+                    communications: ruleData.communication.communications.map(comm => ({
+                        templateId: comm.templateId,
+                        timing: comm.timing,
+                        order: comm.order
+                    })),
+                    recipient: ruleData.communication.recipient,
                 },
+
+
             };
-           
+
             console.log(requestData, 'requestData')
-
-
 
             const responseData = await axios.post(`${backendUrl}/college/dripmarketing/create-dripmarketing-rule`, requestData, {
                 headers: {
@@ -545,13 +699,11 @@ const DripMarketing = () => {
                 alert('Rule created successfully!');
                 setRuleData({
                     startDate: '',
-                    endDate: '',
                     startTime: '',
-                    endTime: '',
-                    description: '',
                     name: '',
                     conditionBlocks: [],
                     interBlockLogicOperator: 'and',
+                    actionsPerformed: [],
                     primaryAction: {
                         activityType: '',
                         values: [],
@@ -566,21 +718,269 @@ const DripMarketing = () => {
                         executionType: '',
                         mode: '',
                         occurrenceCount: '',
+                        communications: [
+                            {
+                                templateId: '',
+                                timing: '',
+                                order: 1
+                            }
+                        ],
+                        recipient: '',
                     },
+
+
                 });
+                
+                // Close the modal
+                closeModal();
             }
 
-            console.log('responseData', responseData)
+            // console.log('responseData', responseData)
 
         }
         catch (error) {
             console.error('Error adding rule:', error);
             setError('Error creating rule. Please try again.');
         }
+        finally{
+            fetchRules();
+        }
 
 
     }
 
+    const fetchRules = async () => {
+
+        try {
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/get-dripmarketing-rule`, {
+                headers: { 'x-auth': token }
+            });
+            // console.log(response.data.data, 'response.data.data')
+            if (response.data.success) {
+                setRules(response.data.data);
+            }
+        }
+        catch (error) {
+            console.error('Error fetching rules:', error);
+        }
+    }
+
+    const handleUpdateRule = async (ruleId) => {
+        try {
+            const updateData = {
+                name: ruleData.name,
+                startDate: ruleData.startDate,
+                startTime: ruleData.startTime,
+                conditionBlocks: ruleData.conditionBlocks.map(block => ({
+                    conditions: block.conditions.filter(condition =>
+                        condition.activityType && condition.operator && condition.values.length > 0
+                    ).map(condition => ({
+                        activityType: condition.activityType,
+                        operator: condition.operator,
+                        values: condition.values,
+                    })),
+                    intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
+                })).filter(block => block.conditions.length > 0),
+                interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
+
+                primaryAction: {
+                    activityType: ruleData.primaryAction.activityType,
+                    values: ruleData.primaryAction.values,
+                },
+                additionalActions: ruleData.additionalActions.filter(action =>
+                    action.activityType && action.values.length > 0
+                ).map(action => ({
+                    activityType: action.activityType,
+                    values: action.values,
+                }))
+                ,
+                communication: {
+                    executionType: ruleData.communication.executionType,
+                    mode: ruleData.communication.mode,
+                    occurrenceCount: ruleData.communication.occurrenceCount,
+                    communications: ruleData.communication.communications.map(comm => ({
+                        templateId: comm.templateId,
+                        timing: comm.timing,
+                        order: comm.order
+                    })),
+                    recipient: ruleData.communication.recipient,
+                },
+
+
+            };
+
+            const response = await axios.put(`${backendUrl}/college/dripmarketing/update-dripmarketing-rule/${ruleData._id}`, updateData, {
+                headers: { 'x-auth': token }
+
+            });
+
+            if(response.data.success){
+                clearRuleData();
+
+                const UpdatedRuleData = response.data.data;
+                const updatedRules = [...rules];
+                updatedRules.forEach(rule => {
+                    if(rule._id === ruleData._id){
+                        rule=UpdatedRuleData;
+                    }
+                });
+                setRules(updatedRules);
+                alert('Rule updated successfully');
+                setIsEditing(false);
+                setModalMode('');
+                setEditRule({});
+                
+                // Close the modal
+                closeModal();
+
+            }
+            // console.log('response', response)
+        }catch(err){
+            console.error('Error updating rule:', err);
+            setError('Error updating rule. Please try again.');
+        }
+    }
+
+
+ 
+ const handleStatusUpdate = async (ruleId, status)=>{
+    try{
+        const response = await axios.put(`${backendUrl}/college/dripmarketing/status-update/${ruleId}`, {status}, {
+            headers: { 'x-auth': token }
+        });
+
+        if(response.data.success){
+
+            const updatedRules = [...rules];
+
+            updatedRules.forEach(rule => {
+                if(rule._id === ruleId){
+
+                    
+                    rule.isActive = status;
+                }
+            });
+            setRules(updatedRules);
+
+            alert('Rule status updated successfully');
+        }
+        else{
+            alert('Error updating rule status. Please try again.');
+        }
+    }catch(err){
+        console.error('Error updating rule status:', err);
+        setError('Error updating rule status. Please try again.');
+    }
+ }
+
+
+    
+const loadRuleForEdit = (ruleId) => {
+        
+        const ruleToEdit = rules.find(rule => rule._id === ruleId);
+      
+        if (ruleToEdit) {
+            
+            setRuleData({
+                _id: ruleToEdit._id || null,
+                name: ruleToEdit.name || '',
+                description: ruleToEdit.description || '',
+                startDate: ruleToEdit.startDate || '',
+                startTime: ruleToEdit.startTime || '',
+                endTime: ruleToEdit.endTime || '',
+                // conditionBlocks: ruleToEdit.conditionBlocks || [],
+                // conditionBlock: ruleToEdit.conditionBlocks.map
+                conditionBlocks: (ruleToEdit.conditionBlocks || []).map(block => ({
+                    ...block,
+                    conditions: (block.conditions || []).map(condition => ({
+                        activityType: condition.activityType || '',
+                        operator: condition.operator || '',
+                        values: condition.values || [],
+                    })),
+                    intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
+                })),
+                interBlockLogicOperator: ruleToEdit.interBlockLogicOperator || 'and',
+                primaryAction: ruleToEdit.primaryAction || { activityType: '', values: [] },
+                additionalActions: ruleToEdit.additionalActions || [],
+                communication: {
+                  executionType: ruleToEdit.communication?.executionType || '',
+                  mode: ruleToEdit.communication?.mode || '',
+                  occurrenceCount: ruleToEdit.communication?.occurrenceCount || '',
+                  communications: ruleToEdit.communication?.communications || [{
+                    templateId: '',
+                    timing: '',
+                    order: 1
+                  }],
+                  recipient: ruleToEdit.communication?.recipient || ''
+                }
+              });
+
+           
+            if (ruleToEdit.conditionBlocks && ruleToEdit.conditionBlocks.length > 0) {
+                
+                const conditionArray = [];
+                const conditionsArray = [];
+                const conditionSelectionsArray = [];
+                const conditionOperatorsArray = [];
+                const conditionValuesArray = [];
+                const subConditionSelectionsArray = [];
+
+               
+                ruleToEdit.conditionBlocks.forEach((block, blockIndex) => {
+                    
+                    conditionArray.push({
+                        blockIndex: blockIndex,
+                        blockId: block._id || `block-${blockIndex}`
+                    });
+
+                    if (block.conditions && block.conditions.length > 0) {
+                        const blockConditions = [];
+                        const blockSelections = [];
+                        const blockOperators = [];
+                        const blockValues = [];
+                        const blockSubSelections = [];
+
+                        block.conditions.forEach((condition, conditionIndex) => {
+                            blockConditions.push(condition);
+                            blockSelections.push(condition.activityType || '');
+                            blockOperators.push(condition.operator || '');
+                            blockValues.push(condition.values || []);
+                            blockSubSelections.push([]);
+                        });
+
+                        conditionsArray.push(blockConditions);
+                        conditionSelectionsArray.push(blockSelections);
+                        conditionOperatorsArray.push(blockOperators);
+                        conditionValuesArray.push(blockValues);
+                        subConditionSelectionsArray.push(blockSubSelections);
+                    } else {
+                        
+                        conditionsArray.push([]);
+                        conditionSelectionsArray.push([]);
+                        conditionOperatorsArray.push([]);
+                        conditionValuesArray.push([]);
+                        subConditionSelectionsArray.push([]);
+                    }
+                });
+
+               
+                setCondition(conditionArray);
+                setConditions(conditionsArray);
+                setConditionSelections(conditionSelectionsArray);
+                setConditionOperators(conditionOperatorsArray);
+                setConditionValues(conditionValuesArray);
+                setSubConditionSelections(subConditionSelectionsArray);
+            } else {
+               
+                setCondition([]);
+                setConditions([]);
+                setConditionSelections([]);
+                setConditionOperators([]);
+                setConditionValues([]);
+                setSubConditionSelections([]);
+            }
+        }
+    };
     const [activeTab, setActiveTab] = useState({});
     const [condition, setCondition] = useState([]);
     const [conditions, setConditions] = useState([]);
@@ -613,7 +1013,6 @@ const DripMarketing = () => {
 
     const [startDate, setStartDate] = useState(null);
     const [startTime, setStartTime] = useState('');
-    const [endDate, setEndDate] = useState(null);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [conditionBlocks, setConditionBlocks] = useState([]);
@@ -967,6 +1366,57 @@ const DripMarketing = () => {
         }));
     };
 
+    const resetFormData = () => {
+        // Reset ruleData to initial state
+        setRuleData({
+            startDate: '',
+            startTime: '',
+            endTime: '',
+            description: '',
+            name: '',
+            conditionBlocks: [],
+            interBlockLogicOperator: 'and',
+            primaryAction: {
+                activityType: '',
+                values: [],
+            },
+            additionalActions: [],
+            communication: {
+                executionType: '',
+                mode: '',
+                occurrenceCount: '',
+                communications: [
+                    {
+                        templateId: '',
+                        timing: '',
+                        order: 1
+                    }
+                ],
+                recipient: '',
+            },
+        });
+
+        // Reset all condition-related state
+        setCondition([]);
+        setConditions([]);
+        setConditionSelections([]);
+        setConditionOperators([]);
+        setConditionValues([]);
+        setSubConditionSelections([]);
+        setSubConditionOperators([]);
+        setSubConditionValues([]);
+
+        // Reset then-related state
+        setThenCondition([]);
+        setThenConditions([]);
+        setThenConditionSelections([]);
+        setThenSubConditionSelections([]);
+
+        // Reset other state
+        setSubLogicOperator('and');
+        setEditRule({});
+        setIsEditing(false);
+    };
 
     const handleAddCondition = () => {
         setCondition(prev => [...prev, {}]);
@@ -975,7 +1425,7 @@ const DripMarketing = () => {
         setConditionOperators(prev => [...prev, ['']]);
         setConditionValues(prev => [...prev, ['']]);
         setSubConditionSelections(prev => [...prev, []]);
-        
+
         // Add new condition block to ruleData
         setRuleData(prev => ({
             ...prev,
@@ -995,10 +1445,18 @@ const DripMarketing = () => {
 
     const handleAddThenCondition = () => {
         // Add a new then condition with default values
-        setThenCondition(prev => [...prev, { activityType: '', values: [] }]);
+        const newAction = { activityType: '', values: [] };
+
+        setThenCondition(prev => [...prev, newAction]);
         setThenConditions(prev => [...prev, [{}]]);
         setThenConditionSelections(prev => [...prev, ['']]);
         setThenSubConditionSelections(prev => [...prev, []]);
+
+
+        setRuleData(prev => ({
+            ...prev,
+            additionalActions: [...prev.additionalActions, newAction]
+        }));
     }
 
     const handleRemoveThenCondition = (indexToRemove) => {
@@ -1006,12 +1464,26 @@ const DripMarketing = () => {
         setThenConditions(prev => prev.filter((_, i) => i !== indexToRemove));
         setThenConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
         setThenSubConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
+
+        //  Remove from ruleData.additionalActions
+        setRuleData(prev => ({
+            ...prev,
+            additionalActions: prev.additionalActions.filter((_, i) => i !== indexToRemove)
+        }));
     }
 
     const handleThenConditionChange = (index, field, value) => {
         setThenCondition(prev => prev.map((condition, i) =>
             i === index ? { ...condition, [field]: value } : condition
         ));
+
+        // Update ruleData.additionalActions
+        setRuleData(prev => ({
+            ...prev,
+            additionalActions: prev.additionalActions.map((action, i) =>
+                i === index ? { ...action, [field]: value } : action
+            )
+        }));
     }
 
     const handleRemoveCondition = (indexToRemove) => {
@@ -1021,7 +1493,7 @@ const DripMarketing = () => {
         setConditionOperators(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditionValues(prev => prev.filter((_, i) => i !== indexToRemove));
         setSubConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
-        
+
         // Remove condition block from ruleData
         setRuleData(prev => ({
             ...prev,
@@ -1036,28 +1508,28 @@ const DripMarketing = () => {
             next[blockIndex] = [...currentBlock, {}];
             return next;
         });
-        setSubConditionSelections(prev => {
+        setConditionSelections(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
-            rows.push(['']);
+            rows.push('');
             next[blockIndex] = rows;
             return next;
         });
-        setSubConditionOperators(prev => {
+        setConditionOperators(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
-            rows.push(['']);
+            rows.push('');
             next[blockIndex] = rows;
             return next;
         });
-        setSubConditionValues(prev => {
+        setConditionValues(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
-            rows.push(['']);
+            rows.push('');
             next[blockIndex] = rows;
             return next;
         });
-        
+
         // Add new condition to existing block in ruleData
         setRuleData(prev => {
             const newRuleData = { ...prev };
@@ -1091,7 +1563,7 @@ const DripMarketing = () => {
         });
 
         // Remove corresponding select state row
-        setSubConditionSelections(prev => {
+        setConditionSelections(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
             if (rows.length > subIndex) {
@@ -1100,7 +1572,7 @@ const DripMarketing = () => {
             }
             return next;
         });
-        setSubConditionOperators(prev => {
+        setConditionOperators(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
             if (rows.length > subIndex) {
@@ -1109,7 +1581,7 @@ const DripMarketing = () => {
             }
             return next;
         });
-        setSubConditionValues(prev => {
+        setConditionValues(prev => {
             const next = [...prev];
             const rows = [...(next[blockIndex] || [])];
             if (rows.length > subIndex) {
@@ -1118,12 +1590,14 @@ const DripMarketing = () => {
             }
             return next;
         });
-        
+
         // Remove condition from ruleData
         setRuleData(prev => {
             const newRuleData = { ...prev };
             if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
-                newRuleData.conditionBlocks[blockIndex].conditions = newRuleData.conditionBlocks[blockIndex].conditions.filter((_, i) => i !== subIndex);
+
+                const conditionIndex = subIndex + 1;
+                newRuleData.conditionBlocks[blockIndex].conditions = newRuleData.conditionBlocks[blockIndex].conditions.filter((_, i) => i !== conditionIndex);
             }
             return newRuleData;
         });
@@ -1136,24 +1610,13 @@ const DripMarketing = () => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
 
+            while (current.length <= selectIndex) {
+                current.push('');
+            }
+
             current[selectIndex] = value;
 
-            const isLast = selectIndex === current.length - 1;
-            const canAddMore = current.length < 3;
 
-            if (isLast && value !== '' && canAddMore) {
-                current.push('');
-            }
-
-            // Trim trailing empties to keep only one empty tail
-            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
-                current.pop();
-            }
-
-
-            if (current.length === 0) {
-                current.push('');
-            }
 
             next[blockIndex] = current;
             return next;
@@ -1168,35 +1631,41 @@ const DripMarketing = () => {
                     intraBlockLogicOperator: 'and'
                 };
             }
-            
-            if (selectIndex === 0) {
-                // Main condition
-                if (!newRuleData.conditionBlocks[blockIndex].conditions) {
-                    newRuleData.conditionBlocks[blockIndex].conditions = [{ activityType: '', operator: '', values: [] }];
-                }
-                newRuleData.conditionBlocks[blockIndex].conditions[0].activityType = value;
-                newRuleData.conditionBlocks[blockIndex].conditions[0].operator = '';
-                newRuleData.conditionBlocks[blockIndex].conditions[0].values = [];
+
+            // Ensure conditions array is long enough
+            while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
+                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
+                    activityType: '', 
+                    operator: '', 
+                    values: [] 
+                });
             }
+
+            // Update the specific condition
+            newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].activityType = value;
             
+            // Only clear operator and values if this is a new selection
+            // Don't clear if user is just changing the activity type
+            if (value === '') {
+                newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].operator = '';
+                newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = [];
+            }
+
             return newRuleData;
         });
 
-        // Clear subsequent dropdowns when Activity Type changes
-        setConditionOperators(prev => {
-            const next = [...prev];
-            next[blockIndex] = [''];
-            return next;
-        });
-        setConditionValues(prev => {
-            const next = [...prev];
-            next[blockIndex] = [''];
-            return next;
-        });
-
-        // If status is selected, fetch sub-statuses
-        if (selectIndex === 0 && value === 'status') {
-            // This will be handled when user selects a specific status value
+        // Only clear subsequent dropdowns if this is the first condition and activity type is cleared
+        if (selectIndex === 0 && value === '') {
+            setConditionOperators(prev => {
+                const next = [...prev];
+                next[blockIndex] = [''];
+                return next;
+            });
+            setConditionValues(prev => {
+                const next = [...prev];
+                next[blockIndex] = [''];
+                return next;
+            });
         }
     };
 
@@ -1205,24 +1674,15 @@ const DripMarketing = () => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
 
+            // Ensure the array is long enough
+            while (current.length <= selectIndex) {
+                current.push('');
+            }
+
             current[selectIndex] = value;
 
-            const isLast = selectIndex === current.length - 1;
-            const canAddMore = current.length < 3;
-
-            if (isLast && value !== '' && canAddMore) {
-                current.push('');
-            }
-
-            // Trim trailing empties to keep only one empty tail
-            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
-                current.pop();
-            }
-
-            // Ensure at least one select exists
-            if (current.length === 0) {
-                current.push('');
-            }
+            // Don't automatically add new operators - only update the current one
+            // New operators will be added only when + button is clicked
 
             next[blockIndex] = current;
             return next;
@@ -1231,12 +1691,30 @@ const DripMarketing = () => {
         // Update ruleData conditionBlocks
         setRuleData(prev => {
             const newRuleData = { ...prev };
-            if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
-                newRuleData.conditionBlocks[blockIndex].conditions[0].operator = value;
-                if (value === '') {
-                    newRuleData.conditionBlocks[blockIndex].conditions[0].values = [];
-                }
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [{ activityType: '', operator: '', values: [] }],
+                    intraBlockLogicOperator: 'and'
+                };
             }
+
+            // Ensure conditions array is long enough
+            while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
+                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
+                    activityType: '', 
+                    operator: '', 
+                    values: [] 
+                });
+            }
+
+            // Update the specific condition
+            newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].operator = value;
+            
+            // Only clear values if operator is cleared
+            if (value === '') {
+                newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = [];
+            }
+
             return newRuleData;
         });
 
@@ -1255,28 +1733,16 @@ const DripMarketing = () => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
 
+            // Ensure the array is long enough
+            while (current.length <= selectIndex) {
+                current.push('');
+            }
+
             // Handle both single values and arrays (for multiselect)
             current[selectIndex] = value;
 
-            const isLast = selectIndex === current.length - 1;
-            const canAddMore = current.length < 3;
-
-            // For multiselect, check if it's an array and has values
-            const hasValue = Array.isArray(value) ? value.length > 0 : value !== '';
-
-            if (isLast && hasValue && canAddMore) {
-                current.push('');
-            }
-
-            // Trim trailing empties to keep only one empty tail
-            while (current.length > 1 && current[current.length - 1] === '' && current[current.length - 2] === '') {
-                current.pop();
-            }
-
-            // Ensure at least one select exists
-            if (current.length === 0) {
-                current.push('');
-            }
+            // Don't automatically add new values - only update the current one
+            // New values will be added only when + button is clicked
 
             next[blockIndex] = current;
             return next;
@@ -1285,9 +1751,25 @@ const DripMarketing = () => {
         // Update ruleData conditionBlocks
         setRuleData(prev => {
             const newRuleData = { ...prev };
-            if (newRuleData.conditionBlocks[blockIndex] && newRuleData.conditionBlocks[blockIndex].conditions) {
-                newRuleData.conditionBlocks[blockIndex].conditions[0].values = Array.isArray(value) ? value : [value];
+            if (!newRuleData.conditionBlocks[blockIndex]) {
+                newRuleData.conditionBlocks[blockIndex] = {
+                    conditions: [{ activityType: '', operator: '', values: [] }],
+                    intraBlockLogicOperator: 'and'
+                };
             }
+
+            // Ensure conditions array is long enough
+            while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
+                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
+                    activityType: '', 
+                    operator: '', 
+                    values: [] 
+                });
+            }
+
+            // Update the specific condition
+            newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = Array.isArray(value) ? value : [value];
+
             return newRuleData;
         });
 
@@ -1353,22 +1835,24 @@ const DripMarketing = () => {
 
         setRuleData(prev => {
             const newRuleData = { ...prev };
-            
+
             if (!newRuleData.conditionBlocks[blockIndex]) {
                 newRuleData.conditionBlocks[blockIndex] = {
                     conditions: [],
                     intraBlockLogicOperator: 'and'
                 };
             }
-            
-            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
-                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+
+            const conditionIndex = rowIndex + 1;
+
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex] = { activityType: '', operator: '', values: [] };
             }
-            
-            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].activityType = value;
-            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].operator = '';
-            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
-            
+
+            newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex].activityType = value;
+            newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex].operator = '';
+            newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex].values = [];
+
             return newRuleData;
         });
 
@@ -1426,14 +1910,17 @@ const DripMarketing = () => {
                     intraBlockLogicOperator: 'and'
                 };
             }
-            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
-                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+
+            const conditionIndex = rowIndex + 1;
+
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex] = { activityType: '', operator: '', values: [] };
             }
-            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].operator = value;
-           
+            newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex].operator = value;
+
             return newRuleData;
         });
-        
+
 
         // Clear Value dropdown when Operator changes
         if (value === '') {
@@ -1446,10 +1933,10 @@ const DripMarketing = () => {
             });
             setRuleData(prev => {
                 const newRuleData = { ...prev };
-                if (newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
-                    newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
+                const conditionIndex = rowIndex + 1;
+                if (newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex]) {
+                    newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex].values = [];
                 }
-                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex].values = [];
                 return newRuleData;
             });
         }
@@ -1484,20 +1971,23 @@ const DripMarketing = () => {
 
         setRuleData(prev => {
             const newRuleData = { ...prev };
-            
+
             if (!newRuleData.conditionBlocks[blockIndex]) {
                 newRuleData.conditionBlocks[blockIndex] = {
                     conditions: [],
                     intraBlockLogicOperator: 'and'
                 };
             }
-            
-            if (!newRuleData.conditionBlocks[blockIndex].conditions[rowIndex]) {
-                newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = { activityType: '', operator: '', values: [] };
+
+
+            const conditionIndex = rowIndex + 1;
+
+            if (!newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex]) {
+                newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex] = { activityType: '', operator: '', values: [] };
             }
-        
+
             let updatedValues = [];
-        
+
             if (Array.isArray(value)) {
                 // Multiselect dropdown already gives you the full list (after add/remove)
                 updatedValues = value;
@@ -1511,15 +2001,15 @@ const DripMarketing = () => {
                     updatedValues = [value];
                 }
             }
-        
-            newRuleData.conditionBlocks[blockIndex].conditions[rowIndex] = {
-                ...newRuleData.conditionBlocks[blockIndex].conditions[rowIndex],
+
+            newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex] = {
+                ...newRuleData.conditionBlocks[blockIndex].conditions[conditionIndex],
                 values: updatedValues
             };
-        
+
             return newRuleData;
         });
-        
+
 
         // Check if this is a status value selection in sub-condition and fetch sub-statuses
         const activityType = (subConditionSelections[blockIndex]?.[rowIndex] || [''])[0];
@@ -1627,29 +2117,32 @@ const DripMarketing = () => {
                                 rules.map((rule, index) => (
                                     <tr className='driprule' key={rule.id || index}>
                                         <td>
-                                            {rule.description}
+                                            {rule.name}
                                         </td>
                                         <td>
-                                            {rule.createdBy}
+                                            {rule.createdBy.name}
                                         </td>
                                         <td>
-                                            {rule.createdOn}
+                                            {/* {rule.createdAt.toString().split('T')[0]} &nbsp; {rule.createdAt.toString().split('T')[1]} */}
+                                            {new Date(rule.createdAt).toLocaleDateString("en-GB")}
                                         </td>
                                         <td>
-                                            {rule.startTime}
+                                        {new Date(rule.startDate).toLocaleDateString("en-GB")} &nbsp; {rule.startTime}
                                         </td>
                                         <td>
                                             <div className="form-check form-switch">
                                                 <input
                                                     className="form-check-input"
                                                     type="checkbox"
-                                                    checked={rule.active}
-                                                    onChange={() => {
-                                                        // Handle toggle logic here
-                                                        const updatedRules = [...rules];
-                                                        updatedRules[index].active = !updatedRules[index].active;
-                                                        setRules(updatedRules);
-                                                    }}
+                                                    checked={rule.isActive}
+                                                    // onChange={() => {
+                                                    //     const updatedRules = [...rules];
+                                                    //     updatedRules[index].active = !updatedRules[index].active;
+                                                    //     setRules(updatedRules);
+                                                    // }}
+                                                    onChange={() => handleStatusUpdate(rule._id, !rule.isActive)}
+
+
                                                 />
                                             </div>
                                         </td>
@@ -1662,8 +2155,7 @@ const DripMarketing = () => {
                                                         <li data-bs-toggle="modal" data-bs-target="#staticBackdropEditRuleModel" onClick={() => {
                                                             // Handle edit logic
                                                             setModalMode('edit');
-                                                            setIsEditing(true);
-                                                            setEditingId(rule.id ?? index);
+                                                            setRuleData(rule);
                                                             setShowPopup(false);
                                                             setPopupIndex(null);
 
@@ -1696,16 +2188,19 @@ const DripMarketing = () => {
 
 
             <div className="btn_add_segement">
-                <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => { setModalMode('add'); setIsEditing(false); setEditingId(null); }}><i className="fa-solid fa-plus"></i></a>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => { 
+                    setModalMode('add'); 
+                    resetFormData();
+                }}><i className="fa-solid fa-plus"></i></a>
             </div>
 
             <div className="add_rule_section">
-                <div className="modal fade" id="staticBackdropRuleModel" data-bs-backdrop="static" data-bs-keyboard="false" tabIndex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                <div className="modal fade" id="staticBackdropRuleModel" ref={modalRef} data-bs-backdrop="static" data-bs-keyboard="false" tabIndex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
                     <div className="modal-dialog modal-dialog-scrollable">
                         <div className="modal-content">
                             <div className="modal-header">
                                 <h1 className="modal-title fs-5" id="staticBackdropLabel">{modalMode === 'edit' ? 'Edit Rule' : 'Add Rule'}</h1>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={forceCloseModal}></button>
                             </div>
                             <div className="modal-body">
                                 <div className="row">
@@ -1713,10 +2208,10 @@ const DripMarketing = () => {
                                         <p className='ruleInfo'>{modalMode === 'edit' ? 'Do you want to update the rule?' : 'A new rule can be added using this dialog, you need to select Rules and actions to be performed based on the Rules'}</p>
                                         <div className="row">
                                             <div className="col-md-6 col-12">
-                                                <input 
-                                                    type="text" 
-                                                    name='ruleName' 
-                                                    placeholder='Name of the Rule' 
+                                                <input
+                                                    type="text"
+                                                    name='ruleName'
+                                                    placeholder='Name of the Rule'
                                                     value={ruleData.name}
                                                     onChange={(e) => setRuleData(prev => ({ ...prev, name: e.target.value }))}
                                                 />
@@ -1826,15 +2321,15 @@ const DripMarketing = () => {
                                                                             onClick={() => {
                                                                                 setSubLogicOperator('and');
                                                                                 setRuleData(prev => ({
-                                                                                  ...prev,
-                                                                                  conditionBlocks: prev.conditionBlocks.map((block, i) =>
-                                                                                    i === index
-                                                                                      ? { ...block, intraBlockLogicOperator: 'and' }
-                                                                                      : block
-                                                                                  ),
+                                                                                    ...prev,
+                                                                                    conditionBlocks: prev.conditionBlocks.map((block, i) =>
+                                                                                        i === index
+                                                                                            ? { ...block, intraBlockLogicOperator: 'and' }
+                                                                                            : block
+                                                                                    ),
                                                                                 }));
-                                                                              }}
-                                                                              
+                                                                            }}
+
                                                                         >
                                                                             And
                                                                         </div>
@@ -1843,17 +2338,17 @@ const DripMarketing = () => {
                                                                             data-value="or"
                                                                             onClick={() => {
                                                                                 setSubLogicOperator('or');
-                                                                           
-                                                                            setRuleData(prev => ({
-                                                                                ...prev,
-                                                                                conditionBlocks: prev.conditionBlocks.map((block, i) =>
-                                                                                  i === index
-                                                                                    ? { ...block, intraBlockLogicOperator: 'or' }
-                                                                                    : block
-                                                                                ),
-                                                                            }));
-                                                                          }}
-                                                                              
+
+                                                                                setRuleData(prev => ({
+                                                                                    ...prev,
+                                                                                    conditionBlocks: prev.conditionBlocks.map((block, i) =>
+                                                                                        i === index
+                                                                                            ? { ...block, intraBlockLogicOperator: 'or' }
+                                                                                            : block
+                                                                                    ),
+                                                                                }));
+                                                                            }}
+
                                                                         >
                                                                             Or
                                                                         </div>
@@ -1861,229 +2356,118 @@ const DripMarketing = () => {
                                                                 )}
 
 
-                                                                <div className="row mb-3 pb-3">
-                                                                    <div className="col-10">
-                                                                        <div className="row">
-                                                                            {/* Activity Type Dropdown - Always visible */}
-                                                                            <div className="col-4">
-                                                                                <select
-                                                                                    className='form-select'
-                                                                                    value={(conditionSelections[index] || [''])[0] || ''}
-                                                                                    onChange={(e) => handleSelectChange(index, 0, e.target.value)}
-                                                                                >
-                                                                                    <option value="">Activity type</option>
-
-
-                                                                                    <option value="state">State</option>
-                                                                                    <option value="status">Status</option>
-                                                                                    <option value="subStatus">Sub Status</option>
-                                                                                    <option value="leadOwner">Lead Owner</option>
-                                                                                    <option value="registeredBy">Registered By</option>
-
-                                                                                    <option value="jobName">Job Name</option>
-                                                                                    <option value="project">Project</option>
-                                                                                    <option value="vertical">Vertical</option>
-                                                                                    <option value="batch">Batch</option>
-                                                                                    <option value="center">Center</option>
-                                                                                    <option value="course">Course</option>
-                                                                                </select>
-                                                                            </div>
-
-                                                                            {/* Operator Dropdown - Only show if Activity Type is selected */}
-                                                                            {(conditionSelections[index] || [''])[0] && (
+                                                                {/* Render all conditions for this block */}
+                                                                {(conditionSelections[index] || []).map((_, conditionIdx) => (
+                                                                    <div key={`condition-${index}-${conditionIdx}`} className="row mb-3 pb-3">
+                                                                        <div className="col-10">
+                                                                            <div className="row">
+                                                                                {/* Activity Type Dropdown - Always visible */}
                                                                                 <div className="col-4">
                                                                                     <select
                                                                                         className='form-select'
-                                                                                        value={(conditionOperators[index] || [''])[0] || ''}
-                                                                                        onChange={(e) => handleOperatorChange(index, 0, e.target.value)}
+                                                                                        value={(conditionSelections[index] || [''])[conditionIdx] || ''}
+                                                                                        onChange={(e) => handleSelectChange(index, conditionIdx, e.target.value)}
                                                                                     >
-                                                                                        <option value="">Select Operator</option>
-                                                                                        <option value="equals">Equals</option>
-                                                                                        <option value="not_equals">Not Equals</option>
+                                                                                        <option value="">Activity type</option>
+
+
+                                                                                        <option value="state">State</option>
+                                                                                        <option value="status">Status</option>
+                                                                                        <option value="subStatus">Sub Status</option>
+                                                                                        <option value="leadOwner">Lead Owner</option>
+                                                                                        <option value="registeredBy">Registered By</option>
+
+                                                                                        <option value="jobName">Job Name</option>
+                                                                                        <option value="project">Project</option>
+                                                                                        <option value="vertical">Vertical</option>
+                                                                                        <option value="batch">Batch</option>
+                                                                                        <option value="center">Center</option>
+                                                                                        <option value="course">Course</option>
                                                                                     </select>
                                                                                 </div>
-                                                                            )}
 
-                                                                            {/* Value Dropdown - Only show if Operator is selected */}
-                                                                            {(conditionOperators[index] || [''])[0] && (conditionSelections[index] || [''])[0] && (
-                                                                                <div className="col-4">
-                                                                                    {(() => {
-                                                                                        const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
-                                                                                        const activityType = (conditionSelections[index] || [''])[0] || '';
-                                                                                        const isMultiselect = multiValues.includes('all')
-                                                                                            ? true
-                                                                                            : multiValues.includes(activityType);
-                                                                                        const valueOptions = getValueOptions(activityType);
-                                                                                        const currentValue = (conditionValues[index] || [''])[0] || '';
-
-                                                                                        if (isMultiselect) {
-                                                                                            return (
-                                                                                                <MultiselectDropdown
-                                                                                                    options={valueOptions}
-                                                                                                    value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
-                                                                                                    onChange={(values) => handleValueChange(index, 0, values)}
-                                                                                                    placeholder="Select values"
-
-                                                                                                />
-                                                                                            );
-                                                                                        } else {
-                                                                                            return (
-                                                                                                <select
-                                                                                                    className='form-select'
-                                                                                                    value={Array.isArray(currentValue) ? '' : currentValue}
-                                                                                                    onChange={(e) => handleValueChange(index, 0, e.target.value)}
-                                                                                                >
-                                                                                                    <option value="">Select value</option>
-                                                                                                    {valueOptions.map((option) => (
-                                                                                                        <option key={option.value} value={option.value}>
-                                                                                                            {option.label}
-                                                                                                        </option>
-                                                                                                    ))}
-                                                                                                </select>
-                                                                                            );
-                                                                                        }
-                                                                                    })()}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="col-2">
-                                                                        <div className="addMore">
-                                                                            <button onClick={() => handleAddSubCondition(index)}>
-                                                                                <i className="fa-solid fa-plus"></i>
-                                                                            </button>
-                                                                            <button onClick={() => handleRemoveCondition(index)}>
-                                                                                <i className="fa-solid fa-xmark"></i>
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-
-
-                                                                </div>
-
-
-
-                                                                {(conditions[index] || []).length > 1 && (conditions[index] || []).slice(1).map((_, subIdx) => (
-                                                                    <div key={`sub-${index}-${subIdx}`}>
-                                                                        {/* AND/OR Logic Button */}
-                                                                        <div className="mb-2">
-                                                                            <button
-                                                                                className="btn btn-sm me-2"
-                                                                                style={{
-                                                                                    backgroundColor: '#ff6b35',
-                                                                                    color: '#fff',
-                                                                                    border: 'none',
-                                                                                    padding: '5px 10px',
-                                                                                    fontSize: '14px',
-                                                                                    borderRadius: '4px'
-                                                                                }}
-                                                                                onClick={() => {
-                                                                                    // Toggle between 'and' and 'or'
-                                                                                    const newOperator = subLogicOperator === 'and' ? 'or' : 'and';
-                                                                                    setSubLogicOperator(newOperator);
-                                                                                }}
-                                                                            >
-                                                                                {subLogicOperator}
-                                                                            </button>
-                                                                        </div>
-
-                                                                        {/* Sub-condition Row */}
-                                                                        <div className="row mb-3 pb-3">
-                                                                            <div className="col-10">
-                                                                                <div className="row">
-                                                                                    {/* Sub-condition Activity Type Dropdown - Always visible */}
+                                                                                {/* Operator Dropdown - Only show if Activity Type is selected */}
+                                                                                {(conditionSelections[index] || [''])[conditionIdx] && (
                                                                                     <div className="col-4">
                                                                                         <select
                                                                                             className='form-select'
-                                                                                            value={(subConditionSelections[index]?.[subIdx] || [''])[0] || ''}
-                                                                                            onChange={(e) => handleSubSelectChange(index, subIdx, 0, e.target.value)}
+                                                                                            value={(conditionOperators[index] || [''])[conditionIdx] || ''}
+                                                                                            onChange={(e) => handleOperatorChange(index, conditionIdx, e.target.value)}
                                                                                         >
-                                                                                            <option value="">Activity type</option>
-
-                                                                                            <option value="state">State</option>
-                                                                                            <option value="status">Status</option>
-                                                                                            <option value="subStatus">Sub Status</option>
-                                                                                            <option value="leadOwner">Lead Owner</option>
-                                                                                            <option value="registeredBy">Registered By</option>
-                                                                                            <option value="courseName">Course Name</option>
-                                                                                            <option value="jobName">Job Name</option>
-                                                                                            <option value="project">Project</option>
-                                                                                            <option value="vertical">Vertical</option>
-                                                                                            <option value="batch">Batch</option>
-                                                                                            <option value="center">Center</option>
+                                                                                            <option value="">Select Operator</option>
+                                                                                            <option value="equals">Equals</option>
+                                                                                            <option value="not_equals">Not Equals</option>
                                                                                         </select>
                                                                                     </div>
+                                                                                )}
 
-                                                                                    {/* Sub-condition Operator Dropdown - Only show if Activity Type is selected */}
-                                                                                    {(subConditionSelections[index]?.[subIdx] || [''])[0] && (
-                                                                                        <div className="col-4">
-                                                                                            <select
-                                                                                                className='form-select'
-                                                                                                value={(subConditionOperators[index]?.[subIdx] || [''])[0] || ''}
-                                                                                                onChange={(e) => handleSubOperatorChange(index, subIdx, 0, e.target.value)}
-                                                                                            >
-                                                                                                <option value="">Select Operator</option>
-                                                                                                <option value="equals">Equals</option>
-                                                                                                <option value="not_equals">Not Equals</option>
-                                                                                            </select>
-                                                                                        </div>
-                                                                                    )}
+                                                                                {/* Value Dropdown - Only show if Operator is selected */}
+                                                                                {(conditionOperators[index] || [''])[conditionIdx] && (conditionSelections[index] || [''])[conditionIdx] && (
+                                                                                    <div className="col-4">
+                                                                                        {(() => {
+                                                                                            const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
+                                                                                            const activityType = (conditionSelections[index] || [''])[conditionIdx] || '';
+                                                                                            const isMultiselect = multiValues.includes('all')
+                                                                                                ? true
+                                                                                                : multiValues.includes(activityType);
+                                                                                            const valueOptions = getValueOptions(activityType);
+                                                                                            const currentValue = (conditionValues[index] || [''])[conditionIdx] || '';
 
-                                                                                    {/* Sub-condition Value Dropdown - Only show if Operator is selected */}
-                                                                                    {(subConditionOperators[index]?.[subIdx] || [''])[0] && (subConditionSelections[index]?.[subIdx] || [''])[0] && (
-                                                                                        <div className="col-4">
-                                                                                            {(() => {
-                                                                                                const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
-                                                                                                const activityType = (subConditionSelections[index]?.[subIdx] || [''])[0] || '';
-                                                                                                const isMultiselect = multiValues.includes('all')
-                                                                                                    ? true
-                                                                                                    : multiValues.includes(activityType);
-                                                                                                const valueOptions = getValueOptions(activityType);
-                                                                                                const currentValue = (subConditionValues[index]?.[subIdx] || [''])[0] || '';
+                                                                                            if (isMultiselect) {
+                                                                                                return (
+                                                                                                    <MultiselectDropdown
+                                                                                                        options={valueOptions}
+                                                                                                        value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
+                                                                                                        onChange={(values) => handleValueChange(index, conditionIdx, values)}
+                                                                                                        placeholder="Select values"
 
-                                                                                                if (isMultiselect) {
-                                                                                                    return (
-                                                                                                        <MultiselectDropdown
-                                                                                                            options={valueOptions}
-                                                                                                            value={Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : [])}
-                                                                                                            onChange={(values) => handleSubValueChange(index, subIdx, 0, values)}
-                                                                                                            placeholder="Select values"
-                                                                                                        />
-                                                                                                    );
-                                                                                                } else {
-                                                                                                    return (
-                                                                                                        <select
-                                                                                                            className='form-select'
-                                                                                                            value={Array.isArray(currentValue) ? '' : currentValue}
-                                                                                                            onChange={(e) => handleSubValueChange(index, subIdx,0, e.target.value)}
-                                                                                                        >
-                                                                                                            <option value="">Select value</option>
-                                                                                                            {valueOptions.map((option) => (
-                                                                                                                <option key={option.value} value={option.value}>
-                                                                                                                    {option.label}
-                                                                                                                </option>
-                                                                                                            ))}
-                                                                                                        </select>
-                                                                                                    );
-                                                                                                }
-                                                                                            })()}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
+                                                                                                    />
+                                                                                                );
+                                                                                            } else {
+                                                                                                return (
+                                                                                                    <select
+                                                                                                        className='form-select'
+                                                                                                        value={Array.isArray(currentValue) ? '' : currentValue}
+                                                                                                        onChange={(e) => handleValueChange(index, conditionIdx, e.target.value)}
+                                                                                                    >
+                                                                                                        <option value="">Select value</option>
+                                                                                                        {valueOptions.map((option) => (
+                                                                                                            <option key={option.value} value={option.value}>
+                                                                                                                {option.label}
+                                                                                                            </option>
+                                                                                                        ))}
+                                                                                                    </select>
+                                                                                                );
+                                                                                            }
+                                                                                        })()}
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
-                                                                            <div className="col-2">
-                                                                                <div className="addMore">
+                                                                        </div>
+                                                                        <div className="col-2">
+                                                                            <div className="addMore">
+                                                                                {conditionIdx === (conditionSelections[index] || []).length - 1 && (
                                                                                     <button onClick={() => handleAddSubCondition(index)}>
                                                                                         <i className="fa-solid fa-plus"></i>
                                                                                     </button>
-                                                                                    <button onClick={() => handleRemoveSubCondition(index, subIdx)}>
+                                                                                )}
+                                                                                {(conditionSelections[index] || []).length > 1 && conditionIdx > 0 && (
+                                                                                    <button onClick={() => handleRemoveSubCondition(index, conditionIdx)}>
                                                                                         <i className="fa-solid fa-xmark"></i>
                                                                                     </button>
-                                                                                </div>
+                                                                                )}
+                                                                                {conditionIdx === 0 && (
+                                                                                    <button onClick={() => handleRemoveCondition(index)}>
+                                                                                        <i className="fa-solid fa-xmark"></i>
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 ))}
+
+
+
                                                             </div>
 
 
@@ -2108,11 +2492,11 @@ const DripMarketing = () => {
 
 
                                                                         <div className="col-4">
-                                                                            <select className='form-select' value={ruleData.primaryAction.activityType} onChange={(e) => {
-                                                                                setRuleData(prev => ({ 
-                                                                                    ...prev, 
-                                                                                    primaryAction: { 
-                                                                                        ...prev.primaryAction, 
+                                                                            <select className='form-select' value={ruleData.activityType} onChange={(e) => {
+                                                                                setRuleData(prev => ({
+                                                                                    ...prev,
+                                                                                    primaryAction: {
+                                                                                        ...prev.primaryAction,
                                                                                         activityType: e.target.value,
                                                                                         values: []
                                                                                     }
@@ -2141,10 +2525,10 @@ const DripMarketing = () => {
                                                                                         <MultiselectDropdown
                                                                                             options={getThenValueOptions(ruleData.primaryAction.activityType)}
                                                                                             value={Array.isArray(ruleData.primaryAction.values) ? ruleData.primaryAction.values : (ruleData.primaryAction.values ? [ruleData.primaryAction.values] : [])}
-                                                                                            onChange={(values) => setRuleData(prev => ({ 
-                                                                                                ...prev, 
-                                                                                                primaryAction: { 
-                                                                                                    ...prev.primaryAction, 
+                                                                                            onChange={(values) => setRuleData(prev => ({
+                                                                                                ...prev,
+                                                                                                primaryAction: {
+                                                                                                    ...prev.primaryAction,
                                                                                                     values: values
                                                                                                 }
                                                                                             }))}
@@ -2178,72 +2562,77 @@ const DripMarketing = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {thenCondition.map((condition, index) => (
-                                                                <div className="row my-3 border p-3" key={`then-${index}`}>
-                                                                    <div className="col-10">
-                                                                        <div className="row">
-                                                                            <div className="col-4">
-                                                                                <select
-                                                                                    className='form-select'
-                                                                                    value={condition.activityType || ''}
-                                                                                    onChange={(e) => {
-                                                                                        handleThenConditionChange(index, 'activityType', e.target.value);
-                                                                                        handleThenConditionChange(index, 'values', []); // Clear values when activity type changes
-                                                                                    }}
-                                                                                >
-                                                                                    <option value="">Activity Type</option>
-                                                                                    <option value="state">State</option>
-                                                                                    <option value="status">Status</option>
-                                                                                    <option value="subStatus">Sub Status</option>
-                                                                                    <option value="leadOwner">Lead Owner</option>
-                                                                                    <option value="registeredBy">Registered By</option>
 
-                                                                                    <option value="jobName">Job Name</option>
-                                                                                    <option value="project">Project</option>
-                                                                                    <option value="vertical">Vertical</option>
-                                                                                    <option value="batch">Batch</option>
-                                                                                    <option value="center">Center</option>
-                                                                                    <option value="course">Course</option>
-                                                                                </select>
-                                                                            </div>
-                                                                            {condition.activityType && (
-                                                                                <div className="col-6">
-                                                                                    <div className="d-flex align-items-center">
-                                                                                        <label className="me-2">Should be</label>
-                                                                                        <div className="flex-grow-1">
-                                                                                            <MultiselectDropdown
-                                                                                                options={getThenValueOptions(condition.activityType)}
-                                                                                                value={Array.isArray(condition.values) ? condition.values : (condition.values ? [condition.values] : [])}
-                                                                                                onChange={(values) => handleThenConditionChange(index, 'values', values)}
-                                                                                                placeholder="Select options"
-                                                                                            />
+                                                            {ruleData.additionalActions && ruleData.additionalActions.length > 0 ? (
+                                                                ruleData.additionalActions.map((action, index) => (
+                                                                    <div className="row my-3 border p-3" key={`then-${index}`}>
+                                                                        <div className="col-10">
+                                                                            <div className="row">
+                                                                                <div className="col-4">
+                                                                                    <select
+                                                                                        className='form-select'
+                                                                                        value={action.activityType || ''}
+                                                                                        onChange={(e) => {
+                                                                                            handleThenConditionChange(index, 'activityType', e.target.value);
+                                                                                            handleThenConditionChange(index, 'values', []); // Clear values when activity type changes
+                                                                                        }}
+                                                                                    >
+                                                                                        <option value="">Activity Type</option>
+                                                                                        <option value="state">State</option>
+                                                                                        <option value="status">Status</option>
+                                                                                        <option value="subStatus">Sub Status</option>
+                                                                                        <option value="leadOwner">Lead Owner</option>
+                                                                                        <option value="registeredBy">Registered By</option>
+                                                                                        <option value="jobName">Job Name</option>
+                                                                                        <option value="project">Project</option>
+                                                                                        <option value="vertical">Vertical</option>
+                                                                                        <option value="batch">Batch</option>
+                                                                                        <option value="center">Center</option>
+                                                                                        <option value="course">Course</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                {action.activityType && (
+                                                                                    <div className="col-6">
+                                                                                        <div className="d-flex align-items-center">
+                                                                                            <label className="me-2">Should be</label>
+                                                                                            <div className="flex-grow-1">
+                                                                                                <MultiselectDropdown
+                                                                                                    options={getThenValueOptions(action.activityType)}
+                                                                                                    value={Array.isArray(action.values) ? action.values : (action.values ? [action.values] : [])}
+                                                                                                    onChange={(values) => handleThenConditionChange(index, 'values', values)}
+                                                                                                    placeholder="Select options"
+                                                                                                />
+                                                                                            </div>
                                                                                         </div>
                                                                                     </div>
-                                                                                </div>
-                                                                            )}
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                    <div className="col-2">
-                                                                        <div className='d-flex gap-2'>
-                                                                            <button
-                                                                                onClick={() => handleAddThenCondition()}
-                                                                                className="btn btn-outline-success btn-sm"
-                                                                                title="Add new condition"
-                                                                            >
-                                                                                <i className="fa-solid fa-plus"></i>
-                                                                            </button>
+                                                                        <div className="col-2">
+                                                                            <div className='d-flex gap-2'>
+                                                                                <button
+                                                                                    onClick={() => handleAddThenCondition()}
+                                                                                    className="btn btn-outline-success btn-sm"
+                                                                                    title="Add new condition"
+                                                                                >
+                                                                                    <i className="fa-solid fa-plus"></i>
+                                                                                </button>
 
-                                                                            <button
-                                                                                onClick={() => handleRemoveThenCondition(index)}
-                                                                                className="btn btn-outline-danger btn-sm"
-                                                                                title="Remove condition"
-                                                                            >
-                                                                                <i className="fa-solid fa-trash"></i>
-                                                                            </button>
+                                                                                <button
+                                                                                    onClick={() => handleRemoveThenCondition(index)}
+                                                                                    className="btn btn-outline-danger btn-sm"
+                                                                                    title="Remove condition"
+                                                                                >
+                                                                                    <i className="fa-solid fa-trash"></i>
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            ))}
+                                                                ))
+                                                            ) : (
+                                                                ''
+                                                            )}
+
 
                                                             <div className="toggle-container-then my-3" id="toggleButtonthen">
 
@@ -2253,17 +2642,17 @@ const DripMarketing = () => {
                                                             <div className="row my-3 border p-3">
                                                                 <div className="col-10">
                                                                     <div className="row">
-
+                                                                        <h1 style={{ fontSize: '1rem' }}>Select Communication</h1>
                                                                         <>
                                                                             <div className="col-4">
                                                                                 <select className='form-select'
                                                                                     value={ruleData.communication.executionType}
                                                                                     onChange={(e) => {
                                                                                         const v = e.target.value;
-                                                                                        setRuleData(prev => ({ 
-                                                                                            ...prev, 
-                                                                                            communication: { 
-                                                                                                ...prev.communication, 
+                                                                                        setRuleData(prev => ({
+                                                                                            ...prev,
+                                                                                            communication: {
+                                                                                                ...prev.communication,
                                                                                                 executionType: v,
                                                                                                 mode: v === 'immediate' ? prev.communication.mode : '',
                                                                                                 occurrenceCount: v === 'occurrences' ? prev.communication.occurrenceCount : ''
@@ -2271,16 +2660,18 @@ const DripMarketing = () => {
                                                                                         }));
                                                                                     }}
                                                                                 >
+                                                                                    <option value="">Select</option>
                                                                                     <option value="immediate">Immediate</option>
                                                                                     <option value="occurrences">No of Occurences</option>
                                                                                 </select>
                                                                             </div>
-                                                                            {ruleData.communication.executionType === 'immediate' && (
+
+                                                                            {(ruleData.communication.executionType === 'occurrences' || ruleData.communication.executionType === 'immediate') && (
                                                                                 <div className="col-4">
-                                                                                    <select className='form-select' value={ruleData.communication.mode} onChange={(e) => setRuleData(prev => ({ 
-                                                                                        ...prev, 
-                                                                                        communication: { 
-                                                                                            ...prev.communication, 
+                                                                                    <select className='form-select' value={ruleData.communication.mode} onChange={(e) => setRuleData(prev => ({
+                                                                                        ...prev,
+                                                                                        communication: {
+                                                                                            ...prev.communication,
                                                                                             mode: e.target.value
                                                                                         }
                                                                                     }))}>
@@ -2291,16 +2682,143 @@ const DripMarketing = () => {
                                                                                     </select>
                                                                                 </div>
                                                                             )}
-                                                                            {ruleData.communication.executionType === 'occurrences' && (
-                                                                                <div className="col-4 d-flex">
-                                                                                    <label htmlFor="">No. Of Communication</label>
-                                                                                    <input type="number" min="1" value={ruleData.communication.occurrenceCount} onChange={(e) => setRuleData(prev => ({ 
-                                                                                        ...prev, 
-                                                                                        communication: { 
-                                                                                            ...prev.communication, 
-                                                                                            occurrenceCount: e.target.value
-                                                                                        }
-                                                                                    }))} />
+                                                                            {ruleData.communication.mode && (ruleData.communication.executionType === 'occurrences' || ruleData.communication.executionType === 'immediate') && (
+                                                                                <div className="col-4">
+                                                                                    <div className='d-flex'>
+                                                                                        <label htmlFor="" className="noOfCom" >No. Of Communication</label>
+                                                                                        <input type="number" min="1" className="noOfComInput" value={ruleData.communication.occurrenceCount} onChange={(e) => handleOccurrenceCountChange(e.target.value)} />
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+
+
+                                                                            {(ruleData.communication.executionType === 'occurrences' || ruleData.communication.executionType === 'immediate') && ruleData.communication.occurrenceCount && ruleData.communication.occurrenceCount > 0 && ruleData.communication.mode && (
+                                                                                <div className="col-12 mt-4">
+                                                                                    <h3 className='studentResponse'>Select a user to receive students response</h3>
+
+                                                                                    <div class='d-flex gap-3 mb-3'>
+                                                                                        <div class="sender">
+                                                                                            <input
+                                                                                                type="radio"
+                                                                                                name='whatapp'
+                                                                                                value="sender"
+                                                                                                id="sender"
+                                                                                                checked={ruleData.communication.recipient === 'sender'}
+                                                                                                onChange={(e) => setRuleData(prev => ({
+                                                                                                    ...prev,
+                                                                                                    communication: {
+                                                                                                        ...prev.communication,
+                                                                                                        recipient: e.target.value
+                                                                                                    }
+                                                                                                }))}
+                                                                                            />
+                                                                                            <label for="sender">Sender</label>
+                                                                                        </div>
+                                                                                        <div class="leadOwner">
+                                                                                            <input
+                                                                                                type="radio"
+                                                                                                name='whatapp'
+                                                                                                value="leadOwner"
+                                                                                                id="leadOwner"
+                                                                                                checked={ruleData.communication.recipient === 'leadOwner'}
+                                                                                                onChange={(e) => setRuleData(prev => ({
+                                                                                                    ...prev,
+                                                                                                    communication: {
+                                                                                                        ...prev.communication,
+                                                                                                        recipient: e.target.value
+                                                                                                    }
+                                                                                                }))}
+                                                                                            />
+                                                                                            <label for="leadOwner">Lead Owner</label>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    {/* <div>
+                                                                                        <h3>Select WhatsApp Templates</h3>
+                                                                                        <div class='d-flex gap-3'>
+                                                                                        <div class="sender">
+                                                                                            <input type="checkbox" name='whatapp' id=""  />
+                                                                                            <label for="sender">Primary Mobile</label>
+                                                                                        </div>
+                                                                                        <div class="leadOwner">
+                                                                                            <input type="checkbox" name='whatapp' id="" />
+                                                                                            <label for="leadOwner">Lead Owner</label>
+                                                                                        </div>
+                                                                                        <div class="leadOwner">
+                                                                                            <input type="checkbox" name='whatapp' id="" />
+                                                                                            <label for="leadOwner">Lead Owner</label>
+                                                                                        </div>
+                                                                                        <div class="leadOwner">
+                                                                                            <input type="checkbox" name='whatapp' id="" />
+                                                                                            <label for="leadOwner">Lead Owner</label>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    </div> */}
+
+
+                                                                                    <div className="col-12">
+                                                                                        <div className="row">
+                                                                                            {ruleData.communication.communications && ruleData.communication.communications.map((comm, index) => (
+                                                                                                <div key={index} className="col-6 mb-3">
+                                                                                                    <h3 className="studentResponse">{index + 1}{index === 0 ? 'st' : index === 1 ? 'nd' : index === 2 ? 'rd' : 'th'} Communication</h3>
+
+                                                                                                    {ruleData.communication.mode === 'email' ? (
+                                                                                                        <div className="alert alert-info" role="alert">
+                                                                                                            <div className="d-flex align-items-center">
+                                                                                                                {/* <div className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div> */}
+                                                                                                                <strong>Work in Progress</strong>
+                                                                                                            </div>
+                                                                                                            <div className="mt-2">
+                                                                                                                Email communication templates are being developed. This feature will be available soon.
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    ) : (
+                                                                                                        <div className="row">
+                                                                                                            <div className="col-4">
+                                                                                                                <select
+                                                                                                                    className='form-select'
+                                                                                                                    // value={comm.templateId}
+                                                                                                                    value={ruleData.communication.communications[index].templateId}
+                                                                                                                    onChange={(e) => updateCommunication(index, 'templateId', e.target.value)}
+                                                                                                                >
+                                                                                                                    <option value="">Select Template</option>
+                                                                                                                    {whatsappTemplates.length > 0 && whatsappTemplates?.map((template) => (
+                                                                                                                        <option key={template?._id} value={template?._id}>
+                                                                                                                            {template?.template?.name || ''}
+                                                                                                                        </option>
+                                                                                                                    ))}
+                                                                                                                </select>
+                                                                                                            </div>
+                                                                                                            <div className="col-4">
+                                                                                                                <select
+                                                                                                                    className='form-select'
+                                                                                                                    // value={comm.timing}
+                                                                                                                    value={ruleData.communication.communications[index].timing}
+                                                                                                                    onChange={(e) => updateCommunication(index, 'timing', e.target.value)}
+                                                                                                                >
+                                                                                                                    <option value="">Select Timing</option>
+                                                                                                                    <option value="1hrs">1hrs</option>
+                                                                                                                    <option value="2hrs">2hrs</option>
+                                                                                                                    <option value="3hrs">3hrs</option>
+                                                                                                                    <option value="4hrs">4hrs</option>
+                                                                                                                    <option value="5hrs">5hrs</option>
+                                                                                                                    <option value="8hrs">8hrs</option>
+                                                                                                                    <option value="1day">1day</option>
+                                                                                                                    <option value="2days">2days</option>
+                                                                                                                    <option value="3days">3days</option>
+                                                                                                                    <option value="4days">4days</option>
+                                                                                                                    <option value="5days">5days</option>
+                                                                                                                    <option value="8days">8days</option>
+                                                                                                                </select>
+                                                                                                            </div>
+                                                                                                            <div className="col-4"></div>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+
+
                                                                                 </div>
                                                                             )}
                                                                         </>
@@ -2323,8 +2841,9 @@ const DripMarketing = () => {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" className="btn btn-primary" onClick={handleAddRule}>Understood</button>
+                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal" onClick={forceCloseModal}>Close</button>
+                                {/* <button type="button" className="btn btn-primary" onClick={handleAddRule}>Understood</button> */}
+                                <button type="submit" className="btn btn-primary" onClick={modalMode === 'add' ? handleAddRule : handleUpdateRule}>{modalMode === 'add' ? 'Add Rule' : 'Update Rule'}</button>
                             </div>
                         </div>
                     </div>
@@ -2350,8 +2869,19 @@ const DripMarketing = () => {
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">No</button>
-                            <button type="button" className="btn btn-primary" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => setModalMode('edit')}>Yes</button>
+                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal" onClick={() => {
+                                setEditRule({});
+                                setIsEditing(false);
+                                setModalMode('');
+                            }}>No</button>
+                            <button type="button" className="btn btn-primary" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => {
+                                setModalMode('edit');
+
+                                
+                                    loadRuleForEdit(ruleData._id);
+                                
+                               
+                            }}>Yes</button>
                         </div>
                     </div>
                 </div>
@@ -2810,6 +3340,75 @@ flex-wrap: nowrap;
 
 }
 
+.sender, .leadOwner {
+ display: flex;
+ align-items: center;
+ cursor: pointer;
+ font-size: 14px;
+ color: #333;
+}
+
+.sender input[type="radio"],
+.leadOwner input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  margin-right: 8px;
+  position: relative;
+  cursor: pointer;
+ transition: all 0.2s ease;
+}
+.sender input[type="radio"]:hover,
+leadOwner input[type="radio"]:hover {
+   border-color: #ff6b35;
+}
+
+/* Checked state */
+.sender input[type="radio"]:checked,
+.leadOwner input[type="radio"]:checked {
+    border-color: #ff6b35;
+    background-color: #ff6b35;
+}
+
+ /* Inner dot for checked state */
+.sender input[type="radio"]:checked::after,
+.leadOwner input[type="radio"]:checked::after {
+  content: '';
+   width: 6px;
+   height: 6px;
+   border-radius: 50%;
+   background-color: white;
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+}
+
+/* Focus state for accessibility */
+.sender input[type="radio"]:focus,
+.leadOwner input[type="radio"]:focus {
+    outline: 2px solid #ff6b35;
+    outline-offset: 2px;
+}
+.whatappTemplate{
+margin-top:20px;
+
+}
+.studentResponse{
+font-size:0.9rem;
+}
+.noOfCom{
+font-size:0.9rem!important;
+margin-right:10px;
+}
+.noOfComInput{
+width:25%;
+padding-left:5px;
+}
 /* Mobile Responsive Styles */
 @media (max-width: 768px) {
 

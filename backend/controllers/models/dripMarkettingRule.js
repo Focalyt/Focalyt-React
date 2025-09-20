@@ -17,10 +17,6 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     trim: true
   },
   
-  description: {
-    type: String,
-    trim: true
-  },
 
   // Scheduling
   startDate: {
@@ -28,13 +24,7 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     required: true
   },
   
-  startTime: {
-    type: String,
-    required: true
-  },
   
-  endDate: Date,
-
   // IF CONDITIONS
   // Structure: Multiple condition blocks (Add Condition button creates these)
   conditionBlocks: [{
@@ -117,6 +107,23 @@ const DripMarketingRuleSchema = new mongoose.Schema({
         return this.executionType === 'immediate';
       }
     },
+
+    communications: [{
+      templateId: String,
+      timing: String,
+      order: Number
+    }],
+    recipient: {
+      type: String,
+      default: ''
+    },
+    // recipient: {
+    //   type: String,
+    //   enum: ['email', 'whatsapp', 'sms'],
+    //   required: function() {
+    //     return this.executionType === 'immediate';
+    //   }
+    // },
     
     // For occurrence-based execution  
     occurrenceCount: {
@@ -127,12 +134,7 @@ const DripMarketingRuleSchema = new mongoose.Schema({
       }
     },
     
-    // Template settings
-    template: {
-      subject: String,
-      message: String,
-      variables: [String]
-    },
+ 
     
     // Advanced settings
     priority: {
@@ -155,6 +157,7 @@ const DripMarketingRuleSchema = new mongoose.Schema({
   
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
   
@@ -328,8 +331,14 @@ DripMarketingRuleSchema.pre('save', function(next) {
   
   // Ensure each block has a main condition
   for (let block of this.conditionBlocks) {
-    if (!block.mainCondition || !block.mainCondition.activityType) {
-      return next(new Error('Each condition block must have a main condition with activityType'));
+    if (!block.conditions || block.conditions.length === 0) {
+      return next(new Error('Each condition block must have at least one condition'));
+    }
+    
+    // Check if any condition has activityType
+    const hasValidCondition = block.conditions.some(condition => condition.activityType);
+    if (!hasValidCondition) {
+      return next(new Error('Each condition block must have a condition with activityType'));
     }
   }
   

@@ -566,9 +566,9 @@ const HomePage = () => {
       <section class="">
         <div class="container">
           <h2 class="section-title py-md-4 text-center color-pink">Empowering Minds Through Future Technology</h2>
-          <div class="row g-4">
+          <div class="row g-4 pb-5">
 
-            <div class="col-md-5 large-images">
+            <div class="col-md-5 large-images" style={{display: 'flex'}}>
               <div class="row g-4">
                 <div class="col-12">
                   <div class="lab-gallery-item">
