@@ -1845,8 +1845,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		} else {
 			console.log('Invalid leadStatus:', filters.leadStatus);
 		}
-	} else {
-		console.log('leadStatus is undefined or has invalid value.');
 	}
 	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
 
@@ -2238,8 +2236,6 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 		} else {
 			console.log('Invalid leadStatus:', filters.leadStatus);
 		}
-	} else {
-		console.log('leadStatus is undefined or has invalid value.');
 	}
 	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
 
