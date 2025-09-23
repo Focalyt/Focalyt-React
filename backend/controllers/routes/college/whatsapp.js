@@ -677,7 +677,9 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 // Create WhatsApp template
 router.post('/create-template', isCollege, async (req, res) => {
 	try {
-		const { name, language, category, components } = req.body;
+		const { name, language, base64File, category, components } = req.body;
+
+    console.log(req.body, "req.body");
 
 		// Validate required fields
 		if (!name || !language || !category || !components) {
@@ -712,6 +714,12 @@ router.post('/create-template', isCollege, async (req, res) => {
 			components
 		};
 
+    if(base64File){
+      templateData.base64File = base64File;
+    }
+
+    console.log(templateData, "templateData");
+
 		// Create template via external API
 		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/create', templateData, {
 			headers: {
@@ -739,6 +747,61 @@ router.post('/create-template', isCollege, async (req, res) => {
 		
 		// Handle specific error cases
 		let errorMessage = 'Failed to create template';
+		if (error.response?.data?.message) {
+			errorMessage = error.response.data.message;
+		} else if (error.response?.data?.error) {
+			errorMessage = error.response.data.error;
+		}
+
+		res.status(500).json({ 
+			success: false, 
+			message: errorMessage,
+			error: error.response?.data || error.message
+		});
+	}
+});
+
+// Delete WhatsApp template
+router.delete('/delete-template/:id', isCollege, async (req, res) => {
+	try {
+		const { id } = req.params;
+
+		// Validate template ID
+		if (!id) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Template ID is required' 
+			});
+		}
+
+		console.log(`Deleting template with ID: ${id}`);
+
+		// Delete template via external API
+		const response = await axios.delete(`https://wa.jflindia.co.in/api/v1/messageTemplate/${id}`, {
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID,
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.WHATSAPP_API_TOKEN
+			}
+		});
+
+    console.log(response, "response");
+
+		res.json({
+			success: true,
+			message: 'Template deleted successfully',
+			data: {
+				templateId: id,
+				response: response.data
+			}
+		});
+
+	} catch (error) {
+		console.error('Error deleting WhatsApp template:', error);
+		
+		// Handle specific error cases
+		let errorMessage = 'Failed to delete template';
 		if (error.response?.data?.message) {
 			errorMessage = error.response.data.message;
 		} else if (error.response?.data?.error) {
