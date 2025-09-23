@@ -3621,6 +3621,7 @@ const MyFollowups = () => {
                           className="btn btn-primary"
                           onClick={() => {
                             fetchProfileData(filterData);
+                            fetchFollowupCounts(filterData)
                             setIsFilterCollapsed(true);
                           }}
                         >

@@ -7393,11 +7393,19 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		let baseMatch = {}
+
+		if(counselorArray.length > 0){
+			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}else{
+			baseMatch.createdBy = user._id;
+		}
+
 
 		const aggregate = [
 			{
 				$match: {
-					createdBy: user._id,
+					...baseMatch,
 					status: followupStatus,
 					followupDate: { $gte: from, $lte: to },
 					
