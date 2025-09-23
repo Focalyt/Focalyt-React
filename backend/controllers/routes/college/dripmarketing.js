@@ -458,8 +458,28 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 		const collegeId = req.user.college._id;
 		const dripMarketingRule = await DripMarketingRule.find({ collegeId: collegeId }).populate('createdBy');
 		
+		// Format the data to separate date and time for frontend
+		const formattedRules = dripMarketingRule.map(rule => {
+			const ruleObj = rule.toObject();
+			
+			
+			if (ruleObj.startDate) {
+				const startDate = new Date(ruleObj.startDate);
+				ruleObj.startDate = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+				
+				
+				const hours = startDate.getHours();
+				const minutes = startDate.getMinutes();
+				const ampm = hours >= 12 ? 'PM' : 'AM';
+				const displayHours = hours % 12 || 12; 
+				ruleObj.startTime = `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+			}
+			
+			return ruleObj;
+		});
+		
 		// console.log("dripMarketingRule",dripMarketingRule[0])
-		res.status(200).json({ success: true, data: dripMarketingRule });
+		res.status(200).json({ success: true, data: formattedRules });
 	}
 	catch (error) {
 		console.error('Error fetching drip marketing rule:', error);
@@ -467,42 +487,6 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 	}
 });
 
-router.get('/whatsapp-templates', [isCollege], async (req, res) => {
-	try {
-		const { page = 1, pageSize = 10 } = req.query;
-		
-		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/getTemplates', {
-			pagination: {
-				current: parseInt(page),
-				pageSize: parseInt(pageSize)
-			},
-			order: [
-				{
-					fieldName: "creationTime",
-					dir: "desc"
-				}
-			],
-			search: []
-		}, {
-			headers: {
-				'accept': 'application/json',
-				'x-phone-id': process.env.WHATSAPP_PHONE_ID ,
-				'Content-Type': 'application/json',
-				'x-api-key': process.env.WHATSAPP_API_TOKEN 
-			}
-		});
-		
-// console.log("response",response.data)
 
-		res.json({
-			success: true,
-			message: 'Templates fetched successfully',
-			data: response.data.results || []
-		});
-	} catch (err) {
-		console.error('Error fetching whatsapp templates:', err);
-		res.status(500).json({ success: false, message: 'Server error' });
-	}
-});
 
 module.exports = router; 

@@ -420,7 +420,8 @@ console.log( "response callback" , response )
                                 data-bs-target="#videoModal"
                                 onClick={(e) => {
                                   e.preventDefault(); // ✅ Prevents default link behavior
-                                  setVideoSrc(course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : "");
+                                  setVideoSrc(course.videos && course.videos[0] ? getFullUrl(course.videos[0]) : "");
+
                                 }}
                                 className="pointer img-fluid"
                               >

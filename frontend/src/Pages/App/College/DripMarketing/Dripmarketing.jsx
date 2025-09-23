@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import DatePicker from 'react-date-picker';
 import axios from 'axios';
-import * as bootstrap from 'bootstrap';
+// import * as bootstrap from 'bootstrap';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -124,69 +124,16 @@ const DripMarketing = () => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
-    
+
     // Modal refs
     const modalRef = useRef(null);
-    
+    const closeModalRef = useRef(null);
+
     // Helper function to close modal
     const closeModal = () => {
-        // Use a more reliable approach
-        try {
-            // Trigger the modal close event
-            const modal = document.getElementById('staticBackdropRuleModel');
-            if (modal) {
-                // Remove show class and add fade class
-                modal.classList.remove('show');
-                modal.classList.add('fade');
-                modal.style.display = 'none';
-                
-                // Remove backdrop
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(backdrop => {
-                    if (backdrop && backdrop.parentNode) {
-                        backdrop.remove();
-                    }
-                });
-                
-                // Clean up body
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
-            }
-        } catch (error) {
-            console.warn('Error closing modal:', error);
-            // Fallback to force close
-            forceCloseModal();
-        }
-    };
-    
-    // Function to force close modal and clean up
-    const forceCloseModal = () => {
-        try {
-            // Remove all modal backdrops
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach(backdrop => {
-                if (backdrop && backdrop.parentNode) {
-                    backdrop.remove();
-                }
-            });
-            
-            // Remove modal-open class from body
-            if (document.body) {
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
-            }
-            
-            // Hide modal if it exists
-            const modal = document.getElementById('staticBackdropRuleModel');
-            if (modal) {
-                modal.style.display = 'none';
-                modal.classList.remove('show');
-            }
-        } catch (error) {
-            console.warn('Error in forceCloseModal:', error);
-        }
+     if(closeModalRef.current){
+        closeModalRef.current.click();
+     }
     };
 
     const [showPopup, setShowPopup] = useState(false);
@@ -228,11 +175,11 @@ const DripMarketing = () => {
     }, []);
 
     // Cleanup modal on component unmount
-    useEffect(() => {
-        return () => {
-            forceCloseModal();
-        };
-    }, []);
+    // useEffect(() => {
+    //     return () => {
+    //         forceCloseModal();
+    //     };
+    // }, []);
 
 
     useEffect(() => {
@@ -248,34 +195,34 @@ const DripMarketing = () => {
 
     const [ruleData, setRuleData] = useState(
         {
-        _id: null,
-        startDate: '',
-        startTime: '',
-        endTime: '',
-        name: '',
-        conditionBlocks: [],
-        interBlockLogicOperator: 'and',
-        // actionsPerformed: {
-        primaryAction: {
-            activityType: '',
-            values: [],
-        },
-        additionalActions: []
-        ,
-        communication: {
-            executionType: '',
-            mode: '',
-            occurrenceCount: '',
-            communications: [
-                {
-                    templateId: '',
-                    timing: '',
-                    order: 1
-                }
-            ],
-            recipient: '',
-        },
-    });
+            _id: null,
+            startDate: '',
+            startTime: '',
+            endTime: '',
+            name: '',
+            conditionBlocks: [],
+            interBlockLogicOperator: 'and',
+            // actionsPerformed: {
+            primaryAction: {
+                activityType: '',
+                values: [],
+            },
+            additionalActions: []
+            ,
+            communication: {
+                executionType: '',
+                mode: '',
+                occurrenceCount: '',
+                communications: [
+                    {
+                        templateId: '',
+                        timing: '',
+                        order: 1
+                    }
+                ],
+                recipient: '',
+            },
+        });
 
     const clearRuleData = () => {
         setRuleData(
@@ -579,7 +526,7 @@ const DripMarketing = () => {
                 return;
             }
 
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/whatsapp-templates`, {
+            const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
                 headers: { 'x-auth': token }
             });
 
@@ -730,9 +677,9 @@ const DripMarketing = () => {
 
 
                 });
-                
+
                 // Close the modal
-                closeModal();
+                // closeModal();
             }
 
             // console.log('responseData', responseData)
@@ -742,7 +689,7 @@ const DripMarketing = () => {
             console.error('Error adding rule:', error);
             setError('Error creating rule. Please try again.');
         }
-        finally{
+        finally {
             fetchRules();
         }
 
@@ -766,6 +713,7 @@ const DripMarketing = () => {
     }
 
     const handleUpdateRule = async (ruleId) => {
+        let updatedRules = [...rules];
         try {
             const updateData = {
                 name: ruleData.name,
@@ -814,79 +762,89 @@ const DripMarketing = () => {
 
             });
 
-            if(response.data.success){
+            if (response.data.success) {
                 clearRuleData();
 
                 const UpdatedRuleData = response.data.data;
-                const updatedRules = [...rules];
-                updatedRules.forEach(rule => {
-                    if(rule._id === ruleData._id){
-                        rule=UpdatedRuleData;
-                    }
-                });
-                setRules(updatedRules);
+                
+              
                 alert('Rule updated successfully');
                 setIsEditing(false);
                 setModalMode('');
                 setEditRule({});
-                
+
                 // Close the modal
                 closeModal();
 
             }
             // console.log('response', response)
-        }catch(err){
+        } catch (err) {
             console.error('Error updating rule:', err);
             setError('Error updating rule. Please try again.');
         }
+        finally{
+            fetchRules();
+
+        }
     }
 
-
- 
- const handleStatusUpdate = async (ruleId, status)=>{
-    try{
-        const response = await axios.put(`${backendUrl}/college/dripmarketing/status-update/${ruleId}`, {status}, {
-            headers: { 'x-auth': token }
-        });
-
-        if(response.data.success){
-
-            const updatedRules = [...rules];
-
-            updatedRules.forEach(rule => {
-                if(rule._id === ruleId){
-
-                    
-                    rule.isActive = status;
-                }
+    const handleStatusUpdate = async (ruleId, status) => {
+        try {
+            const response = await axios.put(`${backendUrl}/college/dripmarketing/status-update/${ruleId}`, { status }, {
+                headers: { 'x-auth': token }
             });
-            setRules(updatedRules);
 
-            alert('Rule status updated successfully');
+            if (response.data.success) {
+
+                const updatedRules = [...rules];
+
+                updatedRules.forEach(rule => {
+                    if (rule._id === ruleId) {
+
+
+                        rule.isActive = status;
+                    }
+                });
+                setRules(updatedRules);
+
+                alert('Rule status updated successfully');
+            }
+            else {
+                alert('Error updating rule status. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error updating rule status:', err);
+            setError('Error updating rule status. Please try again.');
         }
-        else{
-            alert('Error updating rule status. Please try again.');
-        }
-    }catch(err){
-        console.error('Error updating rule status:', err);
-        setError('Error updating rule status. Please try again.');
     }
- }
 
+    const loadRuleForEdit = (ruleId) => {
 
-    
-const loadRuleForEdit = (ruleId) => {
-        
         const ruleToEdit = rules.find(rule => rule._id === ruleId);
-      
+
         if (ruleToEdit) {
-            
+            // Convert 12-hour format to 24-hour format for time input
+            let timeForInput = ruleToEdit.startTime || '';
+            if (timeForInput && timeForInput.includes(' ')) {
+                const [time, ampm] = timeForInput.split(' ');
+                const [hours, minutes] = time.split(':');
+                let hour24 = parseInt(hours);
+
+                if (ampm === 'PM' && hour24 !== 12) {
+                    hour24 += 12;
+                } else if (ampm === 'AM' && hour24 === 12) {
+                    hour24 = 0;
+                }
+
+                timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+            }
+
             setRuleData({
                 _id: ruleToEdit._id || null,
                 name: ruleToEdit.name || '',
                 description: ruleToEdit.description || '',
-                startDate: ruleToEdit.startDate || '',
-                startTime: ruleToEdit.startTime || '',
+                startDate: ruleToEdit.startDate ? new Date(ruleToEdit.startDate) : '',
+                startTime: timeForInput,
                 endTime: ruleToEdit.endTime || '',
                 // conditionBlocks: ruleToEdit.conditionBlocks || [],
                 // conditionBlock: ruleToEdit.conditionBlocks.map
@@ -903,21 +861,21 @@ const loadRuleForEdit = (ruleId) => {
                 primaryAction: ruleToEdit.primaryAction || { activityType: '', values: [] },
                 additionalActions: ruleToEdit.additionalActions || [],
                 communication: {
-                  executionType: ruleToEdit.communication?.executionType || '',
-                  mode: ruleToEdit.communication?.mode || '',
-                  occurrenceCount: ruleToEdit.communication?.occurrenceCount || '',
-                  communications: ruleToEdit.communication?.communications || [{
-                    templateId: '',
-                    timing: '',
-                    order: 1
-                  }],
-                  recipient: ruleToEdit.communication?.recipient || ''
+                    executionType: ruleToEdit.communication?.executionType || '',
+                    mode: ruleToEdit.communication?.mode || '',
+                    occurrenceCount: ruleToEdit.communication?.occurrenceCount || '',
+                    communications: ruleToEdit.communication?.communications || [{
+                        templateId: '',
+                        timing: '',
+                        order: 1
+                    }],
+                    recipient: ruleToEdit.communication?.recipient || ''
                 }
-              });
+            });
 
-           
+
             if (ruleToEdit.conditionBlocks && ruleToEdit.conditionBlocks.length > 0) {
-                
+
                 const conditionArray = [];
                 const conditionsArray = [];
                 const conditionSelectionsArray = [];
@@ -925,9 +883,9 @@ const loadRuleForEdit = (ruleId) => {
                 const conditionValuesArray = [];
                 const subConditionSelectionsArray = [];
 
-               
+
                 ruleToEdit.conditionBlocks.forEach((block, blockIndex) => {
-                    
+
                     conditionArray.push({
                         blockIndex: blockIndex,
                         blockId: block._id || `block-${blockIndex}`
@@ -954,7 +912,7 @@ const loadRuleForEdit = (ruleId) => {
                         conditionValuesArray.push(blockValues);
                         subConditionSelectionsArray.push(blockSubSelections);
                     } else {
-                        
+
                         conditionsArray.push([]);
                         conditionSelectionsArray.push([]);
                         conditionOperatorsArray.push([]);
@@ -963,7 +921,7 @@ const loadRuleForEdit = (ruleId) => {
                     }
                 });
 
-               
+
                 setCondition(conditionArray);
                 setConditions(conditionsArray);
                 setConditionSelections(conditionSelectionsArray);
@@ -971,7 +929,7 @@ const loadRuleForEdit = (ruleId) => {
                 setConditionValues(conditionValuesArray);
                 setSubConditionSelections(subConditionSelectionsArray);
             } else {
-               
+
                 setCondition([]);
                 setConditions([]);
                 setConditionSelections([]);
@@ -981,6 +939,7 @@ const loadRuleForEdit = (ruleId) => {
             }
         }
     };
+
     const [activeTab, setActiveTab] = useState({});
     const [condition, setCondition] = useState([]);
     const [conditions, setConditions] = useState([]);
@@ -1634,16 +1593,16 @@ const loadRuleForEdit = (ruleId) => {
 
             // Ensure conditions array is long enough
             while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
-                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
-                    activityType: '', 
-                    operator: '', 
-                    values: [] 
+                newRuleData.conditionBlocks[blockIndex].conditions.push({
+                    activityType: '',
+                    operator: '',
+                    values: []
                 });
             }
 
             // Update the specific condition
             newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].activityType = value;
-            
+
             // Only clear operator and values if this is a new selection
             // Don't clear if user is just changing the activity type
             if (value === '') {
@@ -1700,16 +1659,16 @@ const loadRuleForEdit = (ruleId) => {
 
             // Ensure conditions array is long enough
             while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
-                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
-                    activityType: '', 
-                    operator: '', 
-                    values: [] 
+                newRuleData.conditionBlocks[blockIndex].conditions.push({
+                    activityType: '',
+                    operator: '',
+                    values: []
                 });
             }
 
             // Update the specific condition
             newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].operator = value;
-            
+
             // Only clear values if operator is cleared
             if (value === '') {
                 newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = [];
@@ -1760,10 +1719,10 @@ const loadRuleForEdit = (ruleId) => {
 
             // Ensure conditions array is long enough
             while (newRuleData.conditionBlocks[blockIndex].conditions.length <= selectIndex) {
-                newRuleData.conditionBlocks[blockIndex].conditions.push({ 
-                    activityType: '', 
-                    operator: '', 
-                    values: [] 
+                newRuleData.conditionBlocks[blockIndex].conditions.push({
+                    activityType: '',
+                    operator: '',
+                    values: []
                 });
             }
 
@@ -2090,7 +2049,7 @@ const loadRuleForEdit = (ruleId) => {
                     <table>
                         <thead>
                             <tr>
-                                <td width={400}>
+                                <td width={200}>
                                     Description
                                 </td>
 
@@ -2127,7 +2086,7 @@ const loadRuleForEdit = (ruleId) => {
                                             {new Date(rule.createdAt).toLocaleDateString("en-GB")}
                                         </td>
                                         <td>
-                                        {new Date(rule.startDate).toLocaleDateString("en-GB")} &nbsp; {rule.startTime}
+                                            {new Date(rule.startDate).toLocaleDateString("en-GB")} &nbsp; {rule.startTime}
                                         </td>
                                         <td>
                                             <div className="form-check form-switch">
@@ -2155,22 +2114,35 @@ const loadRuleForEdit = (ruleId) => {
                                                         <li data-bs-toggle="modal" data-bs-target="#staticBackdropEditRuleModel" onClick={() => {
                                                             // Handle edit logic
                                                             setModalMode('edit');
-                                                            setRuleData(rule);
+
+                                                            // Convert 12-hour format to 24-hour format for time input
+                                                            let timeForInput = rule.startTime || '';
+                                                            if (timeForInput && timeForInput.includes(' ')) {
+                                                                const [time, ampm] = timeForInput.split(' ');
+                                                                const [hours, minutes] = time.split(':');
+                                                                let hour24 = parseInt(hours);
+
+                                                                if (ampm === 'PM' && hour24 !== 12) {
+                                                                    hour24 += 12;
+                                                                } else if (ampm === 'AM' && hour24 === 12) {
+                                                                    hour24 = 0;
+                                                                }
+
+                                                                timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+                                                            }
+
+                                                            setRuleData({
+                                                                ...rule,
+                                                                startDate: rule.startDate ? new Date(rule.startDate) : '',
+                                                                startTime: timeForInput
+                                                            });
                                                             setShowPopup(false);
                                                             setPopupIndex(null);
 
                                                         }}>
                                                             Edit
                                                         </li>
-                                                        <li onClick={() => {
-                                                            // Handle delete logic
-                                                            const updatedRules = rules.filter((_, i) => i !== index);
-                                                            setRules(updatedRules);
-                                                            setShowPopup(false);
-                                                            setPopupIndex(null);
-                                                        }}>
-                                                            Delete
-                                                        </li>
+                                                       
                                                     </ul>
                                                 </div>
                                             )}
@@ -2188,8 +2160,8 @@ const loadRuleForEdit = (ruleId) => {
 
 
             <div className="btn_add_segement">
-                <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => { 
-                    setModalMode('add'); 
+                <a href="#" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => {
+                    setModalMode('add');
                     resetFormData();
                 }}><i className="fa-solid fa-plus"></i></a>
             </div>
@@ -2200,7 +2172,7 @@ const loadRuleForEdit = (ruleId) => {
                         <div className="modal-content">
                             <div className="modal-header">
                                 <h1 className="modal-title fs-5" id="staticBackdropLabel">{modalMode === 'edit' ? 'Edit Rule' : 'Add Rule'}</h1>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={forceCloseModal}></button>
+                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" ></button>
                             </div>
                             <div className="modal-body">
                                 <div className="row">
@@ -2841,7 +2813,7 @@ const loadRuleForEdit = (ruleId) => {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal" onClick={forceCloseModal}>Close</button>
+                                <button ref={closeModalRef} type="button" className="btn btn-secondary" data-bs-dismiss="modal" >Close</button>
                                 {/* <button type="button" className="btn btn-primary" onClick={handleAddRule}>Understood</button> */}
                                 <button type="submit" className="btn btn-primary" onClick={modalMode === 'add' ? handleAddRule : handleUpdateRule}>{modalMode === 'add' ? 'Add Rule' : 'Update Rule'}</button>
                             </div>
@@ -2877,10 +2849,10 @@ const loadRuleForEdit = (ruleId) => {
                             <button type="button" className="btn btn-primary" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#staticBackdropRuleModel" onClick={() => {
                                 setModalMode('edit');
 
-                                
-                                    loadRuleForEdit(ruleData._id);
-                                
-                               
+
+                                loadRuleForEdit(ruleData._id);
+
+
                             }}>Yes</button>
                         </div>
                     </div>
@@ -2945,6 +2917,7 @@ const loadRuleForEdit = (ruleId) => {
     vertical-align: middle;
     padding: 12px;
     border-bottom: 1px solid #dee2e6;
+    font-size:0.9rem
     }
     
     table {

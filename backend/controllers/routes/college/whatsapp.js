@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { College, WhatsAppMessage } = require('../../models');
+const {isCollege}  = require('../../../helpers');
 
 // Middleware to check if college is authenticated
 const authenticateCollege = async (req, res, next) => {
@@ -576,5 +577,182 @@ router.post('/exchange-token', authenticateCollege, async (req, res) => {
     res.status(500).json({ status: false, message: 'Failed to exchange token' });
   }
 });
+
+router.get('/templates', [isCollege], async (req, res) => {
+	try {
+		const { page = 1, pageSize = 10 } = req.query;
+		
+		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/getTemplates', {
+			pagination: {
+				current: parseInt(page),
+				pageSize: parseInt(pageSize)
+			},
+			order: [
+				{
+					fieldName: "creationTime",
+					dir: "desc"
+				}
+			],
+			search: []
+		}, {
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID ,
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.WHATSAPP_API_TOKEN 
+			}
+		});
+		
+// console.log("response",response.data)
+
+		res.json({
+			success: true,
+			message: 'Templates fetched successfully',
+			data: response.data.results || []
+		});
+	} catch (err) {
+		console.error('Error fetching whatsapp templates:', err);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+// Sync templates from Meta
+router.post('/sync-templates', isCollege, async (req, res) => {
+	try {
+		// Make API call to sync templates from Meta
+		const response = await axios.get('https://wa.jflindia.co.in/api/v1/whatsapp/syncTemplatesFromMeta', {
+			params: {
+				apiKey: process.env.WHATSAPP_API_TOKEN
+			},
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID,
+				'x-api-key': process.env.WHATSAPP_API_TOKEN
+			}
+		});
+
+		// Send WebSocket notification
+		if (global.wsServer) {
+			global.wsServer.sendWhatsAppNotification(req.collegeId, {
+				type: 'templates_synced',
+				message: 'Templates synced successfully from Meta',
+				timestamp: new Date().toISOString()
+			});
+		}
+
+		res.json({
+			success: true,
+			message: 'Templates synced successfully from Meta',
+			data: response.data
+		});
+
+	} catch (error) {
+		console.error('Error syncing templates from Meta:', error);
+		
+		// Handle specific error cases
+		let errorMessage = 'Failed to sync templates from Meta';
+		if (error.response?.data?.message) {
+			errorMessage = error.response.data.message;
+		} else if (error.response?.data?.error) {
+			errorMessage = error.response.data.error;
+		}
+
+		// Send WebSocket error notification
+		if (global.wsServer) {
+			global.wsServer.sendWhatsAppNotification(req.collegeId, {
+				type: 'templates_sync_error',
+				error: errorMessage,
+				timestamp: new Date().toISOString()
+			});
+		}
+
+		res.status(500).json({ 
+			success: false, 
+			message: errorMessage,
+			error: error.response?.data || error.message
+		});
+	}
+});
+
+// Create WhatsApp template
+router.post('/create-template', isCollege, async (req, res) => {
+	try {
+		const { name, language, category, components } = req.body;
+
+		// Validate required fields
+		if (!name || !language || !category || !components) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Name, language, category, and components are required' 
+			});
+		}
+
+		// Validate category
+		const validCategories = ['UTILITY', 'MARKETING', 'AUTHENTICATION'];
+		if (!validCategories.includes(category)) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Invalid category. Must be one of: UTILITY, MARKETING, AUTHENTICATION' 
+			});
+		}
+
+		// Validate components structure
+		if (!Array.isArray(components) || components.length === 0) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Components must be a non-empty array' 
+			});
+		}
+
+		// Prepare template data
+		const templateData = {
+			name,
+			language,
+			category,
+			components
+		};
+
+		// Create template via external API
+		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/create', templateData, {
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID,
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.WHATSAPP_API_TOKEN
+			}
+		});
+
+		res.json({
+			success: true,
+			message: 'Template created successfully',
+			data: {
+				templateName: name,
+				templateId: response.data?.id,
+				category,
+				language,
+				response: response.data
+			}
+		});
+
+	} catch (error) {
+		console.error('Error creating WhatsApp template:', error);
+		
+		// Handle specific error cases
+		let errorMessage = 'Failed to create template';
+		if (error.response?.data?.message) {
+			errorMessage = error.response.data.message;
+		} else if (error.response?.data?.error) {
+			errorMessage = error.response.data.error;
+		}
+
+		res.status(500).json({ 
+			success: false, 
+			message: errorMessage,
+			error: error.response?.data || error.message
+		});
+	}
+});
+
+
 
 module.exports = router; 

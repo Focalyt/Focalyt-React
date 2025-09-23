@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
-  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn
 } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -214,19 +214,19 @@ function CollegeLayout({ children }) {
     if (openSubmenu.dropdown !== undefined) {
       const dropdownRef = menuRefs.dropdown;
       const settingsRef = menuRefs.settings;
-      
+
       if (dropdownRef.current) {
         // Force immediate height calculation for dropdown
         const dropdownHeight = dropdownRef.current.scrollHeight;
         console.log('Dropdown height:', dropdownHeight, 'Open state:', openSubmenu.dropdown); // Debug log
         console.log('Current submenuMaxHeight.dropdown:', submenuMaxHeight.dropdown); // Debug log
-        
+
         setSubmenuMaxHeight(prev => ({
           ...prev,
           dropdown: openSubmenu.dropdown ? `${Math.max(dropdownHeight, 80)}px` : '0px'
         }));
       }
-      
+
       if (settingsRef.current && openSubmenu.settings) {
         setTimeout(() => {
           const settingsHeight = settingsRef.current.scrollHeight;
@@ -487,11 +487,11 @@ function CollegeLayout({ children }) {
                   <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Events</span>
                   <span className="dropdown-arrow">
-                        <FontAwesomeIcon
-                          icon={faCaretDown}
-                          className={`chevron-icon ${openSubmenu.events ? 'rotate-90' : ''}`}
-                        />
-                      </span>
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.events ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.events}
@@ -609,6 +609,15 @@ function CollegeLayout({ children }) {
                         </Link>
                       </li>
                     </ul>
+                  </li>
+
+                  <li className={`nav-item ${location.pathname === '/institute/dripmarketing' ? 'active' : ''}`}>
+                    <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>
+                      {/* <FontAwesomeIcon icon={} /> */}
+                      {/* <FontAwesomeIcon icon={faDrip} /> */}
+                      <FontAwesomeIcon icon={faBullhorn} /> 
+                      <span className="menu-title">Drip Marketing</span>
+                    </Link>
                   </li>
                 </ul>
               </li>
