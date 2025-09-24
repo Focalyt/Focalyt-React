@@ -197,8 +197,6 @@ const WhatsAppTemplate = () => {
 
   };
 
-
-
   // Function to replace carousel message variables with their values
 
   const replaceCarouselMessageVariables = (text) => {
@@ -224,8 +222,6 @@ const WhatsAppTemplate = () => {
     return result;
 
   };
-
-
 
   // Function to add variable to carousel message
 
@@ -258,8 +254,6 @@ const WhatsAppTemplate = () => {
     });
 
   };
-
-
 
   // Function to update carousel variable value
 
@@ -462,14 +456,6 @@ const WhatsAppTemplate = () => {
     return baseFormData;
 
   };
-
-
-
-
-
-
-  
-
 
 
   const closeCreateModal = () => {
@@ -1182,6 +1168,11 @@ const WhatsAppTemplate = () => {
         if (window.bootstrap && window.bootstrap.Modal) {
           const modal = new window.bootstrap.Modal(modalElement);
           modal.show();
+          
+          // Add event listener for when modal is hidden
+          modalElement.addEventListener('hidden.bs.modal', () => {
+            setSelectedTemplate(null);
+          });
         } else {
           // Fallback to manual modal show
           modalElement.classList.add('show');
@@ -1191,6 +1182,25 @@ const WhatsAppTemplate = () => {
       }
     }
   }, [selectedTemplate]);
+
+  // Function to close modal manually
+  const closeModal = () => {
+    const modalElement = document.getElementById('templatePreviewModal');
+    if (modalElement) {
+      if (window.bootstrap && window.bootstrap.Modal) {
+        const modal = window.bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+          modal.hide();
+        }
+      } else {
+        // Fallback to manual modal hide
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      }
+    }
+    setSelectedTemplate(null);
+  };
 
   const fetchWhatsappTemplates = async () => {
 
@@ -1342,12 +1352,7 @@ console.log(response.data.data, "response.data.data");
 
   };
 
-
-
   // Function to save template
-
-
-
 
   const handleCloneTemplate = (template) => {
 
@@ -1366,9 +1371,7 @@ console.log(response.data.data, "response.data.data");
     const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
 
     const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
-
-    
-    
+  
     // Determine template type based on buttons or other indicators
 
     let templateType = 'Custom';
@@ -1730,9 +1733,6 @@ console.log(response.data.data, "response.data.data");
         return;
 
       }
-
-
-
       // Show loading state
 
       setIsCreatingTemplate(true);
@@ -2814,7 +2814,6 @@ console.log(response.data.data, "response.data.data");
       </div>
 
 
-
       {/* Table */}
 
       <div className="card shadow-sm" style={{ borderRadius: '12px', border: 'none' }}>
@@ -3061,13 +3060,7 @@ console.log(response.data.data, "response.data.data");
 
       </div>
 
-
-
       {/* model  */}
-
-
-
-
 
       {/* <!-- Modal --> */}
 
@@ -3085,7 +3078,7 @@ console.log(response.data.data, "response.data.data");
 
               </h1>
 
-              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <button type="button" className="btn-close" onClick={closeModal} aria-label="Close"></button>
 
             </div>
 
@@ -7634,7 +7627,7 @@ Specificity: (1,5,0)
 
 }
 
-#createTemplateModal{
+#createTemplateModal , #templatePreviewModal{
 
 background-color:#000000a3;
 }

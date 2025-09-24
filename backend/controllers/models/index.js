@@ -90,6 +90,7 @@ module.exports.AttendanceTracking = require("./attendanceTracking");
 module.exports.StatusLogs = require("./statusLogs");
 module.exports.B2cFollowup = require("./b2cFollowup");
 module.exports.DripMarketingRule = require("./dripMarkettingRule");
+module.exports.ReEnquire = require("./reEnquire");
 // module.exports.Manager = required("");
 
 
