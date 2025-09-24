@@ -58,7 +58,8 @@ const {
   Review,
   Courses,
   AppliedCourses,
-  CandidateProfile
+  CandidateProfile,
+  ReEnquire
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -295,11 +296,10 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     }
 
     const validation = { mobile: req.user.mobile };
-    console.log('validation')
+   
 
 
     let selectedCenter = req.body.selectedCenter;
-    console.log('selectedCenter', selectedCenter)
     if (!selectedCenter) {
       selectedCenter = ""
 
@@ -325,7 +325,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
 
     // Fetch course and candidate
-    const course = await Courses.findById(courseId);
+    const course = await Courses.findById(courseId).lean();
     if (!course) {
       return res.status(404).json({ status: false, msg: "Course not found." });
     }
@@ -336,8 +336,21 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       return res.status(404).json({ status: false, msg: "Candidate not found." });
     }
 
+    const alreadyApplied = await AppliedCourses.findOne({ _candidate: candidate._id, _course: courseId }).lean();
+
     // Check if already applied
-    if (candidate.appliedCourses && candidate.appliedCourses.includes(courseId)) {
+    if (alreadyApplied) {
+
+      const reEnquire = await ReEnquire.create({
+        candidate: candidate._id,
+        appliedCourse: alreadyApplied._id,
+        course: courseId,
+        reEnquireDate: new Date(),
+        counselorName:  alreadyApplied.counsellor
+      });
+
+     
+
       return res.status(400).json({ status: false, msg: "Already applied." });
     };
 

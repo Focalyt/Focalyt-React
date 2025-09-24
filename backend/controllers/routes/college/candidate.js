@@ -65,7 +65,8 @@ const {
 	QuestionAnswer,
 	CandidateVisitCalender,
 	Center,
-	StatusLogs
+	StatusLogs,
+	ReEnquire
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const { statusLogHelper } = require("../../../helpers/college");
@@ -3000,6 +3001,26 @@ router.get('/misreport/:batchId', [isCollege], async (req, res) => {
 		});
 	}
 });
+
+router.get('/reEnquireData', async(req , res)=>{
+    try{
+
+        const reEnquireData = await ReEnquire.find();
+        console.log("reEnquireData...", reEnquireData);
+        res.status(200).json({
+            status: true,
+            msg: "ReEnquire data retrieved successfully",
+            data: reEnquireData
+        });
+    }
+    catch(err){
+        res.status(500).json({
+            status: false,
+            msg: "Failed to get reEnquire data",
+            error: err.message
+        });
+    }
+})
 
 // router.get('/calender-visit-data', [isCollege], async (req, res) => {
 // 	try{}

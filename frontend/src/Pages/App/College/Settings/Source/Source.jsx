@@ -532,11 +532,7 @@ function Source() {
         //     flex: 0 0 100% !important;
         //   }
           
-          /* Button adjustments */
-          .d-flex.gap-2 {
-            flex-direction: column;
-            gap: 0.5rem !important;
-          }
+
           
           .btn {
             width: 100%;

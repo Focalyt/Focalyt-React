@@ -6,7 +6,7 @@ let router = express.Router();
 
 // Models
 let Status = require('../../models/status');
-let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User } = require('../../models');
+let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User , ReEnquire} = require('../../models');
 
 //helpers
 let { statusLogHelper } = require('../../../helpers/college');
@@ -465,10 +465,17 @@ router.route("/addleaddandcourseapply")
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
                 console.log('alreadyApplied:', alreadyApplied);
                 if (alreadyApplied) {
+                    const reEnquire = await ReEnquire.create({
+                        candidate: existingCandidate._id,
+                        appliedCourse: alreadyApplied._id,
+                        course: courseId,
+                        reEnquireDate: new Date(),
+                        counselorName:  alreadyApplied.counsellor
+                    });
                     return res.json({
                         status: false,
                         msg: "Candidate already exists and course already applied",
-                        data: { existingCandidate, alreadyApplied },
+                        data: { existingCandidate, alreadyApplied, reEnquire },
                         mobile: mobile
                     });
                 }
