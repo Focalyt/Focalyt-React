@@ -8,61 +8,40 @@ import axios from 'axios'
 
 
 const ReEnquire = () => {
-    const [reEnquireData, setReEnquireData] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
 
-    // Sample data for demonstration
-    useEffect(() => {
-        const sampleData = [
-            {
-                id: 1,
-                name: "John Doe",
-                course: "Computer Science",
-                mobileNo: "9876543210",
-                counselorName: "Dr. Smith",
-                reEnquireDate: "2024-01-15"
-            },
-            {
-                id: 2,
-                name: "Jane Smith",
-                course: "Business Administration",
-                mobileNo: "9876543211",
-                counselorName: "Dr. Johnson",
-                reEnquireDate: "2024-01-16"
-            },
-            {
-                id: 3,
-                name: "Mike Wilson",
-                course: "Engineering",
-                mobileNo: "9876543212",
-                counselorName: "Dr. Brown",
-                reEnquireDate: "2024-01-17"
-            },
-            {
-                id: 4,
-                name: "Sarah Davis",
-                course: "Medicine",
-                mobileNo: "9876543213",
-                counselorName: "Dr. Wilson",
-                reEnquireDate: "2024-01-18"
-            },
-            {
-                id: 5,
-                name: "David Lee",
-                course: "Law",
-                mobileNo: "9876543214",
-                counselorName: "Dr. Davis",
-                reEnquireDate: "2024-01-19"
-            }
-        ];
-        setReEnquireData(sampleData);
-    }, []);
 
-    const [reenquireFilters, setReEnquireFilters] = useState({});
+    const [reEnquireData, setReEnquireData] = useState([]);
+
+  
+    useEffect(()=>{
+        fetchReEnquireData()
+        
+    },[]) 
+    
+
+    const fetchReEnquireData = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get(`${backendUrl}/college/candidate/reEnquireData`, {
+                headers: { 'x-auth': token }
+            });
+            console.log('response' , response.data.data)
+            setReEnquireData(response.data.data)
+        }catch(err){
+            console.error('Error fetching ReEnquire data:', err);
+             // Show user-friendly error message
+            if (err.response?.data?.msg) {
+                console.error('Server error:', err.response.data.msg);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }
 
 
     return (
@@ -247,7 +226,7 @@ const ReEnquire = () => {
                                                         <td className="py-3 px-3">
                                                             <div className="d-flex align-items-center">
                                                                 <i className="fas fa-phone text-muted me-2"></i>
-                                                                <span className="text-dark">{item.mobileNo}</span>
+                                                                <span className="text-dark">{item.mobile}</span>
                                                             </div>
                                                         </td>
                                                         <td className="py-3 px-3">

@@ -3015,6 +3015,8 @@ const CRMDashboard = () => {
       setShowPanel('Reffer');
     } else if (panel === 'AddAllLeads') {
       setShowPanel('AddAllLeads');
+    } else if (panel === 'whatsapp') {
+      setShowPanel('Whatsapp');
     }
 
     if (!isMobile) {
@@ -3375,7 +3377,7 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
-      <div className="col-12 transition-col" id="editFollowupPanel">
+      <div className="col-11 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
     ) : null;
@@ -3482,7 +3484,7 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
-      <div className="col-12 transition-col" id="refferPanel">
+      <div className="col-11 transition-col" id="refferPanel">
         {panelContent}
       </div>
     ) : null;
@@ -3935,7 +3937,7 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'AddAllLeads') ? (
-      <div className="col-12 transition-col" id="addLeadPanel">
+      <div className="col-11 transition-col" id="addLeadPanel">
         {panelContent}
       </div>
     ) : null;
@@ -3957,9 +3959,7 @@ const CRMDashboard = () => {
             </div>
           </div>
           <div className="right-topbar">
-            <a className="margin-horizontal-4" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
-            </a>
+           
             <a className="margin-horizontal-5" href="#">
               <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
             </a>
@@ -4062,7 +4062,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return showPanel === 'whatsapp' ? (
+      return showPanel === 'Whatsapp' ? (
         <div
           className='modal show d-block'
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -4079,8 +4079,8 @@ const CRMDashboard = () => {
       ) : null;
     }
 
-    return showPanel === 'whatsapp' ? (
-      <div className="col-12 transition-col" id="whatsappPanel">
+    return showPanel === 'Whatsapp' ? (
+      <div className="col-11 transition-col" id="whatsappPanel">
         {panelContent}
       </div>
     ) : null;
@@ -4264,7 +4264,7 @@ const CRMDashboard = () => {
     }
 
     return showPanel === 'leadHistory' ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh', width: '-webkit-fill-available' }}>
+      <div className="col-11 transition-col" id="leadHistoryPanel" style={{ height: '80vh', width: '-webkit-fill-available' }}>
         {panelContent}
       </div>
     ) : null;
@@ -4407,7 +4407,7 @@ const CRMDashboard = () => {
     }
 
     return showPanel === 'changeCenter' ? (
-      <div className="col-12 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
+      <div className="col-11 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
     ) : null;
@@ -4510,12 +4510,12 @@ const CRMDashboard = () => {
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                    <div className="d-flex flex-wrap gap-2 align-items-center mediaCrmFilters">
                       {crmFilters.map((filter, index) => (
                         <div key={index} className="d-flex align-items-center gap-1">
                           <div className='d-flex position-relative'>
                             <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
+                              className={`btn btn-sm btncrm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
                               onClick={() => handleCrmFilterClick(index)}
                             >
                               {filter.name}
@@ -5155,12 +5155,20 @@ const CRMDashboard = () => {
                                           </a>
                                         </button>
 
-                                        <a
+                                        {/* <a
                                           className="btn btn-outline-success btn-sm border-0"
                                           href={`https://wa.me/${profile._candidate?.mobile}`}
                                           style={{ fontSize: '20px' }}
                                           title="WhatsApp"
                                           target="_blank"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </a> */}
+                                        <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openPanel(profile, 'whatsapp')}
+                                          style={{ fontSize: '20px' }}
+                                          title="WhatsApp"
                                         >
                                           <i className="fab fa-whatsapp"></i>
                                         </a>
@@ -7038,7 +7046,8 @@ const CRMDashboard = () => {
 
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed',
-              width: '-webkit-fill-available'
+              width: '-webkit-fill-available',
+              zIndex:'10'
             }}>
               {renderEditPanel()}
               {renderRefferPanel()}
@@ -14550,7 +14559,7 @@ max-width: 600px;
     z-index: 10000 !important;
   }
 
-  
+ 
           `
         }
       </style>

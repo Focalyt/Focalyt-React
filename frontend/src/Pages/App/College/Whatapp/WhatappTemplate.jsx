@@ -8424,20 +8424,6 @@ const mobileStyles = `
 
     }
 
-    
-    
-    /* Action buttons in table */
-
-    .d-flex.gap-2 {
-
-      flex-direction: column;
-
-      gap: 0.25rem !important;
-
-    }
-
-    
-    
     .btn-sm {
 
       width: 100% !important;
@@ -8567,26 +8553,9 @@ const mobileStyles = `
       min-height: 120px !important;
 
     }
-
-    
-    
-    /* Button groups responsive */
-
-    .d-flex.gap-2:not(.table .d-flex.gap-2) {
-
-      flex-wrap: wrap;
-
-      gap: 0.5rem !important;
-
-    }
-
-    
-    
+  
     /* Call to Action fields */
 
-   
-
-   
     
     /* Quick Reply buttons */
 
@@ -8607,19 +8576,7 @@ const mobileStyles = `
       gap: 1rem;
 
     }
-
-    
-    
-    .d-flex.gap-2:last-child {
-
-      width: 100%;
-
-      justify-content: center;
-
-    }
-
-    
-    
+ 
     .btn.px-4 {
 
       width: 100% !important;
@@ -8627,8 +8584,7 @@ const mobileStyles = `
       padding: 0.75rem 1rem !important;
 
     }
-
-    
+ 
     
     /* Header buttons responsive */
 

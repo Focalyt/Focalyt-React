@@ -1,18 +1,21 @@
 const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 const reEnquireSchema = new Schema({
-    name: {
-        type: String,
-    },
     course: {
         type: ObjectId,
         ref: "courses",
     },
-    mobileNo: {
-        type: Number,
+    appliedCourse:{
+        type: ObjectId,
+        ref: "AppliedCourses",
+    },
+    candidate:{
+        type: ObjectId,
+        ref: "CandidateProfile",
     },
     counselorName: {
-        type: String,
+        type: ObjectId,
+        ref: "User",
     },
     reEnquireDate: {
         type: Date,
