@@ -1183,59 +1183,81 @@ const WhatsAppTemplate = () => {
     }
   }, [selectedTemplate]);
 
-  // Old third-party API calls को replace करें
-const fetchWhatsappTemplates = async () => {
-  try {
-    const result = await getWhatsAppTemplatesDirect();
-    
-    if (result.success) {
-
-      console.log(result.data,'result.data');
-      // Data format को match करें अपने existing structure से
-      const formattedTemplates = result.data.map(template => ({
-        id: template.id,
-        template: template
-      }));
-      setTemplates(formattedTemplates);
-    }
-  } catch (error) {
-    console.error('Error fetching templates:', error);
-  }
-};
-
-
-
-
-  const getWhatsAppTemplatesDirect = async () => {
-    const ACCESS_TOKEN = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
-    const WABA_ID = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
-
-    console.log(ACCESS_TOKEN,'ACCESS_TOKEN',WABA_ID,'WABA_ID');
-    if(!ACCESS_TOKEN || !WABA_ID){
-      alert('ACCESS_TOKEN or WABA_ID is not set');
-      return ;
-    }
-    
-    const url = `https://graph.facebook.com/v18.0/${WABA_ID}/message_templates`;
-    
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
+  // Function to close modal manually
+  const closeModal = () => {
+    const modalElement = document.getElementById('templatePreviewModal');
+    if (modalElement) {
+      if (window.bootstrap && window.bootstrap.Modal) {
+        const modal = window.bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+          modal.hide();
         }
-      });
-  
-      const result = await response.json();
-      
-      if (response.ok) {
-        return { success: true, data: result.data };
       } else {
-        return { success: false, error: result };
+        // Fallback to manual modal hide
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+        document.body.classList.remove('modal-open');
       }
-    } catch (error) {
-      return { success: false, error: error.message };
     }
+    setSelectedTemplate(null);
+  };
+
+  const fetchWhatsappTemplates = async () => {
+
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+
+
+      // Get environment variables for Facebook API
+      const businessAccountId = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const accessToken = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
+
+      if (!businessAccountId || !accessToken) {
+        alert('WhatsApp Business Account ID or Access Token not configured in environment variables.');
+        return;
+      }
+
+      // Fetch templates directly from Facebook Graph API
+      const response = await axios.get(
+        `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
+          }
+        }
+      );
+
+
+
+
+
+
+
+      console.log(response.data, "Facebook API response");
+      
+      if (response.data && response.data.data) {
+        setTemplates(response.data.data);
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching WhatsApp templates from Facebook:', error);
+      alert('Error fetching templates from Facebook. Please check your configuration.');
+
+    }
+
   };
 
 
@@ -1268,27 +1290,12 @@ const fetchWhatsappTemplates = async () => {
 
 
 
-      const response = await axios.post(`${backendUrl}/college/whatsapp/sync-templates`, {}, {
-
-        headers: { 'x-auth': token }
-
-      });
-
-
-
-      if (response.data.success) {
-
-        if(!deleteTemplate){
-
-        alert('Templates synced successfully from Meta!')}
-        // Refresh templates list
-
+      // Since we're now fetching directly from Facebook API, 
+      // we just need to refresh the templates list
         await fetchWhatsappTemplates();
 
-      } else {
-
-        throw new Error(response.data.message || 'Failed to sync templates');
-
+      if(!deleteTemplate){
+        alert('Templates synced successfully from Meta!');
       }
 
     } catch (error) {
@@ -1319,13 +1326,13 @@ const fetchWhatsappTemplates = async () => {
 
 
 
-  const filteredTemplates = templates.filter(template =>
-
-    template.template?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-
-    template.template?.subject.toLowerCase().includes(searchTerm.toLowerCase())
-
-  );
+  const filteredTemplates = templates.filter(template => {
+    const templateData = template.template || template;
+    return (
+      templateData.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      templateData.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
 
 
@@ -1385,6 +1392,10 @@ const fetchWhatsappTemplates = async () => {
 
       templateType = 'Carousel';
 
+    } else if (templateData.components.some(comp => (comp.type === 'carousel' || comp.type === 'CAROUSEL') && comp.cards && comp.cards.length > 0)) {
+
+      templateType = 'Carousel';
+
     } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Review and Pay')) {
 
       templateType = 'Order details';
@@ -1395,7 +1406,42 @@ const fetchWhatsappTemplates = async () => {
 
     }
 
-    
+    // Extract carousel data from components
+    let carouselCards = [];
+    let carouselMessage = '';
+
+    if (templateType === 'Carousel') {
+      // First try to get carousel message from BODY component
+      const bodyComponent = templateData.components.find(comp => comp.type === 'BODY' || comp.type === 'body');
+      carouselMessage = bodyComponent?.text || '';
+
+      // Then find carousel component
+      const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+      
+      console.log('Carousel Component Found:', carouselComponent);
+      console.log('Carousel Cards:', carouselComponent?.cards);
+
+      if (carouselComponent && carouselComponent.cards) {
+        carouselCards = carouselComponent.cards.map((card, index) => {
+          const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+          const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
+          const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
+          
+          console.log(`Card ${index + 1} - Header Component:`, headerComponent);
+          console.log(`Card ${index + 1} - Header Image URL:`, headerImage);
+          console.log(`Card ${index + 1} - Header Video URL:`, headerVideo);
+          
+          return {
+            id: Date.now() + index,
+            bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
+            buttons: card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons || [],
+            headerType: headerComponent?.format || 'None',
+            headerImage: headerImage,
+            headerVideo: headerVideo
+          };
+        });
+      }
+    }
     
     // Extract header text
 
@@ -1483,11 +1529,11 @@ const fetchWhatsappTemplates = async () => {
 
       // Carousel configuration fields
 
-      carouselMessage: templateData.carouselMessage || '',
+      carouselMessage: carouselMessage || templateData.carouselMessage || '',
 
-      carouselHeaderType: templateData.carouselHeaderType || '',
+      carouselHeaderType: carouselCards.length > 0 ? carouselCards[0].headerType : (templateData.carouselHeaderType || ''),
 
-      carouselCards: templateData.carouselCards || [],
+      carouselCards: carouselCards.length > 0 ? carouselCards : (templateData.carouselCards || []),
 
       carouselVariables: templateData.carouselVariables || [],
 
@@ -1706,8 +1752,9 @@ const fetchWhatsappTemplates = async () => {
       
 
       // Validate required fields
+      const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
 
-      if (!editForm.name || !editForm.category || !editForm.language || !editForm.bodyText) {
+      if (!editForm.name || !editForm.category || !editForm.language || !hasBodyText) {
 
         alert('Please fill in all required fields (Name, Category, Language, and Body Text).');
 
@@ -1718,13 +1765,36 @@ const fetchWhatsappTemplates = async () => {
 
 
       // Validate body text length (WhatsApp has a limit of 1024 characters)
+      const bodyTextToValidate = editForm.bodyText || editForm.carouselMessage || '';
 
-      if (editForm.bodyText.length > 1024) {
+      if (bodyTextToValidate.length > 1024) {
 
         alert('Body text is too long. Please keep it under 1024 characters.');
 
         return;
 
+      }
+
+      // Validate carousel-specific requirements
+      if (editForm.templateType === 'Carousel') {
+        if (!editForm.carouselCards || editForm.carouselCards.length < 2) {
+          alert('Carousel templates must have at least 2 cards.');
+          return;
+        }
+        
+        if (editForm.carouselCards.length > 10) {
+          alert('Carousel templates can have maximum 10 cards.');
+          return;
+        }
+        
+        // Validate that each card has required fields
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          if (!card.buttons || card.buttons.length === 0) {
+            alert(`Card ${i + 1} must have at least one button.`);
+            return;
+          }
+        }
       }
       // Show loading state
 
@@ -1761,13 +1831,27 @@ const fetchWhatsappTemplates = async () => {
             format: 'IMAGE'
             }] : []),
 
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'VIDEO' ? [{
+
+            type: 'HEADER',
+
+            format: 'VIDEO'
+            }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'DOCUMENT' ? [{
+
+            type: 'HEADER',
+
+            format: 'DOCUMENT'
+            }] : []),
+
             {
 
               type: 'BODY',
 
-            text: editForm.bodyText,
+            text: editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText,
 
-            ...(editForm.bodyText.includes('{{') ? {
+            ...((editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText).includes('{{') ? {
 
               example: {
 
@@ -1791,7 +1875,42 @@ const fetchWhatsappTemplates = async () => {
 
             }] : []),
 
-            ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Carousel' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
+            // Handle carousel templates separately
+            ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
+              type: 'carousel',
+              cards: editForm.carouselCards.map(card => ({
+                components: [
+                  // Header component for each card
+                  ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
+                    type: 'header',
+                    format: editForm.carouselHeaderType.toLowerCase(),
+                    example: {
+                      header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
+                    }
+                  }] : []),
+                  // Card body if exists
+                  ...(card.bodyText ? [{
+                    type: 'body',
+                    text: card.bodyText
+                  }] : []),
+                  // Buttons for each card
+                  ...(card.buttons && card.buttons.length > 0 ? [{
+                    type: 'buttons',
+                    buttons: card.buttons.map(button => ({
+                      type: button.type === 'quick_reply' ? 'quick_reply' : 
+                            button.type === 'call_to_action' ? 'url' : 'quick_reply',
+                      text: button.text || 'Button',
+                      ...(button.type === 'call_to_action' && button.url ? {
+                        url: button.url,
+                        example: [button.url]
+                      } : {})
+                    }))
+                  }] : [])
+                ]
+              }))
+            }] : []),
+            // Handle other template types
+            ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
 
               type: 'BUTTONS',
 
@@ -1826,22 +1945,6 @@ const fetchWhatsappTemplates = async () => {
                         otp_type: editForm.codeDeliveryMethod
 
                       }]
-
-                    : editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0
-
-                      ? editForm.carouselCards.flatMap(card => 
-
-                          (card.buttons || []).map(button => ({
-
-                            type: button.type === 'quick_reply' ? 'QUICK_REPLY' : 'URL',
-
-                            text: button.text || (button.type === 'quick_reply' ? 'Quick Reply' : 'View Details'),
-
-                            url: button.type === 'call_to_action' ? (button.url || '#') : undefined
-
-                          }))
-
-                        )
 
                       : editForm.templateType === 'Order details'
 
@@ -1923,37 +2026,104 @@ const fetchWhatsappTemplates = async () => {
 
 
 
-      // Add base64File if there's an image header
-      if (editForm.headerType === 'IMAGE' && editForm.headerImage) {
-        // Extract image name from the file or use a default name
-        const imageName = editForm.headerImage.name || 'header_image.png';
+      // Add base64File if there's an image, video, or document header
+      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) || 
+          (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
+          (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
+        // Get the appropriate file based on header type
+        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage : 
+                    editForm.headerType === 'VIDEO' ? editForm.headerVideo : 
+                    editForm.headerDocument;
+        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' : 
+                           editForm.headerType === 'VIDEO' ? 'header_video.mp4' : 
+                           'header_document.pdf';
         
-        // If headerImage is a File object, convert to base64
-        if (editForm.headerImage instanceof File) {
+        // Extract file name from the file or use a default name
+        const fileName = file.name || defaultName;
+        
+        // If file is a File object, convert to base64
+        if (file instanceof File) {
           const base64String = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
             reader.onerror = reject;
-            reader.readAsDataURL(editForm.headerImage);
+            reader.readAsDataURL(file);
           });
           
           templateData.base64File = {
-            name: imageName,
+            name: fileName,
             body: base64String
           };
-        } else if (typeof editForm.headerImage === 'string' && editForm.headerImage.startsWith('data:')) {
+        } else if (typeof file === 'string' && file.startsWith('data:')) {
           // If it's already a data URL, extract the base64 part
-          const base64String = editForm.headerImage.split(',')[1];
+          const base64String = file.split(',')[1];
           templateData.base64File = {
-            name: imageName,
+            name: fileName,
             body: base64String
           };
-        } else if (typeof editForm.headerImage === 'string') {
+        } else if (typeof file === 'string') {
           // If it's already a base64 string
           templateData.base64File = {
-            name: imageName,
-            body: editForm.headerImage
+            name: fileName,
+            body: file
           };
+        }
+      }
+
+      // Handle carousel file uploads
+      if (editForm.templateType === 'Carousel' && editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None') {
+        // For carousel, we need to upload files for each card
+        const carouselFiles = [];
+        
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          let file = null;
+          let defaultName = '';
+          
+          if (editForm.carouselHeaderType === 'IMAGE' && card.headerImage) {
+            file = card.headerImage;
+            defaultName = `card_${i + 1}_image.png`;
+          } else if (editForm.carouselHeaderType === 'VIDEO' && card.headerVideo) {
+            file = card.headerVideo;
+            defaultName = `card_${i + 1}_video.mp4`;
+          }
+          
+          if (file) {
+            const fileName = file.name || defaultName;
+            
+            // Convert file to base64
+            if (file instanceof File) {
+              const base64String = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+              
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string' && file.startsWith('data:')) {
+              const base64String = file.split(',')[1];
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string') {
+              carouselFiles.push({
+                name: fileName,
+                body: file,
+                cardIndex: i
+              });
+            }
+          }
+        }
+        
+        if (carouselFiles.length > 0) {
+          templateData.carouselFiles = carouselFiles;
         }
       }
 
@@ -2710,6 +2880,42 @@ const fetchWhatsappTemplates = async () => {
 
     <div className="container-fluid p-4" style={{ backgroundColor: '#f8f9fa' }}>
 
+      <style>
+
+        {`
+
+          .carousel-scroll::-webkit-scrollbar {
+
+            height: 6px;
+
+          }
+
+          .carousel-scroll::-webkit-scrollbar-track {
+
+            background: #f0f0f0;
+
+            border-radius: 3px;
+
+          }
+
+          .carousel-scroll::-webkit-scrollbar-thumb {
+
+            background: #25D366;
+
+            border-radius: 3px;
+
+          }
+
+          .carousel-scroll::-webkit-scrollbar-thumb:hover {
+
+            background: #1ea952;
+
+          }
+
+        `}
+
+      </style>
+
       {/* Header */}
 
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -2857,15 +3063,15 @@ const fetchWhatsappTemplates = async () => {
 
               {filteredTemplates.map((template) => (
 
-                <tr key={template.id} style={{ borderBottom: '1px solid #f1f3f4' }}>
+                <tr key={(template?.template || template)?.id} style={{ borderBottom: '1px solid #f1f3f4' }}>
 
                   <td className="py-3 ps-4">
 
                     <div>
 
-                      <div className="fw-medium text-dark">{template?.template?.name || ""}</div>
+                      <div className="fw-medium text-dark">{(template?.template || template)?.name || ""}</div>
 
-                      <small className="text-muted">{template?.template?.category || ""}</small>
+                      <small className="text-muted">{(template?.template || template)?.category || ""}</small>
 
                     </div>
 
@@ -2877,11 +3083,11 @@ const fetchWhatsappTemplates = async () => {
 
                     <div className="text-truncate">
 
-                      {template?.template?.components?.find(comp => comp.type === 'BODY')?.text || 
+                      {(template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text || 
 
-                       template?.template?.components?.[0]?.text || 
+                       (template?.template || template)?.components?.[0]?.text || 
 
-                       template?.template?.subject || 
+                       (template?.template || template)?.subject || 
 
                        "No message content"}
 
@@ -2917,7 +3123,7 @@ const fetchWhatsappTemplates = async () => {
 
                     >
 
-                      {template?.template?.status || ""}
+                      {(template?.template || template)?.status || ""}
 
                     </span>
 
@@ -3207,15 +3413,277 @@ const fetchWhatsappTemplates = async () => {
 
                       <div className="preview-body">
 
-                        {selectedTemplate?.template?.components?.find(comp => comp.type === 'BODY')?.text || 
+                        {selectedTemplate?.template?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text || 
 
-                         selectedTemplate?.components?.find(comp => comp.type === 'BODY')?.text ||
+                         selectedTemplate?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text ||
 
                          selectedTemplate?.template?.components?.[0]?.text || 
 
                          'No content available'}
 
                       </div>
+
+                      
+
+                      {/* Carousel Cards */}
+
+                      {(() => {
+
+                        const carouselComponent = selectedTemplate?.template?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL') || 
+
+                                                selectedTemplate?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+
+                        if (carouselComponent && carouselComponent.cards) {
+
+                          return (
+
+                            <div className="carousel-preview" style={{ marginTop: '10px' }}>
+
+                              <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+
+                                Carousel ({carouselComponent.cards.length} cards)
+
+                              </div>
+
+                              <div style={{ 
+
+                                display: 'flex', 
+
+                                overflowX: 'auto', 
+
+                                gap: '12px', 
+
+                                padding: '8px 0',
+
+                                scrollbarWidth: 'thin',
+
+                                scrollbarColor: '#25D366 #f0f0f0',
+
+                                WebkitScrollbar: {
+
+                                  height: '6px'
+
+                                },
+
+                                WebkitScrollbarTrack: {
+
+                                  background: '#f0f0f0',
+
+                                  borderRadius: '3px'
+
+                                },
+
+                                WebkitScrollbarThumb: {
+
+                                  background: '#25D366',
+
+                                  borderRadius: '3px'
+
+                                }
+
+                              }} className="carousel-scroll">
+
+                                {carouselComponent.cards.map((card, index) => (
+
+                                  <div key={index} className="carousel-card" style={{
+
+                                    minWidth: '280px',
+
+                                    maxWidth: '280px',
+
+                                    border: '1px solid #ddd',
+
+                                    borderRadius: '12px',
+
+                                    padding: '0',
+
+                                    backgroundColor: 'white',
+
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+
+                                    overflow: 'hidden'
+
+                                  }}>
+
+                                  {/* Card Header */}
+
+                                  {card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER') && (() => {
+
+                                    const headerComponent = card.components.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+
+                                    if (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') {
+
+                                      return (
+
+                                        <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
+
+                                          <img 
+
+                                            src={headerComponent?.example?.header_handle?.[0] || 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=Image'}
+
+                                            alt="Card header"
+
+                                            style={{ 
+
+                                              width: '100%', 
+
+                                              height: '100%', 
+
+                                              objectFit: 'cover',
+
+                                              display: 'block'
+
+                                            }}
+
+                                            onError={(e) => {
+
+                                              e.target.src = 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=No+Image';
+
+                                            }}
+
+                                          />
+
+                                        </div>
+
+                                      );
+
+                                    } else if (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') {
+
+                                      return (
+
+                                        <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
+
+                                          <video 
+
+                                            src={headerComponent?.example?.header_handle?.[0]}
+
+                                            controls
+
+                                            style={{ 
+
+                                              width: '100%', 
+
+                                              height: '100%', 
+
+                                              objectFit: 'cover',
+
+                                              display: 'block'
+
+                                            }}
+
+                                            onError={(e) => {
+
+                                              e.target.style.display = 'none';
+
+                                            }}
+
+                                          />
+
+                                        </div>
+
+                                      );
+
+                                    }
+
+                                    return null;
+
+                                  })()}
+
+                                  
+
+                                  {/* Card Content */}
+
+                                  <div style={{ padding: '12px' }}>
+
+                                    {/* Card Body */}
+
+                                    {card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY') && (
+
+                                      <div style={{ 
+
+                                        fontSize: '14px', 
+
+                                        marginBottom: '12px',
+
+                                        color: '#333',
+
+                                        lineHeight: '1.4'
+
+                                      }}>
+
+                                        {card.components.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text}
+
+                                      </div>
+
+                                    )}
+
+                                    
+
+                                    {/* Card Buttons */}
+
+                                    {card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS') && (
+
+                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+
+                                        {card.components.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons?.map((button, btnIndex) => (
+
+                                          <button 
+
+                                            key={btnIndex}
+
+                                            style={{
+
+                                              fontSize: '12px',
+
+                                              padding: '8px 12px',
+
+                                              border: '1px solid #25D366',
+
+                                              borderRadius: '20px',
+
+                                              backgroundColor: '#25D366',
+
+                                              color: 'white',
+
+                                              cursor: 'default',
+
+                                              fontWeight: '500',
+
+                                              minWidth: '80px',
+
+                                              textAlign: 'center'
+
+                                            }}
+
+                                          >
+
+                                            {button.text}
+
+                                          </button>
+
+                                        ))}
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                </div>
+
+                              ))}
+
+                              </div>
+
+                            </div>
+
+                          );
+
+                        }
+
+                        return null;
+
+                      })()}
 
                       
                       
@@ -5388,7 +5856,7 @@ const fetchWhatsappTemplates = async () => {
 
                                                 </button>
 
-                                                {card.headerImage && (
+                                                {(card.headerImage || card.headerVideo) && (
 
                                                   <span className="text-success" style={{ fontSize: '12px' }}>
 
@@ -5402,7 +5870,7 @@ const fetchWhatsappTemplates = async () => {
 
                                               </div>
 
-                                              {card.headerImage && (
+                                              {(card.headerImage || card.headerVideo) && (
 
                                                 <div className="mt-2">
 
@@ -5432,13 +5900,19 @@ const fetchWhatsappTemplates = async () => {
 
                                                         }}
 
+                                                        onError={(e) => {
+
+                                                          e.target.style.display = 'none';
+
+                                                        }}
+
                                                       />
 
                                                     ) : (
 
                                                       <video 
 
-                                                        src={card.headerImage} 
+                                                        src={card.headerVideo} 
 
                                                         controls
 
@@ -5451,6 +5925,12 @@ const fetchWhatsappTemplates = async () => {
                                                           borderRadius: '4px',
 
                                                           border: '1px solid #dee2e6'
+
+                                                        }}
+
+                                                        onError={(e) => {
+
+                                                          e.target.style.display = 'none';
 
                                                         }}
 
@@ -6572,55 +7052,41 @@ const fetchWhatsappTemplates = async () => {
 
                                         width: '100%',
 
-                                        height: '120px',
-
-                                        backgroundColor: '#FF6B35',
+                                        backgroundColor: 'white',
 
                                         borderRadius: '8px',
 
                                         display: 'flex',
 
-                                        alignItems: 'center',
-
-                                        justifyContent: 'center',
+                                        flexDirection: 'column',
 
                                         position: 'relative',
 
                                         flexShrink: 0,
 
-                                        margin: '0 4px'
+                                        margin: '0 4px',
+
+                                        border: '1px solid #ddd',
+
+                                        overflow: 'hidden'
 
                                       }}>
 
-                                      {/* Card Content */}
+                                      {/* Card Header Media */}
 
                                       <div style={{
 
-                                        textAlign: 'center',
-
-                                        color: 'white',
-
-                                        fontSize: '12px',
-
-                                        fontWeight: '500',
-
-                                        padding: '12px',
-
                                         width: '100%',
 
-                                        height: '100%',
+                                        height: '120px',
 
-                                        display: 'flex',
+                                        overflow: 'hidden',
 
-                                        flexDirection: 'column',
-
-                                        alignItems: 'center',
-
-                                        justifyContent: 'center'
+                                        position: 'relative'
 
                                       }}>
 
-                                        {card.headerImage ? (
+                                        {card.headerImage || card.headerVideo ? (
 
                                           editForm.carouselHeaderType === 'IMAGE' ? (
 
@@ -6636,9 +7102,7 @@ const fetchWhatsappTemplates = async () => {
 
                                                 height: '100%',
 
-                                                objectFit: 'cover',
-
-                                                borderRadius: '6px'
+                                                objectFit: 'cover'
 
                                               }}
 
@@ -6656,7 +7120,7 @@ const fetchWhatsappTemplates = async () => {
 
                                             <video
 
-                                              src={card.headerImage}
+                                              src={card.headerVideo}
 
                                               style={{
 
@@ -6664,9 +7128,7 @@ const fetchWhatsappTemplates = async () => {
 
                                                 height: '100%',
 
-                                                objectFit: 'cover',
-
-                                                borderRadius: '6px'
+                                                objectFit: 'cover'
 
                                               }}
 
@@ -6694,13 +7156,17 @@ const fetchWhatsappTemplates = async () => {
 
                                             justifyContent: 'center',
 
-                                            height: '100%'
+                                            height: '100%',
+
+                                            backgroundColor: '#f8f9fa',
+
+                                            color: '#6c757d'
 
                                           }}>
 
                                             <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}`} style={{ fontSize: '24px', marginBottom: '6px' }}></i>
 
-                                            <span style={{ fontSize: '11px' }}>Card {index + 1}</span>
+                                            <span style={{ fontSize: '11px' }}>No Media</span>
 
                                           </div>
 
@@ -6718,15 +7184,127 @@ const fetchWhatsappTemplates = async () => {
 
                                           justifyContent: 'center',
 
-                                          height: '100%'
+                                          height: '100%',
+
+                                          backgroundColor: '#f8f9fa',
+
+                                          color: '#6c757d'
 
                                         }}>
 
                                           <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}`} style={{ fontSize: '24px', marginBottom: '6px' }}></i>
 
-                                          <span style={{ fontSize: '11px' }}>Card {index + 1}</span>
+                                          <span style={{ fontSize: '11px' }}>No Media</span>
 
                                         </div>
+
+                                      </div>
+
+                                      {/* Card Content */}
+
+                                      <div style={{
+
+                                        padding: '12px',
+
+                                        flex: 1,
+
+                                        display: 'flex',
+
+                                        flexDirection: 'column',
+
+                                        justifyContent: 'space-between'
+
+                                      }}>
+
+                                        {/* Body Text */}
+
+                                        {card.bodyText && (
+
+                                          <div style={{
+
+                                            fontSize: '12px',
+
+                                            color: '#333',
+
+                                            marginBottom: '8px',
+
+                                            lineHeight: '1.4',
+
+                                            maxHeight: '40px',
+
+                                            overflow: 'hidden',
+
+                                            textOverflow: 'ellipsis'
+
+                                          }}>
+
+                                            {card.bodyText}
+
+                                          </div>
+
+                                        )}
+
+                                        {/* Buttons */}
+
+                                        {card.buttons && card.buttons.length > 0 && (
+
+                                          <div style={{
+
+                                            display: 'flex',
+
+                                            gap: '4px',
+
+                                            flexWrap: 'wrap'
+
+                                          }}>
+
+                                            {card.buttons.slice(0, 2).map((button, btnIndex) => (
+
+                                              <button
+
+                                                key={btnIndex}
+
+                                                style={{
+
+                                                  fontSize: '10px',
+
+                                                  padding: '4px 8px',
+
+                                                  border: '1px solid #25D366',
+
+                                                  borderRadius: '12px',
+
+                                                  backgroundColor: '#25D366',
+
+                                                  color: 'white',
+
+                                                  cursor: 'default',
+
+                                                  fontWeight: '500',
+
+                                                  minWidth: '60px',
+
+                                                  textAlign: 'center',
+
+                                                  whiteSpace: 'nowrap',
+
+                                                  overflow: 'hidden',
+
+                                                  textOverflow: 'ellipsis'
+
+                                                }}
+
+                                              >
+
+                                                {button.text}
+
+                                              </button>
+
+                                            ))}
+
+                                          </div>
+
+                                        )}
 
                                       </div>
 
