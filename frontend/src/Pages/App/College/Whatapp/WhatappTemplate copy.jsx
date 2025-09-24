@@ -1192,59 +1192,47 @@ const WhatsAppTemplate = () => {
     }
   }, [selectedTemplate]);
 
-  // Old third-party API calls को replace करें
-const fetchWhatsappTemplates = async () => {
-  try {
-    const result = await getWhatsAppTemplatesDirect();
-    
-    if (result.success) {
+  const fetchWhatsappTemplates = async () => {
 
-      console.log(result.data,'result.data');
-      // Data format को match करें अपने existing structure से
-      const formattedTemplates = result.data.map(template => ({
-        id: template.id,
-        template: template
-      }));
-      setTemplates(formattedTemplates);
-    }
-  } catch (error) {
-    console.error('Error fetching templates:', error);
-  }
-};
-
-
-
-
-  const getWhatsAppTemplatesDirect = async () => {
-    const ACCESS_TOKEN = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
-    const WABA_ID = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
-
-    console.log(ACCESS_TOKEN,'ACCESS_TOKEN',WABA_ID,'WABA_ID');
-    if(!ACCESS_TOKEN || !WABA_ID){
-      alert('ACCESS_TOKEN or WABA_ID is not set');
-      return ;
-    }
-    
-    const url = `https://graph.facebook.com/v18.0/${WABA_ID}/message_templates`;
-    
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      });
-  
-      const result = await response.json();
-      
-      if (response.ok) {
-        return { success: true, data: result.data };
-      } else {
-        return { success: false, error: result };
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
       }
+
+
+
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+
+        headers: { 'x-auth': token }
+
+      });
+
+
+
+
+
+
+
+      if (response.data.success) {
+
+      
+
+console.log(response.data.data, "response.data.data");      
+        setTemplates(response.data.data);
+
+      }
+
     } catch (error) {
-      return { success: false, error: error.message };
+
+      console.error('Error fetching WhatsApp templates:', error);
+
     }
+
   };
 
 
