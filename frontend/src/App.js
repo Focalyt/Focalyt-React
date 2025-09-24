@@ -113,6 +113,7 @@ import CalenderFolowupB2C from './Pages/App/College/Course/CalenderFolowupB2C';
 import Source from './Pages/App/College/Settings/Source/Source';
 import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
+import ReEnquire from './Pages/App/College/Course/ReEnquire';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -246,6 +247,7 @@ const Layout = () => {
           <Route path='source' element={<Source/>}/>
           <Route path='misreport/:batchId' element={<MisReport/>}/>
           <Route path='dripmarketing' element={<DripMarketing/>}/>
+          <Route path='re-enquire' element={<ReEnquire/>}/>
         </Route>
 
         {/* company  */}

@@ -390,6 +390,12 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Follow up</span>
                     </Link>
                   </li>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/re-enquire' ? 'active' : ''}`}>
+                    <Link to="/institute/re-enquire" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBell} />
+                      <span className="menu-title">Re-enquire</span>
+                    </Link>
+                  </li> */}
                 </ul>
               </li>
 

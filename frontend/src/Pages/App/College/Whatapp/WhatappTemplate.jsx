@@ -197,8 +197,6 @@ const WhatsAppTemplate = () => {
 
   };
 
-
-
   // Function to replace carousel message variables with their values
 
   const replaceCarouselMessageVariables = (text) => {
@@ -224,8 +222,6 @@ const WhatsAppTemplate = () => {
     return result;
 
   };
-
-
 
   // Function to add variable to carousel message
 
@@ -258,8 +254,6 @@ const WhatsAppTemplate = () => {
     });
 
   };
-
-
 
   // Function to update carousel variable value
 
@@ -462,14 +456,6 @@ const WhatsAppTemplate = () => {
     return baseFormData;
 
   };
-
-
-
-
-
-
-  
-
 
 
   const closeCreateModal = () => {
@@ -1182,6 +1168,11 @@ const WhatsAppTemplate = () => {
         if (window.bootstrap && window.bootstrap.Modal) {
           const modal = new window.bootstrap.Modal(modalElement);
           modal.show();
+          
+          // Add event listener for when modal is hidden
+          modalElement.addEventListener('hidden.bs.modal', () => {
+            setSelectedTemplate(null);
+          });
         } else {
           // Fallback to manual modal show
           modalElement.classList.add('show');
@@ -1354,12 +1345,7 @@ const fetchWhatsappTemplates = async () => {
 
   };
 
-
-
   // Function to save template
-
-
-
 
   const handleCloneTemplate = (template) => {
 
@@ -1378,9 +1364,7 @@ const fetchWhatsappTemplates = async () => {
     const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
 
     const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
-
-    
-    
+  
     // Determine template type based on buttons or other indicators
 
     let templateType = 'Custom';
@@ -1742,9 +1726,6 @@ const fetchWhatsappTemplates = async () => {
         return;
 
       }
-
-
-
       // Show loading state
 
       setIsCreatingTemplate(true);
@@ -2826,7 +2807,6 @@ const fetchWhatsappTemplates = async () => {
       </div>
 
 
-
       {/* Table */}
 
       <div className="card shadow-sm" style={{ borderRadius: '12px', border: 'none' }}>
@@ -3073,13 +3053,7 @@ const fetchWhatsappTemplates = async () => {
 
       </div>
 
-
-
       {/* model  */}
-
-
-
-
 
       {/* <!-- Modal --> */}
 
@@ -3097,7 +3071,7 @@ const fetchWhatsappTemplates = async () => {
 
               </h1>
 
-              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <button type="button" className="btn-close" onClick={closeModal} aria-label="Close"></button>
 
             </div>
 
@@ -7646,7 +7620,7 @@ Specificity: (1,5,0)
 
 }
 
-#createTemplateModal{
+#createTemplateModal , #templatePreviewModal{
 
 background-color:#000000a3;
 }
