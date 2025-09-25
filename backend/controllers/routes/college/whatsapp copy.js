@@ -1,47 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const AWS = require("aws-sdk");
-const uuid = require('uuid/v1');
-const multer = require('multer');
-const FormData = require('form-data');
 const { College, WhatsAppMessage } = require('../../models');
 const {isCollege}  = require('../../../helpers');
-const {
-	accessKeyId,
-	secretAccessKey,
-	bucketName,
-	region,
-} = require("../../../config");
-
-// Configure AWS S3
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
-
-const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
-const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
-const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, 'pdf'];
-
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
-const upload = multer({ 
-	storage: storage,
-	limits: {
-		fileSize: 25 * 1024 * 1024, // 25MB limit for WhatsApp
-	},
-	fileFilter: (req, file, cb) => {
-		const ext = file.originalname.split('.').pop().toLowerCase();
-		if (allowedExtensions.includes(ext)) {
-			cb(null, true);
-		} else {
-			cb(new Error(`File type not supported: ${ext}`), false);
-		}
-	}
-});
 
 // Middleware to check if college is authenticated
 const authenticateCollege = async (req, res, next) => {
@@ -714,13 +675,11 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 });
 
 // Create WhatsApp template
-router.post('/create-template', isCollege, upload.array('file', 5), async (req, res) => {
+router.post('/create-template', isCollege, async (req, res) => {
 	try {
-		const { name, language, category, components, base64File, carouselFiles } = req.body;
-		let files = req.files;
+		const { name, language, base64File, category, components } = req.body;
 
     console.log(req.body, "req.body");
-		console.log("Files", files);
 
 		// Validate required fields
 		if (!name || !language || !category || !components) {
@@ -747,304 +706,29 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			});
 		}
 
-		// Get environment variables for Facebook API
-		const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-		const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-
-		if (!businessAccountId || !accessToken) {
-			return res.status(500).json({ 
-				success: false, 
-				message: 'WhatsApp Business Account ID or Access Token not configured' 
-			});
-		}
-
-		// Handle file uploads to Facebook if files are provided
-		let uploadedFiles = [];
-		let carouselUploadedFiles = [];
-		
-		// Function to upload file using Facebook Resumable Upload API
-		const uploadFileToFacebook = async (fileName, fileBuffer, contentType) => {
-			try {
-				// Get Facebook App ID from environment
-				const facebookAppId = process.env.FACEBOOK_APP_ID;
-				if (!facebookAppId) {
-					throw new Error('FACEBOOK_APP_ID not configured in environment variables');
-				}
-
-				console.log(`Starting upload for file: ${fileName}, size: ${fileBuffer.length} bytes, type: ${contentType}`);
-
-				// Step 1: Start upload session
-				const uploadSessionResponse = await axios.post(
-					`https://graph.facebook.com/v23.0/${facebookAppId}/uploads`,
-					{
-						file_name: fileName,
-						file_length: fileBuffer.length,
-						file_type: contentType
-					},
-					{
-						headers: {
-							'Authorization': `Bearer ${accessToken}`,
-							'Content-Type': 'application/json'
-						}
-					}
-				);
-
-				const uploadSessionId = uploadSessionResponse.data.id.replace('upload:', '');
-				console.log(`Created upload session: ${uploadSessionId}`);
-				
-				if (!uploadSessionId) {
-					throw new Error('Failed to create upload session');
-				}
-
-				// Step 2: Upload file data
-				const uploadResponse = await axios.post(
-					`https://graph.facebook.com/v23.0/upload:${uploadSessionId}`,
-					fileBuffer,
-					{
-						headers: {
-							'Authorization': `Bearer ${accessToken}`,
-							'file_offset': '0',
-							'Content-Type': contentType
-						},
-						maxContentLength: Infinity,
-						maxBodyLength: Infinity,
-						timeout: 30000
-					}
-				);
-
-				const fileHandle = uploadResponse.data.h;
-				console.log(`Uploaded file to Facebook, handle: ${fileHandle}`);
-				
-				return fileHandle;
-			} catch (error) {
-				console.error('Error uploading file to Facebook:', error.response?.data || error.message);
-				throw error;
-			}
-		};
-		
-		// Handle base64 files first (as this is how files are coming from frontend)
-		if (base64File && base64File.name && base64File.body) {
-			console.log(`Processing Base64 File: ${base64File.name}`);
-			
-			const ext = base64File.name?.split('.').pop().toLowerCase();
-			
-			if (!allowedExtensions.includes(ext)) {
-				console.log("File type not supported");
-				throw new Error(`File type not supported: ${ext}`);
-			}
-
-			// Special handling for video files
-			if (allowedVideoExtensions.includes(ext)) {
-				console.log(`Processing video file: ${base64File.name}, extension: ${ext}`);
-			}
-
-			let fileType = "document";
-			if (allowedImageExtensions.includes(ext)) {
-				fileType = "image";
-			} else if (allowedVideoExtensions.includes(ext)) {
-				fileType = "video";
-			}
-
-			// Convert base64 to buffer
-			const base64Data = base64File.body.replace(/^data:[^;]+;base64,/, '');
-			const buffer = Buffer.from(base64Data, 'base64');
-
-			// Determine content type based on file extension
-			let contentType = `image/${ext}`;
-			if (allowedVideoExtensions.includes(ext)) {
-				// Map video extensions to proper MIME types
-				if (ext === 'mp4') {
-					contentType = 'video/mp4';
-				} else if (ext === '3gpp') {
-					contentType = 'video/3gpp';
-				} else {
-					contentType = `video/${ext}`;
-				}
-			} else if (ext === 'pdf') {
-				contentType = 'application/pdf';
-			}
-
-			// Upload to Facebook using Resumable Upload API
-			const fileHandle = await uploadFileToFacebook(base64File.name, buffer, contentType);
-			
-			uploadedFiles.push({
-				fileHandle: fileHandle,
-				fileType,
-				fileName: base64File.name,
-			});
-			
-			console.log("Uploaded base64 file to Facebook:", fileHandle);
-		}
-		
-		// Handle multipart files (fallback for direct file uploads)
-		else if (files && files.length > 0) {
-			const filesArray = Array.isArray(files) ? files : [files];
-			const uploadPromises = [];
-
-			filesArray.forEach((item) => {
-				const { name: fileName, mimetype } = item;
-				const ext = fileName?.split('.').pop().toLowerCase();
-
-				console.log(`Processing File: ${fileName}, Extension: ${ext}`);
-
-				if (!allowedExtensions.includes(ext)) {
-					console.log("File type not supported");
-					throw new Error(`File type not supported: ${ext}`);
-				}
-
-				let fileType = "document";
-				if (allowedImageExtensions.includes(ext)) {
-					fileType = "image";
-				} else if (allowedVideoExtensions.includes(ext)) {
-					fileType = "video";
-				}
-
-				uploadPromises.push(
-					uploadFileToFacebook(fileName, item.data, mimetype).then((fileHandle) => {
-						uploadedFiles.push({
-							fileHandle: fileHandle,
-							fileType,
-							fileName,
-						});
-					})
-				);
-			});
-
-			await Promise.all(uploadPromises);
-			console.log("Uploaded files to Facebook:", uploadedFiles);
-		}
-
-		// Handle carousel file uploads
-		if (carouselFiles && carouselFiles.length > 0) {
-			console.log("Processing carousel files:", carouselFiles);
-			const carouselUploadPromises = [];
-			
-			carouselFiles.forEach((carouselFile) => {
-				const { name: fileName, body: base64Data, cardIndex } = carouselFile;
-				
-				// Convert base64 to buffer
-				const buffer = Buffer.from(base64Data, 'base64');
-				
-				// Determine content type based on file extension
-				const ext = fileName.split('.').pop().toLowerCase();
-				let contentType = `image/${ext}`;
-				if (allowedVideoExtensions.includes(ext)) {
-					if (ext === 'mp4') {
-						contentType = 'video/mp4';
-					} else if (ext === '3gpp') {
-						contentType = 'video/3gpp';
-					} else {
-						contentType = `video/${ext}`;
-					}
-				} else if (ext === 'pdf') {
-					contentType = 'application/pdf';
-				}
-				
-				carouselUploadPromises.push(
-					uploadFileToFacebook(fileName, buffer, contentType).then((fileHandle) => {
-						carouselUploadedFiles.push({
-							fileHandle: fileHandle,
-							cardIndex: cardIndex,
-							fileName: fileName
-						});
-					})
-				);
-			});
-			
-			await Promise.all(carouselUploadPromises);
-			console.log("Uploaded carousel files to Facebook:", carouselUploadedFiles);
-		}
-
-		// Prepare template data for Facebook API
+		// Prepare template data
 		const templateData = {
 			name,
 			language,
 			category,
-			components: []
+			components
 		};
 
-		// Process components and add file URLs if files were uploaded
-		let fileIndex = 0;
-		components.forEach((component) => {
-			const processedComponent = { ...component };
-			
-			// Handle carousel components
-			if (component.type === 'carousel' && component.cards) {
-				processedComponent.cards = component.cards.map((card, cardIndex) => {
-					const processedCard = { ...card };
-					
-					// Find uploaded file for this card
-					const cardFile = carouselUploadedFiles.find(file => file.cardIndex === cardIndex);
-					
-					if (cardFile) {
-						// Update header component with file handle
-						processedCard.components = card.components.map(comp => {
-							if (comp.type === 'header' && comp.format) {
-								return {
-									...comp,
-									example: {
-										header_handle: [cardFile.fileHandle]
-									}
-								};
-							}
-							return comp;
-						});
-					}
-					
-					return processedCard;
-				});
+    if(base64File){
+      templateData.base64File = base64File;
+    }
+
+    console.log(templateData, "templateData");
+
+		// Create template via external API
+		const response = await axios.post('https://wa.jflindia.co.in/api/v1/messageTemplate/create', templateData, {
+			headers: {
+				'accept': 'application/json',
+				'x-phone-id': process.env.WHATSAPP_PHONE_ID,
+				'Content-Type': 'application/json',
+				'x-api-key': process.env.WHATSAPP_API_TOKEN
 			}
-			// Handle HEADER components with media
-			else if (component.type === 'HEADER' && component.format && uploadedFiles[fileIndex]) {
-				// Facebook API expects example with header_handle array containing file handle
-				processedComponent.example = {
-					header_handle: [uploadedFiles[fileIndex].fileHandle]
-				};
-				console.log(`Added example for HEADER component:`, processedComponent.example);
-				fileIndex++;
-			}
-			// If HEADER has format but no uploaded file, this might cause the error
-			else if (component.type === 'HEADER' && component.format && !uploadedFiles[fileIndex]) {
-				console.log(`Warning: HEADER component with format ${component.format} but no uploaded file found`);
-			}
-			// Handle HEADER components without media (TEXT format)
-			else if (component.type === 'HEADER' && component.format === 'TEXT' && component.text) {
-				processedComponent.example = {
-					header_text: [component.text]
-				};
-			}
-			
-			// Handle BUTTONS component - ensure proper structure
-			if (component.type === 'BUTTONS' && component.buttons) {
-				processedComponent.buttons = component.buttons.map(button => ({
-					type: button.type,
-					text: button.text,
-					...(button.url && { url: button.url })
-				}));
-			}
-			
-			// Remove example property if it's empty or undefined
-			if (!processedComponent.example || Object.keys(processedComponent.example).length === 0) {
-				delete processedComponent.example;
-			}
-			
-			templateData.components.push(processedComponent);
 		});
-
-		console.log("Template data for Facebook:", JSON.stringify(templateData, null, 2));
-		console.log("Uploaded files:", uploadedFiles);
-
-		// Create template directly via Facebook Graph API
-		const response = await axios.post(
-			`https://graph.facebook.com/v23.0/${businessAccountId}/message_templates`,
-			templateData,
-			{
-				headers: {
-					'Authorization': `Bearer ${accessToken}`,
-					'Content-Type': 'application/json'
-				}
-			}
-		);
 
 		res.json({
 			success: true,
@@ -1054,16 +738,6 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 				templateId: response.data?.id,
 				category,
 				language,
-				uploadedFiles: uploadedFiles.map(file => ({
-					fileName: file.fileName,
-					fileType: file.fileType,
-					fileHandle: file.fileHandle
-				})),
-				carouselFiles: carouselUploadedFiles.map(file => ({
-					fileName: file.fileName,
-					cardIndex: file.cardIndex,
-					fileHandle: file.fileHandle
-				})),
 				response: response.data
 			}
 		});
@@ -1073,9 +747,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 		
 		// Handle specific error cases
 		let errorMessage = 'Failed to create template';
-		if (error.response?.data?.error?.message) {
-			errorMessage = error.response.data.error.message;
-		} else if (error.response?.data?.message) {
+		if (error.response?.data?.message) {
 			errorMessage = error.response.data.message;
 		} else if (error.response?.data?.error) {
 			errorMessage = error.response.data.error;
