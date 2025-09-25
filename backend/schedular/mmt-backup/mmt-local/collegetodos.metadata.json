@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"79e41b39cdb84701a74a2c8969b9138f","collectionName":"collegetodos","type":"collection"}

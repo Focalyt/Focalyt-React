@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"_company":{"$numberDouble":"-1.0"}},"name":"_company_-1"},{"v":{"$numberInt":"2"},"key":{"_cadidate":{"$numberDouble":"-1.0"}},"name":"_cadidate_-1"}],"uuid":"e6af4cdfad854d41b231b4c2fc8a43ba","collectionName":"appliedjobs","type":"collection"}

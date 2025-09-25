@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"57632f7d234e49d0adaffb8acd906f70","collectionName":"smshistories","type":"collection"}
