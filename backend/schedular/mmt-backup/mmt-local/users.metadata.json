@@ -1,1 +1,0 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"googleAuthToken.expiresAt":{"$numberInt":"1"}},"name":"googleAuthToken.expiresAt_1","background":true}],"uuid":"cfb6f32147994f20a33b81fac12c6cf0","collectionName":"users","type":"collection"}

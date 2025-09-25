@@ -1,1 +1,0 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"candidateId":{"$numberDouble":"-1.0"}},"name":"candidateId_-1"}],"uuid":"c3103a73894440e59a5e35dd2386fdb2","collectionName":"candidatecashbacks","type":"collection"}
