@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 import axios from 'axios'
 import DatePicker from 'react-date-picker';
-
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
@@ -163,6 +162,21 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+  const [permissions, setPermissions] = useState();
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    console.log('response')
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  }
 
   // State to store batches
   const [loading, setLoading] = useState(false);
@@ -1566,7 +1580,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               {/* <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button> */}
-              {mainTab === 'Batches' && (
+              { mainTab === 'Batches' && (
                 <button className="btn btn-warning" onClick={handleAdd}>Add Batch</button>
               )}
             </div>

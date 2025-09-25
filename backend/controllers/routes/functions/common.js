@@ -528,7 +528,7 @@ module.exports.otpLogin = async (req, res) => {
     if (user && user.role === 2) {
       userData = {
         _id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id,
-        token
+        token,
       };
       req.session.user = userData;
     } else {
@@ -565,7 +565,7 @@ module.exports.loginCommon = async (req, res) => {
       const _college = await College.findOne({ _concernPerson: userData._id }).select('_id');
       if (!_college) throw req.ykError('College not found!');
       user = {
-        _id: userData._id, name: userData.name, role: 'college', _college: _college._id, email
+        _id: userData._id, name: userData.name, role: 'college', _college: _college._id, email,
       };
     } else if (userData && userData.role === 3) {
       user = {

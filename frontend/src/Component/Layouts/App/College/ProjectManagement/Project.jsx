@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Center from '../../../../Layouts/App/College/ProjectManagement/Center';
-
+import axios from 'axios';
 const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  
+
   // Safe session storage access with fallback
   const getUserData = () => {
     try {
@@ -20,6 +20,20 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
   const userData = getUserData();
   const token = userData.token;
+
+  const [permissions, setPermissions] = useState();
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  }
 
   const [activeProjectTab, setActiveProjectTab] = useState('Active Projects');
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,7 +165,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   const fetchProjects = async () => {
     // Get verticalId from selectedVertical prop or URL (for refresh cases)
     const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
-    
+
     if (!verticalId) {
       console.warn('No verticalId available from selectedVertical or URL');
       setProjects([]);
@@ -173,7 +187,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     try {
       const url = `${backendUrl}/college/list-projects?vertical=${verticalId}`;
       console.log('Fetching from URL:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -181,9 +195,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Response error:', errorText);
@@ -193,7 +207,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       // Response text pehle check karo
       const responseText = await response.text();
       console.log('Raw response:', responseText);
-      
+
       if (!responseText || responseText.trim() === '') {
         console.warn('Empty response received');
         setProjects([]);
@@ -209,9 +223,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
         console.error('Response text that failed to parse:', responseText);
         throw new Error('Invalid JSON response from server');
       }
-      
+
       console.log('Parsed data:', data);
-      
+
       if (data && data.success && Array.isArray(data.data)) {
         setProjects(data.data);
         console.log('Projects set successfully:', data.data.length, 'projects');
@@ -235,18 +249,18 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
   useEffect(() => {
     if (!token) return;
-    
+
     // Get verticalId from selectedVertical prop or URL
     const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
-    
+
     console.log('useEffect for fetching projects:', { selectedVertical: !!selectedVertical, verticalId, token: !!token });
-    
+
     if (verticalId) {
       // Small delay add karo to ensure component properly mounted hai
       const timeoutId = setTimeout(() => {
         fetchProjects();
       }, 100);
-      
+
       return () => clearTimeout(timeoutId);
     } else {
       console.log('No verticalId available, not fetching projects');
@@ -257,7 +271,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
   const handleSubmit = async () => {
     console.log('selectedVertical', selectedVertical);
-    
+
     if (!formData.name?.trim() || !formData.vertical?.toString().trim()) {
       alert('Please fill in all required fields');
       return;
@@ -326,7 +340,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     const urlParams = new URLSearchParams(window.location.search);
     const stage = urlParams.get('stage') || 'project';
     const projectId = urlParams.get('projectId');
-    
+
     return { stage, projectId };
   };
 
@@ -344,15 +358,15 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   useEffect(() => {
     // URL-based restoration logic - only run when projects are loaded
     const { stage, projectId } = getProjectState();
-  
+
     console.log('Project component - URL restoration:', { stage, projectId, projectsLoaded: projects.length > 0 });
-  
+
     // Don't make any decisions until projects are loaded
     if (projects.length === 0) {
       console.log('Projects not loaded yet, skipping URL restoration');
       return;
     }
-  
+
     if ((stage === "center" || stage === "course" || stage === "batch") && projectId) {
       // We have projectId in URL and projects are loaded, find the project
       const foundProject = projects.find(p => (p._id || p.id) === projectId);
@@ -490,11 +504,11 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   if (showCenters && selectedProjectForCenters) {
     return (
       <div>
-        <Center 
-          selectedProject={selectedProjectForCenters} 
-          onBackToProjects={handleBackToProjects} 
-          onBackToVerticals={onBackToVerticals} 
-          selectedVertical={selectedVertical} 
+        <Center
+          selectedProject={selectedProjectForCenters}
+          onBackToProjects={handleBackToProjects}
+          onBackToVerticals={onBackToVerticals}
+          selectedVertical={selectedVertical}
         />
       </div>
     );
@@ -532,7 +546,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
+          {((permissions?.custom_permissions?.can_add_project && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+
+            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
+          )}
         </div>
       </div>
 
@@ -586,12 +603,15 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                       {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
                         <i className="bi bi-share-fill"></i>
                       </button> */}
-                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>
-                        <i className="bi bi-pencil-square"></i>
-                      </button>
-                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(project); }}>
-                        <i className="bi bi-trash"></i>
-                      </button>
+                      {((permissions?.custom_permissions?.can_add_project && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <>
+                          <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>
+                            <i className="bi bi-pencil-square"></i>
+                          </button>
+                          <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(project); }}>
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </>)}
                     </div>
                   </div>
 
@@ -763,7 +783,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           </div>
         </div>
       )}
-      
+
       <style>
         {`
           @media(max-width:768px){

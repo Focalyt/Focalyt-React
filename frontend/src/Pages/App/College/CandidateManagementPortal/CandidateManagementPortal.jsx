@@ -7,6 +7,24 @@ const CandidateManagementPortal = () => {
   const userStr = sessionStorage.getItem("user");
   const user = (userStr && userStr !== "undefined") ? JSON.parse(userStr) : {};
   const token = user.token;
+
+  const [permissions, setPermissions] = useState();
+
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
+
   const [activeVerticalTab, setActiveVerticalTab] = useState('Active Verticals');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -42,7 +60,7 @@ const CandidateManagementPortal = () => {
   const getInitialState = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const stage = urlParams.get('stage') || 'vertical';
-    const verticalId = urlParams.get('verticalId');    
+    const verticalId = urlParams.get('verticalId');
     return { stage, verticalId };
   };
 
@@ -119,7 +137,7 @@ const CandidateManagementPortal = () => {
 
 
   const handleEdit = async (vertical) => {
-     setEditingVertical(vertical);
+    setEditingVertical(vertical);
     console.log('vertical', vertical)
     setFormData({
       description: vertical.code,
@@ -195,14 +213,14 @@ const CandidateManagementPortal = () => {
   useEffect(() => {
     // URL-based restoration logic - only run when verticals are loaded
     const { stage, verticalId } = getInitialState();
-  
-  
+
+
     // Don't make any decisions until verticals are loaded
     if (verticals.length === 0) {
       console.log('Verticals not loaded yet, skipping URL restoration');
       return;
     }
-  
+
     if (stage === "project") {
       // We have verticalId in URL and verticals are loaded, find the vertical
       const foundVertical = verticals.find(v => v.id === verticalId);
@@ -319,7 +337,7 @@ const CandidateManagementPortal = () => {
     return (
       <div>
         {/* Project Component with filtered data */}
-       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} /> </div>
+        <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} /> </div>
     );
   }
 
@@ -333,8 +351,9 @@ const CandidateManagementPortal = () => {
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
 
-          <button className="btn btn-danger" onClick={handleAdd}>Add Vertical</button>
-
+          {((permissions?.custom_permissions?.can_add_vertical && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+            <button className="btn btn-danger" onClick={handleAdd}>Add Vertical</button>
+          )}
         </div>
       </div>
 
@@ -376,12 +395,17 @@ const CandidateManagementPortal = () => {
                     {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
                       <i className="bi bi-share-fill"></i>
                     </button> */}
-                    <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(vertical); }}>
+                    {((permissions?.custom_permissions?.can_edit_vertical && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <>
+<button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(vertical); }}>
                       <i className="bi bi-pencil-square"></i>
                     </button>
                     <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(vertical); }}>
                       <i className="bi bi-trash"></i>
                     </button>
+</>
+)}
+
                   </div>
                 </div>
                 <div className="small text-muted mt-3">

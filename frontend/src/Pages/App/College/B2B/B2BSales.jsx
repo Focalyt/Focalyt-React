@@ -316,6 +316,23 @@ const B2BSales = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
+  // const permissions = userData.permissions
+  const [permissions, setPermissions] = useState();
+
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
 
   const [openModalId, setOpenModalId] = useState(null);
 
@@ -973,14 +990,14 @@ const B2BSales = () => {
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
     setSelectedStatusFilter(statusId);
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchLeads(statusId, 1);
   };
 
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
     setSelectedStatusFilter(null);
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchLeads(null, 1);
   };
 
@@ -1003,7 +1020,7 @@ const B2BSales = () => {
   };
 
   const applyFilters = () => {
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
   };
 
@@ -1020,7 +1037,7 @@ const B2BSales = () => {
       status: null,
       subStatus: null
     });
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
   };
 
@@ -1031,10 +1048,10 @@ const B2BSales = () => {
 
       // Build query parameters
       const params = {
-        page: page,           
+        page: page,
         // limit: 10,           
       };
-      
+
       if (statusFilter) {
         params.status = statusFilter;
       }
@@ -2341,7 +2358,7 @@ const B2BSales = () => {
 
   return (
     <div className="container-fluid">
-     
+
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass} style={{
           width: !isMobile && showPanel ? 'calc(100% - 350px)' : '100%',
@@ -2488,10 +2505,12 @@ const B2BSales = () => {
                         <i className="fas fa-filter me-1"></i>
 
                       </button>
-
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
+ 
                       <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
+                    )}  
                     </div>
                   </div>
 
@@ -3256,7 +3275,7 @@ const B2BSales = () => {
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
                         <i className="fas fa-envelope text-primary me-1"></i>
-                        Email 
+                        Email
                       </label>
                       <input
                         type="email"
@@ -3410,8 +3429,8 @@ const B2BSales = () => {
           </div>
         )
       }
- {/* Inject Google Maps styles */}
- <style>{mapStyles}</style>
+      {/* Inject Google Maps styles */}
+      <style>{mapStyles}</style>
       <style>{`
   .modal .pac-container {
     z-index: 99999 !important;

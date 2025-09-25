@@ -7,6 +7,19 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+  const [permissions , setPermissions]= useState()
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+  const updatedPermission = async () => {
+    const response = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if(response.data.status){
+      setPermissions(response.data.permissions);
+    }
+  }
   const [activeCourseTab, setActiveCourseTab] = useState('Active Courses');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -429,7 +442,10 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
+          {((permissions?.custom_permissions?.can_add_course && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+        
           <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
+          )}
         </div>
       </div>
 

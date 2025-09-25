@@ -150,7 +150,24 @@ const CRMDashboard = (profile) => {
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const [showPanel, setShowPanel] = useState('')
     const token = userData.token;
+    // const permissions = userData.permissions;
+    const [permissions, setPermissions] = useState();
 
+    useEffect(() => {
+      updatedPermission()
+    }, [])
+  
+    const updatedPermission = async () => {
+  
+      const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+      });
+      if (respose.data.status) {
+  
+        setPermissions(respose.data.permissions);
+      }
+    }
+    
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     // ========================================OpenPanel
     // 🎯 Main Tab State
@@ -1468,6 +1485,8 @@ const CRMDashboard = (profile) => {
                                         <div className="main-tabs-container">
                                             <ul className="nav nav-tabs nav-tabs-main border-0">
                                                 {/* kyc Management Tab */}
+                                          {((permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                               
                                                 <li className="nav-item">
                                                     <button
                                                         className={`nav-link main-tab ${mainTab === 'kyc' ? 'active' : ''}`}
@@ -1479,6 +1498,7 @@ const CRMDashboard = (profile) => {
                                                         </span>
                                                     </button>
                                                 </li>
+                                          )}
                                                 {/* All Admission Tab */}
                                                 <li className="nav-item">
                                                     <button

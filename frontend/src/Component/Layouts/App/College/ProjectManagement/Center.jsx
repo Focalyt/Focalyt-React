@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import Course from '../../../../Layouts/App/College/ProjectManagement/Course';
-
+import axios from 'axios';
 const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerticals = null, selectedVertical = null }) => {
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+
+const [permissions , setPermissions]= useState()
+useEffect(() => {
+    updatedPermission()
+}, [])
+
+const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+        setPermissions(respose.data.permissions);
+    }
+}
+ 
 
     const getURLParams = () => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -593,7 +608,10 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                         <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
                     </button>
                     <button className="btn btn-primary me-2 subBtnRes" onClick={handleAlign}>Align Exsting Center</button>
+                    {((permissions?.custom_permissions?.can_add_center && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+    
                     <button className="btn btn-primary subBtnRes" onClick={handleAdd}>Add New Center</button>
+                    )}
                 </div>
             </div>
 

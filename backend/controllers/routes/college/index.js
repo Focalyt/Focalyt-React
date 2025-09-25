@@ -257,7 +257,7 @@ router.route("/login")
 
 
 			userData = {
-				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin, googleAuthToken: user.googleAuthToken
+				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin, googleAuthToken: user.googleAuthToken, permissions: user.permissions
 			};
 
 			return res.json({ status: true, message: "Login successful", userData });
@@ -267,6 +267,17 @@ router.route("/login")
 			return res.send({ status: false, error: err.message });
 		}
 	});
+
+router.route('/permission')
+.get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const permissions = user.permissions;
+		return res.send({ status: true, message: "Permission fetched successfully", permissions: permissions });
+	} catch (err) {
+		return res.send({ status: false, error: err.message });
+	}
+});
 
 router.route("/register")
 	.post(async (req, res) => {
@@ -5317,13 +5328,13 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		let baseMatch = {}
 
-		if(counselorArray.length > 0){
+		if (counselorArray.length > 0) {
 			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}else{
+		} else {
 			baseMatch.createdBy = user._id;
 		}
 
-		let group =[{
+		let group = [{
 			$group: {
 				_id: "$status",
 				count: { $sum: 1 }
@@ -5457,7 +5468,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 					preserveNullAndEmptyArrays: true
 				}
 			},
-			
+
 			{
 				$group: {
 					_id: '$_id',
@@ -5469,7 +5480,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 					status: { $first: '$status' },
 				}
 			}
-			
+
 		)
 
 		let additionalMatches = {}
@@ -5497,9 +5508,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			aggregate.push({ $match: additionalMatches });
 		}
 
-	
 
-		
+
+
 
 
 
@@ -5511,21 +5522,21 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		let missedCount = 0
 
 		followupCounts.forEach(item => {
-			if(item.status == 'done'){
+			if (item.status == 'done') {
 				doneCount++
 			}
-			if(item.status == 'planned'){
+			if (item.status == 'planned') {
 				plannedCount++
 			}
-			if(item.status == 'missed'){
+			if (item.status == 'missed') {
 				missedCount++
 			}
 		})
 
 		let count = {
-			'done':doneCount,
-			'planned':plannedCount,
-			'missed':missedCount
+			'done': doneCount,
+			'planned': plannedCount,
+			'missed': missedCount
 		}
 
 
@@ -6308,7 +6319,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			},
 			{ $unwind: '$_course' },
 			{
-				$lookup:{
+				$lookup: {
 					from: 'users',
 					localField: 'counsellor',
 					foreignField: '_id',
@@ -6593,7 +6604,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					// Find matching uploaded docs for this required doc
 					const matchingUploads = uploadedDocs.filter(
 
-						
+
 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
 					)
 
@@ -7353,8 +7364,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus , projects, verticals, course, center, counselor } = req.query;
-		
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor } = req.query;
+
 		// Add date validation
 		let from, to;
 
@@ -7376,7 +7387,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
 
-		
+
 		let projectsArray = [];
 		let verticalsArray = [];
 		let courseArray = [];
@@ -7395,9 +7406,9 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 
 		let baseMatch = {}
 
-		if(counselorArray.length > 0){
+		if (counselorArray.length > 0) {
 			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}else{
+		} else {
 			baseMatch.createdBy = user._id;
 		}
 
@@ -7408,7 +7419,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 					...baseMatch,
 					status: followupStatus,
 					followupDate: { $gte: from, $lte: to },
-					
+
 				}
 			},
 			{
@@ -7509,7 +7520,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 					preserveNullAndEmptyArrays: true
 				}
 			},
-			
+
 			{
 				$group: {
 					_id: '$_id',
@@ -7534,7 +7545,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		let additionalMatches = {};
 
 		// Course type filter
-		
+
 
 		// Sector filter (multi-select - using projects array)
 		if (projectsArray.length > 0) {
@@ -7556,14 +7567,14 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			additionalMatches['center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
-		
+
 
 		// Add additional match stage if any filters are applied
 		if (Object.keys(additionalMatches).length > 0) {
 			aggregate.push({ $match: additionalMatches });
 		}
 
-		
+
 
 
 		const followups = await B2cFollowup.aggregate(aggregate);
@@ -7572,7 +7583,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		// 	select: 'name mobile email'
 		// });	
 
-		
+
 
 		if (!followups) {
 			return res.status(400).json({ error: "No followups found" });

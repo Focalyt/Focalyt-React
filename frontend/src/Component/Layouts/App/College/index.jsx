@@ -4,7 +4,7 @@ import CollegeHeader from './CollegeHeader/CollegeHeader';
 import CollegeFooter from './CollegeFooter/CollegeFooter';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
-
+import axios from 'axios';
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
@@ -21,9 +21,31 @@ function CollegeLayout({ children }) {
   const navigate = useNavigate();
   const userData = JSON.parse(sessionStorage.getItem('user'))
   const isUser = JSON.parse(sessionStorage.getItem('user'))?.role === 2 ? true : false
-
+  // const permissions = userData?.permissions
+  const [permissions, setPermissions] = useState();
   const [user, setUser] = useState();
   const location = useLocation();
+const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+const token = userData.token;
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
+
+useEffect(()=>{
+  console.log('userData', userData)
+  console.log("permissions", permissions)
+},[permissions])
 
   useEffect(() => {
     const userFromStorage = sessionStorage.getItem('user');
@@ -340,6 +362,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Sales (B2C) */}
+              {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
+
               <li className={`nav-item has-sub ${openSubmenu.sales ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('sales')}>
                   <FontAwesomeIcon icon={faShoppingCart} />
@@ -398,8 +422,10 @@ function CollegeLayout({ children }) {
                   </li> */}
                 </ul>
               </li>
+            )}
 
               {/* Sales (B2B) */}
+              {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
               <li className={`nav-item has-sub ${openSubmenu.salesb2b ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
                   <FontAwesomeIcon icon={faHandshake} />
@@ -444,8 +470,9 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Calendar Follow-up</span>
                     </Link>
                   </li>
-                </ul>
-              </li>
+                  </ul>
+                </li>
+              )}
 
               {/* Training management */}
               <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>

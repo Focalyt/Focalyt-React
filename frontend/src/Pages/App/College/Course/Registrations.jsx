@@ -763,6 +763,25 @@ const CRMDashboard = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
+  // const permissions = userData.permissions
+
+  const [permissions, setPermissions] = useState();
+
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
+
   const [openModalId, setOpenModalId] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
   // const [activeTab, setActiveTab] = useState(0);
@@ -2673,7 +2692,7 @@ const CRMDashboard = () => {
       ...(filters.name && { name: filters.name }),
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-    
+
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -2701,13 +2720,13 @@ const CRMDashboard = () => {
           responseType: "blob"   // 👈 yeh zaroori hai
         }
       );
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
       a.download = "leads.csv";
       a.click();
-      
+
 
 
     } catch (error) {
@@ -2768,7 +2787,7 @@ const CRMDashboard = () => {
   };
 
   useEffect(() => {
-    
+
     fetchLeadDetails();
   }, [leadDetailsVisible]);
 
@@ -3959,7 +3978,7 @@ const CRMDashboard = () => {
             </div>
           </div>
           <div className="right-topbar">
-           
+
             <a className="margin-horizontal-5" href="#">
               <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
             </a>
@@ -5042,63 +5061,68 @@ const CRMDashboard = () => {
                     alignItems: "center",
                     gap: "4px"
                   }}
-                  onClick={downloadLeads}
+                    onClick={downloadLeads}
                   >
                     <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
                     Download Leads
                   </button>
-
-                  <button className="btn btn-sm btn-outline-primary" style={{
-                    padding: "6px 12px",
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                    onClick={() => {
-                      openPanel(null, 'AddAllLeads');
-                    }}
-                  >
-                    <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
-                    Add Leads
-                  </button>
-
-                  <button
-                    className="btn btn-sm btn-outline-primary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => {
-                      openPanel(null, 'RefferAllLeads');
-                      console.log('selectedProfile', null);
-                    }}
-                  >
-                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                    Refer All Leads
-                  </button>
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
-                  >
-                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
-                    Bulk Action
-                  </button>
+                  {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                    <>
+                      <button className="btn btn-sm btn-outline-primary" style={{
+                        padding: "6px 12px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                        onClick={() => {
+                          openPanel(null, 'AddAllLeads');
+                        }}
+                      >
+                        <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                        Add Leads
+                      </button>
+                    </>
+                  )}
+                  {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                    <>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        disabled={isLoadingProfiles || allProfiles.length === 0}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        onClick={() => {
+                          openPanel(null, 'RefferAllLeads');
+                          console.log('selectedProfile', null);
+                        }}
+                      >
+                        <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                        Refer All Leads
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        disabled={isLoadingProfiles || allProfiles.length === 0}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                      >
+                        <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
+                        Bulk Action
+                      </button>
+                    </>)}
 
                 </div>
               </div>
@@ -5266,41 +5290,110 @@ const CRMDashboard = () => {
                                             display: showPopup === profileIndex ? "block" : "none"
                                           }}
                                         >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
-                                          >
-                                            Move To KYC List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
+                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => (handleMoveToKyc(profile))}
+                                              >
+                                                Move To KYC List
+                                              </button>
+
+
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openPanel(profile, 'SetFollowup');
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+
+                                                }}
+                                              >
+                                                Profile Edit
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  getBranches(profile);
+                                                  setShowBranchModal(true);
+                                                  console.log('change Branch')
+
+                                                }}
+                                              >
+                                                Change Branch
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openPanel(profile, 'Reffer');
+                                                console.log('selectedProfile', profile);
+                                              }}
+                                            >
+                                              Reffer
+                                            </button>
+                                          )}
+
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -5320,106 +5413,6 @@ const CRMDashboard = () => {
                                             }}
                                           >
                                             History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`#profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button>
-
-                                          {/* <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
-
-                                            }}
-                                          >
-                                            Change Center
-                                          </button> */}
-
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              getBranches(profile);
-                                              setShowBranchModal(true);
-                                              console.log('change Branch')
-
-                                            }}
-                                          >
-                                            Change Branch
                                           </button>
 
                                         </div>
@@ -5484,42 +5477,109 @@ const CRMDashboard = () => {
                                             display: showPopup === profileIndex ? "block" : "none"
                                           }}
                                         >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
-                                          >
-                                            Move To KYC List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              setShowPopup(null)
-                                              openPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
+
+                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => (handleMoveToKyc(profile))}
+                                              >
+                                                Move To KYC List
+                                              </button>
+
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openEditPanel(profile, 'SetFollowup');
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  // open modal for this profile
+                                                }}
+                                              >
+                                                Profile Edit
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  getBranches(profile);
+                                                  console.log('change Branch')
+                                                  setShowBranchModal(true);
+                                                }}
+                                              >
+                                                Change Branch
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openPanel(profile, 'Reffer');
+                                                console.log('selectedProfile', profile);
+                                              }}
+                                            >
+                                              Reffer
+                                            </button>
+                                          )}
+
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -5536,101 +5596,8 @@ const CRMDashboard = () => {
                                           >
                                             History List
                                           </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
 
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-                                              // open modal for this profile
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button>
-                                          {/* <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
 
-                                            }}
-                                          >
-                                            Change Center
-                                          </button>*/}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              getBranches(profile);
-                                              console.log('change Branch')
-                                              setShowBranchModal(true);
-                                            }}
-                                          >
-                                            Change Branch
-                                          </button>
 
                                         </div>
                                       </div>
@@ -7047,7 +7014,7 @@ const CRMDashboard = () => {
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed',
               width: '-webkit-fill-available',
-              zIndex:'10'
+              zIndex: '10'
             }}>
               {renderEditPanel()}
               {renderRefferPanel()}
