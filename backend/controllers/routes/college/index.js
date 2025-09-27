@@ -38,7 +38,8 @@ const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
 const dripmarketingRoutes = require("./dripmarketing");
 
-
+//Trainer route 
+const trainerRoutes = require('./trainer');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
@@ -71,6 +72,7 @@ router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
 router.use("/dripmarketing", isCollege, dripmarketingRoutes);
+router.use("/trainer" , isCollege, trainerRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 

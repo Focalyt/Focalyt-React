@@ -169,12 +169,12 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   }, [])
 
   const updatedPermission = async () => {
-    const respose = await axios.get(`${backendUrl}/college/permission`, {
+    const response = await axios.get(`${backendUrl}/college/permission`, {
       headers: { 'x-auth': token }
     });
     console.log('response')
-    if (respose.data.status) {
-      setPermissions(respose.data.permissions);
+    if (response.data.status) {
+      setPermissions(response.data.permissions);
     }
   }
 

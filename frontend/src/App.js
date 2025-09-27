@@ -114,6 +114,11 @@ import Source from './Pages/App/College/Settings/Source/Source';
 import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
 import ReEnquire from './Pages/App/College/Course/ReEnquire';
+import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
+// Trainer module
+import TrainerLayout from './Component/Layouts/App/Trainer'
+import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
+import TrainerHeader from './Component/Layouts/App/Trainer/TrainerHeader/TrainerHeader'
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -248,6 +253,7 @@ const Layout = () => {
           <Route path='misreport/:batchId' element={<MisReport/>}/>
           <Route path='dripmarketing' element={<DripMarketing/>}/>
           <Route path='re-enquire' element={<ReEnquire/>}/>
+          <Route path='trainerManagement' element={<TrainerManagement/>}/>
         </Route>
 
         {/* company  */}
@@ -271,7 +277,15 @@ const Layout = () => {
         <Route path="list-candidates" element={<ListCandidate/>}/>
         <Route path="nearbyCandidates" element={<NearByCandidate/>}/>
         <Route path="Coins" element={<Coins/>}/>
+
         </Route>
+
+        {/* Training Module  */}
+        <Route path='/trainer/login' element={<TrainerLogin />}/>
+        <Route path="/trainer" element={<TrainerLayout />}>
+        
+        </Route>
+
 
 
       </Routes>
