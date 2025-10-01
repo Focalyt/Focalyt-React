@@ -7,6 +7,11 @@ const collegeSchema = new Schema({
     _id: { type: ObjectId, ref: 'User' },
     defaultAdmin: { type: Boolean, default: false }
   }],
+  trainers: [
+    {
+       type: ObjectId, ref: 'User' 
+    }
+  ],
 
   _courses: [{ type: ObjectId, ref: 'courses' }],
   _branches: [{ type: ObjectId, ref: 'Center' }],

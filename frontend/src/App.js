@@ -119,6 +119,15 @@ import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/Tr
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
 import TrainerHeader from './Component/Layouts/App/Trainer/TrainerHeader/TrainerHeader'
+import TrainerProfile from './Pages/App/Trainer/TrainerProfile/TrainerProfile';
+import MyCourses from './Pages/App/Trainer/CourseManagement/MyCourses';
+import AddCourseContent from './Pages/App/Trainer/CourseManagement/AddCourseContent';
+import StudyMaterial from './Pages/App/Trainer/CourseManagement/StudyMaterial';
+import AllStudent from './Pages/App/Trainer/StudentManagement/AllStudents';
+import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgress';
+import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
+
+
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -283,7 +292,14 @@ const Layout = () => {
         {/* Training Module  */}
         <Route path='/trainer/login' element={<TrainerLogin />}/>
         <Route path="/trainer" element={<TrainerLayout />}>
-        
+        <Route path='profile' element={<TrainerProfile/>}/>
+        <Route path='mycourses' element={<MyCourses/>}/>
+        <Route path='viewcourses' element={<ViewTrainerCourses/>}/>
+        <Route path='addcoursecontent' element={<AddCourseContent/>}/>
+        <Route path='studymaterial' element={<StudyMaterial/>}/>
+        <Route path='allstudents' element={<AllStudent/>}/>
+        <Route path='studentprogress' element={<StudentProgress/>}/>
+
         </Route>
 
 

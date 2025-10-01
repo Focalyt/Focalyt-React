@@ -20,7 +20,7 @@ function TrainerHeader() {
       try {
         localStorage.clear();
         sessionStorage.clear();
-        navigate('/institute/login');
+        navigate('/trainer/login');
       } catch (error) {
         console.error('Logout failed:', error);
       }
@@ -106,7 +106,7 @@ function TrainerHeader() {
                     </a>
   
                     <div className="dropdown-menu dropdown-menu-right" id="logout-div">
-                      <a className="dropdown-item" href="/institute/myProfile">
+                      <a className="dropdown-item" href="/trainer/myProfile">
                         <i className="feather icon-user"></i> Edit Profile
                       </a>
                       <div className="dropdown-divider"></div>

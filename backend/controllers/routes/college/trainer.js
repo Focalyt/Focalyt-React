@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const uuid = require('uuid/v1');
-const { isCollege } = require('../../../helpers');
+const { isCollege, isTrainer } = require('../../../helpers');
 const { Parser } = require("json2csv");
 const mongoose = require('mongoose');
 const axios = require('axios');
@@ -56,7 +56,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 
-router.post('/login', async (req, res) => {
+router.post('/trinerValidation' ,isTrainer,  async(req, res)=>{
+
+
+})
+
+
+router.post('/addTrainer', async (req, res) => {
     try {
         const { name, email, mobile, designation } = req.body;
         
@@ -120,7 +126,7 @@ router.post('/login', async (req, res) => {
             created_at: savedUser.createdAt
         }
 
-      console.log("newUser" , newUser)
+    //   console.log("newUser" , newUser)
         res.status(200).json({
             status: true,
             message: `User "${name}" added successfully`,
@@ -133,10 +139,12 @@ router.post('/login', async (req, res) => {
             return res.send({ status: false, error: err.message });
 
         }
-    })
-.get('/trainers', async (req, res) => {
+})
+
+router.get('/trainers', isCollege ,async (req, res) => {
     try {
-       
+        const user = req.user;
+        // console.log("user" , user)
        
         const trainers = await User.find({
             role: 4,

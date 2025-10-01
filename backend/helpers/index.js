@@ -188,6 +188,33 @@ module.exports.isCandidate = async (req, res, next) => {
   }
 };
 
+module.exports.isTrainer = async (req, res, next) => {
+  try {
+    const error = req.ykError("You are not authorized");
+    let user = null;
+    // ✅ Else check for token in headers (for React SPA project)
+    const token = req.header('x-auth');
+    if (!token) throw error;
+    const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+
+    user = await User.findById(decoded.id);
+    if (!user || user.role !== 4) throw error;
+
+    const college = await College.findOne({ '_concernPerson._id': user._id })
+    req.user = user
+    req.college = college
+    user.college = college
+
+    return next();
+  } catch (err) {
+    const userAgent = req.get('User-Agent');
+    const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
+    console.log("--- ERROR College", ipAddress, userAgent, err);
+    req.flash("error", err.message);
+    return res.redirect("/institute/login");
+  }
+};
+
 module.exports.logUserActivity = (action) => {
   return async (req, res, next) => {
     try {
@@ -294,6 +321,9 @@ module.exports.authCollege = async (req, res, next) => {
     return req.errFunc(err);
   }
 };
+module.exports.authTrainer = async(req , res , next)=>{
+  
+}
 module.exports.auth1 = async (req, res, next) => {
   try {
     const user = await User.findOne({

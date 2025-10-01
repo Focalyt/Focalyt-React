@@ -815,6 +815,39 @@ router.post('/reset-password', async (req, res) => {
     });
   }
 });
+router.post('/reset-trainer-password', async (req, res) => {
+  try {
+    const { module, userInput, password } = req.body;
+
+    // console.log('userInput', userInput, 'module', module)
+    let user = null;
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role: 4 });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role: 4 });
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.password = password;
+    await user.save();
+    res.json({
+      status: true,
+      message: 'Password reset successfully',
+      data: user
+    });
+  } catch (err) {
+    console.error('Error in POST /add-user:', err);
+    res.status(500).json({
+      status: false,
+      message: "Server Error"
+    });
+  }
+});
 
 router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users')], async (req, res) => {
   try {

@@ -150,7 +150,7 @@ function TrainerManagement() {
     
             const url = isEditing 
                 ? `${backendUrl}/college/trainer/update/${editingId}`
-                : `${backendUrl}/college/trainer/login`;
+                : `${backendUrl}/college/trainer/addTrainer`;
             
             const method = isEditing ? 'PUT' : 'POST';
     

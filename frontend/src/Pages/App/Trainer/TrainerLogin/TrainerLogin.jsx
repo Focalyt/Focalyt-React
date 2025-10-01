@@ -5,8 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 
 const TrainerLogin = () => {
-    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-    const token = userData.token;
+    const token = JSON.parse(sessionStorage.getItem('token'))
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
@@ -37,15 +36,15 @@ const TrainerLogin = () => {
     const logoUrl = "/Assets/images/logo/logo.png";
 
     useEffect(() => {
-        console.log('userData', userData)
-        if (userData?.role === 2) {
+        console.log('userData4', token)
+        if (token?.role === 4) {
             if (returnUrl) {
                 navigate(returnUrl);
             } else {
-                navigate('/institute/dashboard');
+                navigate('/trainer/dashboard');
             }
         }
-    }, [userData]);
+    }, [token]);
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const loginBtnRef = useRef(null);
@@ -71,21 +70,23 @@ const TrainerLogin = () => {
             const body = {
                 userInput,
                 password,
-                module: 'college'
+                module: 'trainer'
             };
+            console.log("body" , body)
 
             try {
-                const verifyRes = await axios.post(`${backendUrl}/college/login`, body);
-
+                const verifyRes = await axios.post(`${backendUrl}/college/trainee/login`, body);
+console.log("verifyRes" , verifyRes)
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
                     setSuccessMessage('Password verified');
-                    sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    sessionStorage.setItem("token", JSON.stringify(verifyRes.data.token));
+                    sessionStorage.setItem("role", JSON.stringify(verifyRes.data.role));
                     if (returnUrl) {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
                     } else {
-                        window.location.href = '/institute/dashboard';
+                        window.location.href = '/trainer/dashboard';
                     }
                 } else {
                     setSuccessMessage('');
@@ -111,12 +112,15 @@ const TrainerLogin = () => {
                     setErrorMessage('');
                     setSuccessMessage('OTP verified');
                     sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    if (verifyRes.data.userData?.token) {
+                        axios.defaults.headers.common['x-auth'] = verifyRes.data.userData.token;
+                    }
                     if (returnUrl) {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
                     } else {
-                        // window.location.href = '/institute/dashboard';
-                        navigate('/institute/dashboard');
+                        // window.location.href = '/ta/dashboard';
+                        navigate('/trainer/dashboard');
                     }
                 } else {
                     setSuccessMessage('');
@@ -140,9 +144,9 @@ const TrainerLogin = () => {
 
             const body = {
                 userInput,
-                module: 'college'
+                module: 'trainer'
             };
-
+console.log("mobile number", userInput)
             const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
 
             if (sendRes.data.status === true) {
@@ -207,11 +211,11 @@ const TrainerLogin = () => {
                 setErrorMessage('Please enter mobile number or email');
                 return;
             }
-
             const body = {
                 userInput: forgotMobile,
-                module: 'college',
+                module: 'trainer',
             };
+            console.log(':body' , body)
 
             const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
 
@@ -240,11 +244,11 @@ const TrainerLogin = () => {
             const body = {
                 userInput: forgotMobile,
                 otp: forgotOtp,
-                module: 'college',
+                module: 'trainer',
                 purpose: 'reset_password'
             };
 
-            const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
+            const verifyRes = await axios.post(`${backendUrl}/api/verifyInstituteOtp`, body);
 
             if (verifyRes.data.status === true) {
                 setErrorMessage('');
@@ -276,10 +280,10 @@ const TrainerLogin = () => {
             const body = {
                 userInput: forgotMobile,
                 password: newPassword,
-                module: 'college'
+                module: 'trainer'
             };
 
-            const resetRes = await axios.post(`${backendUrl}/college/users/reset-password`, body);
+            const resetRes = await axios.post(`${backendUrl}/college/users/reset-trainer-password`, body);
 
             if (resetRes.data.status === true) {
                 setErrorMessage('');
