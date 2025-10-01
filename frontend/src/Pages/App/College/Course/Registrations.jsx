@@ -763,6 +763,44 @@ const CRMDashboard = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
+  // WhatsApp templates dropdown state
+  const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
+  const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplatesError, setWhatsAppTemplatesError] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templatePreview, setTemplatePreview] = useState("");
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWhatsAppTemplates && !event.target.closest('.input-template')) {
+        setShowWhatsAppTemplates(false);
+      }
+    };
+
+    if (showWhatsAppTemplates) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showWhatsAppTemplates]);
+
+  const fetchWhatsAppTemplates = async () => {
+    try {
+      setIsLoadingWhatsAppTemplates(true);
+      setWhatsAppTemplatesError("");
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
+      const list = response?.data?.data || [];
+      setWhatsAppTemplates(Array.isArray(list) ? list : []);
+    } catch (error) {
+      setWhatsAppTemplatesError("Failed to load WhatsApp templates.");
+    } finally {
+      setIsLoadingWhatsAppTemplates(false);
+    }
+  };
+
   // const permissions = userData.permissions
 
   const [permissions, setPermissions] = useState();
@@ -4040,16 +4078,134 @@ const CRMDashboard = () => {
 
         <section className="footer-container">
           <div className="footer-box">
-            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-              <textarea
-                placeholder="Choose a template"
-                className="disabled-style message-input"
-                disabled
-                rows="1"
-                id="message-input"
-                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-              ></textarea>
-            </div>
+            {templatePreview ? (
+              (() => {
+                const templateData = JSON.parse(templatePreview);
+                return (
+                  <div className="message-container" style={{ 
+                    padding: '15px', 
+                    backgroundColor: '#f8f9fa', 
+                    borderRadius: '12px', 
+                    marginBottom: '15px',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    {/* Template Info Header */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      marginBottom: '10px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid #dee2e6'
+                    }}>
+                      <div>
+                        <strong style={{ color: '#495057', fontSize: '14px' }}>{templateData.templateName}</strong>
+                        <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                          {templateData.category} • {templateData.status}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => { setTemplatePreview(""); setSelectedTemplate(null); }}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          fontSize: '18px', 
+                          color: '#dc3545',
+                          cursor: 'pointer',
+                          padding: '4px'
+                        }}
+                        title="Clear template"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {/* WhatsApp Message Preview */}
+                    <div style={{ 
+                      backgroundColor: '#dcf8c6', 
+                      padding: '12px 16px', 
+                      borderRadius: '18px 18px 4px 18px', 
+                      maxWidth: '90%', 
+                      marginLeft: 'auto',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      position: 'relative'
+                    }}>
+                      {/* Media Preview */}
+                      {templateData.hasMedia && (
+                        <div style={{ 
+                          width: '100%', 
+                          height: '150px', 
+                          backgroundColor: '#ffffff',
+                          borderRadius: '8px',
+                          marginBottom: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'column',
+                          border: '1px solid #e9ecef'
+                        }}>
+                          {templateData.mediaType === 'image' && (
+                            <>
+                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🖼️</div>
+                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>IMAGE</div>
+                            </>
+                          )}
+                          {templateData.mediaType === 'video' && (
+                            <>
+                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎥</div>
+                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>VIDEO</div>
+                            </>
+                          )}
+                          {templateData.mediaType === 'document' && (
+                            <>
+                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>📄</div>
+                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>DOCUMENT</div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Text Content */}
+                      <div style={{ 
+                        fontSize: '14px', 
+                        lineHeight: '1.5', 
+                        color: '#303030',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+                        {templateData.text || 'No text content available'}
+                      </div>
+
+                      {/* Message Footer */}
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#667781', 
+                        textAlign: 'right', 
+                        marginTop: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: '4px'
+                      }}>
+                        <span>{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <span style={{ color: '#4fc3f7' }}>✓✓</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
+                <textarea
+                  placeholder="Choose a template"
+                  className="message-input"
+                  disabled
+                  rows="1"
+                  id="message-input"
+                  style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
+                ></textarea>
+              </div>
+            )}
             <hr className="divider" />
             <div className="message-container-input">
               <div className="left-footer">
@@ -4061,10 +4217,11 @@ const CRMDashboard = () => {
                 <span className="disabled-style">
                   <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
                 </span>
-                <span className="input-template">
-                  <a title="Whatsapp Template">
+                <span className="input-template position-relative">
+                  <a title="Whatsapp Template" onClick={(e) => { e.preventDefault(); setShowWhatsAppTemplates(!showWhatsAppTemplates); if (!showWhatsAppTemplates) fetchWhatsAppTemplates(); }} href="#">
                     <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
                   </a>
+                  {renderWhatsAppTemplatesDropdown()}
                 </span>
               </div>
               <div className="right-footer">
@@ -4142,6 +4299,104 @@ const CRMDashboard = () => {
       setIsHistoryLoading(false);
     }
   }
+  /************************************/
+
+  // WhatsApp Templates Dropdown
+  const renderWhatsAppTemplatesDropdown = () => {
+    if (!showWhatsAppTemplates) return null;
+    return (
+      <div className="position-absolute" style={{ 
+        bottom: '100%', 
+        left: '0', 
+        width: '300px',
+        zIndex: 1000,
+        backgroundColor: 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxHeight: '300px',
+        overflow: 'auto',
+        marginBottom: '8px'
+      }}>
+        {isLoadingWhatsAppTemplates ? (
+          <div className="d-flex align-items-center justify-content-center py-3">
+            <div className="spinner-border spinner-border-sm" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <span className="ms-2">Loading templates...</span>
+          </div>
+        ) : whatsAppTemplatesError ? (
+          <div className="alert alert-danger m-2">{whatsAppTemplatesError}</div>
+        ) : (
+          <div className="list-group list-group-flush">
+            {whatsAppTemplates.length === 0 ? (
+              <div className="p-3 text-center text-muted">No templates found.</div>
+            ) : (
+              whatsAppTemplates.map((tpl) => (
+                <div 
+                  key={tpl.id || tpl.name} 
+                  className="list-group-item list-group-item-action"
+                  style={{ cursor: 'pointer', border: 'none', padding: '12px 16px' }}
+                  onClick={() => {
+                    setSelectedTemplate(tpl);
+                    setShowWhatsAppTemplates(false);
+                    
+                    // Generate template preview from components
+                    let previewText = "";
+                    let hasMedia = false;
+                    let mediaType = "";
+                    let mediaUrl = "";
+                    
+                    if (tpl.components && Array.isArray(tpl.components)) {
+                      tpl.components.forEach(component => {
+                        if (component.type === 'HEADER') {
+                          if (component.text) {
+                            previewText += component.text + "\n\n";
+                          } else if (component.format) {
+                            hasMedia = true;
+                            mediaType = component.format.toLowerCase();
+                            if (component.example && component.example.header_handle) {
+                              mediaUrl = component.example.header_handle[0];
+                            }
+                          }
+                        } else if (component.type === 'BODY' && component.text) {
+                          previewText += component.text + "\n\n";
+                        } else if (component.type === 'FOOTER' && component.text) {
+                          previewText += component.text;
+                        }
+                      });
+                    }
+                    
+                    // If no components, use template name as preview
+                    if (!previewText.trim()) {
+                      previewText = `Template: ${tpl.name}`;
+                    }
+                    
+                    // Store template data for enhanced preview
+                    const templateData = {
+                      text: previewText.trim(),
+                      hasMedia,
+                      mediaType,
+                      mediaUrl,
+                      templateName: tpl.name,
+                      status: tpl.status,
+                      category: tpl.category
+                    };
+                    
+                    setTemplatePreview(JSON.stringify(templateData));
+                    console.log('Selected template:', tpl);
+                  }}
+                >
+                  <div className="fw-semibold text-dark">{tpl.name}</div>
+                  <div className="small text-muted">{tpl.category} • {tpl.language} • {tpl.status}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
   /************************************/
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)

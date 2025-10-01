@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import axios from 'axios';
 
@@ -97,7 +97,7 @@ const WhatsAppTemplate = () => {
 
   const goToPreviousCard = () => {
 
-    setCurrentCarouselIndex(prev => 
+    setCurrentCarouselIndex(prev =>
 
       prev > 0 ? prev - 1 : editForm.carouselCards.length - 1
 
@@ -109,7 +109,7 @@ const WhatsAppTemplate = () => {
 
   const goToNextCard = () => {
 
-    setCurrentCarouselIndex(prev => 
+    setCurrentCarouselIndex(prev =>
 
       prev < editForm.carouselCards.length - 1 ? prev + 1 : 0
 
@@ -125,8 +125,8 @@ const WhatsAppTemplate = () => {
 
     if (!name) return '';
 
-    
-    
+
+
     let formatted = name
 
       .toLowerCase() // Convert to lowercase
@@ -139,10 +139,10 @@ const WhatsAppTemplate = () => {
 
       .replace(/^|$/g, ''); // Remove leading/trailing underscores
 
-    
 
-    
-    
+
+
+
     return formatted;
 
   };
@@ -241,8 +241,8 @@ const WhatsAppTemplate = () => {
 
     };
 
-    
-    
+
+
     setEditForm({
 
       ...editForm,
@@ -283,8 +283,8 @@ const WhatsAppTemplate = () => {
 
       const updatedVariables = editForm.carouselVariables.filter(v => v.id !== variableId);
 
-      
-      
+
+
       // Renumber remaining variables
 
       const renumberedVariables = updatedVariables.map((variable, index) => ({
@@ -297,8 +297,8 @@ const WhatsAppTemplate = () => {
 
       }));
 
-      
-      
+
+
       // Update message with renumbered variables
 
       let updatedMessageWithRenumbered = updatedMessage;
@@ -317,8 +317,8 @@ const WhatsAppTemplate = () => {
 
       });
 
-      
-      
+
+
       setEditForm({
 
         ...editForm,
@@ -345,7 +345,7 @@ const WhatsAppTemplate = () => {
 
     }
 
-    const usedVariables = editForm.variables.filter(variable => 
+    const usedVariables = editForm.variables.filter(variable =>
 
       bodyText.includes(variable.placeholder)
 
@@ -476,13 +476,13 @@ const WhatsAppTemplate = () => {
       const backdrop = document.querySelector('.modal-backdrop');
       if (backdrop) {
         backdrop.remove();
-    }
+      }
 
     }
 
     // Reset clone mode when closing modal
     setIsCloneMode(false);
-    
+
     setShowCreateModal(false);
 
     // Reset form only when closing
@@ -1090,56 +1090,56 @@ const WhatsAppTemplate = () => {
       // Initialize form with default values when opening create modal (not in clone mode)
       if (!isCloneMode) {
 
-      setEditForm({
+        setEditForm({
 
-        name: '',
+          name: '',
 
-        category: 'UTILITY',
+          category: 'UTILITY',
 
-        language: 'en',
+          language: 'en',
 
-        bodyText: '',
+          bodyText: '',
 
-        headerText: '',
+          headerText: '',
 
-        headerType: 'None',
+          headerType: 'None',
 
-        headerImage: null,
+          headerImage: null,
 
-        headerVideo: null,
+          headerVideo: null,
 
-        headerDocument: null,
+          headerDocument: null,
 
-        footerText: '',
+          footerText: '',
 
-        buttons: [],
+          buttons: [],
 
-        templateType: 'Custom',
+          templateType: 'Custom',
 
-        flowId: '',
+          flowId: '',
 
-        flowAction: '',
+          flowAction: '',
 
-        navigateScreen: '',
+          navigateScreen: '',
 
-        codeDeliveryMethod: 'copy_code',
+          codeDeliveryMethod: 'copy_code',
 
-        carouselMessage: '',
+          carouselMessage: '',
 
-        carouselHeaderType: '',
+          carouselHeaderType: '',
 
-        carouselCards: [],
+          carouselCards: [],
 
-        orderButtonText: 'Review and Pay',
+          orderButtonText: 'Review and Pay',
 
-        orderStatusButtons: ['Track Order', 'Cancel Order'],
+          orderStatusButtons: ['Track Order', 'Cancel Order'],
 
-        variables: []
+          variables: []
 
-      });
+        });
 
-      
-      
+
+
       }
 
       // Show modal for both create and clone modes
@@ -1168,7 +1168,7 @@ const WhatsAppTemplate = () => {
         if (window.bootstrap && window.bootstrap.Modal) {
           const modal = new window.bootstrap.Modal(modalElement);
           modal.show();
-          
+
           // Add event listener for when modal is hidden
           modalElement.addEventListener('hidden.bs.modal', () => {
             setSelectedTemplate(null);
@@ -1216,37 +1216,15 @@ const WhatsAppTemplate = () => {
 
 
 
-      // Get environment variables for Facebook API
-      const businessAccountId = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
-      const accessToken = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
-
-      if (!businessAccountId || !accessToken) {
-        alert('WhatsApp Business Account ID or Access Token not configured in environment variables.');
-        return;
-      }
 
       // Fetch templates directly from Facebook Graph API
       const response = await axios.get(
-        `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
+        `${backendUrl}/college/whatsapp/templates`,
         {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          params: {
-            fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
-          }
+          headers: { 'x-auth': token }
         }
       );
 
-
-
-
-
-
-
-      console.log(response.data, "Facebook API response");
-      
       if (response.data && response.data.data) {
         setTemplates(response.data.data);
       }
@@ -1292,9 +1270,9 @@ const WhatsAppTemplate = () => {
 
       // Since we're now fetching directly from Facebook API, 
       // we just need to refresh the templates list
-        await fetchWhatsappTemplates();
+      await fetchWhatsappTemplates();
 
-      if(!deleteTemplate){
+      if (!deleteTemplate) {
         alert('Templates synced successfully from Meta!');
       }
 
@@ -1358,8 +1336,8 @@ const WhatsAppTemplate = () => {
 
     setEditingTemplate(template);
 
-    
-    
+
+
     // Extract template data for editing
 
     const templateData = template.template || template;
@@ -1371,7 +1349,7 @@ const WhatsAppTemplate = () => {
     const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
 
     const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
-  
+
     // Determine template type based on buttons or other indicators
 
     let templateType = 'Custom';
@@ -1417,7 +1395,7 @@ const WhatsAppTemplate = () => {
 
       // Then find carousel component
       const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
-      
+
       console.log('Carousel Component Found:', carouselComponent);
       console.log('Carousel Cards:', carouselComponent?.cards);
 
@@ -1426,11 +1404,9 @@ const WhatsAppTemplate = () => {
           const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
           const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
           const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
-          
-          console.log(`Card ${index + 1} - Header Component:`, headerComponent);
-          console.log(`Card ${index + 1} - Header Image URL:`, headerImage);
-          console.log(`Card ${index + 1} - Header Video URL:`, headerVideo);
-          
+
+
+
           return {
             id: Date.now() + index,
             bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
@@ -1442,33 +1418,33 @@ const WhatsAppTemplate = () => {
         });
       }
     }
-    
+
     // Extract header text
 
-    const headerText = headerComponent?.text || 
+    const headerText = headerComponent?.text ||
 
-                      headerComponent?.example?.header_text?.[0] || 
+      headerComponent?.example?.header_text?.[0] ||
 
-                      headerComponent?.example?.header_text_named_params?.[0] || 
+      headerComponent?.example?.header_text_named_params?.[0] ||
 
-                      '';
-    
-    
-    
+      '';
+
+
+
     // Map header type
 
-    const headerType = headerComponent?.format === 'TEXT' ? 'Text' : 
+    const headerType = headerComponent?.format === 'TEXT' ? 'Text' :
 
-                      headerComponent?.format === 'IMAGE' ? 'IMAGE' :
+      headerComponent?.format === 'IMAGE' ? 'IMAGE' :
 
-                      headerComponent?.format === 'VIDEO' ? 'VIDEO' :
+        headerComponent?.format === 'VIDEO' ? 'VIDEO' :
 
-                      headerComponent?.format === 'DOCUMENT' ? 'DOCUMENT' :
+          headerComponent?.format === 'DOCUMENT' ? 'DOCUMENT' :
 
-                      headerComponent ? 'Text' : 'None';
-    
-    
-    
+            headerComponent ? 'Text' : 'None';
+
+
+
     // Extract variables from body text
 
     const bodyText = bodyComponent?.text || '';
@@ -1485,8 +1461,8 @@ const WhatsAppTemplate = () => {
 
     }));
 
-    
-    
+
+
     // Clone the template with all data
 
     setEditForm({
@@ -1560,7 +1536,7 @@ const WhatsAppTemplate = () => {
       bodyText: bodyText,
       footerText: footerComponent?.text || ''
     });
-    
+
     // Reset carousel index
 
     setCurrentCarouselIndex(0);
@@ -1568,7 +1544,7 @@ const WhatsAppTemplate = () => {
     // Set clone mode and open create modal
     setIsCloneMode(true);
     setShowCreateModal(true);
-    
+
     console.log('Template cloned:', templateData.name, 'Type:', templateType);
     console.log('Header component:', headerComponent);
     console.log('Extracted header data:', {
@@ -1603,7 +1579,7 @@ const WhatsAppTemplate = () => {
     setIsDeletingTemplate(true);
 
     try {
-     
+
       if (!token) {
         alert('No token found in session storage.');
         return;
@@ -1637,8 +1613,8 @@ const WhatsAppTemplate = () => {
 
     setShowButtonTypeDropdown(false);
 
-    
-    
+
+
     let newButton = {
 
       type: buttonType,
@@ -1715,7 +1691,7 @@ const WhatsAppTemplate = () => {
 
     const buttons = editForm.buttons || [];
 
-    const updatedButtons = buttons.map((button, i) => 
+    const updatedButtons = buttons.map((button, i) =>
 
       i === index ? { ...button, [field]: value } : button
 
@@ -1747,9 +1723,9 @@ const WhatsAppTemplate = () => {
 
 
 
-      
 
-      
+
+
 
       // Validate required fields
       const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
@@ -1781,12 +1757,12 @@ const WhatsAppTemplate = () => {
           alert('Carousel templates must have at least 2 cards.');
           return;
         }
-        
+
         if (editForm.carouselCards.length > 10) {
           alert('Carousel templates can have maximum 10 cards.');
           return;
         }
-        
+
         // Validate that each card has required fields
         for (let i = 0; i < editForm.carouselCards.length; i++) {
           const card = editForm.carouselCards[i];
@@ -1806,17 +1782,17 @@ const WhatsAppTemplate = () => {
 
       const templateData = {
 
-          name: editForm.name,
+        name: editForm.name,
 
-          language: editForm.language,
+        language: editForm.language,
 
         category: editForm.category,
 
-          components: [
+        components: [
 
           ...(editForm.headerType !== 'None' && editForm.headerType === 'Text' && editForm.headerText ? [{
 
-              type: 'HEADER',
+            type: 'HEADER',
 
             format: 'TEXT',
 
@@ -1829,25 +1805,25 @@ const WhatsAppTemplate = () => {
             type: 'HEADER',
 
             format: 'IMAGE'
-            }] : []),
+          }] : []),
 
           ...(editForm.headerType !== 'None' && editForm.headerType === 'VIDEO' ? [{
 
             type: 'HEADER',
 
             format: 'VIDEO'
-            }] : []),
+          }] : []),
 
           ...(editForm.headerType !== 'None' && editForm.headerType === 'DOCUMENT' ? [{
 
             type: 'HEADER',
 
             format: 'DOCUMENT'
-            }] : []),
+          }] : []),
 
-            {
+          {
 
-              type: 'BODY',
+            type: 'BODY',
 
             text: editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText,
 
@@ -1865,182 +1841,182 @@ const WhatsAppTemplate = () => {
 
             } : {})
 
-            },
+          },
 
-            ...(editForm.footerText ? [{
+          ...(editForm.footerText ? [{
 
-              type: 'FOOTER',
+            type: 'FOOTER',
 
-              text: editForm.footerText
+            text: editForm.footerText
 
-            }] : []),
+          }] : []),
 
-            // Handle carousel templates separately
-            ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
-              type: 'carousel',
-              cards: editForm.carouselCards.map(card => ({
-                components: [
-                  // Header component for each card
-                  ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
-                    type: 'header',
-                    format: editForm.carouselHeaderType.toLowerCase(),
-                    example: {
-                      header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
-                    }
-                  }] : []),
-                  // Card body if exists
-                  ...(card.bodyText ? [{
-                    type: 'body',
-                    text: card.bodyText
-                  }] : []),
-                  // Buttons for each card
-                  ...(card.buttons && card.buttons.length > 0 ? [{
-                    type: 'buttons',
-                    buttons: card.buttons.map(button => ({
-                      type: button.type === 'quick_reply' ? 'quick_reply' : 
-                            button.type === 'call_to_action' ? 'url' : 'quick_reply',
-                      text: button.text || 'Button',
-                      ...(button.type === 'call_to_action' && button.url ? {
-                        url: button.url,
-                        example: [button.url]
-                      } : {})
-                    }))
-                  }] : [])
-                ]
-              }))
-            }] : []),
-            // Handle other template types
-            ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
+          // Handle carousel templates separately
+          ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
+            type: 'carousel',
+            cards: editForm.carouselCards.map(card => ({
+              components: [
+                // Header component for each card
+                ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
+                  type: 'header',
+                  format: editForm.carouselHeaderType.toLowerCase(),
+                  example: {
+                    header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
+                  }
+                }] : []),
+                // Card body if exists
+                ...(card.bodyText ? [{
+                  type: 'body',
+                  text: card.bodyText
+                }] : []),
+                // Buttons for each card
+                ...(card.buttons && card.buttons.length > 0 ? [{
+                  type: 'buttons',
+                  buttons: card.buttons.map(button => ({
+                    type: button.type === 'quick_reply' ? 'quick_reply' :
+                      button.type === 'call_to_action' ? 'url' : 'quick_reply',
+                    text: button.text || 'Button',
+                    ...(button.type === 'call_to_action' && button.url ? {
+                      url: button.url,
+                      example: [button.url]
+                    } : {})
+                  }))
+                }] : [])
+              ]
+            }))
+          }] : []),
+          // Handle other template types
+          ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
 
-              type: 'BUTTONS',
+            type: 'BUTTONS',
 
-              buttons: editForm.templateType === 'Catalog' 
+            buttons: editForm.templateType === 'Catalog'
 
-                ? [{ type: 'CATALOG', text: 'View catalog' }]
+              ? [{ type: 'CATALOG', text: 'View catalog' }]
 
-                : editForm.templateType === 'Flows' && editForm.flowId
+              : editForm.templateType === 'Flows' && editForm.flowId
 
-                  ? [{ 
+                ? [{
 
-                      type: 'FLOW', 
+                  type: 'FLOW',
 
-                      text: 'Start Flow',
+                  text: 'Start Flow',
 
-                      flow_id: editForm.flowId,
+                  flow_id: editForm.flowId,
 
-                      flow_action: editForm.flowAction || 'NAVIGATE',
+                  flow_action: editForm.flowAction || 'NAVIGATE',
 
-                      navigate_screen: editForm.navigateScreen || 'REGISTRATION'
+                  navigate_screen: editForm.navigateScreen || 'REGISTRATION'
 
-                    }]
+                }]
 
-                  : editForm.templateType === 'Authentication'
+                : editForm.templateType === 'Authentication'
 
-                    ? [{ 
+                  ? [{
 
-                        type: 'OTP', 
+                    type: 'OTP',
 
-                        text: editForm.codeDeliveryMethod === 'copy_code' ? 'Copy Code' : 'Authenticate',
+                    text: editForm.codeDeliveryMethod === 'copy_code' ? 'Copy Code' : 'Authenticate',
 
-                        otp_type: editForm.codeDeliveryMethod
+                    otp_type: editForm.codeDeliveryMethod
 
-                      }]
+                  }]
 
-                      : editForm.templateType === 'Order details'
+                  : editForm.templateType === 'Order details'
 
-                        ? [
+                    ? [
 
-                            { type: 'URL', text: editForm.orderButtonText || 'Review and Pay', url: '#' },
+                      { type: 'URL', text: editForm.orderButtonText || 'Review and Pay', url: '#' },
 
-                            { type: 'URL', text: 'Pay now', url: '#' }
+                      { type: 'URL', text: 'Pay now', url: '#' }
 
-                          ]
+                    ]
 
-                        : editForm.templateType === 'Order Status'
+                    : editForm.templateType === 'Order Status'
 
-                          ? (editForm.orderStatusButtons || []).map(buttonText => ({
+                      ? (editForm.orderStatusButtons || []).map(buttonText => ({
 
-                              type: 'URL',
+                        type: 'URL',
 
-                              text: buttonText,
+                        text: buttonText,
 
-                              url: '#'
+                        url: '#'
 
-                            }))
+                      }))
 
-                          : (editForm.buttons || []).map(button => {
+                      : (editForm.buttons || []).map(button => {
 
-                              // Map button types to WhatsApp API format
+                        // Map button types to WhatsApp API format
 
-                              let mappedButton = {
+                        let mappedButton = {
 
-                                text: button.text
+                          text: button.text
 
-                              };
+                        };
 
-                              
-                              
-                              switch (button.type) {
 
-                                case 'CALL_TO_ACTION':
 
-                                  mappedButton.type = 'URL';
+                        switch (button.type) {
 
-                                  mappedButton.url = button.url || '#';
+                          case 'CALL_TO_ACTION':
 
-                                  break;
+                            mappedButton.type = 'URL';
 
-                                case 'PHONE_NUMBER':
+                            mappedButton.url = button.url || '#';
 
-                                  mappedButton.type = 'PHONE_NUMBER';
+                            break;
 
-                                  mappedButton.phone_number = button.phone_number || '+1234567890';
+                          case 'PHONE_NUMBER':
 
-                                  break;
+                            mappedButton.type = 'PHONE_NUMBER';
 
-                                case 'COPY_CODE':
+                            mappedButton.phone_number = button.phone_number || '+1234567890';
 
-                                  mappedButton.type = 'OTP';
+                            break;
 
-                                  mappedButton.otp_type = 'copy_code';
+                          case 'COPY_CODE':
 
-                                  break;
+                            mappedButton.type = 'OTP';
 
-                                default:
+                            mappedButton.otp_type = 'copy_code';
 
-                                  mappedButton.type = 'QUICK_REPLY';
+                            break;
 
-                              }
+                          default:
 
-                              
-                              
-                              return mappedButton;
+                            mappedButton.type = 'QUICK_REPLY';
 
-                            })
+                        }
 
-            }] : [])
 
-          ]
+
+                        return mappedButton;
+
+                      })
+
+          }] : [])
+
+        ]
 
       };
 
 
 
       // Add base64File if there's an image, video, or document header
-      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) || 
-          (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
-          (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
+      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) ||
+        (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
+        (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
         // Get the appropriate file based on header type
-        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage : 
-                    editForm.headerType === 'VIDEO' ? editForm.headerVideo : 
-                    editForm.headerDocument;
-        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' : 
-                           editForm.headerType === 'VIDEO' ? 'header_video.mp4' : 
-                           'header_document.pdf';
-        
+        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage :
+          editForm.headerType === 'VIDEO' ? editForm.headerVideo :
+            editForm.headerDocument;
+        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' :
+          editForm.headerType === 'VIDEO' ? 'header_video.mp4' :
+            'header_document.pdf';
+
         // Extract file name from the file or use a default name
         const fileName = file.name || defaultName;
-        
+
         // If file is a File object, convert to base64
         if (file instanceof File) {
           const base64String = await new Promise((resolve, reject) => {
@@ -2049,7 +2025,7 @@ const WhatsAppTemplate = () => {
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
-          
+
           templateData.base64File = {
             name: fileName,
             body: base64String
@@ -2074,12 +2050,12 @@ const WhatsAppTemplate = () => {
       if (editForm.templateType === 'Carousel' && editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None') {
         // For carousel, we need to upload files for each card
         const carouselFiles = [];
-        
+
         for (let i = 0; i < editForm.carouselCards.length; i++) {
           const card = editForm.carouselCards[i];
           let file = null;
           let defaultName = '';
-          
+
           if (editForm.carouselHeaderType === 'IMAGE' && card.headerImage) {
             file = card.headerImage;
             defaultName = `card_${i + 1}_image.png`;
@@ -2087,10 +2063,10 @@ const WhatsAppTemplate = () => {
             file = card.headerVideo;
             defaultName = `card_${i + 1}_video.mp4`;
           }
-          
+
           if (file) {
             const fileName = file.name || defaultName;
-            
+
             // Convert file to base64
             if (file instanceof File) {
               const base64String = await new Promise((resolve, reject) => {
@@ -2099,7 +2075,7 @@ const WhatsAppTemplate = () => {
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
               });
-              
+
               carouselFiles.push({
                 name: fileName,
                 body: base64String,
@@ -2121,13 +2097,12 @@ const WhatsAppTemplate = () => {
             }
           }
         }
-        
+
         if (carouselFiles.length > 0) {
           templateData.carouselFiles = carouselFiles;
         }
       }
 
-      console.log('Creating template:', templateData);
 
 
       // Make API call to create template
@@ -2148,57 +2123,57 @@ const WhatsAppTemplate = () => {
 
 
 
-      // Close the modal
+        // Close the modal
 
-      setEditingTemplate(null);
+        setEditingTemplate(null);
 
-      setEditForm({
+        setEditForm({
 
-        name: '',
+          name: '',
 
-        category: 'UTILITY',
+          category: 'UTILITY',
 
-        language: '',
+          language: '',
 
-        bodyText: '',
+          bodyText: '',
 
-        headerText: '',
+          headerText: '',
 
-        footerText: '',
+          footerText: '',
 
-        headerType: 'None',
+          headerType: 'None',
 
-        headerImage: null,
+          headerImage: null,
 
-        headerVideo: null,
+          headerVideo: null,
 
-        headerDocument: null,
+          headerDocument: null,
 
-        buttons: [],
+          buttons: [],
 
-        templateType: 'Custom',
+          templateType: 'Custom',
 
-        flowId: '',
+          flowId: '',
 
-        flowAction: '',
+          flowAction: '',
 
-        navigateScreen: '',
+          navigateScreen: '',
 
-        codeDeliveryMethod: 'copy_code',
+          codeDeliveryMethod: 'copy_code',
 
-        carouselMessage: '',
+          carouselMessage: '',
 
-        carouselHeaderType: '',
+          carouselHeaderType: '',
 
-        carouselCards: [],
+          carouselCards: [],
 
-        orderButtonText: 'Review and Pay',
+          orderButtonText: 'Review and Pay',
 
-        orderStatusButtons: ['Track Order', 'Cancel Order'],
+          orderStatusButtons: ['Track Order', 'Cancel Order'],
 
-        variables: []
+          variables: []
 
-      });
+        });
 
 
 
@@ -2218,14 +2193,14 @@ const WhatsAppTemplate = () => {
 
       console.log('Full error response:', error.response?.data);
 
-      
-      
+
+
       // Extract detailed error message
 
       let errorMessage = 'Error creating template. Please try again.';
 
-      
-      
+
+
       if (error.response?.data?.error?.error_user_msg) {
 
         errorMessage = error.response.data.error.error_user_msg;
@@ -2244,8 +2219,8 @@ const WhatsAppTemplate = () => {
 
       }
 
-      
-      
+
+
       alert(`Error: ${errorMessage}`);
 
     } finally {
@@ -2816,13 +2791,13 @@ const WhatsAppTemplate = () => {
 
             <div className="modal-body">
 
-              <pre style={{ 
+              <pre style={{
 
-                backgroundColor: '#f8f9fa', 
+                backgroundColor: '#f8f9fa',
 
-                padding: '1rem', 
+                padding: '1rem',
 
-                borderRadius: '8px', 
+                borderRadius: '8px',
 
                 fontSize: '12px',
 
@@ -2842,9 +2817,9 @@ const WhatsAppTemplate = () => {
 
               <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 
-              <button 
+              <button
 
-                type="button" 
+                type="button"
 
                 className="btn btn-primary"
 
@@ -2928,9 +2903,9 @@ const WhatsAppTemplate = () => {
 
         <div className="d-flex align-items-center">
 
-          <button 
+          <button
 
-            className="btn btn-outline-primary me-2" 
+            className="btn btn-outline-primary me-2"
 
             style={{ borderRadius: '8px' }}
 
@@ -2944,9 +2919,9 @@ const WhatsAppTemplate = () => {
 
           </button>
 
-          <button 
+          <button
 
-            className="btn btn-outline-info me-2" 
+            className="btn btn-outline-info me-2"
 
             style={{ borderRadius: '8px' }}
 
@@ -2960,8 +2935,8 @@ const WhatsAppTemplate = () => {
 
           </button>
 
-       
-       
+
+
           <div className="position-relative me-3">
 
             <button
@@ -2977,9 +2952,9 @@ const WhatsAppTemplate = () => {
               <span style={{ color: '#28a745' }}>📝</span>
 
             </button>
-           
-           
-           
+
+
+
           </div>
 
           <div className="input-group" style={{ width: '250px' }}>
@@ -3079,17 +3054,17 @@ const WhatsAppTemplate = () => {
 
                   <td className="py-3" style={{ maxWidth: '200px' }}>
 
-                  {/* {template?.template?.components[0]?.text || ""} */}
+                    {/* {template?.template?.components[0]?.text || ""} */}
 
                     <div className="text-truncate">
 
-                      {(template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text || 
+                      {(template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text ||
 
-                       (template?.template || template)?.components?.[0]?.text || 
+                        (template?.template || template)?.components?.[0]?.text ||
 
-                       (template?.template || template)?.subject || 
+                        (template?.template || template)?.subject ||
 
-                       "No message content"}
+                        "No message content"}
 
                     </div>
 
@@ -3295,143 +3270,143 @@ const WhatsAppTemplate = () => {
 
                       {/* Header Media for Media Header Template */}
 
-                      {(selectedTemplate?.template?.components?.some(comp => comp.type === 'HEADER') || 
+                      {(selectedTemplate?.template?.components?.some(comp => comp.type === 'HEADER') ||
 
                         selectedTemplate?.components?.some(comp => comp.type === 'HEADER')) && (
 
-                        <div className="preview-header-media">
+                          <div className="preview-header-media">
 
-                          <div className="header-media-container">
+                            <div className="header-media-container">
 
-                            {/* Check if header has image format */}
+                              {/* Check if header has image format */}
 
-                            {(selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.format === 'IMAGE' ||
+                              {(selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.format === 'IMAGE' ||
 
-                              selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.format === 'IMAGE') ? (
+                                selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.format === 'IMAGE') ? (
 
-                              <img
+                                <img
 
-                                src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                  src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
 
-                                     selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
 
-                                     selectedTemplate?.template?.headerImage || 
+                                    selectedTemplate?.template?.headerImage ||
 
-                                     selectedTemplate?.headerImage || 
+                                    selectedTemplate?.headerImage ||
 
-                                     selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.image_url ||
+                                    selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.image_url ||
 
-                                     selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.image_url ||
+                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.image_url ||
 
-                                     "https://via.placeholder.com/400x200/25D366/FFFFFF?text=Template+Image"}
+                                    "https://via.placeholder.com/400x200/25D366/FFFFFF?text=Template+Image"}
 
-                                className="image-uploaded"
+                                  className="image-uploaded"
 
-                                alt="Template preview"
+                                  alt="Template preview"
 
-                                onError={(e) => {
+                                  onError={(e) => {
 
-                                  e.target.src = "https://via.placeholder.com/400x200/25D366/FFFFFF?text=No+Image+Available";
+                                    e.target.src = "https://via.placeholder.com/400x200/25D366/FFFFFF?text=No+Image+Available";
 
-                                }}
+                                  }}
 
-                              />
+                                />
 
-                            ) : (selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.format === 'VIDEO' ||
+                              ) : (selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.format === 'VIDEO' ||
 
-                              selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.format === 'VIDEO') ? (
+                                selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.format === 'VIDEO') ? (
 
-                              <video
+                                <video
 
-                                src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                  src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
 
-                                     selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
 
-                                     selectedTemplate?.template?.headerVideo || 
+                                    selectedTemplate?.template?.headerVideo ||
 
-                                     selectedTemplate?.headerVideo || 
+                                    selectedTemplate?.headerVideo ||
 
-                                     selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
+                                    selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
 
-                                     selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url}
+                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url}
 
-                                controls
+                                  controls
 
-                                className="image-uploaded"
+                                  className="image-uploaded"
 
-                                style={{ width: '100%', height: 'auto' }}
+                                  style={{ width: '100%', height: 'auto' }}
 
-                                onError={(e) => {
+                                  onError={(e) => {
 
-                                  e.target.style.display = 'none';
+                                    e.target.style.display = 'none';
 
-                                }}
+                                  }}
 
-                              />
+                                />
 
-                            ) : (
+                              ) : (
 
-                              /* Text Header */
+                                /* Text Header */
 
-                              <div className="text-header" style={{
+                                <div className="text-header" style={{
 
-                                padding: '12px',
+                                  padding: '12px',
 
-                                backgroundColor: '#f8f9fa',
+                                  backgroundColor: '#f8f9fa',
 
-                                border: '1px solid #e9ecef',
+                                  border: '1px solid #e9ecef',
 
-                                borderRadius: '4px',
+                                  borderRadius: '4px',
 
-                                fontSize: '14px',
+                                  fontSize: '14px',
 
-                                fontWeight: '500',
+                                  fontWeight: '500',
 
-                                color: '#495057'
+                                  color: '#495057'
 
-                              }}>
+                                }}>
 
-                                {selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.text ||
+                                  {selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.text ||
 
-                                 selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.text ||
+                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.text ||
 
-                                 'Header Text'}
+                                    'Header Text'}
 
-                              </div>
+                                </div>
 
-                            )}
+                              )}
+
+                            </div>
 
                           </div>
 
-                        </div>
+                        )}
 
-                      )}
 
-                      
-                      
+
                       {/* Body Content */}
 
                       <div className="preview-body">
 
-                        {selectedTemplate?.template?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text || 
+                        {selectedTemplate?.template?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text ||
 
-                         selectedTemplate?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text ||
+                          selectedTemplate?.components?.find(comp => comp.type === 'BODY' || comp.type === 'body')?.text ||
 
-                         selectedTemplate?.template?.components?.[0]?.text || 
+                          selectedTemplate?.template?.components?.[0]?.text ||
 
-                         'No content available'}
+                          'No content available'}
 
                       </div>
 
-                      
+
 
                       {/* Carousel Cards */}
 
                       {(() => {
 
-                        const carouselComponent = selectedTemplate?.template?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL') || 
+                        const carouselComponent = selectedTemplate?.template?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL') ||
 
-                                                selectedTemplate?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+                          selectedTemplate?.components?.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
 
                         if (carouselComponent && carouselComponent.cards) {
 
@@ -3445,13 +3420,13 @@ const WhatsAppTemplate = () => {
 
                               </div>
 
-                              <div style={{ 
+                              <div style={{
 
-                                display: 'flex', 
+                                display: 'flex',
 
-                                overflowX: 'auto', 
+                                overflowX: 'auto',
 
-                                gap: '12px', 
+                                gap: '12px',
 
                                 padding: '8px 0',
 
@@ -3505,173 +3480,173 @@ const WhatsAppTemplate = () => {
 
                                   }}>
 
-                                  {/* Card Header */}
+                                    {/* Card Header */}
 
-                                  {card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER') && (() => {
+                                    {card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER') && (() => {
 
-                                    const headerComponent = card.components.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+                                      const headerComponent = card.components.find(comp => comp.type === 'header' || comp.type === 'HEADER');
 
-                                    if (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') {
+                                      if (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') {
 
-                                      return (
+                                        return (
 
-                                        <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
+                                          <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
 
-                                          <img 
+                                            <img
 
-                                            src={headerComponent?.example?.header_handle?.[0] || 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=Image'}
+                                              src={headerComponent?.example?.header_handle?.[0] || 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=Image'}
 
-                                            alt="Card header"
+                                              alt="Card header"
 
-                                            style={{ 
+                                              style={{
 
-                                              width: '100%', 
+                                                width: '100%',
 
-                                              height: '100%', 
+                                                height: '100%',
 
-                                              objectFit: 'cover',
+                                                objectFit: 'cover',
 
-                                              display: 'block'
+                                                display: 'block'
 
-                                            }}
+                                              }}
 
-                                            onError={(e) => {
+                                              onError={(e) => {
 
-                                              e.target.src = 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=No+Image';
+                                                e.target.src = 'https://via.placeholder.com/280x160/25D366/FFFFFF?text=No+Image';
 
-                                            }}
+                                              }}
 
-                                          />
+                                            />
+
+                                          </div>
+
+                                        );
+
+                                      } else if (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') {
+
+                                        return (
+
+                                          <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
+
+                                            <video
+
+                                              src={headerComponent?.example?.header_handle?.[0]}
+
+                                              controls
+
+                                              style={{
+
+                                                width: '100%',
+
+                                                height: '100%',
+
+                                                objectFit: 'cover',
+
+                                                display: 'block'
+
+                                              }}
+
+                                              onError={(e) => {
+
+                                                e.target.style.display = 'none';
+
+                                              }}
+
+                                            />
+
+                                          </div>
+
+                                        );
+
+                                      }
+
+                                      return null;
+
+                                    })()}
+
+
+
+                                    {/* Card Content */}
+
+                                    <div style={{ padding: '12px' }}>
+
+                                      {/* Card Body */}
+
+                                      {card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY') && (
+
+                                        <div style={{
+
+                                          fontSize: '14px',
+
+                                          marginBottom: '12px',
+
+                                          color: '#333',
+
+                                          lineHeight: '1.4'
+
+                                        }}>
+
+                                          {card.components.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text}
 
                                         </div>
 
-                                      );
+                                      )}
 
-                                    } else if (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') {
 
-                                      return (
 
-                                        <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
+                                      {/* Card Buttons */}
 
-                                          <video 
+                                      {card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS') && (
 
-                                            src={headerComponent?.example?.header_handle?.[0]}
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
 
-                                            controls
+                                          {card.components.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons?.map((button, btnIndex) => (
 
-                                            style={{ 
+                                            <button
 
-                                              width: '100%', 
+                                              key={btnIndex}
 
-                                              height: '100%', 
+                                              style={{
 
-                                              objectFit: 'cover',
+                                                fontSize: '12px',
 
-                                              display: 'block'
+                                                padding: '8px 12px',
 
-                                            }}
+                                                border: '1px solid #25D366',
 
-                                            onError={(e) => {
+                                                borderRadius: '20px',
 
-                                              e.target.style.display = 'none';
+                                                backgroundColor: '#25D366',
 
-                                            }}
+                                                color: 'white',
 
-                                          />
+                                                cursor: 'default',
+
+                                                fontWeight: '500',
+
+                                                minWidth: '80px',
+
+                                                textAlign: 'center'
+
+                                              }}
+
+                                            >
+
+                                              {button.text}
+
+                                            </button>
+
+                                          ))}
 
                                         </div>
 
-                                      );
+                                      )}
 
-                                    }
-
-                                    return null;
-
-                                  })()}
-
-                                  
-
-                                  {/* Card Content */}
-
-                                  <div style={{ padding: '12px' }}>
-
-                                    {/* Card Body */}
-
-                                    {card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY') && (
-
-                                      <div style={{ 
-
-                                        fontSize: '14px', 
-
-                                        marginBottom: '12px',
-
-                                        color: '#333',
-
-                                        lineHeight: '1.4'
-
-                                      }}>
-
-                                        {card.components.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text}
-
-                                      </div>
-
-                                    )}
-
-                                    
-
-                                    {/* Card Buttons */}
-
-                                    {card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS') && (
-
-                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-
-                                        {card.components.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons?.map((button, btnIndex) => (
-
-                                          <button 
-
-                                            key={btnIndex}
-
-                                            style={{
-
-                                              fontSize: '12px',
-
-                                              padding: '8px 12px',
-
-                                              border: '1px solid #25D366',
-
-                                              borderRadius: '20px',
-
-                                              backgroundColor: '#25D366',
-
-                                              color: 'white',
-
-                                              cursor: 'default',
-
-                                              fontWeight: '500',
-
-                                              minWidth: '80px',
-
-                                              textAlign: 'center'
-
-                                            }}
-
-                                          >
-
-                                            {button.text}
-
-                                          </button>
-
-                                        ))}
-
-                                      </div>
-
-                                    )}
+                                    </div>
 
                                   </div>
 
-                                </div>
-
-                              ))}
+                                ))}
 
                               </div>
 
@@ -3685,118 +3660,118 @@ const WhatsAppTemplate = () => {
 
                       })()}
 
-                      
-                      
+
+
                       {/* Footer Content */}
 
-                      {(selectedTemplate?.template?.components?.find(comp => comp.type === 'FOOTER') || 
+                      {(selectedTemplate?.template?.components?.find(comp => comp.type === 'FOOTER') ||
 
                         selectedTemplate?.components?.find(comp => comp.type === 'FOOTER')) && (
 
-                        <div className="preview-footer" style={{ 
+                          <div className="preview-footer" style={{
 
-                          fontSize: '11px', 
+                            fontSize: '11px',
 
-                          color: '#666', 
+                            color: '#666',
 
-                          marginTop: '8px',
+                            marginTop: '8px',
 
-                          fontStyle: 'italic'
+                            fontStyle: 'italic'
 
-                        }}>
+                          }}>
 
-                          {(selectedTemplate?.template?.components?.find(comp => comp.type === 'FOOTER') || 
+                            {(selectedTemplate?.template?.components?.find(comp => comp.type === 'FOOTER') ||
 
-                            selectedTemplate?.components?.find(comp => comp.type === 'FOOTER'))?.text}
+                              selectedTemplate?.components?.find(comp => comp.type === 'FOOTER'))?.text}
 
-                        </div>
+                          </div>
 
-                      )}
+                        )}
 
                     </div>
 
                     <span className="mb-3 current-time">12:15 pm</span>
 
-                    
-                    
+
+
                     {/* Buttons for Template */}
 
-                    {(selectedTemplate?.template?.components?.find(comp => comp.type === 'BUTTONS') || 
+                    {(selectedTemplate?.template?.components?.find(comp => comp.type === 'BUTTONS') ||
 
                       selectedTemplate?.components?.find(comp => comp.type === 'BUTTONS')) && (
 
-                      <div className="call-to-action-btn">
+                        <div className="call-to-action-btn">
 
-                        {(() => {
+                          {(() => {
 
-                          const buttonsComponent = selectedTemplate?.template?.components?.find(comp => comp.type === 'BUTTONS') || 
+                            const buttonsComponent = selectedTemplate?.template?.components?.find(comp => comp.type === 'BUTTONS') ||
 
-                                                  selectedTemplate?.components?.find(comp => comp.type === 'BUTTONS');
+                              selectedTemplate?.components?.find(comp => comp.type === 'BUTTONS');
 
-                          const buttons = buttonsComponent?.buttons || [];
+                            const buttons = buttonsComponent?.buttons || [];
 
-                          
-                          
-                          return buttons.map((button, index) => (
 
-                            <button 
 
-                              key={index}
+                            return buttons.map((button, index) => (
 
-                              type="button" 
+                              <button
 
-                              className="btn btn-sm"
+                                key={index}
 
-                              style={{ 
+                                type="button"
 
-                                backgroundColor: '#FFFFFF', 
+                                className="btn btn-sm"
 
-                                border: '1px solid #25D366',
+                                style={{
 
-                                borderRadius: '20px',
+                                  backgroundColor: '#FFFFFF',
 
-                                padding: '8px 16px',
+                                  border: '1px solid #25D366',
 
-                                fontSize: '13px',
+                                  borderRadius: '20px',
 
-                                fontWeight: '400',
+                                  padding: '8px 16px',
 
-                                color: '#25D366',
+                                  fontSize: '13px',
 
-                                minWidth: '120px',
+                                  fontWeight: '400',
 
-                                textAlign: 'center'
+                                  color: '#25D366',
 
-                              }}
+                                  minWidth: '120px',
 
-                            >
+                                  textAlign: 'center'
 
-                              {button.text || `Button ${index + 1}`}
+                                }}
 
-                            </button>
+                              >
 
-                          ));
+                                {button.text || `Button ${index + 1}`}
 
-                        })()}
+                              </button>
 
-                      </div>
+                            ));
 
-                    )}
+                          })()}
+
+                        </div>
+
+                      )}
 
                   </div>
-                  
-                  
 
-                
-                  
-                
-                 
+
+
+
+
+
+
                 </div>
 
               </div>
 
-              
-              
+
+
               {/* Template Details */}
 
               <div className="mt-4">
@@ -3837,23 +3812,23 @@ const WhatsAppTemplate = () => {
 
                 </div>
 
-                
-                
+
+
                 {/* Debug Info for Buttons */}
-               
-                
-
-                
-
-                  </div>
-
-                </div>
 
 
 
-                        </div>
 
-                      </div>
+
+              </div>
+
+            </div>
+
+
+
+          </div>
+
+        </div>
 
       </div>
 
@@ -3861,7 +3836,7 @@ const WhatsAppTemplate = () => {
 
       {/* Clone Template Modal */}
 
-     
+
 
 
       {/* Create Template Modal */}
@@ -3900,8 +3875,8 @@ const WhatsAppTemplate = () => {
 
                       <h6 className="fw-bold mb-3" style={{ color: '#495057', fontSize: '16px' }}>Template Configuration</h6>
 
-                      
-                      
+
+
                       <div className="row">
 
                         <div className="col-md-6 mb-3">
@@ -3922,8 +3897,8 @@ const WhatsAppTemplate = () => {
 
                               const newTemplateType = e.target.value;
 
-                              
-                              
+
+
                               // Reset all form data when template type changes
 
                               const resetFormData = resetFormDataForTemplateType(newTemplateType);
@@ -3954,8 +3929,8 @@ const WhatsAppTemplate = () => {
 
                         </div>
 
-                        
-                        
+
+
                         <div className="col-md-6 mb-3">
 
                           <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
@@ -3974,9 +3949,9 @@ const WhatsAppTemplate = () => {
 
                             disabled={editForm.templateType === 'Catalog' || editForm.templateType === 'Order Status' || editForm.templateType === 'Carousel' || editForm.templateType === 'Authentication'}
 
-                            style={{ 
+                            style={{
 
-                              borderRadius: '8px', 
+                              borderRadius: '8px',
 
                               border: '1px solid #ced4da',
 
@@ -4016,8 +3991,8 @@ const WhatsAppTemplate = () => {
 
                       </div>
 
-                      
-                      
+
+
                       <div className="row">
 
                         <div className="col-md-6 mb-3">
@@ -4082,8 +4057,8 @@ const WhatsAppTemplate = () => {
 
                         </div>
 
-                        
-                        
+
+
                         <div className="col-md-6 mb-3">
 
                           <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
@@ -4141,1060 +4116,164 @@ const WhatsAppTemplate = () => {
                       <div className="col-12">
 
                         <h6 className="fw-bold mb-3" style={{ color: '#495057', fontSize: '16px' }}>Template Content</h6>
-                      
-                      
-                      
-                      {/* Header Section */}
 
-                      {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Catalog' && editForm.templateType !== 'Authentication' && editForm.templateType !== 'Order Status' && (
 
-                        <div className="mb-4">
 
-                          <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+                        {/* Header Section */}
 
-                            Header <span className="text-muted">(Optional)</span>
+                        {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Catalog' && editForm.templateType !== 'Authentication' && editForm.templateType !== 'Order Status' && (
 
-                          </label>
+                          <div className="mb-4">
 
-                        <div className="row">
+                            <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
 
-                          <div className="col-md-6">
+                              Header <span className="text-muted">(Optional)</span>
 
-                            <select
-
-                              className="form-select"
-
-                              value={editForm.headerType}
-
-                              onChange={(e) => setEditForm({ ...editForm, headerType: e.target.value })}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            >
-
-                              <option value="None">No Header</option>
-
-                              <option value="Text">Text Header</option>
-
-                              <option value="IMAGE">Image Header</option>
-
-                              <option value="VIDEO">Video Header</option>
-
-                              <option value="DOCUMENT">Document Header</option>
-
-                            </select>
-
-                          </div>
-
-                          <div className="col-md-6 d-flex align-items-end">
-
-                            <small className="text-muted" style={{ fontSize: '12px' }}>Media or text header</small>
-
-                          </div>
-
-                        </div>
-
-                        
-                        
-                        {editForm.headerType === 'Text' && (
-
-                          <div className="mt-3">
-
-                            <input
-
-                              type="text"
-
-                              className="form-control"
-
-                              placeholder="Enter header text"
-
-                              value={editForm.headerText}
-
-                              onChange={(e) => setEditForm({ ...editForm, headerText: e.target.value })}
-
-                              maxLength={60}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            />
-
-                            <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                              {editForm.headerText.length}/60
-
-                            </small>
-
-                          </div>
-
-                        )}
-
-                        
-                        
-                        {editForm.headerType === 'IMAGE' && (
-
-                          <div className="mt-3">
-
-                            <input
-
-                              type="file"
-
-                              className="form-control"
-
-                              accept="image/*"
-
-                              onChange={(e) => {
-
-                                const file = e.target.files[0];
-
-                                if (file) {
-
-                                  // Create a preview URL for the selected file
-
-                                  const reader = new FileReader();
-
-                                  reader.onload = (event) => {
-
-                                    setEditForm({ ...editForm, headerImage: event.target.result });
-
-                                  };
-
-                                  reader.readAsDataURL(file);
-
-                                }
-
-                              }}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            />
-
-                            {editForm.headerImage && (
-
-                              <div className="mt-2">
-
-                                <small className="text-muted d-block mb-1">Preview:</small>
-
-                                <img 
-
-                                  src={editForm.headerImage} 
-
-                                  alt="Header preview" 
-
-                                  style={{ 
-
-                                    maxWidth: '100%', 
-
-                                    maxHeight: '150px', 
-
-                                    objectFit: 'contain',
-
-                                    border: '1px solid #ddd',
-
-                                    borderRadius: '4px',
-
-                                    backgroundColor: '#f8f9fa'
-
-                                  }}
-
-                                  onError={(e) => {
-
-                                    e.target.style.display = 'none';
-
-                                  }}
-
-                                />
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        )}
-
-
-
-                        {editForm.headerType === 'VIDEO' && (
-
-                          <div className="mt-3">
-
-                            <input
-
-                              type="file"
-
-                              className="form-control"
-
-                              accept="video/*"
-
-                              onChange={(e) => {
-
-                                const file = e.target.files[0];
-
-                                if (file) {
-
-                                  // Create a preview URL for the selected file
-
-                                  const reader = new FileReader();
-
-                                  reader.onload = (event) => {
-
-                                    setEditForm({ ...editForm, headerVideo: event.target.result });
-
-                                  };
-
-                                  reader.readAsDataURL(file);
-
-                                }
-
-                              }}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            />
-
-                            {editForm.headerVideo && (
-
-                              <div className="mt-2">
-
-                                <small className="text-muted d-block mb-1">Preview:</small>
-
-                                <video 
-
-                                  src={editForm.headerVideo} 
-
-                                  controls
-
-                                  style={{ 
-
-                                    maxWidth: '100%', 
-
-                                    maxHeight: '150px', 
-
-                                    objectFit: 'contain',
-
-                                    border: '1px solid #ddd',
-
-                                    borderRadius: '4px',
-
-                                    backgroundColor: '#f8f9fa'
-
-                                  }}
-
-                                  onError={(e) => {
-
-                                    e.target.style.display = 'none';
-
-                                  }}
-
-                                />
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        )}
-
-
-
-                        {editForm.headerType === 'DOCUMENT' && (
-
-                          <div className="mt-3">
-
-                            <input
-
-                              type="file"
-
-                              className="form-control"
-
-                              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
-
-                              onChange={(e) => {
-
-                                const file = e.target.files[0];
-
-                                if (file) {
-
-                                  // Create a preview URL for the selected file
-
-                                  const reader = new FileReader();
-
-                                  reader.onload = (event) => {
-
-                                    setEditForm({ ...editForm, headerDocument: event.target.result });
-
-                                  };
-
-                                  reader.readAsDataURL(file);
-
-                                }
-
-                              }}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            />
-
-                            {editForm.headerDocument && (
-
-                              <div className="mt-2">
-
-                                <small className="text-muted d-block mb-1">Document uploaded:</small>
-
-                                <div 
-
-                                  style={{ 
-
-                                    padding: '12px',
-
-                                    backgroundColor: '#f8f9fa',
-
-                                    border: '1px solid #e9ecef',
-
-                                    borderRadius: '4px',
-
-                                    fontSize: '14px',
-
-                                    color: '#495057'
-
-                                  }}
-
-                                >
-
-                                  <i className="fas fa-file me-2"></i>
-
-                                  Document ready for preview
-
-                                </div>
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        )}
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Message Body Section */}
-
-                      {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && (
-
-                        <div className="mb-4">
-
-                          <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                            Message Body <span className="text-danger">*</span>
-
-                          </label>
-
-                        <textarea
-
-                          className="form-control"
-
-                          placeholder="Enter your message content here..."
-
-                          rows={6}
-
-                          value={editForm.bodyText}
-
-                          onChange={(e) => {
-
-                            const newBodyText = e.target.value;
-
-                            const cleanedVariables = cleanupVariables(newBodyText);
-
-                            setEditForm({ 
-
-                              ...editForm, 
-
-                              bodyText: newBodyText,
-
-                              variables: cleanedVariables
-
-                            });
-
-                          }}
-
-                          maxLength={1024}
-
-                          style={{ 
-
-                            borderRadius: '8px', 
-
-                            border: '1px solid #ced4da',
-
-                            resize: 'vertical'
-
-                          }}
-
-                        />
-
-                        <div className="d-flex justify-content-between align-items-center mt-2">
-
-                          <button
-
-                            type="button"
-
-                            className="btn btn-outline-primary btn-sm"
-
-                            style={{ fontSize: '12px' }}
-
-                            onClick={() => {
-
-                              const variables = editForm.variables || [];
-
-                              const newVariableNumber = variables.length + 1;
-
-                              const newVariable = {
-
-                                id: newVariableNumber,
-
-                                placeholder: `{{${newVariableNumber}}}`,
-
-                                value: ''
-
-                              };
-
-                              setEditForm({
-
-                                ...editForm,
-
-                                variables: [...variables, newVariable],
-
-                                bodyText: editForm.bodyText + `{{${newVariableNumber}}}`
-
-                              });
-
-                            }}
-
-                          >
-
-                            + Add Variable
-
-                          </button>
-
-                          <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                            {editForm.bodyText.length}/1024
-
-                          </small>
-
-                        </div>
-
-                        <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                          Variables allow dynamic content in your template.
-
-                        </small>
-
-
-
-                        {/* Variables Section */}
-
-                        {editForm.variables && editForm.variables.length > 0 && (
-
-                          <div className="mt-3">
-
-                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '14px' }}>
-
-                              Variables in your message:
-
-                            </h6>
-
-                            {editForm.variables.map((variable, index) => (
-
-                              <div key={variable.id} className="mb-3">
-
-                                <div className="d-flex align-items-center mb-2">
-
-                                  <span 
-
-                                    className="badge me-2" 
-
-                                    style={{ 
-
-                                      backgroundColor: '#e3f2fd', 
-
-                                      color: '#1976d2',
-
-                                      fontSize: '12px',
-
-                                      padding: '4px 8px',
-
-                                      borderRadius: '12px'
-
-                                    }}
-
-                                  >
-
-                                    {variable.placeholder}
-
-                                  </span>
-
-                                  <span className="fw-medium" style={{ fontSize: '12px' }}>
-
-                                    Variable {variable.id} Value:
-
-                                  </span>
-
-                                </div>
-
-                                <input
-
-                                  type="text"
-
-                                  className="form-control form-control-sm"
-
-                                  placeholder={`Enter value for ${variable.placeholder} (required)`}
-
-                                  value={variable.value}
-
-                                  onChange={(e) => {
-
-                                    const variables = editForm.variables || [];
-
-                                    const updatedVariables = variables.map(v => 
-
-                                      v.id === variable.id ? { ...v, value: e.target.value } : v
-
-                                    );
-
-                                    setEditForm({ ...editForm, variables: updatedVariables });
-
-                                  }}
-
-                                  style={{
-
-                                    border: variable.value ? '1px solid #ced4da' : '1px solid #dc3545',
-
-                                    borderRadius: '4px'
-
-                                  }}
-
-                                />
-
-                              </div>
-
-                            ))}
-
-                          </div>
-
-                        )}
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Footer Section */}
-
-                      {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && (
-
-                        <div className="mb-4">
-
-                          <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                            Footer <span className="text-muted">(Optional)</span>
-
-                          </label>
-
-                        <input
-
-                          type="text"
-
-                          className="form-control"
-
-                          placeholder="Enter footer text"
-
-                          value={editForm.footerText}
-
-                          onChange={(e) => setEditForm({ ...editForm, footerText: e.target.value })}
-
-                          maxLength={60}
-
-                          style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                        />
-
-                        <div className="d-flex justify-content-between align-items-center mt-2">
-
-                          <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                            Footer text appears at the bottom of your message in a smaller font.
-
-                          </small>
-
-                          <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                            {editForm.footerText.length}/60
-
-                          </small>
-
-                        </div>
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Buttons Section */}
-
-                      {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && editForm.templateType !== 'Order details' && editForm.templateType !== 'Order Status' && (
-
-                        <div className="mb-4">
-
-                          <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                            Buttons <span className="text-muted">(Optional)</span>
-
-                          </label>
-                        
-                        
-                        
-                        {/* Catalog Template Special Handling */}
-
-                        {editForm.templateType === 'Catalog' && (
-
-                          <div className="mb-3 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
-
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-
-                              <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
-
-                                Catalog templates automatically include a 'View catalog' button.
-
-                              </small>
-
-                              <button
-
-                                type="button"
-
-                                className="btn btn-outline-danger btn-sm"
-
-                                disabled
-
-                                style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
-                                
-                                
-                                
-                              >
-
-                                🗑️
-
-                              </button>
-
-                            </div>
+                            </label>
 
                             <div className="row">
 
                               <div className="col-md-6">
 
-                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button text</label>
+                                <select
+
+                                  className="form-select"
+
+                                  value={editForm.headerType}
+
+                                  onChange={(e) => setEditForm({ ...editForm, headerType: e.target.value })}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                >
+
+                                  <option value="None">No Header</option>
+
+                                  <option value="Text">Text Header</option>
+
+                                  <option value="IMAGE">Image Header</option>
+
+                                  <option value="VIDEO">Video Header</option>
+
+                                  <option value="DOCUMENT">Document Header</option>
+
+                                </select>
+
+                              </div>
+
+                              <div className="col-md-6 d-flex align-items-end">
+
+                                <small className="text-muted" style={{ fontSize: '12px' }}>Media or text header</small>
+
+                              </div>
+
+                            </div>
+
+
+
+                            {editForm.headerType === 'Text' && (
+
+                              <div className="mt-3">
 
                                 <input
 
                                   type="text"
 
-                                  className="form-control form-control-sm"
+                                  className="form-control"
 
-                                  placeholder="View catalog"
+                                  placeholder="Enter header text"
 
-                                  value="View catalog"
+                                  value={editForm.headerText}
 
-                                  readOnly
+                                  onChange={(e) => setEditForm({ ...editForm, headerText: e.target.value })}
 
-                                  style={{ backgroundColor: '#e9ecef' }}
+                                  maxLength={60}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
 
                                 />
 
-                              </div>
+                                <small className="text-muted" style={{ fontSize: '12px' }}>
 
-                            </div>
+                                  {editForm.headerText.length}/60
 
-                          </div>
-
-                        )}
-
-                        
-                        
-                        {/* Regular Button Management */}
-
-                        {editForm.templateType !== 'Catalog' && (
-
-                          <div className="d-flex align-items-center">
-
-                            {(editForm.buttons || []).length < 10 && (
-
-                              <div className="dropdown me-2">
-
-                                <button
-
-                                  className="btn btn-outline-primary btn-sm dropdown-toggle"
-
-                                  type="button"
-
-                                  id="buttonDropdown"
-
-                                  data-bs-toggle="dropdown"
-
-                                  aria-expanded="false"
-
-                                  style={{ fontSize: '12px' }}
-
-                                >
-
-                                  + Add button
-
-                                </button>
-
-                                <ul className="dropdown-menu" aria-labelledby="buttonDropdown" style={{ minWidth: '250px' }}>
-
-                                  <li>
-
-                                    <button
-
-                                      className="dropdown-item px-3 py-2"
-
-                                      type="button"
-
-                                      onClick={() => addButton('QUICK_REPLY')}
-
-                                      style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                    >
-
-                                      <div className="fw-medium" style={{ fontSize: '14px' }}>Quick reply buttons</div>
-
-                                      <small className="text-muted" style={{ fontSize: '12px' }}>Custom response</small>
-
-                                    </button>
-
-                                  </li>
-
-                                  <li><hr className="dropdown-divider" /></li>
-
-                                  <li>
-
-                                    <button
-
-                                      className="dropdown-item px-3 py-2"
-
-                                      type="button"
-
-                                      onClick={() => addButton('CALL_TO_ACTION')}
-
-                                      style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                    >
-
-                                      <div className="fw-medium" style={{ fontSize: '14px' }}>Call-to-action buttons</div>
-
-                                      <small className="text-muted" style={{ fontSize: '12px' }}>Visit website</small>
-
-                                    </button>
-
-                                  </li>
-
-                                  <li><hr className="dropdown-divider" /></li>
-
-                                  <li>
-
-                                    <button
-
-                                      className="dropdown-item px-3 py-2"
-
-                                      type="button"
-
-                                      onClick={() => addButton('PHONE_NUMBER')}
-
-                                      style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                    >
-
-                                      <div className="fw-medium" style={{ fontSize: '14px' }}>Call Phone Number</div>
-
-                                      <small className="text-muted" style={{ fontSize: '12px' }}>Call us</small>
-
-                                    </button>
-
-                                  </li>
-
-                                  <li><hr className="dropdown-divider" /></li>
-
-                                  <li>
-
-                                    <button
-
-                                      className="dropdown-item px-3 py-2"
-
-                                      type="button"
-
-                                      onClick={() => addButton('COPY_CODE')}
-
-                                      style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                    >
-
-                                      <div className="fw-medium" style={{ fontSize: '14px' }}>Copy offer code</div>
-
-                                      <small className="text-muted" style={{ fontSize: '12px' }}>Copy code</small>
-
-                                    </button>
-
-                                  </li>
-
-                                </ul>
+                                </small>
 
                               </div>
 
                             )}
 
-                            <small className="text-muted" style={{ fontSize: '12px' }}>
 
-                              Create buttons that let customers respond to your message or take action. You can add up to ten buttons. If you add more than three buttons, they will appear in a list.
 
-                            </small>
+                            {editForm.headerType === 'IMAGE' && (
 
-                          </div>
+                              <div className="mt-3">
 
-                        )}
+                                <input
 
+                                  type="file"
 
+                                  className="form-control"
 
-                        {/* Button Configuration Forms */}
+                                  accept="image/*"
 
-                        {editForm.buttons && editForm.buttons.length > 0 && (
+                                  onChange={(e) => {
 
-                          <div className="mt-4">
+                                    const file = e.target.files[0];
 
-                            {editForm.buttons.map((button, index) => (
+                                    if (file) {
 
-                              <div key={index} className="border rounded p-4 mb-3" style={{ 
+                                      // Create a preview URL for the selected file
 
-                                backgroundColor: '#ffffff',
+                                      const reader = new FileReader();
 
-                                border: '1px solid #e9ecef',
+                                      reader.onload = (event) => {
 
-                                borderRadius: '8px'
+                                        setEditForm({ ...editForm, headerImage: event.target.result });
 
-                              }}>
+                                      };
 
-                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                      reader.readAsDataURL(file);
 
-                                  <h6 className="fw-medium mb-0" style={{ 
+                                    }
 
-                                    fontSize: '14px',
+                                  }}
 
-                                    color: '#495057',
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
 
-                                    fontWeight: '600'
+                                />
 
-                                  }}>
+                                {editForm.headerImage && (
 
-                                    {button.type === 'CALL_TO_ACTION' ? 'Call-to-action buttons' :
+                                  <div className="mt-2">
 
-                                     button.type === 'PHONE_NUMBER' ? 'Call Phone Number' :
+                                    <small className="text-muted d-block mb-1">Preview:</small>
 
-                                     button.type === 'COPY_CODE' ? 'Copy offer code' :
+                                    <img
 
-                                     'Quick reply buttons'}
+                                      src={editForm.headerImage}
 
-                                  </h6>
+                                      alt="Header preview"
 
-                                  <button
+                                      style={{
 
-                                    type="button"
+                                        maxWidth: '100%',
 
-                                    className="btn btn-outline-danger btn-sm"
+                                        maxHeight: '150px',
 
-                                    onClick={() => removeButton(index)}
+                                        objectFit: 'contain',
 
-                                    style={{ 
+                                        border: '1px solid #ddd',
 
-                                      width: '28px', 
+                                        borderRadius: '4px',
 
-                                      height: '28px', 
-
-                                      padding: '0', 
-
-                                      fontSize: '14px',
-
-                                      border: '1px solid #dc3545',
-
-                                      borderRadius: '4px',
-
-                                      display: 'flex',
-
-                                      alignItems: 'center',
-
-                                      justifyContent: 'center'
-
-                                    }}
-
-                                  >
-
-                                    🗑️
-
-                                  </button>
-
-                                </div>
-
-                                
-                                
-                                {/* Button Text Field */}
-
-                                <div className="mb-3">
-
-                                  <div className="d-flex justify-content-between align-items-center mb-2">
-
-                                    <label className="form-label fw-medium mb-0" style={{ 
-
-                                      fontSize: '13px',
-
-                                      color: '#495057'
-
-                                    }}>
-
-                                      Button text
-
-                                    </label>
-
-                                    <small className="text-muted" style={{ fontSize: '11px' }}>
-
-                                      {button.text.length} / 25
-
-                                    </small>
-
-                                  </div>
-
-                                  <input
-
-                                    type="text"
-
-                                    className="form-control"
-
-                                    placeholder="Button text"
-
-                                    value={button.text}
-
-                                    onChange={(e) => updateButton(index, 'text', e.target.value)}
-
-                                    maxLength={25}
-
-                                    style={{ 
-
-                                      fontSize: '13px',
-
-                                      border: '1px solid #ced4da',
-
-                                      borderRadius: '6px',
-
-                                      padding: '8px 12px'
-
-                                    }}
-
-                                  />
-
-                                </div>
-
-                                
-                                
-                                {/* Additional Fields based on button type */}
-
-                                {button.type === 'CALL_TO_ACTION' && (
-
-                                  <div className="mb-2">
-
-                                    <label className="form-label fw-medium mb-2" style={{ 
-
-                                      fontSize: '13px',
-
-                                      color: '#495057'
-
-                                    }}>
-
-                                      Website URL
-
-                                    </label>
-
-                                    <input
-
-                                      type="url"
-
-                                      className="form-control"
-
-                                      placeholder="https://example.com"
-
-                                      value={button.url || ''}
-
-                                      onChange={(e) => updateButton(index, 'url', e.target.value)}
-
-                                      style={{ 
-
-                                        fontSize: '13px',
-
-                                        border: '1px solid #ced4da',
-
-                                        borderRadius: '6px',
-
-                                        padding: '8px 12px'
+                                        backgroundColor: '#f8f9fa'
 
                                       }}
 
-                                    />
+                                      onError={(e) => {
 
-                                  </div>
-
-                                )}
-
-                                
-                                
-                                {button.type === 'PHONE_NUMBER' && (
-
-                                  <div className="mb-2">
-
-                                    <label className="form-label fw-medium mb-2" style={{ 
-
-                                      fontSize: '13px',
-
-                                      color: '#495057'
-
-                                    }}>
-
-                                      Phone number
-
-                                    </label>
-
-                                    <input
-
-                                      type="tel"
-
-                                      className="form-control"
-
-                                      placeholder="+1234567890"
-
-                                      value={button.phone_number || ''}
-
-                                      onChange={(e) => updateButton(index, 'phone_number', e.target.value)}
-
-                                      style={{ 
-
-                                        fontSize: '13px',
-
-                                        border: '1px solid #ced4da',
-
-                                        borderRadius: '6px',
-
-                                        padding: '8px 12px'
+                                        e.target.style.display = 'none';
 
                                       }}
 
@@ -5206,245 +4285,189 @@ const WhatsAppTemplate = () => {
 
                               </div>
 
-                            ))}
+                            )}
+
+
+
+                            {editForm.headerType === 'VIDEO' && (
+
+                              <div className="mt-3">
+
+                                <input
+
+                                  type="file"
+
+                                  className="form-control"
+
+                                  accept="video/*"
+
+                                  onChange={(e) => {
+
+                                    const file = e.target.files[0];
+
+                                    if (file) {
+
+                                      // Create a preview URL for the selected file
+
+                                      const reader = new FileReader();
+
+                                      reader.onload = (event) => {
+
+                                        setEditForm({ ...editForm, headerVideo: event.target.result });
+
+                                      };
+
+                                      reader.readAsDataURL(file);
+
+                                    }
+
+                                  }}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                />
+
+                                {editForm.headerVideo && (
+
+                                  <div className="mt-2">
+
+                                    <small className="text-muted d-block mb-1">Preview:</small>
+
+                                    <video
+
+                                      src={editForm.headerVideo}
+
+                                      controls
+
+                                      style={{
+
+                                        maxWidth: '100%',
+
+                                        maxHeight: '150px',
+
+                                        objectFit: 'contain',
+
+                                        border: '1px solid #ddd',
+
+                                        borderRadius: '4px',
+
+                                        backgroundColor: '#f8f9fa'
+
+                                      }}
+
+                                      onError={(e) => {
+
+                                        e.target.style.display = 'none';
+
+                                      }}
+
+                                    />
+
+                                  </div>
+
+                                )}
+
+                              </div>
+
+                            )}
+
+
+
+                            {editForm.headerType === 'DOCUMENT' && (
+
+                              <div className="mt-3">
+
+                                <input
+
+                                  type="file"
+
+                                  className="form-control"
+
+                                  accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+
+                                  onChange={(e) => {
+
+                                    const file = e.target.files[0];
+
+                                    if (file) {
+
+                                      // Create a preview URL for the selected file
+
+                                      const reader = new FileReader();
+
+                                      reader.onload = (event) => {
+
+                                        setEditForm({ ...editForm, headerDocument: event.target.result });
+
+                                      };
+
+                                      reader.readAsDataURL(file);
+
+                                    }
+
+                                  }}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                />
+
+                                {editForm.headerDocument && (
+
+                                  <div className="mt-2">
+
+                                    <small className="text-muted d-block mb-1">Document uploaded:</small>
+
+                                    <div
+
+                                      style={{
+
+                                        padding: '12px',
+
+                                        backgroundColor: '#f8f9fa',
+
+                                        border: '1px solid #e9ecef',
+
+                                        borderRadius: '4px',
+
+                                        fontSize: '14px',
+
+                                        color: '#495057'
+
+                                      }}
+
+                                    >
+
+                                      <i className="fas fa-file me-2"></i>
+
+                                      Document ready for preview
+
+                                    </div>
+
+                                  </div>
+
+                                )}
+
+                              </div>
+
+                            )}
 
                           </div>
 
                         )}
 
-                        </div>
 
-                      )}
 
+                        {/* Message Body Section */}
 
+                        {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && (
 
-                      {/* Flow Configuration Section */}
+                          <div className="mb-4">
 
-                      {editForm.templateType === 'Flows' && (
+                            <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
 
-                        <div className="mb-4">
+                              Message Body <span className="text-danger">*</span>
 
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>Flow Configuration</h6>
-
-                          <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
-
-                            Configure flow settings for flow buttons
-
-                          </small>
-
-                          
-                          
-                          <div className="row">
-
-                            <div className="col-md-4 mb-3">
-
-                              <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                                Flow Id:
-
-                              </label>
-
-                              <select
-
-                                className="form-select"
-
-                                value={editForm.flowId}
-
-                                onChange={(e) => setEditForm({ ...editForm, flowId: e.target.value })}
-
-                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                              >
-
-                                <option value="">Select a Flow</option>
-
-                                <option value="flow_001">Registration Flow</option>
-
-                                <option value="flow_002">Support Flow</option>
-
-                                <option value="flow_003">Order Flow</option>
-
-                                <option value="flow_004">Feedback Flow</option>
-
-                                <option value="flow_005">Survey Flow</option>
-
-                              </select>
-
-                            </div>
-
-                            
-                            
-                            <div className="col-md-4 mb-3">
-
-                              <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                                Flow Action:
-
-                              </label>
-
-                              <select
-
-                                className="form-select"
-
-                                value={editForm.flowAction}
-
-                                onChange={(e) => setEditForm({ ...editForm, flowAction: e.target.value })}
-
-                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                              >
-
-                                <option value="">Select Flow Action</option>
-
-                                <option value="navigate">Navigate</option>
-
-                                <option value="data_exchange">Data exchange</option>
-
-                              </select>
-
-                            </div>
-
-                            
-                            
-                            <div className="col-md-4 mb-3">
-
-                              <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                                Navigate Screen:
-
-                              </label>
-
-                              <select
-
-                                className="form-select"
-
-                                value={editForm.navigateScreen}
-
-                                onChange={(e) => setEditForm({ ...editForm, navigateScreen: e.target.value })}
-
-                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                              >
-
-                                <option value="">Select screen</option>
-
-                                <option value="REGISTRATION">Registration</option>
-
-                                <option value="SUPPORT">Support</option>
-
-                                <option value="ORDER">Order</option>
-
-                                <option value="FEEDBACK">Feedback</option>
-
-                                <option value="SURVEY">Survey</option>
-
-                                <option value="PAYMENT">Payment</option>
-
-                                <option value="CONFIRMATION">Confirmation</option>
-
-                              </select>
-
-                            </div>
-
-                          </div>
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Authentication Configuration Section */}
-
-                      {editForm.templateType === 'Authentication' && (
-
-                        <div className="mb-4">
-
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
-
-                            Code delivery setup <span className="text-danger">*</span>
-
-                          </h6>
-
-                          <p className="text-muted mb-3" style={{ fontSize: '14px' }}>
-
-                            Choose how customers send the code from WhatsApp to your app. Edits to this section won't require review or count towards edit limits.
-
-                          </p>
-
-                          
-                          
-                          <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
-
-                            <div className="form-check mb-3">
-
-                              <input
-
-                                className="form-check-input"
-
-                                type="radio"
-
-                                name="codeDeliveryMethod"
-
-                                id="copyCode"
-
-                                value="copy_code"
-
-                                checked={editForm.codeDeliveryMethod === 'copy_code'}
-
-                                onChange={(e) => setEditForm({ ...editForm, codeDeliveryMethod: e.target.value })}
-
-                                style={{ marginTop: '0.25rem' }}
-
-                              />
-
-                              <label className="form-check-label" htmlFor="copyCode" style={{ fontSize: '14px' }}>
-
-                                <div className="fw-medium">Copy code</div>
-
-                                <small className="text-muted d-block" style={{ fontSize: '12px' }}>
-
-                                  Basic authentication with quick setup. Your customers copy and paste the code into your app.
-
-                                </small>
-
-                              </label>
-
-                            </div>
-
-                            
-
-                            
-                         
-                          </div>
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Carousel Message Section */}
-
-                      {editForm.templateType === 'Carousel' && (
-
-                        <div className="mb-4">
-
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
-
-                            Carousel Message <span className="text-danger">*</span>
-
-                          </h6>
-
-                          <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
-
-                            Main message above carousel cards (required)
-
-                          </small>
-
-                          
-                          
-                          <div className="mb-3">
+                            </label>
 
                             <textarea
 
@@ -5452,11 +4475,225 @@ const WhatsAppTemplate = () => {
 
                               placeholder="Enter your message content here..."
 
-                              rows={4}
+                              rows={6}
 
-                              value={editForm.carouselMessage}
+                              value={editForm.bodyText}
 
-                              onChange={(e) => setEditForm({ ...editForm, carouselMessage: e.target.value })}
+                              onChange={(e) => {
+
+                                const newBodyText = e.target.value;
+
+                                const cleanedVariables = cleanupVariables(newBodyText);
+
+                                setEditForm({
+
+                                  ...editForm,
+
+                                  bodyText: newBodyText,
+
+                                  variables: cleanedVariables
+
+                                });
+
+                              }}
+
+                              maxLength={1024}
+
+                              style={{
+
+                                borderRadius: '8px',
+
+                                border: '1px solid #ced4da',
+
+                                resize: 'vertical'
+
+                              }}
+
+                            />
+
+                            <div className="d-flex justify-content-between align-items-center mt-2">
+
+                              <button
+
+                                type="button"
+
+                                className="btn btn-outline-primary btn-sm"
+
+                                style={{ fontSize: '12px' }}
+
+                                onClick={() => {
+
+                                  const variables = editForm.variables || [];
+
+                                  const newVariableNumber = variables.length + 1;
+
+                                  const newVariable = {
+
+                                    id: newVariableNumber,
+
+                                    placeholder: `{{${newVariableNumber}}}`,
+
+                                    value: ''
+
+                                  };
+
+                                  setEditForm({
+
+                                    ...editForm,
+
+                                    variables: [...variables, newVariable],
+
+                                    bodyText: editForm.bodyText + `{{${newVariableNumber}}}`
+
+                                  });
+
+                                }}
+
+                              >
+
+                                + Add Variable
+
+                              </button>
+
+                              <small className="text-muted" style={{ fontSize: '12px' }}>
+
+                                {editForm.bodyText.length}/1024
+
+                              </small>
+
+                            </div>
+
+                            <small className="text-muted" style={{ fontSize: '12px' }}>
+
+                              Variables allow dynamic content in your template.
+
+                            </small>
+
+
+
+                            {/* Variables Section */}
+
+                            {editForm.variables && editForm.variables.length > 0 && (
+
+                              <div className="mt-3">
+
+                                <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '14px' }}>
+
+                                  Variables in your message:
+
+                                </h6>
+
+                                {editForm.variables.map((variable, index) => (
+
+                                  <div key={variable.id} className="mb-3">
+
+                                    <div className="d-flex align-items-center mb-2">
+
+                                      <span
+
+                                        className="badge me-2"
+
+                                        style={{
+
+                                          backgroundColor: '#e3f2fd',
+
+                                          color: '#1976d2',
+
+                                          fontSize: '12px',
+
+                                          padding: '4px 8px',
+
+                                          borderRadius: '12px'
+
+                                        }}
+
+                                      >
+
+                                        {variable.placeholder}
+
+                                      </span>
+
+                                      <span className="fw-medium" style={{ fontSize: '12px' }}>
+
+                                        Variable {variable.id} Value:
+
+                                      </span>
+
+                                    </div>
+
+                                    <input
+
+                                      type="text"
+
+                                      className="form-control form-control-sm"
+
+                                      placeholder={`Enter value for ${variable.placeholder} (required)`}
+
+                                      value={variable.value}
+
+                                      onChange={(e) => {
+
+                                        const variables = editForm.variables || [];
+
+                                        const updatedVariables = variables.map(v =>
+
+                                          v.id === variable.id ? { ...v, value: e.target.value } : v
+
+                                        );
+
+                                        setEditForm({ ...editForm, variables: updatedVariables });
+
+                                      }}
+
+                                      style={{
+
+                                        border: variable.value ? '1px solid #ced4da' : '1px solid #dc3545',
+
+                                        borderRadius: '4px'
+
+                                      }}
+
+                                    />
+
+                                  </div>
+
+                                ))}
+
+                              </div>
+
+                            )}
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Footer Section */}
+
+                        {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && (
+
+                          <div className="mb-4">
+
+                            <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                              Footer <span className="text-muted">(Optional)</span>
+
+                            </label>
+
+                            <input
+
+                              type="text"
+
+                              className="form-control"
+
+                              placeholder="Enter footer text"
+
+                              value={editForm.footerText}
+
+                              onChange={(e) => setEditForm({ ...editForm, footerText: e.target.value })}
+
+                              maxLength={60}
 
                               style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
 
@@ -5466,77 +4703,1787 @@ const WhatsAppTemplate = () => {
 
                               <small className="text-muted" style={{ fontSize: '12px' }}>
 
-                                {editForm.carouselMessage.length} / 1024
+                                Footer text appears at the bottom of your message in a smaller font.
 
                               </small>
 
-                              <button
+                              <small className="text-muted" style={{ fontSize: '12px' }}>
 
-                                type="button"
+                                {editForm.footerText.length}/60
 
-                                className="btn btn-outline-secondary btn-sm"
-
-                                onClick={addCarouselVariable}
-
-                                style={{ fontSize: '12px' }}
-
-                              >
-
-                                + Add Variable
-
-                              </button>
+                              </small>
 
                             </div>
 
-                            <small className="text-muted" style={{ fontSize: '11px' }}>
+                          </div>
 
-                              Variables allow dynamic content in your template
+                        )}
 
-                            </small>
+
+
+                        {/* Buttons Section */}
+
+                        {editForm.templateType !== 'Carousel' && editForm.templateType !== 'Authentication' && editForm.templateType !== 'Order details' && editForm.templateType !== 'Order Status' && (
+
+                          <div className="mb-4">
+
+                            <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                              Buttons <span className="text-muted">(Optional)</span>
+
+                            </label>
+
+
+
+                            {/* Catalog Template Special Handling */}
+
+                            {editForm.templateType === 'Catalog' && (
+
+                              <div className="mb-3 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
+
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+
+                                  <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
+
+                                    Catalog templates automatically include a 'View catalog' button.
+
+                                  </small>
+
+                                  <button
+
+                                    type="button"
+
+                                    className="btn btn-outline-danger btn-sm"
+
+                                    disabled
+
+                                    style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
+
+
+
+                                  >
+
+                                    🗑️
+
+                                  </button>
+
+                                </div>
+
+                                <div className="row">
+
+                                  <div className="col-md-6">
+
+                                    <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button text</label>
+
+                                    <input
+
+                                      type="text"
+
+                                      className="form-control form-control-sm"
+
+                                      placeholder="View catalog"
+
+                                      value="View catalog"
+
+                                      readOnly
+
+                                      style={{ backgroundColor: '#e9ecef' }}
+
+                                    />
+
+                                  </div>
+
+                                </div>
+
+                              </div>
+
+                            )}
+
+
+
+                            {/* Regular Button Management */}
+
+                            {editForm.templateType !== 'Catalog' && (
+
+                              <div className="d-flex align-items-center">
+
+                                {(editForm.buttons || []).length < 10 && (
+
+                                  <div className="dropdown me-2">
+
+                                    <button
+
+                                      className="btn btn-outline-primary btn-sm dropdown-toggle"
+
+                                      type="button"
+
+                                      id="buttonDropdown"
+
+                                      data-bs-toggle="dropdown"
+
+                                      aria-expanded="false"
+
+                                      style={{ fontSize: '12px' }}
+
+                                    >
+
+                                      + Add button
+
+                                    </button>
+
+                                    <ul className="dropdown-menu" aria-labelledby="buttonDropdown" style={{ minWidth: '250px' }}>
+
+                                      <li>
+
+                                        <button
+
+                                          className="dropdown-item px-3 py-2"
+
+                                          type="button"
+
+                                          onClick={() => addButton('QUICK_REPLY')}
+
+                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                        >
+
+                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Quick reply buttons</div>
+
+                                          <small className="text-muted" style={{ fontSize: '12px' }}>Custom response</small>
+
+                                        </button>
+
+                                      </li>
+
+                                      <li><hr className="dropdown-divider" /></li>
+
+                                      <li>
+
+                                        <button
+
+                                          className="dropdown-item px-3 py-2"
+
+                                          type="button"
+
+                                          onClick={() => addButton('CALL_TO_ACTION')}
+
+                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                        >
+
+                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Call-to-action buttons</div>
+
+                                          <small className="text-muted" style={{ fontSize: '12px' }}>Visit website</small>
+
+                                        </button>
+
+                                      </li>
+
+                                      <li><hr className="dropdown-divider" /></li>
+
+                                      <li>
+
+                                        <button
+
+                                          className="dropdown-item px-3 py-2"
+
+                                          type="button"
+
+                                          onClick={() => addButton('PHONE_NUMBER')}
+
+                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                        >
+
+                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Call Phone Number</div>
+
+                                          <small className="text-muted" style={{ fontSize: '12px' }}>Call us</small>
+
+                                        </button>
+
+                                      </li>
+
+                                      <li><hr className="dropdown-divider" /></li>
+
+                                      <li>
+
+                                        <button
+
+                                          className="dropdown-item px-3 py-2"
+
+                                          type="button"
+
+                                          onClick={() => addButton('COPY_CODE')}
+
+                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                        >
+
+                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Copy offer code</div>
+
+                                          <small className="text-muted" style={{ fontSize: '12px' }}>Copy code</small>
+
+                                        </button>
+
+                                      </li>
+
+                                    </ul>
+
+                                  </div>
+
+                                )}
+
+                                <small className="text-muted" style={{ fontSize: '12px' }}>
+
+                                  Create buttons that let customers respond to your message or take action. You can add up to ten buttons. If you add more than three buttons, they will appear in a list.
+
+                                </small>
+
+                              </div>
+
+                            )}
+
+
+
+                            {/* Button Configuration Forms */}
+
+                            {editForm.buttons && editForm.buttons.length > 0 && (
+
+                              <div className="mt-4">
+
+                                {editForm.buttons.map((button, index) => (
+
+                                  <div key={index} className="border rounded p-4 mb-3" style={{
+
+                                    backgroundColor: '#ffffff',
+
+                                    border: '1px solid #e9ecef',
+
+                                    borderRadius: '8px'
+
+                                  }}>
+
+                                    <div className="d-flex justify-content-between align-items-center mb-3">
+
+                                      <h6 className="fw-medium mb-0" style={{
+
+                                        fontSize: '14px',
+
+                                        color: '#495057',
+
+                                        fontWeight: '600'
+
+                                      }}>
+
+                                        {button.type === 'CALL_TO_ACTION' ? 'Call-to-action buttons' :
+
+                                          button.type === 'PHONE_NUMBER' ? 'Call Phone Number' :
+
+                                            button.type === 'COPY_CODE' ? 'Copy offer code' :
+
+                                              'Quick reply buttons'}
+
+                                      </h6>
+
+                                      <button
+
+                                        type="button"
+
+                                        className="btn btn-outline-danger btn-sm"
+
+                                        onClick={() => removeButton(index)}
+
+                                        style={{
+
+                                          width: '28px',
+
+                                          height: '28px',
+
+                                          padding: '0',
+
+                                          fontSize: '14px',
+
+                                          border: '1px solid #dc3545',
+
+                                          borderRadius: '4px',
+
+                                          display: 'flex',
+
+                                          alignItems: 'center',
+
+                                          justifyContent: 'center'
+
+                                        }}
+
+                                      >
+
+                                        🗑️
+
+                                      </button>
+
+                                    </div>
+
+
+
+                                    {/* Button Text Field */}
+
+                                    <div className="mb-3">
+
+                                      <div className="d-flex justify-content-between align-items-center mb-2">
+
+                                        <label className="form-label fw-medium mb-0" style={{
+
+                                          fontSize: '13px',
+
+                                          color: '#495057'
+
+                                        }}>
+
+                                          Button text
+
+                                        </label>
+
+                                        <small className="text-muted" style={{ fontSize: '11px' }}>
+
+                                          {button.text.length} / 25
+
+                                        </small>
+
+                                      </div>
+
+                                      <input
+
+                                        type="text"
+
+                                        className="form-control"
+
+                                        placeholder="Button text"
+
+                                        value={button.text}
+
+                                        onChange={(e) => updateButton(index, 'text', e.target.value)}
+
+                                        maxLength={25}
+
+                                        style={{
+
+                                          fontSize: '13px',
+
+                                          border: '1px solid #ced4da',
+
+                                          borderRadius: '6px',
+
+                                          padding: '8px 12px'
+
+                                        }}
+
+                                      />
+
+                                    </div>
+
+
+
+                                    {/* Additional Fields based on button type */}
+
+                                    {button.type === 'CALL_TO_ACTION' && (
+
+                                      <div className="mb-2">
+
+                                        <label className="form-label fw-medium mb-2" style={{
+
+                                          fontSize: '13px',
+
+                                          color: '#495057'
+
+                                        }}>
+
+                                          Website URL
+
+                                        </label>
+
+                                        <input
+
+                                          type="url"
+
+                                          className="form-control"
+
+                                          placeholder="https://example.com"
+
+                                          value={button.url || ''}
+
+                                          onChange={(e) => updateButton(index, 'url', e.target.value)}
+
+                                          style={{
+
+                                            fontSize: '13px',
+
+                                            border: '1px solid #ced4da',
+
+                                            borderRadius: '6px',
+
+                                            padding: '8px 12px'
+
+                                          }}
+
+                                        />
+
+                                      </div>
+
+                                    )}
+
+
+
+                                    {button.type === 'PHONE_NUMBER' && (
+
+                                      <div className="mb-2">
+
+                                        <label className="form-label fw-medium mb-2" style={{
+
+                                          fontSize: '13px',
+
+                                          color: '#495057'
+
+                                        }}>
+
+                                          Phone number
+
+                                        </label>
+
+                                        <input
+
+                                          type="tel"
+
+                                          className="form-control"
+
+                                          placeholder="+1234567890"
+
+                                          value={button.phone_number || ''}
+
+                                          onChange={(e) => updateButton(index, 'phone_number', e.target.value)}
+
+                                          style={{
+
+                                            fontSize: '13px',
+
+                                            border: '1px solid #ced4da',
+
+                                            borderRadius: '6px',
+
+                                            padding: '8px 12px'
+
+                                          }}
+
+                                        />
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                ))}
+
+                              </div>
+
+                            )}
 
                           </div>
 
-                        </div>
-
-                      )}
+                        )}
 
 
 
-                      {/* Carousel Variables Section */}
+                        {/* Flow Configuration Section */}
 
-                      {editForm.templateType === 'Carousel' && editForm.carouselVariables && editForm.carouselVariables.length > 0 && (
+                        {editForm.templateType === 'Flows' && (
 
-                        <div className="mb-4">
+                          <div className="mb-4">
 
-                          <h6 className="fw-bold mb-3" style={{ color: '#495057', fontSize: '16px' }}>
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>Flow Configuration</h6>
 
-                            Variables in your message:
+                            <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
 
-                          </h6>
+                              Configure flow settings for flow buttons
 
-                          {editForm.carouselVariables.map((variable, index) => (
+                            </small>
 
-                            <div key={variable.id} className="mb-3">
 
-                              <div className="d-flex align-items-center mb-2">
 
-                                <label className="form-label fw-medium me-2" style={{ fontSize: '14px', minWidth: '120px' }}>
+                            <div className="row">
 
-                                  {variable.placeholder} Variable {index + 1} Value:
+                              <div className="col-md-4 mb-3">
+
+                                <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                                  Flow Id:
 
                                 </label>
+
+                                <select
+
+                                  className="form-select"
+
+                                  value={editForm.flowId}
+
+                                  onChange={(e) => setEditForm({ ...editForm, flowId: e.target.value })}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                >
+
+                                  <option value="">Select a Flow</option>
+
+                                  <option value="flow_001">Registration Flow</option>
+
+                                  <option value="flow_002">Support Flow</option>
+
+                                  <option value="flow_003">Order Flow</option>
+
+                                  <option value="flow_004">Feedback Flow</option>
+
+                                  <option value="flow_005">Survey Flow</option>
+
+                                </select>
+
+                              </div>
+
+
+
+                              <div className="col-md-4 mb-3">
+
+                                <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                                  Flow Action:
+
+                                </label>
+
+                                <select
+
+                                  className="form-select"
+
+                                  value={editForm.flowAction}
+
+                                  onChange={(e) => setEditForm({ ...editForm, flowAction: e.target.value })}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                >
+
+                                  <option value="">Select Flow Action</option>
+
+                                  <option value="navigate">Navigate</option>
+
+                                  <option value="data_exchange">Data exchange</option>
+
+                                </select>
+
+                              </div>
+
+
+
+                              <div className="col-md-4 mb-3">
+
+                                <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                                  Navigate Screen:
+
+                                </label>
+
+                                <select
+
+                                  className="form-select"
+
+                                  value={editForm.navigateScreen}
+
+                                  onChange={(e) => setEditForm({ ...editForm, navigateScreen: e.target.value })}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                >
+
+                                  <option value="">Select screen</option>
+
+                                  <option value="REGISTRATION">Registration</option>
+
+                                  <option value="SUPPORT">Support</option>
+
+                                  <option value="ORDER">Order</option>
+
+                                  <option value="FEEDBACK">Feedback</option>
+
+                                  <option value="SURVEY">Survey</option>
+
+                                  <option value="PAYMENT">Payment</option>
+
+                                  <option value="CONFIRMATION">Confirmation</option>
+
+                                </select>
+
+                              </div>
+
+                            </div>
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Authentication Configuration Section */}
+
+                        {editForm.templateType === 'Authentication' && (
+
+                          <div className="mb-4">
+
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
+
+                              Code delivery setup <span className="text-danger">*</span>
+
+                            </h6>
+
+                            <p className="text-muted mb-3" style={{ fontSize: '14px' }}>
+
+                              Choose how customers send the code from WhatsApp to your app. Edits to this section won't require review or count towards edit limits.
+
+                            </p>
+
+
+
+                            <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
+
+                              <div className="form-check mb-3">
+
+                                <input
+
+                                  className="form-check-input"
+
+                                  type="radio"
+
+                                  name="codeDeliveryMethod"
+
+                                  id="copyCode"
+
+                                  value="copy_code"
+
+                                  checked={editForm.codeDeliveryMethod === 'copy_code'}
+
+                                  onChange={(e) => setEditForm({ ...editForm, codeDeliveryMethod: e.target.value })}
+
+                                  style={{ marginTop: '0.25rem' }}
+
+                                />
+
+                                <label className="form-check-label" htmlFor="copyCode" style={{ fontSize: '14px' }}>
+
+                                  <div className="fw-medium">Copy code</div>
+
+                                  <small className="text-muted d-block" style={{ fontSize: '12px' }}>
+
+                                    Basic authentication with quick setup. Your customers copy and paste the code into your app.
+
+                                  </small>
+
+                                </label>
+
+                              </div>
+
+
+
+
+
+                            </div>
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Carousel Message Section */}
+
+                        {editForm.templateType === 'Carousel' && (
+
+                          <div className="mb-4">
+
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
+
+                              Carousel Message <span className="text-danger">*</span>
+
+                            </h6>
+
+                            <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
+
+                              Main message above carousel cards (required)
+
+                            </small>
+
+
+
+                            <div className="mb-3">
+
+                              <textarea
+
+                                className="form-control"
+
+                                placeholder="Enter your message content here..."
+
+                                rows={4}
+
+                                value={editForm.carouselMessage}
+
+                                onChange={(e) => setEditForm({ ...editForm, carouselMessage: e.target.value })}
+
+                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                              />
+
+                              <div className="d-flex justify-content-between align-items-center mt-2">
+
+                                <small className="text-muted" style={{ fontSize: '12px' }}>
+
+                                  {editForm.carouselMessage.length} / 1024
+
+                                </small>
 
                                 <button
 
                                   type="button"
 
-                                  className="btn btn-outline-danger btn-sm ms-auto"
+                                  className="btn btn-outline-secondary btn-sm"
 
-                                  onClick={() => removeCarouselVariable(variable.id)}
+                                  onClick={addCarouselVariable}
+
+                                  style={{ fontSize: '12px' }}
+
+                                >
+
+                                  + Add Variable
+
+                                </button>
+
+                              </div>
+
+                              <small className="text-muted" style={{ fontSize: '11px' }}>
+
+                                Variables allow dynamic content in your template
+
+                              </small>
+
+                            </div>
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Carousel Variables Section */}
+
+                        {editForm.templateType === 'Carousel' && editForm.carouselVariables && editForm.carouselVariables.length > 0 && (
+
+                          <div className="mb-4">
+
+                            <h6 className="fw-bold mb-3" style={{ color: '#495057', fontSize: '16px' }}>
+
+                              Variables in your message:
+
+                            </h6>
+
+                            {editForm.carouselVariables.map((variable, index) => (
+
+                              <div key={variable.id} className="mb-3">
+
+                                <div className="d-flex align-items-center mb-2">
+
+                                  <label className="form-label fw-medium me-2" style={{ fontSize: '14px', minWidth: '120px' }}>
+
+                                    {variable.placeholder} Variable {index + 1} Value:
+
+                                  </label>
+
+                                  <button
+
+                                    type="button"
+
+                                    className="btn btn-outline-danger btn-sm ms-auto"
+
+                                    onClick={() => removeCarouselVariable(variable.id)}
+
+                                    style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
+
+                                    title="Remove variable"
+
+                                  >
+
+                                    🗑️
+
+                                  </button>
+
+                                </div>
+
+                                <input
+
+                                  type="text"
+
+                                  className="form-control"
+
+                                  placeholder={`Enter value for ${variable.placeholder} (required)`}
+
+                                  value={variable.value}
+
+                                  onChange={(e) => updateCarouselVariable(variable.id, e.target.value)}
+
+                                  style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                                />
+
+                              </div>
+
+                            ))}
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Carousel Cards Section */}
+
+                        {editForm.templateType === 'Carousel' && (
+
+                          <div className="mb-4">
+
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
+
+                              Carousel Cards <span className="text-danger">*</span>
+
+                            </h6>
+
+                            <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
+
+                              Create multiple cards that customers can swipe through. All cards must have the same type of header and include body text.
+
+                            </small>
+
+
+
+                            {/* Carousel Header Type Selection */}
+
+                            <div className="mb-3">
+
+                              <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                                Carousel Header Type <span className="text-danger">*</span>
+
+                              </label>
+
+                              <select
+
+                                className="form-select"
+
+                                value={editForm.carouselHeaderType}
+
+                                onChange={(e) => setEditForm({ ...editForm, carouselHeaderType: e.target.value })}
+
+                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                              >
+
+                                <option value="">Select header type for all cards</option>
+
+                                <option value="IMAGE">Image Header</option>
+
+                                <option value="VIDEO">Video Header</option>
+
+                              </select>
+
+                              <small className="text-muted" style={{ fontSize: '12px' }}>
+
+                                Required for all cards
+
+                              </small>
+
+                            </div>
+
+
+
+                            {/* Carousel Cards Container */}
+
+                            <div className="border rounded p-3" style={{
+
+                              backgroundColor: '#f8f9fa',
+
+                              minHeight: '200px',
+
+                              border: '2px dashed #ced4da'
+
+                            }}>
+
+                              {!editForm.carouselHeaderType ? (
+
+                                <div className="text-center text-muted py-4">
+
+                                  <div className="mb-2">
+
+                                    <i className="fas fa-images" style={{ fontSize: '2rem', opacity: 0.5 }}></i>
+
+                                  </div>
+
+                                  <div className="fw-medium mb-1">Select header type first</div>
+
+                                  <small>Choose whether all cards will have image or video headers</small>
+
+                                </div>
+
+                              ) : (
+
+                                <div>
+
+                                  <div className="d-flex justify-content-between align-items-center mb-3">
+
+                                    <span className="fw-medium" style={{ fontSize: '14px' }}>
+
+                                      {(editForm.carouselCards || []).length} of 10 cards
+
+                                    </span>
+
+                                    <button
+
+                                      type="button"
+
+                                      className="btn btn-outline-primary btn-sm"
+
+                                      onClick={() => {
+
+                                        const carouselCards = editForm.carouselCards || [];
+
+                                        if (carouselCards.length < 10) {
+
+                                          const newCard = {
+
+                                            id: Date.now(),
+
+                                            headerImage: '',
+
+                                            bodyText: '',
+
+                                            buttons: [],
+
+                                            variables: []
+
+                                          };
+
+                                          setEditForm({
+
+                                            ...editForm,
+
+                                            carouselCards: [...carouselCards, newCard]
+
+                                          });
+
+                                        }
+
+                                      }}
+
+                                      disabled={(editForm.carouselCards || []).length >= 10}
+
+                                      style={{ fontSize: '12px' }}
+
+                                    >
+
+                                      + Add Card
+
+                                    </button>
+
+                                  </div>
+
+
+
+                                  {(editForm.carouselCards || []).length === 0 ? (
+
+                                    <div className="text-center text-muted py-4">
+
+                                      <div className="mb-2">
+
+                                        <i className="fas fa-plus-circle" style={{ fontSize: '2rem', opacity: 0.5 }}></i>
+
+                                      </div>
+
+                                      <div className="fw-medium mb-1">No cards added yet</div>
+
+                                      <small>Click "Add Card" to create your first carousel card</small>
+
+                                    </div>
+
+                                  ) : (
+
+                                    <div className="row">
+
+                                      {editForm.carouselCards && editForm.carouselCards.map((card, index) => (
+
+                                        <div key={card.id} className="col-12 mb-3">
+
+                                          <div className="card border" style={{ backgroundColor: 'white' }}>
+
+                                            <div className="card-header d-flex justify-content-between align-items-center">
+
+                                              <span className="fw-medium" style={{ fontSize: '14px' }}>
+
+                                                Card {index + 1}
+
+                                              </span>
+
+                                              <button
+
+                                                type="button"
+
+                                                className="btn btn-outline-danger btn-sm"
+
+                                                onClick={() => {
+
+                                                  const carouselCards = editForm.carouselCards || [];
+
+                                                  setEditForm({
+
+                                                    ...editForm,
+
+                                                    carouselCards: carouselCards.filter(c => c.id !== card.id)
+
+                                                  });
+
+                                                }}
+
+                                                style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
+
+                                              >
+
+                                                ×
+
+                                              </button>
+
+                                            </div>
+
+                                            <div className="card-body p-3">
+
+                                              <div className="mb-2">
+
+                                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
+
+                                                  {editForm.carouselHeaderType === 'IMAGE' ? 'Image' : 'Video'}
+
+                                                </label>
+
+                                                <div className="d-flex align-items-center gap-2">
+
+                                                  <button
+
+                                                    type="button"
+
+                                                    className="btn btn-outline-primary btn-sm"
+
+                                                    style={{ fontSize: '12px' }}
+
+                                                    onClick={() => {
+
+                                                      const input = document.createElement('input');
+
+                                                      input.type = 'file';
+
+                                                      input.accept = editForm.carouselHeaderType === 'IMAGE' ? 'image/*' : 'video/*';
+
+                                                      input.onchange = (e) => {
+
+                                                        const file = e.target.files[0];
+
+                                                        if (file) {
+
+                                                          const reader = new FileReader();
+
+                                                          reader.onload = (event) => {
+
+                                                            const carouselCards = editForm.carouselCards || [];
+
+                                                            const updatedCards = carouselCards.map(c =>
+
+                                                              c.id === card.id ? { ...c, headerImage: event.target.result } : c
+
+                                                            );
+
+                                                            setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                          };
+
+                                                          reader.readAsDataURL(file);
+
+                                                        }
+
+                                                      };
+
+                                                      input.click();
+
+                                                    }}
+
+                                                  >
+
+                                                    <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'} me-1`}></i>
+
+                                                    Upload {editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}
+
+                                                  </button>
+
+                                                  {(card.headerImage || card.headerVideo) && (
+
+                                                    <span className="text-success" style={{ fontSize: '12px' }}>
+
+                                                      <i className="fas fa-check-circle me-1"></i>
+
+                                                      {editForm.carouselHeaderType === 'IMAGE' ? 'Image' : 'Video'} uploaded
+
+                                                    </span>
+
+                                                  )}
+
+                                                </div>
+
+                                                {(card.headerImage || card.headerVideo) && (
+
+                                                  <div className="mt-2">
+
+                                                    <div className="mb-2">
+
+                                                      <small className="text-muted d-block mb-1">Preview:</small>
+
+                                                      {editForm.carouselHeaderType === 'IMAGE' ? (
+
+                                                        <img
+
+                                                          src={card.headerImage}
+
+                                                          alt="Card preview"
+
+                                                          style={{
+
+                                                            maxWidth: '100%',
+
+                                                            maxHeight: '150px',
+
+                                                            objectFit: 'contain',
+
+                                                            borderRadius: '4px',
+
+                                                            border: '1px solid #dee2e6'
+
+                                                          }}
+
+                                                          onError={(e) => {
+
+                                                            e.target.style.display = 'none';
+
+                                                          }}
+
+                                                        />
+
+                                                      ) : (
+
+                                                        <video
+
+                                                          src={card.headerVideo}
+
+                                                          controls
+
+                                                          style={{
+
+                                                            maxWidth: '100%',
+
+                                                            maxHeight: '150px',
+
+                                                            borderRadius: '4px',
+
+                                                            border: '1px solid #dee2e6'
+
+                                                          }}
+
+                                                          onError={(e) => {
+
+                                                            e.target.style.display = 'none';
+
+                                                          }}
+
+                                                        />
+
+                                                      )}
+
+                                                    </div>
+
+
+
+                                                  </div>
+
+                                                )}
+
+                                              </div>
+
+                                              <div className="mb-2">
+
+                                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
+
+                                                  Body Text <span className="text-danger">*</span>
+
+                                                </label>
+
+                                                <textarea
+
+                                                  className="form-control form-control-sm"
+
+                                                  placeholder="Enter card body text"
+
+                                                  rows={2}
+
+                                                  value={card.bodyText}
+
+                                                  onChange={(e) => {
+
+                                                    const carouselCards = editForm.carouselCards || [];
+
+                                                    const updatedCards = carouselCards.map(c =>
+
+                                                      c.id === card.id ? { ...c, bodyText: e.target.value } : c
+
+                                                    );
+
+                                                    setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                  }}
+
+                                                />
+
+                                                <div className="d-flex justify-content-between align-items-center mt-2">
+
+                                                  <button
+
+                                                    type="button"
+
+                                                    className="btn btn-outline-secondary btn-sm"
+
+                                                    onClick={() => {
+
+                                                      const variables = card.variables || [];
+
+                                                      const variableNumber = variables.length + 1;
+
+                                                      const newVariable = {
+
+                                                        id: Date.now(),
+
+                                                        placeholder: `{{${variableNumber}}}`,
+
+                                                        value: ''
+
+                                                      };
+
+                                                      const updatedCards = editForm.carouselCards.map(c =>
+
+                                                        c.id === card.id ? {
+
+                                                          ...c,
+
+                                                          variables: [...variables, newVariable],
+
+                                                          bodyText: c.bodyText + `{{${variableNumber}}}`
+
+                                                        } : c
+
+                                                      );
+
+                                                      setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                    }}
+
+                                                    style={{ fontSize: '12px' }}
+
+                                                  >
+
+                                                    + Add Variable
+
+                                                  </button>
+
+                                                  <small className="text-muted" style={{ fontSize: '11px' }}>
+
+                                                    Variables let you personalize each card
+
+                                                  </small>
+
+                                                </div>
+
+                                              </div>
+
+
+
+                                              {/* Variable Values Section */}
+
+                                              {card.variables && card.variables.length > 0 && (
+
+                                                <div className="mb-3">
+
+                                                  <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
+
+                                                    Variable Values
+
+                                                  </label>
+
+                                                  {card.variables.map((variable, varIndex) => (
+
+                                                    <div key={variable.id} className="mb-2">
+
+                                                      <label className="form-label fw-medium" style={{ fontSize: '11px' }}>
+
+                                                        {variable.placeholder} Variable {varIndex + 1} Value:
+
+                                                      </label>
+
+                                                      <input
+
+                                                        type="text"
+
+                                                        className="form-control form-control-sm"
+
+                                                        placeholder={`Enter value for ${variable.placeholder} (required)`}
+
+                                                        value={variable.value}
+
+                                                        onChange={(e) => {
+
+                                                          const carouselCards = editForm.carouselCards || [];
+
+                                                          const updatedCards = carouselCards.map(c =>
+
+                                                            c.id === card.id ? {
+
+                                                              ...c,
+
+                                                              variables: (c.variables || []).map(v =>
+
+                                                                v.id === variable.id ? { ...v, value: e.target.value } : v
+
+                                                              )
+
+                                                            } : c
+
+                                                          );
+
+                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                        }}
+
+                                                        style={{
+
+                                                          borderColor: !variable.value ? '#dc3545' : '#ced4da',
+
+                                                          fontSize: '12px'
+
+                                                        }}
+
+                                                      />
+
+                                                    </div>
+
+                                                  ))}
+
+                                                </div>
+
+                                              )}
+
+
+
+                                              {/* Buttons Section */}
+
+                                              <div className="mb-2">
+
+                                                <div className="d-flex justify-content-between align-items-center mb-2">
+
+                                                  <label className="form-label fw-medium mb-0" style={{ fontSize: '12px' }}>
+
+                                                    Buttons
+
+                                                  </label>
+
+                                                  <small className="text-muted" style={{ fontSize: '10px' }}>
+
+                                                    Max 2 per card
+
+                                                  </small>
+
+                                                </div>
+
+
+
+                                                {/* Add Button Dropdown */}
+
+                                                {(card.buttons || []).length < 2 && (
+
+                                                  <div className="dropdown">
+
+                                                    <button
+
+                                                      className="btn btn-outline-primary btn-sm dropdown-toggle"
+
+                                                      type="button"
+
+                                                      id={`buttonDropdown-${card.id}`}
+
+                                                      data-bs-toggle="dropdown"
+
+                                                      aria-expanded="false"
+
+                                                      style={{ fontSize: '12px' }}
+
+                                                    >
+
+                                                      + Add button
+
+                                                    </button>
+
+                                                    <ul className="dropdown-menu" aria-labelledby={`buttonDropdown-${card.id}`} style={{ minWidth: '250px' }}>
+
+                                                      <li>
+
+                                                        <button
+
+                                                          className="dropdown-item px-3 py-2"
+
+                                                          type="button"
+
+                                                          onClick={() => {
+
+                                                            const newButton = {
+
+                                                              id: Date.now(),
+
+                                                              type: 'quick_reply',
+
+                                                              text: '',
+
+                                                              url: ''
+
+                                                            };
+
+                                                            const carouselCards = editForm.carouselCards || [];
+
+                                                            const updatedCards = carouselCards.map(c =>
+
+                                                              c.id === card.id ? { ...c, buttons: [...(c.buttons || []), newButton] } : c
+
+                                                            );
+
+                                                            setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                          }}
+
+                                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                                        >
+
+                                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Quick reply buttons</div>
+
+                                                          <small className="text-muted" style={{ fontSize: '12px' }}>Custom response</small>
+
+                                                        </button>
+
+                                                      </li>
+
+                                                      <li><hr className="dropdown-divider" /></li>
+
+                                                      <li>
+
+                                                        <button
+
+                                                          className="dropdown-item px-3 py-2"
+
+                                                          type="button"
+
+                                                          onClick={() => {
+
+                                                            const newButton = {
+
+                                                              id: Date.now(),
+
+                                                              type: 'call_to_action',
+
+                                                              text: '',
+
+                                                              url: ''
+
+                                                            };
+
+                                                            const carouselCards = editForm.carouselCards || [];
+
+                                                            const updatedCards = carouselCards.map(c =>
+
+                                                              c.id === card.id ? { ...c, buttons: [...(c.buttons || []), newButton] } : c
+
+                                                            );
+
+                                                            setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                          }}
+
+                                                          style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
+
+                                                        >
+
+                                                          <div className="fw-medium" style={{ fontSize: '14px' }}>Call-to-action buttons</div>
+
+                                                          <small className="text-muted" style={{ fontSize: '12px' }}>Visit website</small>
+
+                                                        </button>
+
+                                                      </li>
+
+                                                    </ul>
+
+                                                  </div>
+
+                                                )}
+
+
+
+                                                {/* Button Configurations */}
+
+                                                {card.buttons && card.buttons.map((button, buttonIndex) => (
+
+                                                  <div key={button.id} className="mt-3 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
+
+                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+
+                                                      <div>
+
+                                                        <span className="fw-medium" style={{ fontSize: '12px' }}>
+
+                                                          {button.type === 'quick_reply' ? 'Quick reply buttons' : 'Call-to-action buttons'}
+
+                                                        </span>
+
+                                                        <div className="text-muted" style={{ fontSize: '11px' }}>
+
+                                                          {button.type === 'quick_reply' ? 'Quick reply.' : 'Visit website.'}
+
+                                                        </div>
+
+                                                      </div>
+
+                                                      <button
+
+                                                        type="button"
+
+                                                        className="btn btn-outline-danger btn-sm"
+
+                                                        onClick={() => {
+
+                                                          const carouselCards = editForm.carouselCards || [];
+
+                                                          const updatedCards = carouselCards.map(c =>
+
+                                                            c.id === card.id ? { ...c, buttons: (c.buttons || []).filter(b => b.id !== button.id) } : c
+
+                                                          );
+
+                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                        }}
+
+                                                        style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
+
+                                                      >
+
+                                                        <i className="fas fa-trash"></i>
+
+                                                      </button>
+
+                                                    </div>
+
+
+
+                                                    <div className="mb-2">
+
+                                                      <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
+
+                                                        Button text
+
+                                                      </label>
+
+                                                      <div className="d-flex justify-content-between align-items-center">
+
+                                                        <input
+
+                                                          type="text"
+
+                                                          className="form-control form-control-sm"
+
+                                                          placeholder="Button text"
+
+                                                          value={button.text}
+
+                                                          onChange={(e) => {
+
+                                                            const carouselCards = editForm.carouselCards || [];
+
+                                                            const updatedCards = carouselCards.map(c =>
+
+                                                              c.id === card.id ? {
+
+                                                                ...c,
+
+                                                                buttons: (c.buttons || []).map(b =>
+
+                                                                  b.id === button.id ? { ...b, text: e.target.value } : b
+
+                                                                )
+
+                                                              } : c
+
+                                                            );
+
+                                                            setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                          }}
+
+                                                          style={{ flex: 1, marginRight: '10px' }}
+
+                                                        />
+
+                                                        <small className="text-muted" style={{ fontSize: '10px', minWidth: '50px' }}>
+
+                                                          {button.text.length} / 25
+
+                                                        </small>
+
+                                                      </div>
+
+                                                    </div>
+
+
+
+                                                    {button.type === 'call_to_action' && (
+
+                                                      <div className="mb-2">
+
+                                                        <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
+
+                                                          Website URL
+
+                                                        </label>
+
+                                                        <input
+
+                                                          type="url"
+
+                                                          className="form-control form-control-sm"
+
+                                                          placeholder="https://example.com"
+
+                                                          value={button.url}
+
+                                                          onChange={(e) => {
+
+                                                            const carouselCards = editForm.carouselCards || [];
+
+                                                            const updatedCards = carouselCards.map(c =>
+
+                                                              c.id === card.id ? {
+
+                                                                ...c,
+
+                                                                buttons: (c.buttons || []).map(b =>
+
+                                                                  b.id === button.id ? { ...b, url: e.target.value } : b
+
+                                                                )
+
+                                                              } : c
+
+                                                            );
+
+                                                            setEditForm({ ...editForm, carouselCards: updatedCards });
+
+                                                          }}
+
+                                                        />
+
+                                                      </div>
+
+                                                    )}
+
+                                                  </div>
+
+                                                ))}
+
+                                              </div>
+
+                                            </div>
+
+                                          </div>
+
+                                        </div>
+
+                                      ))}
+
+                                    </div>
+
+                                  )}
+
+                                </div>
+
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        )}
+
+
+
+                        {/* Order Details Section */}
+
+                        {editForm.templateType === 'Order details' && (
+
+                          <div className="mb-4">
+
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
+
+                              Order Details Configuration
+
+                            </h6>
+
+                            <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
+
+                              Order details templates automatically include a 'Review and Pay' button.
+
+                            </small>
+
+
+
+                            <div className="border rounded p-3" disabled style={{ backgroundColor: '#f8f9fa' }}>
+
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+
+                                <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
+
+                                  Review and Pay Button
+
+                                </small>
+
+                                <button
+
+                                  type="button"
+
+                                  className="btn btn-outline-danger btn-sm"
+
+                                  disabled
 
                                   style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
 
-                                  title="Remove variable"
+                                  title="Remove order details button"
 
                                 >
 
@@ -5546,997 +6493,153 @@ const WhatsAppTemplate = () => {
 
                               </div>
 
-                              <input
+                              <div className="row">
 
-                                type="text"
+                                <div className="col-md-6">
 
-                                className="form-control"
+                                  <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button text</label>
 
-                                placeholder={`Enter value for ${variable.placeholder} (required)`}
+                                  <input
 
-                                value={variable.value}
+                                    type="text"
 
-                                onChange={(e) => updateCarouselVariable(variable.id, e.target.value)}
+                                    className="form-control form-control-sm"
 
-                                style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+                                    placeholder="Review and Pay"
 
-                              />
+                                    disabled
+
+                                    value={editForm.orderButtonText}
+
+                                  />
+
+                                </div>
+
+                              </div>
 
                             </div>
 
-                          ))}
+                          </div>
 
-                        </div>
-
-                      )}
+                        )}
 
 
 
-                      {/* Carousel Cards Section */}
+                        {/* Order Status Section */}
 
-                      {editForm.templateType === 'Carousel' && (
+                        {false && editForm.templateType === 'Order Status' && (
 
-                        <div className="mb-4">
+                          <div className="mb-4">
 
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
+                            <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
 
-                            Carousel Cards <span className="text-danger">*</span>
+                              Order Status Configuration
 
-                          </h6>
+                            </h6>
 
-                          <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
+                            <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
 
-                            Create multiple cards that customers can swipe through. All cards must have the same type of header and include body text.
-
-                          </small>
-
-                          
-                          
-                          {/* Carousel Header Type Selection */}
-
-                          <div className="mb-3">
-
-                            <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
-
-                              Carousel Header Type <span className="text-danger">*</span>
-
-                            </label>
-
-                            <select
-
-                              className="form-select"
-
-                              value={editForm.carouselHeaderType}
-
-                              onChange={(e) => setEditForm({ ...editForm, carouselHeaderType: e.target.value })}
-
-                              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
-
-                            >
-
-                              <option value="">Select header type for all cards</option>
-
-                              <option value="IMAGE">Image Header</option>
-
-                              <option value="VIDEO">Video Header</option>
-
-                            </select>
-
-                            <small className="text-muted" style={{ fontSize: '12px' }}>
-
-                              Required for all cards
+                              Order status templates automatically include 'Track Order' and 'Cancel Order' buttons.
 
                             </small>
 
-                          </div>
 
 
+                            <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
 
-                          {/* Carousel Cards Container */}
+                              <div className="d-flex justify-content-between align-items-center mb-2">
 
-                          <div className="border rounded p-3" style={{ 
+                                <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
 
-                            backgroundColor: '#f8f9fa',
+                                  Order Status Buttons
 
-                            minHeight: '200px',
+                                </small>
 
-                            border: '2px dashed #ced4da'
+                                <button
 
-                          }}>
+                                  type="button"
 
-                            {!editForm.carouselHeaderType ? (
+                                  className="btn btn-outline-danger btn-sm"
 
-                              <div className="text-center text-muted py-4">
+                                  onClick={() => {
 
-                                <div className="mb-2">
+                                    setEditForm({ ...editForm, templateType: 'Custom' });
 
-                                  <i className="fas fa-images" style={{ fontSize: '2rem', opacity: 0.5 }}></i>
+                                  }}
 
-                                </div>
+                                  style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
 
-                                <div className="fw-medium mb-1">Select header type first</div>
+                                  title="Remove order status buttons"
 
-                                <small>Choose whether all cards will have image or video headers</small>
+                                >
+
+                                  🗑️
+
+                                </button>
 
                               </div>
 
-                            ) : (
+                              <div className="row">
 
-                              <div>
+                                <div className="col-md-6 mb-2">
 
-                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                  <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button 1</label>
 
-                                  <span className="fw-medium" style={{ fontSize: '14px' }}>
+                                  <input
 
-                                    {(editForm.carouselCards || []).length} of 10 cards
+                                    type="text"
 
-                                  </span>
+                                    className="form-control form-control-sm"
 
-                                  <button
+                                    placeholder="Track Order"
 
-                                    type="button"
+                                    value={editForm.orderStatusButtons[0] || 'Track Order'}
 
-                                    className="btn btn-outline-primary btn-sm"
+                                    onChange={(e) => {
 
-                                    onClick={() => {
+                                      const orderStatusButtons = editForm.orderStatusButtons || ['Track Order', 'Cancel Order'];
 
-                                      const carouselCards = editForm.carouselCards || [];
+                                      const newButtons = [...orderStatusButtons];
 
-                                      if (carouselCards.length < 10) {
+                                      newButtons[0] = e.target.value;
 
-                                        const newCard = {
-
-                                          id: Date.now(),
-
-                                          headerImage: '',
-
-                                          bodyText: '',
-
-                                          buttons: [],
-
-                                          variables: []
-
-                                        };
-
-                                        setEditForm({
-
-                                          ...editForm,
-
-                                          carouselCards: [...carouselCards, newCard]
-
-                                        });
-
-                                      }
+                                      setEditForm({ ...editForm, orderStatusButtons: newButtons });
 
                                     }}
 
-                                    disabled={(editForm.carouselCards || []).length >= 10}
-
-                                    style={{ fontSize: '12px' }}
-
-                                  >
-
-                                    + Add Card
-
-                                  </button>
+                                  />
 
                                 </div>
 
+                                <div className="col-md-6 mb-2">
 
+                                  <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button 2</label>
 
-                                {(editForm.carouselCards || []).length === 0 ? (
+                                  <input
 
-                                  <div className="text-center text-muted py-4">
+                                    type="text"
 
-                                    <div className="mb-2">
+                                    className="form-control form-control-sm"
 
-                                      <i className="fas fa-plus-circle" style={{ fontSize: '2rem', opacity: 0.5 }}></i>
+                                    placeholder="Cancel Order"
 
-                                    </div>
+                                    value={editForm.orderStatusButtons[1] || 'Cancel Order'}
 
-                                    <div className="fw-medium mb-1">No cards added yet</div>
+                                    onChange={(e) => {
 
-                                    <small>Click "Add Card" to create your first carousel card</small>
+                                      const orderStatusButtons = editForm.orderStatusButtons || ['Track Order', 'Cancel Order'];
 
-                                  </div>
+                                      const newButtons = [...orderStatusButtons];
 
-                                ) : (
+                                      newButtons[1] = e.target.value;
 
-                                  <div className="row">
+                                      setEditForm({ ...editForm, orderStatusButtons: newButtons });
 
-                                    {editForm.carouselCards && editForm.carouselCards.map((card, index) => (
+                                    }}
 
-                                      <div key={card.id} className="col-12 mb-3">
+                                  />
 
-                                        <div className="card border" style={{ backgroundColor: 'white' }}>
-
-                                          <div className="card-header d-flex justify-content-between align-items-center">
-
-                                            <span className="fw-medium" style={{ fontSize: '14px' }}>
-
-                                              Card {index + 1}
-
-                                            </span>
-
-                                            <button
-
-                                              type="button"
-
-                                              className="btn btn-outline-danger btn-sm"
-
-                                              onClick={() => {
-
-                                                const carouselCards = editForm.carouselCards || [];
-
-                                                setEditForm({
-
-                                                  ...editForm,
-
-                                                  carouselCards: carouselCards.filter(c => c.id !== card.id)
-
-                                                });
-
-                                              }}
-
-                                              style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
-
-                                            >
-
-                                              ×
-
-                                            </button>
-
-                                          </div>
-
-                                          <div className="card-body p-3">
-
-                                            <div className="mb-2">
-
-                                              <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
-
-                                                {editForm.carouselHeaderType === 'IMAGE' ? 'Image' : 'Video'}
-
-                                              </label>
-
-                                              <div className="d-flex align-items-center gap-2">
-
-                                                <button
-
-                                                  type="button"
-
-                                                  className="btn btn-outline-primary btn-sm"
-
-                                                  style={{ fontSize: '12px' }}
-
-                                                  onClick={() => {
-
-                                                    const input = document.createElement('input');
-
-                                                    input.type = 'file';
-
-                                                    input.accept = editForm.carouselHeaderType === 'IMAGE' ? 'image/*' : 'video/*';
-
-                                                    input.onchange = (e) => {
-
-                                                      const file = e.target.files[0];
-
-                                                      if (file) {
-
-                                                        const reader = new FileReader();
-
-                                                        reader.onload = (event) => {
-
-                                                        const carouselCards = editForm.carouselCards || [];
-
-                                                        const updatedCards = carouselCards.map(c => 
-
-                                                          c.id === card.id ? { ...c, headerImage: event.target.result } : c
-
-                                                        );
-
-                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                        };
-
-                                                        reader.readAsDataURL(file);
-
-                                                      }
-
-                                                    };
-
-                                                    input.click();
-
-                                                  }}
-
-                                                >
-
-                                                  <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'} me-1`}></i>
-
-                                                  Upload {editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}
-
-                                                </button>
-
-                                                {(card.headerImage || card.headerVideo) && (
-
-                                                  <span className="text-success" style={{ fontSize: '12px' }}>
-
-                                                    <i className="fas fa-check-circle me-1"></i>
-
-                                                    {editForm.carouselHeaderType === 'IMAGE' ? 'Image' : 'Video'} uploaded
-
-                                                  </span>
-
-                                                )}
-
-                                              </div>
-
-                                              {(card.headerImage || card.headerVideo) && (
-
-                                                <div className="mt-2">
-
-                                                  <div className="mb-2">
-
-                                                    <small className="text-muted d-block mb-1">Preview:</small>
-
-                                                    {editForm.carouselHeaderType === 'IMAGE' ? (
-
-                                                      <img 
-
-                                                        src={card.headerImage} 
-
-                                                        alt="Card preview" 
-
-                                                        style={{ 
-
-                                                          maxWidth: '100%', 
-
-                                                          maxHeight: '150px', 
-
-                                                          objectFit: 'contain',
-
-                                                          borderRadius: '4px',
-
-                                                          border: '1px solid #dee2e6'
-
-                                                        }}
-
-                                                        onError={(e) => {
-
-                                                          e.target.style.display = 'none';
-
-                                                        }}
-
-                                                      />
-
-                                                    ) : (
-
-                                                      <video 
-
-                                                        src={card.headerVideo} 
-
-                                                        controls
-
-                                                        style={{ 
-
-                                                          maxWidth: '100%', 
-
-                                                          maxHeight: '150px', 
-
-                                                          borderRadius: '4px',
-
-                                                          border: '1px solid #dee2e6'
-
-                                                        }}
-
-                                                        onError={(e) => {
-
-                                                          e.target.style.display = 'none';
-
-                                                        }}
-
-                                                      />
-
-                                                    )}
-
-                                                  </div>
-                                                  
-                                                  
-                                                  
-                                                </div>
-
-                                              )}
-
-                                            </div>
-
-                                            <div className="mb-2">
-
-                                              <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
-
-                                                Body Text <span className="text-danger">*</span>
-
-                                              </label>
-
-                                              <textarea
-
-                                                className="form-control form-control-sm"
-
-                                                placeholder="Enter card body text"
-
-                                                rows={2}
-
-                                                value={card.bodyText}
-
-                                                onChange={(e) => {
-
-                                                  const carouselCards = editForm.carouselCards || [];
-
-                                                  const updatedCards = carouselCards.map(c => 
-
-                                                    c.id === card.id ? { ...c, bodyText: e.target.value } : c
-
-                                                  );
-
-                                                  setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                }}
-
-                                              />
-
-                                              <div className="d-flex justify-content-between align-items-center mt-2">
-
-                                                <button
-
-                                                  type="button"
-
-                                                  className="btn btn-outline-secondary btn-sm"
-
-                                                  onClick={() => {
-
-                                                    const variables = card.variables || [];
-
-                                                    const variableNumber = variables.length + 1;
-
-                                                    const newVariable = {
-
-                                                      id: Date.now(),
-
-                                                      placeholder: `{{${variableNumber}}}`,
-
-                                                      value: ''
-
-                                                    };
-
-                                                    const updatedCards = editForm.carouselCards.map(c => 
-
-                                                      c.id === card.id ? { 
-
-                                                        ...c, 
-
-                                                        variables: [...variables, newVariable],
-
-                                                        bodyText: c.bodyText + `{{${variableNumber}}}`
-
-                                                      } : c
-
-                                                    );
-
-                                                    setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                  }}
-
-                                                  style={{ fontSize: '12px' }}
-
-                                                >
-
-                                                  + Add Variable
-
-                                                </button>
-
-                                                <small className="text-muted" style={{ fontSize: '11px' }}>
-
-                                                  Variables let you personalize each card
-
-                                                </small>
-
-                                              </div>
-
-                                            </div>
-
-                                            
-                                            
-                                            {/* Variable Values Section */}
-
-                                            {card.variables && card.variables.length > 0 && (
-
-                                              <div className="mb-3">
-
-                                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
-
-                                                  Variable Values
-
-                                                </label>
-
-                                                {card.variables.map((variable, varIndex) => (
-
-                                                  <div key={variable.id} className="mb-2">
-
-                                                    <label className="form-label fw-medium" style={{ fontSize: '11px' }}>
-
-                                                      {variable.placeholder} Variable {varIndex + 1} Value:
-
-                                                    </label>
-
-                                                    <input
-
-                                                      type="text"
-
-                                                      className="form-control form-control-sm"
-
-                                                      placeholder={`Enter value for ${variable.placeholder} (required)`}
-
-                                                      value={variable.value}
-
-                                                      onChange={(e) => {
-
-                                                        const carouselCards = editForm.carouselCards || [];
-
-                                                        const updatedCards = carouselCards.map(c => 
-
-                                                          c.id === card.id ? { 
-
-                                                            ...c, 
-
-                                                            variables: (c.variables || []).map(v => 
-
-                                                              v.id === variable.id ? { ...v, value: e.target.value } : v
-
-                                                            )
-
-                                                          } : c
-
-                                                        );
-
-                                                        setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                      }}
-
-                                                      style={{ 
-
-                                                        borderColor: !variable.value ? '#dc3545' : '#ced4da',
-
-                                                        fontSize: '12px'
-
-                                                      }}
-
-                                                    />
-
-                                                  </div>
-
-                                                ))}
-
-                                              </div>
-
-                                            )}
-
-                                            
-                                            
-                                            {/* Buttons Section */}
-
-                                            <div className="mb-2">
-
-                                              <div className="d-flex justify-content-between align-items-center mb-2">
-
-                                                <label className="form-label fw-medium mb-0" style={{ fontSize: '12px' }}>
-
-                                                  Buttons
-
-                                                </label>
-
-                                                <small className="text-muted" style={{ fontSize: '10px' }}>
-
-                                                  Max 2 per card
-
-                                                </small>
-
-                                              </div>
-
-                                              
-                                              
-                                              {/* Add Button Dropdown */}
-
-                                              {(card.buttons || []).length < 2 && (
-
-                                                <div className="dropdown">
-
-                                                  <button
-
-                                                    className="btn btn-outline-primary btn-sm dropdown-toggle"
-
-                                                    type="button"
-
-                                                    id={`buttonDropdown-${card.id}`}
-
-                                                    data-bs-toggle="dropdown"
-
-                                                    aria-expanded="false"
-
-                                                    style={{ fontSize: '12px' }}
-
-                                                  >
-
-                                                    + Add button
-
-                                                  </button>
-
-                                                  <ul className="dropdown-menu" aria-labelledby={`buttonDropdown-${card.id}`} style={{ minWidth: '250px' }}>
-
-                                                    <li>
-
-                                                      <button
-
-                                                        className="dropdown-item px-3 py-2"
-
-                                                        type="button"
-
-                                                        onClick={() => {
-
-                                                          const newButton = {
-
-                                                            id: Date.now(),
-
-                                                            type: 'quick_reply',
-
-                                                            text: '',
-
-                                                            url: ''
-
-                                                          };
-
-                                                          const carouselCards = editForm.carouselCards || [];
-
-                                                          const updatedCards = carouselCards.map(c => 
-
-                                                            c.id === card.id ? { ...c, buttons: [...(c.buttons || []), newButton] } : c
-
-                                                          );
-
-                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                        }}
-
-                                                        style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                                      >
-
-                                                        <div className="fw-medium" style={{ fontSize: '14px' }}>Quick reply buttons</div>
-
-                                                        <small className="text-muted" style={{ fontSize: '12px' }}>Custom response</small>
-
-                                                      </button>
-
-                                                    </li>
-
-                                                    <li><hr className="dropdown-divider" /></li>
-
-                                                    <li>
-
-                                                      <button
-
-                                                        className="dropdown-item px-3 py-2"
-
-                                                        type="button"
-
-                                                        onClick={() => {
-
-                                                          const newButton = {
-
-                                                            id: Date.now(),
-
-                                                            type: 'call_to_action',
-
-                                                            text: '',
-
-                                                            url: ''
-
-                                                          };
-
-                                                          const carouselCards = editForm.carouselCards || [];
-
-                                                          const updatedCards = carouselCards.map(c => 
-
-                                                            c.id === card.id ? { ...c, buttons: [...(c.buttons || []), newButton] } : c
-
-                                                          );
-
-                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                        }}
-
-                                                        style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left' }}
-
-                                                      >
-
-                                                        <div className="fw-medium" style={{ fontSize: '14px' }}>Call-to-action buttons</div>
-
-                                                        <small className="text-muted" style={{ fontSize: '12px' }}>Visit website</small>
-
-                                                      </button>
-
-                                                    </li>
-
-                                                  </ul>
-
-                                                </div>
-
-                                              )}
-
-                                              
-                                              
-                                              {/* Button Configurations */}
-
-                                              {card.buttons && card.buttons.map((button, buttonIndex) => (
-
-                                                <div key={button.id} className="mt-3 p-3 border rounded" style={{ backgroundColor: '#f8f9fa' }}>
-
-                                                  <div className="d-flex justify-content-between align-items-center mb-2">
-
-                                                    <div>
-
-                                                      <span className="fw-medium" style={{ fontSize: '12px' }}>
-
-                                                        {button.type === 'quick_reply' ? 'Quick reply buttons' : 'Call-to-action buttons'}
-
-                                                      </span>
-
-                                                      <div className="text-muted" style={{ fontSize: '11px' }}>
-
-                                                        {button.type === 'quick_reply' ? 'Quick reply.' : 'Visit website.'}
-
-                                                      </div>
-
-                                                    </div>
-
-                                                    <button
-
-                                                      type="button"
-
-                                                      className="btn btn-outline-danger btn-sm"
-
-                                                      onClick={() => {
-
-                                                        const carouselCards = editForm.carouselCards || [];
-
-                                                        const updatedCards = carouselCards.map(c => 
-
-                                                          c.id === card.id ? { ...c, buttons: (c.buttons || []).filter(b => b.id !== button.id) } : c
-
-                                                        );
-
-                                                        setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                      }}
-
-                                                      style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
-
-                                                    >
-
-                                                      <i className="fas fa-trash"></i>
-
-                                                    </button>
-
-                                                  </div>
-
-                                                  
-                                                  
-                                                  <div className="mb-2">
-
-                                                    <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
-
-                                                      Button text
-
-                                                    </label>
-
-                                                    <div className="d-flex justify-content-between align-items-center">
-
-                                                      <input
-
-                                                        type="text"
-
-                                                        className="form-control form-control-sm"
-
-                                                        placeholder="Button text"
-
-                                                        value={button.text}
-
-                                                        onChange={(e) => {
-
-                                                          const carouselCards = editForm.carouselCards || [];
-
-                                                          const updatedCards = carouselCards.map(c => 
-
-                                                            c.id === card.id ? { 
-
-                                                              ...c, 
-
-                                                              buttons: (c.buttons || []).map(b => 
-
-                                                                b.id === button.id ? { ...b, text: e.target.value } : b
-
-                                                              )
-
-                                                            } : c
-
-                                                          );
-
-                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                        }}
-
-                                                        style={{ flex: 1, marginRight: '10px' }}
-
-                                                      />
-
-                                                      <small className="text-muted" style={{ fontSize: '10px', minWidth: '50px' }}>
-
-                                                        {button.text.length} / 25
-
-                                                      </small>
-
-                                                    </div>
-
-                                                  </div>
-
-                                                  
-                                                  
-                                                  {button.type === 'call_to_action' && (
-
-                                                    <div className="mb-2">
-
-                                                      <label className="form-label fw-medium" style={{ fontSize: '12px' }}>
-
-                                                        Website URL
-
-                                                      </label>
-
-                                                      <input
-
-                                                        type="url"
-
-                                                        className="form-control form-control-sm"
-
-                                                        placeholder="https://example.com"
-
-                                                        value={button.url}
-
-                                                        onChange={(e) => {
-
-                                                          const carouselCards = editForm.carouselCards || [];
-
-                                                          const updatedCards = carouselCards.map(c => 
-
-                                                            c.id === card.id ? { 
-
-                                                              ...c, 
-
-                                                              buttons: (c.buttons || []).map(b => 
-
-                                                                b.id === button.id ? { ...b, url: e.target.value } : b
-
-                                                              )
-
-                                                            } : c
-
-                                                          );
-
-                                                          setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                        }}
-
-                                                      />
-
-                                                    </div>
-
-                                                  )}
-
-                                                </div>
-
-                                              ))}
-
-                                            </div>
-
-                                          </div>
-
-                                        </div>
-
-                                      </div>
-
-                                    ))}
-
-                                  </div>
-
-                                )}
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        </div>
-
-                      )}
-
-
-
-                      {/* Order Details Section */}
-
-                      {editForm.templateType === 'Order details' && (
-
-                        <div className="mb-4">
-
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
-
-                            Order Details Configuration
-
-                          </h6>
-
-                          <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
-
-                            Order details templates automatically include a 'Review and Pay' button.
-
-                          </small>
-
-                          
-                          
-                          <div className="border rounded p-3" disabled style={{ backgroundColor: '#f8f9fa' }}>
-
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-
-                              <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
-
-                                Review and Pay Button
-
-                              </small>
-
-                              <button
-
-                                type="button"
-
-                                className="btn btn-outline-danger btn-sm"
-
-                                disabled
-
-                                style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
-
-                                title="Remove order details button"
-
-                              >
-
-                                🗑️
-
-                              </button>
-
-                            </div>
-
-                            <div className="row">
-
-                              <div className="col-md-6">
-
-                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button text</label>
-
-                                <input
-
-                                  type="text"
-
-                                  className="form-control form-control-sm"
-
-                                  placeholder="Review and Pay"
-
-                                  disabled
-
-                                  value={editForm.orderButtonText}
-
-                                />
+                                </div>
 
                               </div>
 
@@ -6544,137 +6647,9 @@ const WhatsAppTemplate = () => {
 
                           </div>
 
-                        </div>
+                        )}
 
-                      )}
-
-
-
-                      {/* Order Status Section */}
-
-                      {false && editForm.templateType === 'Order Status' && (
-
-                        <div className="mb-4">
-
-                          <h6 className="fw-bold mb-2" style={{ color: '#495057', fontSize: '16px' }}>
-
-                            Order Status Configuration
-
-                          </h6>
-
-                          <small className="text-muted mb-3 d-block" style={{ fontSize: '12px' }}>
-
-                            Order status templates automatically include 'Track Order' and 'Cancel Order' buttons.
-
-                          </small>
-
-                          
-                          
-                          <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
-
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-
-                              <small className="text-muted fw-medium" style={{ fontSize: '12px' }}>
-
-                                Order Status Buttons
-
-                              </small>
-
-                              <button
-
-                                type="button"
-
-                                className="btn btn-outline-danger btn-sm"
-
-                                onClick={() => {
-
-                                  setEditForm({ ...editForm, templateType: 'Custom' });
-
-                                }}
-
-                                style={{ width: '24px', height: '24px', padding: '0', fontSize: '12px' }}
-
-                                title="Remove order status buttons"
-
-                              >
-
-                                🗑️
-
-                              </button>
-
-                            </div>
-
-                            <div className="row">
-
-                              <div className="col-md-6 mb-2">
-
-                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button 1</label>
-
-                                <input
-
-                                  type="text"
-
-                                  className="form-control form-control-sm"
-
-                                  placeholder="Track Order"
-
-                                  value={editForm.orderStatusButtons[0] || 'Track Order'}
-
-                                  onChange={(e) => {
-
-                                    const orderStatusButtons = editForm.orderStatusButtons || ['Track Order', 'Cancel Order'];
-
-                                    const newButtons = [...orderStatusButtons];
-
-                                    newButtons[0] = e.target.value;
-
-                                    setEditForm({ ...editForm, orderStatusButtons: newButtons });
-
-                                  }}
-
-                                />
-
-                              </div>
-
-                              <div className="col-md-6 mb-2">
-
-                                <label className="form-label fw-medium" style={{ fontSize: '12px' }}>Button 2</label>
-
-                                <input
-
-                                  type="text"
-
-                                  className="form-control form-control-sm"
-
-                                  placeholder="Cancel Order"
-
-                                  value={editForm.orderStatusButtons[1] || 'Cancel Order'}
-
-                                  onChange={(e) => {
-
-                                    const orderStatusButtons = editForm.orderStatusButtons || ['Track Order', 'Cancel Order'];
-
-                                    const newButtons = [...orderStatusButtons];
-
-                                    newButtons[1] = e.target.value;
-
-                                    setEditForm({ ...editForm, orderStatusButtons: newButtons });
-
-                                  }}
-
-                                />
-
-                              </div>
-
-                            </div>
-
-                          </div>
-
-                        </div>
-
-                      )}
-
-                    </div>
+                      </div>
 
                     )}
 
@@ -6682,8 +6657,8 @@ const WhatsAppTemplate = () => {
 
                 </div>
 
-                    
-                    
+
+
                 {/* Right Side - Preview */}
 
                 <div className="col-md-4" style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderLeft: '1px solid #e9ecef' }}>
@@ -6728,8 +6703,8 @@ const WhatsAppTemplate = () => {
 
                   </div>
 
-                  
-                  
+
+
                   <div className="preview-template">
 
                     <div className="preview-container">
@@ -6858,13 +6833,13 @@ const WhatsAppTemplate = () => {
 
                           )}
 
-                          
-                          
+
+
                           {/* Body Preview */}
 
                           <div className="preview-body">
 
-                            {editForm.templateType === 'Carousel' 
+                            {editForm.templateType === 'Carousel'
 
                               ? (replaceCarouselMessageVariables(editForm.carouselMessage) || 'Enter your carousel message...')
 
@@ -7010,8 +6985,8 @@ const WhatsAppTemplate = () => {
 
                                 )}
 
-                                
-                                
+
+
                                 <div className="carousel-container" style={{
 
                                   display: 'flex',
@@ -7072,83 +7047,111 @@ const WhatsAppTemplate = () => {
 
                                       }}>
 
-                                      {/* Card Header Media */}
+                                        {/* Card Header Media */}
 
-                                      <div style={{
+                                        <div style={{
 
-                                        width: '100%',
+                                          width: '100%',
 
-                                        height: '120px',
+                                          height: '120px',
 
-                                        overflow: 'hidden',
+                                          overflow: 'hidden',
 
-                                        position: 'relative'
+                                          position: 'relative'
 
-                                      }}>
+                                        }}>
 
-                                        {card.headerImage || card.headerVideo ? (
+                                          {card.headerImage || card.headerVideo ? (
 
-                                          editForm.carouselHeaderType === 'IMAGE' ? (
+                                            editForm.carouselHeaderType === 'IMAGE' ? (
 
-                                            <img
+                                              <img
 
-                                              src={card.headerImage}
+                                                src={card.headerImage}
 
-                                              alt={`Card ${index + 1}`}
+                                                alt={`Card ${index + 1}`}
 
-                                              style={{
+                                                style={{
 
-                                                width: '100%',
+                                                  width: '100%',
 
-                                                height: '100%',
+                                                  height: '100%',
 
-                                                objectFit: 'cover'
+                                                  objectFit: 'cover'
 
-                                              }}
+                                                }}
 
-                                              onError={(e) => {
+                                                onError={(e) => {
 
-                                                e.target.style.display = 'none';
+                                                  e.target.style.display = 'none';
 
-                                                e.target.nextSibling.style.display = 'flex';
+                                                  e.target.nextSibling.style.display = 'flex';
 
-                                              }}
+                                                }}
 
-                                            />
+                                              />
+
+                                            ) : (
+
+                                              <video
+
+                                                src={card.headerVideo}
+
+                                                style={{
+
+                                                  width: '100%',
+
+                                                  height: '100%',
+
+                                                  objectFit: 'cover'
+
+                                                }}
+
+                                                onError={(e) => {
+
+                                                  e.target.style.display = 'none';
+
+                                                  e.target.nextSibling.style.display = 'flex';
+
+                                                }}
+
+                                              />
+
+                                            )
 
                                           ) : (
 
-                                            <video
+                                            <div style={{
 
-                                              src={card.headerVideo}
+                                              display: 'flex',
 
-                                              style={{
+                                              flexDirection: 'column',
 
-                                                width: '100%',
+                                              alignItems: 'center',
 
-                                                height: '100%',
+                                              justifyContent: 'center',
 
-                                                objectFit: 'cover'
+                                              height: '100%',
 
-                                              }}
+                                              backgroundColor: '#f8f9fa',
 
-                                              onError={(e) => {
+                                              color: '#6c757d'
 
-                                                e.target.style.display = 'none';
+                                            }}>
 
-                                                e.target.nextSibling.style.display = 'flex';
+                                              <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}`} style={{ fontSize: '24px', marginBottom: '6px' }}></i>
 
-                                              }}
+                                              <span style={{ fontSize: '11px' }}>No Media</span>
 
-                                            />
+                                            </div>
 
-                                          )
+                                          )}
 
-                                        ) : (
+                                          {/* Fallback for failed media */}
 
                                           <div style={{
 
-                                            display: 'flex',
+                                            display: 'none',
 
                                             flexDirection: 'column',
 
@@ -7170,185 +7173,157 @@ const WhatsAppTemplate = () => {
 
                                           </div>
 
-                                        )}
+                                        </div>
 
-                                        {/* Fallback for failed media */}
+                                        {/* Card Content */}
 
                                         <div style={{
 
-                                          display: 'none',
+                                          padding: '12px',
+
+                                          flex: 1,
+
+                                          display: 'flex',
 
                                           flexDirection: 'column',
+
+                                          justifyContent: 'space-between'
+
+                                        }}>
+
+                                          {/* Body Text */}
+
+                                          {card.bodyText && (
+
+                                            <div style={{
+
+                                              fontSize: '12px',
+
+                                              color: '#333',
+
+                                              marginBottom: '8px',
+
+                                              lineHeight: '1.4',
+
+                                              maxHeight: '40px',
+
+                                              overflow: 'hidden',
+
+                                              textOverflow: 'ellipsis'
+
+                                            }}>
+
+                                              {card.bodyText}
+
+                                            </div>
+
+                                          )}
+
+                                          {/* Buttons */}
+
+                                          {card.buttons && card.buttons.length > 0 && (
+
+                                            <div style={{
+
+                                              display: 'flex',
+
+                                              gap: '4px',
+
+                                              flexWrap: 'wrap'
+
+                                            }}>
+
+                                              {card.buttons.slice(0, 2).map((button, btnIndex) => (
+
+                                                <button
+
+                                                  key={btnIndex}
+
+                                                  style={{
+
+                                                    fontSize: '10px',
+
+                                                    padding: '4px 8px',
+
+                                                    border: '1px solid #25D366',
+
+                                                    borderRadius: '12px',
+
+                                                    backgroundColor: '#25D366',
+
+                                                    color: 'white',
+
+                                                    cursor: 'default',
+
+                                                    fontWeight: '500',
+
+                                                    minWidth: '60px',
+
+                                                    textAlign: 'center',
+
+                                                    whiteSpace: 'nowrap',
+
+                                                    overflow: 'hidden',
+
+                                                    textOverflow: 'ellipsis'
+
+                                                  }}
+
+                                                >
+
+                                                  {button.text}
+
+                                                </button>
+
+                                              ))}
+
+                                            </div>
+
+                                          )}
+
+                                        </div>
+
+
+
+                                        {/* Card Number Indicator */}
+
+                                        <div style={{
+
+                                          position: 'absolute',
+
+                                          top: '8px',
+
+                                          right: '8px',
+
+                                          backgroundColor: 'rgba(0,0,0,0.4)',
+
+                                          color: 'white',
+
+                                          borderRadius: '50%',
+
+                                          width: '20px',
+
+                                          height: '20px',
+
+                                          display: 'flex',
 
                                           alignItems: 'center',
 
                                           justifyContent: 'center',
 
-                                          height: '100%',
+                                          fontSize: '10px',
 
-                                          backgroundColor: '#f8f9fa',
-
-                                          color: '#6c757d'
+                                          fontWeight: 'bold'
 
                                         }}>
 
-                                          <i className={`fas fa-${editForm.carouselHeaderType === 'IMAGE' ? 'image' : 'video'}`} style={{ fontSize: '24px', marginBottom: '6px' }}></i>
-
-                                          <span style={{ fontSize: '11px' }}>No Media</span>
+                                          {index + 1}
 
                                         </div>
 
                                       </div>
 
-                                      {/* Card Content */}
-
-                                      <div style={{
-
-                                        padding: '12px',
-
-                                        flex: 1,
-
-                                        display: 'flex',
-
-                                        flexDirection: 'column',
-
-                                        justifyContent: 'space-between'
-
-                                      }}>
-
-                                        {/* Body Text */}
-
-                                        {card.bodyText && (
-
-                                          <div style={{
-
-                                            fontSize: '12px',
-
-                                            color: '#333',
-
-                                            marginBottom: '8px',
-
-                                            lineHeight: '1.4',
-
-                                            maxHeight: '40px',
-
-                                            overflow: 'hidden',
-
-                                            textOverflow: 'ellipsis'
-
-                                          }}>
-
-                                            {card.bodyText}
-
-                                          </div>
-
-                                        )}
-
-                                        {/* Buttons */}
-
-                                        {card.buttons && card.buttons.length > 0 && (
-
-                                          <div style={{
-
-                                            display: 'flex',
-
-                                            gap: '4px',
-
-                                            flexWrap: 'wrap'
-
-                                          }}>
-
-                                            {card.buttons.slice(0, 2).map((button, btnIndex) => (
-
-                                              <button
-
-                                                key={btnIndex}
-
-                                                style={{
-
-                                                  fontSize: '10px',
-
-                                                  padding: '4px 8px',
-
-                                                  border: '1px solid #25D366',
-
-                                                  borderRadius: '12px',
-
-                                                  backgroundColor: '#25D366',
-
-                                                  color: 'white',
-
-                                                  cursor: 'default',
-
-                                                  fontWeight: '500',
-
-                                                  minWidth: '60px',
-
-                                                  textAlign: 'center',
-
-                                                  whiteSpace: 'nowrap',
-
-                                                  overflow: 'hidden',
-
-                                                  textOverflow: 'ellipsis'
-
-                                                }}
-
-                                              >
-
-                                                {button.text}
-
-                                              </button>
-
-                                            ))}
-
-                                          </div>
-
-                                        )}
-
-                                      </div>
-
-                                      
-                                      
-                                      {/* Card Number Indicator */}
-
-                                      <div style={{
-
-                                        position: 'absolute',
-
-                                        top: '8px',
-
-                                        right: '8px',
-
-                                        backgroundColor: 'rgba(0,0,0,0.4)',
-
-                                        color: 'white',
-
-                                        borderRadius: '50%',
-
-                                        width: '20px',
-
-                                        height: '20px',
-
-                                        display: 'flex',
-
-                                        alignItems: 'center',
-
-                                        justifyContent: 'center',
-
-                                        fontSize: '10px',
-
-                                        fontWeight: 'bold'
-
-                                      }}>
-
-                                        {index + 1}
-
-                                      </div>
-
-                                    </div>
-
-                                  ))}
+                                    ))}
 
                                   </div>
 
@@ -7412,8 +7387,8 @@ const WhatsAppTemplate = () => {
 
                               )}
 
-                              
-                              
+
+
                               <div style={{
 
                                 textAlign: 'center',
@@ -7454,17 +7429,17 @@ const WhatsAppTemplate = () => {
 
                           )}
 
-                          
-                          
+
+
                           {/* Footer Preview */}
 
                           {editForm.footerText && (
 
-                            <div className="preview-footer" style={{ 
+                            <div className="preview-footer" style={{
 
-                              fontSize: '11px', 
+                              fontSize: '11px',
 
-                              color: '#666', 
+                              color: '#666',
 
                               marginTop: '8px',
 
@@ -7482,8 +7457,8 @@ const WhatsAppTemplate = () => {
 
                         <span className="mb-3 current-time">11:02</span>
 
-                        
-                        
+
+
                         {/* Buttons Preview */}
 
                         {((editForm.buttons && editForm.buttons.length > 0) || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status') && (
@@ -7494,15 +7469,15 @@ const WhatsAppTemplate = () => {
 
                             {editForm.templateType === 'Catalog' && (
 
-                              <button 
+                              <button
 
-                                type="button" 
+                                type="button"
 
                                 className="btn btn-sm"
 
-                                style={{ 
+                                style={{
 
-                                  backgroundColor: '#FFFFFF', 
+                                  backgroundColor: '#FFFFFF',
 
                                   border: '1px solid #25D366',
 
@@ -7530,21 +7505,21 @@ const WhatsAppTemplate = () => {
 
                             )}
 
-                            
-                            
+
+
                             {/* Show flow button if template type is Flows */}
 
                             {editForm.templateType === 'Flows' && editForm.flowId && (
 
-                              <button 
+                              <button
 
-                                type="button" 
+                                type="button"
 
                                 className="btn btn-sm"
 
-                                style={{ 
+                                style={{
 
-                                  backgroundColor: '#FFFFFF', 
+                                  backgroundColor: '#FFFFFF',
 
                                   border: '1px solid #25D366',
 
@@ -7572,21 +7547,21 @@ const WhatsAppTemplate = () => {
 
                             )}
 
-                            
-                            
+
+
                             {/* Show authentication button if template type is Authentication */}
 
                             {editForm.templateType === 'Authentication' && (
 
-                              <button 
+                              <button
 
-                                type="button" 
+                                type="button"
 
                                 className="btn btn-sm"
 
-                                style={{ 
+                                style={{
 
-                                  backgroundColor: '#FFFFFF', 
+                                  backgroundColor: '#FFFFFF',
 
                                   border: '1px solid #25D366',
 
@@ -7614,23 +7589,23 @@ const WhatsAppTemplate = () => {
 
                             )}
 
-                            
-                            
+
+
                             {/* Show order details buttons if template type is Order details */}
 
                             {editForm.templateType === 'Order details' && (
 
                               <>
 
-                                <button 
+                                <button
 
-                                  type="button" 
+                                  type="button"
 
                                   className="btn btn-sm"
 
-                                  style={{ 
+                                  style={{
 
-                                    backgroundColor: '#FFFFFF', 
+                                    backgroundColor: '#FFFFFF',
 
                                     border: '1px solid #25D366',
 
@@ -7656,15 +7631,15 @@ const WhatsAppTemplate = () => {
 
                                 </button>
 
-                                <button 
+                                <button
 
-                                  type="button" 
+                                  type="button"
 
                                   className="btn btn-sm"
 
-                                  style={{ 
+                                  style={{
 
-                                    backgroundColor: '#FFFFFF', 
+                                    backgroundColor: '#FFFFFF',
 
                                     border: '1px solid #25D366',
 
@@ -7694,23 +7669,23 @@ const WhatsAppTemplate = () => {
 
                             )}
 
-                            
-                            
+
+
                             {/* Show order status buttons if template type is Order Status */}
 
                             {editForm.templateType === 'Order Status' && (
 
                               <>
 
-                                <button 
+                                <button
 
-                                  type="button" 
+                                  type="button"
 
                                   className="btn btn-sm"
 
-                                  style={{ 
+                                  style={{
 
-                                    backgroundColor: '#FFFFFF', 
+                                    backgroundColor: '#FFFFFF',
 
                                     border: '1px solid #25D366',
 
@@ -7736,15 +7711,15 @@ const WhatsAppTemplate = () => {
 
                                 </button>
 
-                                <button 
+                                <button
 
-                                  type="button" 
+                                  type="button"
 
                                   className="btn btn-sm"
 
-                                  style={{ 
+                                  style={{
 
-                                    backgroundColor: '#FFFFFF', 
+                                    backgroundColor: '#FFFFFF',
 
                                     border: '1px solid #25D366',
 
@@ -7774,23 +7749,23 @@ const WhatsAppTemplate = () => {
 
                             )}
 
-                            
-                            
+
+
                             {/* Show regular buttons */}
 
                             {editForm.buttons && editForm.buttons.map((button, index) => (
 
-                              <button 
+                              <button
 
                                 key={index}
 
-                                type="button" 
+                                type="button"
 
                                 className="btn btn-sm"
 
-                                style={{ 
+                                style={{
 
-                                  backgroundColor: '#FFFFFF', 
+                                  backgroundColor: '#FFFFFF',
 
                                   border: '1px solid #25D366',
 
@@ -7836,21 +7811,21 @@ const WhatsAppTemplate = () => {
 
             <div className="modal-footer" style={{ borderTop: '1px solid #e9ecef', padding: '1.5rem' }}>
 
-              <button 
+              <button
 
-                type="button" 
+                type="button"
 
                 className="btn btn-primary btn-lg px-5"
 
-                onClick={createTemplate} 
+                onClick={createTemplate}
 
                 disabled={isCreatingTemplate}
 
-                style={{ 
+                style={{
 
-                  backgroundColor: '#25D366', 
+                  backgroundColor: '#25D366',
 
-                  border: 'none', 
+                  border: 'none',
 
                   borderRadius: '8px',
 
@@ -7886,7 +7861,7 @@ const WhatsAppTemplate = () => {
 
             {isCreatingTemplate && (
 
-              <div 
+              <div
 
                 className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
 
@@ -7929,7 +7904,7 @@ const WhatsAppTemplate = () => {
 
       {/* Global Delete Loading Overlay */}
       {isDeletingTemplate && (
-        <div 
+        <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
