@@ -8,7 +8,9 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
-  const [permissions , setPermissions]= useState()
+  const [trainer, setTrainer] = useState(false)
+
+  const [permissions, setPermissions] = useState()
   useEffect(() => {
     updatedPermission()
   }, [])
@@ -16,7 +18,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     const response = await axios.get(`${backendUrl}/college/permission`, {
       headers: { 'x-auth': token }
     });
-    if(response.data.status){
+    if (response.data.status) {
       setPermissions(response.data.permissions);
     }
   }
@@ -67,7 +69,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     // Get IDs from props or URL
     const centerId = selectedCenter?._id || new URLSearchParams(window.location.search).get('centerId');
     const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-    
+
     if (centerId && projectId && token) {
       fetchCourses();
     } else {
@@ -78,11 +80,11 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   useEffect(() => {
     const urlParams = getURLParams();
     console.log('Course initial URL setup - current params:', urlParams);
-    
+
     // If we're not in course or batch stage, set to course stage
     if (urlParams.stage !== 'course' && urlParams.stage !== 'batch') {
       console.log('Setting to course stage');
-      updateURL({ 
+      updateURL({
         stage: 'course',
         centerId: selectedCenter?._id,
         centerName: selectedCenter?.name,
@@ -100,7 +102,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       // Get IDs from props or URL (for refresh cases)
       const centerId = selectedCenter?._id || new URLSearchParams(window.location.search).get('centerId');
       const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-      
+
       if (!centerId || !projectId) {
         console.warn('Missing centerId or projectId for fetching courses');
         setCourses([]);
@@ -213,7 +215,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
   const updateURL = (params) => {
     const url = new URL(window.location);
-    
+
     // Clear all existing params first
     url.searchParams.delete('stage');
     url.searchParams.delete('courseId');
@@ -226,14 +228,14 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     url.searchParams.delete('verticalName');
     url.searchParams.delete('batchId');
     url.searchParams.delete('batchName');
-    
+
     // Set new params
     Object.keys(params).forEach(key => {
       if (params[key] !== null && params[key] !== undefined) {
         url.searchParams.set(key, params[key]);
       }
     });
-    
+
     window.history.replaceState({}, '', url);
   };
 
@@ -242,10 +244,10 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const handleCourseClick = (course) => {
     setSelectedCourseForBatches(course);
     setShowBatches(true);
-    
-    updateURL({ 
-      stage: 'batch', 
-      courseId: course._id, 
+
+    updateURL({
+      stage: 'batch',
+      courseId: course._id,
       courseName: course.name,
       centerId: selectedCenter?._id,
       centerName: selectedCenter?.name,
@@ -259,13 +261,13 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   useEffect(() => {
     const urlParams = getURLParams();
     console.log('Course component - URL params:', urlParams);
-    
+
     // Only restore state if courses are loaded
     if (courses.length === 0) {
       console.log('Courses not loaded yet, skipping state restoration');
       return;
     }
-    
+
     if (urlParams.stage === "batch" && urlParams.courseId) {
       // Find course from current courses list
       const course = courses.find(c => c._id === urlParams.courseId);
@@ -276,7 +278,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       } else {
         // Course not found, reset to course view
         console.warn('Course not found in current list, resetting to course view');
-        updateURL({ 
+        updateURL({
           stage: 'course',
           centerId: selectedCenter?._id,
           centerName: selectedCenter?.name,
@@ -298,9 +300,9 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const handleBackToCourses = () => {
     setShowBatches(false);
     setSelectedCourseForBatches(null);
-    
-     // Update URL to course view - only set essential parameters, not names
-     updateURL({ 
+
+    // Update URL to course view - only set essential parameters, not names
+    updateURL({
       stage: 'course',
       centerId: selectedCenter?._id,
       projectId: selectedProject?._id,
@@ -397,7 +399,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         </div> */}
 
         {/* Batch Component with filtered data */}
-        <Batch selectedCourse={selectedCourseForBatches} onBackToCourses = {handleBackToCourses} selectedCenter={selectedCenter} onBackToCenters={onBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
+        <Batch selectedCourse={selectedCourseForBatches} onBackToCourses={handleBackToCourses} selectedCenter={selectedCenter} onBackToCenters={onBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
       </div>
     );
   }
@@ -409,13 +411,13 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           <div className="d-flex align-items-center gap-3">
 
             <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
               <span className="mx-2"> &gt; </span>
@@ -443,8 +445,8 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
           {((permissions?.custom_permissions?.can_add_course && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-        
-          <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
+
+            <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
           )}
         </div>
       </div>
@@ -500,17 +502,23 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
                         <span className="bg-primary">{course.sectors && course.sectors.length > 0 ? course.sectors[0].name : 'N/A'}
                         </span>
-                       
+
                       </div>
-                     
+
                     </div>
-                   
+                    <div className="text-end d-flex">
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); }}>
+                        <i className="bi bi-people"></i>
+
+                      </button>
+
+                    </div>
                   </div>
 
-                  
-                 
 
-                  
+
+
+
                 </div>
               </div>
             </div>
@@ -530,9 +538,57 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         </div>
       )}
 
+      (trainer && {
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ margin: 'auto' }}>
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Select Trainer</h1>
+                <button type="button" className="btn-close" onClick={() => {
+                  // setShowBranchModal(false);
+                  // setSelectedProfile(null);
+                }}></button>
+              </div>
+              <div className="modal-body">
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="course"
+                    // value={selectedBranch}
+                    // onChange={(e) => setSelectedBranch(e.target.value)}
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef',
+
+                    }}
+
+                  >
+                    <option value="">Select Trainer</option>
+                    {/* {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                      <option key={branch._id || index} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))} */}
+                  </select>
+                </div>
 
 
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => {
 
+                }}>Close</button>
+                <button type="button" className="btn btn-primary" >Assign Trainer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      })
 
       {/* Share Modal */}
       {/* {showShareModal && selectedCourse && (

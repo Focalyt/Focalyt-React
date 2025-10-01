@@ -87,7 +87,7 @@ const userSchema = new Schema(
 			type: Boolean,
 			default: false,
 		},
-		role: { type: Number, trim: true }, // 0-admin, 1-company, 2-college, 3-student, 10-admin view		
+		role: { type: Number, trim: true }, // 0-admin, 1-company, 2-college, 3-student, 4 trainer, 10-admin view		
 		status: {
 			type: Boolean,
 			default: true,

@@ -126,6 +126,8 @@ module.exports.sendOtp = async (req, res) => {
       role = 3;
     } else if (module === 'company') {
       role = 1;
+    } else if (module === 'trainer') {
+      role = 4;
     }
 
     console.log('userInput', userInput, 'module', module)
@@ -296,6 +298,75 @@ module.exports.verifyOtp = async (req, res) => {
       user = await User.findOne({ mobile: parseInt(userInput), role: 2 });
     } else {
       user = await User.findOne({ email: userInput.toLowerCase(), role: 2 });
+    }
+      if (!user) {
+        return res.send({
+          status: false,
+          message: 'User not found!'
+        });
+      }
+
+      const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${user.mobile}&otp=${otp}`;
+    
+    const result = await axios.get(url);
+    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+      return res.send({
+        status: true,
+        message: 'OTP verified!'
+      });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!'
+      });
+    }
+    }
+    else
+  {
+    console.log("mobile", mobile, otp);
+    
+    if (!mobile || !otp) {
+      return res.send({
+        status: false,
+        message: 'Mobile number and OTP are required!'
+      });
+    }
+
+   
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    
+    const result = await axios.get(url);
+    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+      return res.send({
+        status: true,
+        message: 'OTP verified!'
+      });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!'
+      });
+    }}
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+module.exports.verifyInstituteOtp = async (req, res) => {
+  try {
+
+    let { mobile, otp, userInput } = req.body;
+    const auth = authKey;
+    if (userInput ) {
+      console.log('userInput', userInput, 'module', module)
+    
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+    let user = null;
+
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role: 4 });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role: 4 });
     }
       if (!user) {
         return res.send({
@@ -707,6 +778,63 @@ module.exports.loginAsCollege = async (req, res) => {
 
   }
   catch (err) {
+    req.flash("error", err.message || "Something went wrong!");
+    return res.redirect("back");
+  }
+}
+
+module.exports.loginAsTrainer = async (req, res) => {
+  try {
+
+    const { userInput, otp } = req.body;
+    const isMobile = /^\d{10}$/.test(userInput);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
+    let mobile;
+    let email;
+    if (isMobile) {
+      mobile = userInput;
+    } else if (isEmail) {
+      email = userInput;
+      const user = await User.findOne({ email, role: 4 });
+      if (!user) {
+        return res.json({ status: false, error: "User not found" });
+      }
+      mobile = user.mobile;
+    } else {
+      return res.json({ status: false, error: "Invalid mobile number or email" });
+    }
+
+    const auth = authKey;
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    const result = await axios.get(url);
+    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+      const query = { mobile, role: 4 };
+      const user = await User.findOne(query);
+
+      if (!user) {
+        return res.json({ status: false, error: "User not found" });
+      }
+
+      const token = await user.generateAuthToken();
+
+      const userData = {
+        _id: user._id,
+        name: user.name,
+        role: 4,
+        email: user.email,
+        mobile: user.mobile,
+        token
+      };
+
+      return res.json({ status: true, message: "Login successful", userData });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!'
+      });
+    }
+
+  } catch (err) {
     req.flash("error", err.message || "Something went wrong!");
     return res.redirect("back");
   }

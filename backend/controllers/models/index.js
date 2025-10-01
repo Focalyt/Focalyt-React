@@ -91,6 +91,7 @@ module.exports.B2cFollowup = require("./b2cFollowup");
 module.exports.DripMarketingRule = require("./dripMarkettingRule");
 module.exports.ReEnquire = require("./reEnquire");
 // module.exports.Manager = required("");
+module.exports.Traine = require("./trainer")
 
 
 //b2b models

@@ -46,6 +46,7 @@ educationRoutes.get("/educationlist", educationlist.educationlist);
 
 commonRoutes.post("/sendOtptoAddLead", commonFunc.sendOtptoAddLead);
 commonRoutes.post("/otpCollegeLogin", commonFunc.loginAsCollege);
+commonRoutes.post("/otpTrainerLogin", commonFunc.loginAsTrainer);
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
 commonRoutes.get("/sectorList", commonFunc.sectorList);
 commonRoutes.get("/centerList", commonFunc.centerList);
@@ -63,6 +64,7 @@ commonRoutes.post("/sendOtptoRegisterCandidate", commonFunc.sendOtptoRegisterCan
 commonRoutes.post("/sendOtptoRegisterCompany", commonFunc.sendOtptoRegisterCompany);
 commonRoutes.post("/sendOtptoRegister", commonFunc.sendOtptoRegister);
 commonRoutes.post("/verifyOtp", commonFunc.verifyOtp);
+commonRoutes.post("/verifyInstituteOtp", commonFunc.verifyInstituteOtp);
 commonRoutes.post("/verifyPass", commonFunc.verifyPass);
 commonRoutes.get("/resendOTP",commonFunc.resendOTP);
 commonRoutes.post("/resendOTP",commonFunc.resendOTP);

@@ -38,7 +38,8 @@ const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
 const dripmarketingRoutes = require("./dripmarketing");
 
-
+//Trainer route 
+const trainerRoutes = require('./trainer');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
@@ -71,6 +72,7 @@ router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
 router.use("/dripmarketing", isCollege, dripmarketingRoutes);
+router.use("/trainer", isCollege, trainerRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -269,15 +271,15 @@ router.route("/login")
 	});
 
 router.route('/permission')
-.get(isCollege, async (req, res) => {
-	try {
-		const user = req.user;
-		const permissions = user.permissions;
-		return res.send({ status: true, message: "Permission fetched successfully", permissions: permissions });
-	} catch (err) {
-		return res.send({ status: false, error: err.message });
-	}
-});
+	.get(isCollege, async (req, res) => {
+		try {
+			const user = req.user;
+			const permissions = user.permissions;
+			return res.send({ status: true, message: "Permission fetched successfully", permissions: permissions });
+		} catch (err) {
+			return res.send({ status: false, error: err.message });
+		}
+	});
 
 router.route("/register")
 	.post(async (req, res) => {
@@ -11532,6 +11534,54 @@ router.delete('/delete-leads', async (req, res) => {
 	}
 });
 
+router.post('/trainee/login', async (req, res) => {
 
+	try {
+		const { userInput, password } = req.body;
+
+		console.log("req.body", req.body)
+		const isMobile = /^\d{10}$/.test(userInput);
+		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
+
+		let mobile;
+		let email;
+		let user;
+		if (isMobile) {
+			mobile = userInput;
+			user = await User.findOne({ mobile: userInput, role: 4 });
+
+		} else if (isEmail) {
+			email = userInput;
+			user = await User.findOne({ email: userInput, role: 4 });
+
+		}
+
+		if (!user) {
+			return res.status(400).json({ status: false, error: "User not found" });
+		}
+		// console.log("user", user)
+
+		const isMatch = await user.validPassword(password);
+		if(!isMatch){
+			return res.status(400).json({ status: false, error: "Invalid password" });
+		}
+		// console.log("Is Match", isMatch)
+
+		const token = await user.generateAuthToken();
+		return res.status(200).json({ status: true, message: "Login successful", token ,role:4  });
+		// console.log("Token" , token)
+
+		// const isMatch = user.validPassword(password);
+		// if (!isMatch) {
+		//     return res.status(400).json({ status: false, error: "Invalid password" });
+		// }
+		// const token = await user.generateAuthToken();
+		// return res.status(200).json({ status: true, message: "Login successful", token });
+
+	} catch (err) {
+		console.log('Error in POST /login:', err.message);
+		return res.status(500).json({ status: false, error: err.message });
+	}
+})
 
 module.exports = router;
