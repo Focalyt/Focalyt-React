@@ -763,6 +763,44 @@ const CRMDashboard = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
+  // WhatsApp templates dropdown state
+  const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
+  const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplatesError, setWhatsAppTemplatesError] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templatePreview, setTemplatePreview] = useState("");
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWhatsAppTemplates && !event.target.closest('.input-template')) {
+        setShowWhatsAppTemplates(false);
+      }
+    };
+
+    if (showWhatsAppTemplates) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showWhatsAppTemplates]);
+
+  const fetchWhatsAppTemplates = async () => {
+    try {
+      setIsLoadingWhatsAppTemplates(true);
+      setWhatsAppTemplatesError("");
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
+      const list = response?.data?.data || [];
+      setWhatsAppTemplates(Array.isArray(list) ? list : []);
+    } catch (error) {
+      setWhatsAppTemplatesError("Failed to load WhatsApp templates.");
+    } finally {
+      setIsLoadingWhatsAppTemplates(false);
+    }
+  };
+
   // const permissions = userData.permissions
 
   const [permissions, setPermissions] = useState();
@@ -5251,6 +5289,104 @@ const CRMDashboard = () => {
       setIsHistoryLoading(false);
     }
   }
+  /************************************/
+
+  // WhatsApp Templates Dropdown
+  const renderWhatsAppTemplatesDropdown = () => {
+    if (!showWhatsAppTemplates) return null;
+    return (
+      <div className="position-absolute" style={{ 
+        bottom: '100%', 
+        left: '0', 
+        width: '300px',
+        zIndex: 1000,
+        backgroundColor: 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxHeight: '300px',
+        overflow: 'auto',
+        marginBottom: '8px'
+      }}>
+        {isLoadingWhatsAppTemplates ? (
+          <div className="d-flex align-items-center justify-content-center py-3">
+            <div className="spinner-border spinner-border-sm" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <span className="ms-2">Loading templates...</span>
+          </div>
+        ) : whatsAppTemplatesError ? (
+          <div className="alert alert-danger m-2">{whatsAppTemplatesError}</div>
+        ) : (
+          <div className="list-group list-group-flush">
+            {whatsAppTemplates.length === 0 ? (
+              <div className="p-3 text-center text-muted">No templates found.</div>
+            ) : (
+              whatsAppTemplates.map((tpl) => (
+                <div 
+                  key={tpl.id || tpl.name} 
+                  className="list-group-item list-group-item-action"
+                  style={{ cursor: 'pointer', border: 'none', padding: '12px 16px' }}
+                  onClick={() => {
+                    setSelectedTemplate(tpl);
+                    setShowWhatsAppTemplates(false);
+                    
+                    // Generate template preview from components
+                    let previewText = "";
+                    let hasMedia = false;
+                    let mediaType = "";
+                    let mediaUrl = "";
+                    
+                    if (tpl.components && Array.isArray(tpl.components)) {
+                      tpl.components.forEach(component => {
+                        if (component.type === 'HEADER') {
+                          if (component.text) {
+                            previewText += component.text + "\n\n";
+                          } else if (component.format) {
+                            hasMedia = true;
+                            mediaType = component.format.toLowerCase();
+                            if (component.example && component.example.header_handle) {
+                              mediaUrl = component.example.header_handle[0];
+                            }
+                          }
+                        } else if (component.type === 'BODY' && component.text) {
+                          previewText += component.text + "\n\n";
+                        } else if (component.type === 'FOOTER' && component.text) {
+                          previewText += component.text;
+                        }
+                      });
+                    }
+                    
+                    // If no components, use template name as preview
+                    if (!previewText.trim()) {
+                      previewText = `Template: ${tpl.name}`;
+                    }
+                    
+                    // Store template data for enhanced preview
+                    const templateData = {
+                      text: previewText.trim(),
+                      hasMedia,
+                      mediaType,
+                      mediaUrl,
+                      templateName: tpl.name,
+                      status: tpl.status,
+                      category: tpl.category
+                    };
+                    
+                    setTemplatePreview(JSON.stringify(templateData));
+                    console.log('Selected template:', tpl);
+                  }}
+                >
+                  <div className="fw-semibold text-dark">{tpl.name}</div>
+                  <div className="small text-muted">{tpl.category} • {tpl.language} • {tpl.status}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
   /************************************/
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)

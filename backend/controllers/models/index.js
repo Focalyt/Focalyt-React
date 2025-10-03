@@ -83,7 +83,6 @@ module.exports.StatusB2b = require("./statusB2b");
 module.exports.ApprovalRequest = require("./approval");
 module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
 module.exports.EventType = require("./eventType");
-module.exports.WhatsAppMessage = require("./whatsappMessage");
 module.exports.QuestionAnswer = require("./questionAnswer");
 module.exports.CandidateVisitCalender = require("./candidateVisitCalender");
 module.exports.AttendanceTracking = require("./attendanceTracking");
