@@ -853,6 +853,20 @@ const CRMDashboard = () => {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
+  // WhatsApp Panel states
+  const [whatsappMessages, setWhatsappMessages] = useState([
+    { id: 1, text: 'Hi, I am interested in your course', sender: 'lead', time: '10:25 AM', type: 'session' },
+    { id: 2, text: 'Hello! Thank you for your interest. I would be happy to help you.', sender: 'agent', time: '10:26 AM', type: 'session' }
+  ]);
+  const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
+  const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
+  const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
+  const [showWhatsappEmojiPicker, setShowWhatsappEmojiPicker] = useState(false);
+  const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
+  const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
+  const whatsappMessagesEndRef = useRef(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -3117,6 +3131,214 @@ const CRMDashboard = () => {
     }
   };
 
+  // Fetch WhatsApp Templates from backend
+  const fetchWhatsappTemplates = async () => {
+
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+
+
+      // Get environment variables for Facebook API
+      const businessAccountId = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const accessToken = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
+
+      if (!businessAccountId || !accessToken) {
+        alert('WhatsApp Business Account ID or Access Token not configured in environment variables.');
+        return;
+      }
+
+      // Fetch templates directly from Facebook Graph API
+      const response = await axios.get(
+        `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
+          }
+        }
+      );
+      
+      if (response.data && response.data.data) {
+        // downloadTemplatesJSON(response.data.data);
+        console.log('templates', response.data.data);
+        
+        const formattedTemplates = response.data.data
+          .filter(template => template.status === 'APPROVED') // Only show approved templates
+          .map((template) => {
+            // Extract BODY text from components
+            let bodyText = '';
+            let headerText = '';
+            let footerText = '';
+            let hasButtons = false;
+            
+            if (template.components && Array.isArray(template.components)) {
+              template.components.forEach(component => {
+                if (component.type === 'BODY') {
+                  bodyText = component.text || '';
+                } else if (component.type === 'HEADER') {
+                  if (component.format === 'TEXT') {
+                    headerText = component.text || '';
+                  } else {
+                    headerText = `[${component.format}]`;
+                  }
+                } else if (component.type === 'FOOTER') {
+                  footerText = component.text || '';
+                } else if (component.type === 'BUTTONS') {
+                  hasButtons = true;
+                } else if (component.type === 'CAROUSEL') {
+                  bodyText = '[Carousel Template]';
+                }
+              });
+            }
+            
+            // Combine all text parts
+            let fullContent = '';
+            if (headerText) fullContent += headerText + '\n\n';
+            fullContent += bodyText;
+            if (footerText) fullContent += '\n\n' + footerText;
+            if (hasButtons) fullContent += '\n[Interactive Buttons]';
+            
+            return {
+              id: template.id,
+              name: template.name,
+              content: fullContent || 'No preview available',
+              category: template.category || 'General',
+              language: template.language || 'en',
+              status: template.status,
+              components: template.components // Keep original for sending
+            };
+          });
+        
+        setWhatsappTemplates(formattedTemplates);
+        console.log('Formatted templates:', formattedTemplates);
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching WhatsApp templates from Facebook:', error);
+      alert('Error fetching templates from Facebook. Please check your configuration.');
+
+    }
+
+  };
+
+  const downloadTemplatesJSON = (data) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `whatsapp-templates-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+
+  const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
+
+  const handleWhatsappSendMessage = () => {
+    if (whatsappNewMessage.trim() && hasActiveSession) {
+      setWhatsappMessages([...whatsappMessages, {
+        id: whatsappMessages.length + 1,
+        text: whatsappNewMessage,
+        sender: 'agent',
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        type: 'session'
+      }]);
+      setWhatsappNewMessage('');
+      setShowWhatsappEmojiPicker(false);
+    }
+  };
+
+  const handleWhatsappEmojiClick = (emoji) => {
+    setWhatsappNewMessage(whatsappNewMessage + emoji);
+    setShowWhatsappEmojiPicker(false);
+  };
+
+  const handleWhatsappSelectTemplate = (template) => {
+    setSelectedWhatsappTemplate(template);
+    setShowWhatsappTemplateMenu(false);
+  };
+
+  const handleWhatsappSendTemplate = async () => {
+    if (!selectedWhatsappTemplate) return;
+    
+    setIsSendingWhatsapp(true);
+    
+    let content = selectedWhatsappTemplate.content
+      .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+      .replace('{{2}}', 'Course Name');
+    
+    setWhatsappMessages([...whatsappMessages, {
+      id: whatsappMessages.length + 1,
+      text: content,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: 'template'
+    }]);
+    
+    // Template bhejne ke baad session activate ho jata hai
+    setHasActiveSession(true);
+    setSelectedWhatsappTemplate(null);
+    
+    setTimeout(() => {
+      setIsSendingWhatsapp(false);
+    }, 1000);
+  };
+
+  // Click outside to close WhatsApp dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside template menu
+      if (showWhatsappTemplateMenu) {
+        const templateButton = event.target.closest('.whatsapp-template-trigger');
+        const templateMenu = event.target.closest('.whatsapp-template-menu');
+        if (!templateButton && !templateMenu) {
+          setShowWhatsappTemplateMenu(false);
+        }
+      }
+      // Check if click is outside emoji picker
+      if (showWhatsappEmojiPicker) {
+        const emojiButton = event.target.closest('.whatsapp-emoji-trigger');
+        const emojiMenu = event.target.closest('.whatsapp-emoji-menu');
+        if (!emojiButton && !emojiMenu) {
+          setShowWhatsappEmojiPicker(false);
+        }
+      }
+    };
+
+    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker]);
+
+  // Fetch templates when WhatsApp panel opens
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappTemplates.length === 0) {
+      fetchWhatsappTemplates();
+    }
+  }, [showPanel]);
+
+  // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappMessagesEndRef.current) {
+      whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showPanel, whatsappMessages, selectedWhatsappTemplate]);
 
 
   const openleadHistoryPanel = async (profile = null) => {
@@ -3966,117 +4188,1004 @@ const CRMDashboard = () => {
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
     const panelContent = (
-      <div className="whatsapp-chat right-side-panel">
-        <section className="topbar-container">
-          <div className="left-topbar">
-            <div className="img-container">
-              <div className="small-avatar" title="Ram Ruhela">RR</div>
-            </div>
-            <div className="flex-column">
-              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
-              <span className="selected-number">Primary: 918875426236</span>
-            </div>
-          </div>
-          <div className="right-topbar">
-
-            <a className="margin-horizontal-5" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
-            </a>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={closePanel}
-              title="Close WhatsApp"
+      <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+        {/* WhatsApp Header */}
+        <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
+          
+          <div className="d-flex align-items-center mb-2">
+            <div 
+              className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+              style={{ 
+                width: '48px', 
+                height: '48px', 
+                fontSize: '20px', 
+                fontWeight: '600',
+                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                flexShrink: 0
+              }}
             >
-              <i className="fas fa-times"></i>
-            </button>
+              {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+            </div>
+            <div className="flex-grow-1">
+              <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+                {selectedProfile?._candidate?.name || 'Ravi Prakash'}
+              </h6>
+              <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+                {selectedProfile?._candidate?.mobile || '8957066852'}
+              </p>
+            </div>
+            <button 
+              className="btn-close" 
+              onClick={closePanel}
+              style={{ marginLeft: '8px' }}
+            ></button>
           </div>
-        </section>
 
-        <section className="chat-view">
-          <ul className="chat-container" id="messageList">
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>03/26/2025</span></div>
-              <div className="counselor-msg-0 counselor-msg macro">
-                <div className="text text-r">
-                  <div>
-                    <span className="message-header-name student-messages">Anjali</span><br />
-                    <div className="d-flex">
-                      <pre className="text-message">
-                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
-                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
-                          12:31 PM
-                          <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
+          {/* Session Status Badge - Below name */}
+          <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+            {hasActiveSession ? (
+              <div 
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{ 
+                  backgroundColor: '#D1F4E0',
+                  border: '1px solid #25D366',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <div 
+                  className="rounded-circle me-1"
+                  style={{ 
+                    width: '6px', 
+                    height: '6px', 
+                    backgroundColor: '#25D366' 
+                  }}
+                ></div>
+                <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+                  Active
+                </span>
+              </div>
+            ) : (
+              <div 
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{ 
+                  backgroundColor: '#FFF3CD',
+                  border: '1px solid #FFA500',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+                <span className="fw-semibold" style={{ color: '#856404' }}>
+                  No Session
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Info Banner */}
+          {!hasActiveSession && (
+            <div 
+              className="d-flex align-items-start mt-3 p-2 rounded"
+              style={{ 
+                backgroundColor: '#E3F2FD',
+                border: '1px solid #2196F3'
+              }}
+            >
+              <i className="fas fa-info-circle me-2 mt-1" style={{ color: '#1976D2', fontSize: '14px' }}></i>
+              <div style={{ fontSize: '12px', color: '#1565C0' }}>
+                <p className="mb-1 fw-semibold">WhatsApp Business API Rule:</p>
+                <p className="mb-0">No active session hai. Aap sirf <strong>approved template</strong> bhej sakte hain.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Messages Area */}
+        <div 
+          className="flex-grow-1 overflow-auto p-3" 
+          style={{ 
+            backgroundColor: '#ECE5DD',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+            maxHeight: '55vh',
+            minHeight: '300px'
+          }}
+        >
+          {whatsappMessages.map(message => (
+            <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+              <div style={{ maxWidth: '75%' }}>
+                <div 
+                  className={`p-2 ${
+                    message.sender === 'agent' 
+                      ? 'text-white' 
+                      : 'bg-white text-dark'
+                  }`}
+                  style={{ 
+                    backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+                    color: message.sender === 'agent' ? '#000' : '#000',
+                    borderRadius: '8px',
+                    borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+                    borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+                    boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                    padding: '6px 10px 8px'
+                  }}
+                >
+                  <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                    {message.text}
+                  </p>
+                  <p 
+                    className="mb-0 text-end" 
+                    style={{ 
+                      fontSize: '11px', 
+                      color: '#667781',
+                      marginTop: '4px'
+                    }}
+                  >
+                    {message.time}
+                  </p>
+                </div>
+                {message.sender === 'agent' && message.type === 'template' && (
+                  <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                    <i className="fas fa-file-alt me-1"></i>Template Message
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Selected Template Preview in Chat */}
+          {selectedWhatsappTemplate && (
+            <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+              <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+                <div 
+                  className="rounded-3 overflow-hidden" 
+                  style={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Decorative gradient overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+                    pointerEvents: 'none'
+                  }}></div>
+                  
+                  {/* Header */}
+                  <div className="d-flex align-items-center justify-content-between p-3" style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.15)', 
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    <div className="d-flex align-items-center">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2" 
+                        style={{ 
+                          width: '32px', 
+                          height: '32px', 
+                          backgroundColor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+                      </div>
+                      <div>
+                        <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          WhatsApp Template
+                        </p>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                          {selectedWhatsappTemplate.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      className="btn btn-sm p-0"
+                      onClick={() => setSelectedWhatsappTemplate(null)}
+                      style={{ 
+                        width: '28px',
+                        height: '28px',
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        borderRadius: '50%',
+                        color: '#fff',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+                        e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                        e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                      }}
+                      title="Remove Template"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+                    {/* Category Badge */}
+                    <div className="mb-2">
+                      <span className="badge" style={{ 
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#fff',
+                        fontSize: '10px',
+                        padding: '5px 12px',
+                        fontWeight: '600',
+                        borderRadius: '20px',
+                        letterSpacing: '0.3px'
+                      }}>
+                        <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+                        {selectedWhatsappTemplate.category}
+                      </span>
+                    </div>
+                    
+                    {/* Template Content */}
+                    <div 
+                      className="rounded-3 p-3 mb-2"
+                      style={{ 
+                        backgroundColor: '#f8f9fa',
+                        border: '2px solid #e9ecef',
+                        borderLeft: '4px solid #667eea',
+                        position: 'relative'
+                      }}
+                    >
+                      {(() => {
+                        const components = selectedWhatsappTemplate.components || [];
+                        
+                        // Check if it's a carousel template
+                        const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+                        if (carouselComponent && carouselComponent.cards) {
+                          return (
+                            <div>
+                              {/* Carousel Body Text (if exists outside carousel) */}
+                              {(() => {
+                                const bodyComp = components.find(c => c.type === 'BODY');
+                                if (bodyComp && bodyComp.text) {
+                                  return (
+                                    <p className="mb-3" style={{ 
+                                      fontSize: '13px', 
+                                      color: '#2c3e50', 
+                                      fontWeight: '500'
+                                    }}>
+                                      {bodyComp.text}
+                                    </p>
+                                  );
+                                }
+                              })()}
+                              
+                              <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+                                <i className="fas fa-images me-1"></i>
+                                Carousel ({carouselComponent.cards.length} cards)
+                              </p>
+                              
+                              <div style={{ 
+                                display: 'flex', 
+                                gap: '12px', 
+                                overflowX: 'auto', 
+                                paddingBottom: '10px',
+                                scrollbarWidth: 'thin'
+                              }}>
+                                {carouselComponent.cards.map((card, idx) => {
+                                  const cardHeader = card.components.find(c => c.type === 'HEADER');
+                                  const cardBody = card.components.find(c => c.type === 'BODY');
+                                  const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+                                  const imageUrl = cardHeader?.example?.header_handle?.[0];
+                                  
+                                  return (
+                                    <div key={idx} style={{ 
+                                      minWidth: '200px',
+                                      maxWidth: '200px',
+                                      border: '2px solid #dee2e6', 
+                                      borderRadius: '12px',
+                                      overflow: 'hidden',
+                                      backgroundColor: '#fff',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}>
+                                      {imageUrl && (
+                                        <>
+                                          <img 
+                                            src={imageUrl} 
+                                            alt={`Card ${idx + 1}`}
+                                            style={{ 
+                                              width: '100%', 
+                                              height: '150px', 
+                                              objectFit: 'cover'
+                                            }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              e.target.nextElementSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                          <div style={{ 
+                                            display: 'none', 
+                                            height: '150px', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            backgroundColor: '#e9ecef',
+                                            fontSize: '48px'
+                                          }}>
+                                            🖼️
+                                          </div>
+                                        </>
+                                      )}
+                                      <div style={{ padding: '12px' }}>
+                                        <p className="mb-2" style={{ 
+                                          fontSize: '12px', 
+                                          lineHeight: '1.4',
+                                          color: '#2c3e50'
+                                        }}>
+                                          {cardBody?.text || ''}
+                                        </p>
+                                        {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+                                          <div style={{ 
+                                            borderTop: '1px solid #dee2e6',
+                                            paddingTop: '8px',
+                                            marginTop: '8px'
+                                          }}>
+                                            {cardButtons.buttons.map((btn, bidx) => (
+                                              <div 
+                                                key={bidx}
+                                                style={{
+                                                  padding: '6px',
+                                                  marginBottom: '4px',
+                                                  textAlign: 'center',
+                                                  fontSize: '11px',
+                                                  color: '#007bff',
+                                                  fontWeight: '500'
+                                                }}
+                                              >
+                                                {btn.type === 'QUICK_REPLY' && '↩️ '}
+                                                {btn.text}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // Regular template with header (image/video), body, footer, buttons
+                        const headerComponent = components.find(c => c.type === 'HEADER');
+                        const bodyComponent = components.find(c => c.type === 'BODY');
+                        const footerComponent = components.find(c => c.type === 'FOOTER');
+                        const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+                        
+                        return (
+                          <div>
+                            {/* Header - Image or Video */}
+                            {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <img 
+                                  src={headerComponent.example.header_handle[0]} 
+                                  alt="Template header"
+                                  style={{ 
+                                    width: '100%', 
+                                    maxHeight: '200px', 
+                                    objectFit: 'cover',
+                                    borderRadius: '12px 12px 0 0'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                                <div style={{ 
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  backgroundColor: '#e9ecef',
+                                  fontSize: '64px'
+                                }}>
+                                  🖼️
+                                </div>
+                              </div>
+                            )}
+                            
+                            {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <video 
+                                  src={headerComponent.example.header_handle[0]} 
+                                  controls
+                                  style={{ 
+                                    width: '100%', 
+                                    maxHeight: '200px',
+                                    borderRadius: '12px 12px 0 0',
+                                    backgroundColor: '#000'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                >
+                                  Your browser does not support the video tag.
+                                </video>
+                                <div style={{ 
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  backgroundColor: '#000',
+                                  color: '#fff',
+                                  fontSize: '64px'
+                                }}>
+                                  🎥
+                                </div>
+                              </div>
+                            )}
+                            
+                            {headerComponent && headerComponent.format === 'TEXT' && (
+                              <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+                                {headerComponent.text}
+                              </p>
+                            )}
+                            
+                            {/* Body */}
+                            {bodyComponent && (
+                              <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{ 
+                                fontSize: '13px', 
+                                color: '#2c3e50', 
+                                lineHeight: '1.6',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {bodyComponent.text
+                                  ?.replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+                                  .replace('{{2}}', 'Course Name') || ''}
+                              </p>
+                            )}
+                            
+                            {/* Footer */}
+                            {footerComponent && (
+                              <p className="mb-2" style={{ 
+                                fontSize: '11px', 
+                                color: '#6b7280',
+                                fontStyle: 'italic'
+                              }}>
+                                {footerComponent.text}
+                              </p>
+                            )}
+                            
+                            {/* Buttons */}
+                            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+                              <div style={{ 
+                                marginTop: '12px',
+                                paddingTop: '12px',
+                                borderTop: '1px solid #dee2e6'
+                              }}>
+                                {buttonsComponent.buttons.map((button, idx) => (
+                                  <div 
+                                    key={idx}
+                                    style={{
+                                      padding: '8px 12px',
+                                      marginBottom: '6px',
+                                      textAlign: 'center',
+                                      fontSize: '12px',
+                                      color: '#007bff',
+                                      border: '1px solid #007bff',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#fff',
+                                      fontWeight: '500',
+                                      cursor: 'default'
+                                    }}
+                                  >
+                                    {button.type === 'QUICK_REPLY' && '↩️ '}
+                                    {button.type === 'URL' && '🔗 '}
+                                    {button.type === 'PHONE_NUMBER' && '📞 '}
+                                    {button.text}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center">
+                        <div 
+                          className="rounded-circle me-2"
+                          style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+                            animation: 'pulse 2s ease-in-out infinite'
+                          }}
+                        ></div>
+                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                          Ready to send
                         </span>
-                      </pre>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+                        <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+                          Pre-approved
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>04/07/2025</span></div>
-              <div className="counselor-msg-1 counselor-msg macro">
-                <div className="text text-r">
-                  <div className="d-flex">
-                    <pre className="text-message">
-                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
-                      <span><h6>Hello</h6></span>
-                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
-                        04:28 PM
-                        <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                      </span>
-                    </pre>
+          {/* Scroll anchor */}
+          <div ref={whatsappMessagesEndRef} />
+        </div>
+
+        {/* Bottom Input Area */}
+        <div className="bg-white border-top p-3">
+          <div className="d-flex align-items-center gap-2">
+            {/* File Upload Button */}
+            <button 
+              className="btn"
+              title="Attach File"
+              style={{ 
+                width: '42px', 
+                height: '42px',
+                backgroundColor: 'transparent',
+                color: '#54656F',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+            </button>
+
+            {/* Template Button */}
+            <div className="position-relative">
+              <button 
+                className="btn whatsapp-template-trigger"
+                onClick={() => {
+                  setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+                  setShowWhatsappEmojiPicker(false);
+                }}
+                title="Templates"
+                style={{ 
+                  width: '42px', 
+                  height: '42px',
+                  backgroundColor: '#0B66E4',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+              </button>
+
+              {/* Template Dropdown */}
+              {showWhatsappTemplateMenu && (
+                <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '350px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                  <div className="p-3 border-bottom bg-light">
+                    <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+                    <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
                   </div>
+                  
+                  {whatsappTemplates.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mb-0 small text-muted">Loading templates...</p>
+                    </div>
+                  ) : (
+                    whatsappTemplates.map(template => (
+                      <div 
+                        key={template.id}
+                        className="p-3 border-bottom"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleWhatsappSelectTemplate(template)}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <h6 className="mb-0 fw-semibold">{template.name}</h6>
+                          <div className="d-flex gap-1">
+                            <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+                            {template.language && (
+                              <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-light p-2 rounded">
+                          {/* Template Preview in Dropdown */}
+                          {(() => {
+                            const components = template.components || [];
+                            
+                            // Check if it's a carousel template
+                            const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+                            if (carouselComponent && carouselComponent.cards) {
+                              return (
+                                <div>
+                                  <p className="mb-2 small fw-semibold text-primary">
+                                    <i className="fas fa-images me-1"></i>
+                                    Carousel Template ({carouselComponent.cards.length} cards)
+                                  </p>
+                                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                                    {carouselComponent.cards.slice(0, 3).map((card, idx) => {
+                                      const cardHeader = card.components.find(c => c.type === 'HEADER');
+                                      const cardBody = card.components.find(c => c.type === 'BODY');
+                                      const imageUrl = cardHeader?.example?.header_handle?.[0];
+                                      
+                                      return (
+                                        <div key={idx} style={{ 
+                                          minWidth: '100px',
+                                          maxWidth: '100px',
+                                          border: '1px solid #dee2e6', 
+                                          borderRadius: '6px',
+                                          overflow: 'hidden',
+                                          backgroundColor: '#fff'
+                                        }}>
+                                          {imageUrl && (
+                                            <>
+                                              <img 
+                                                src={imageUrl} 
+                                                alt={`Card ${idx + 1}`}
+                                                style={{ 
+                                                  width: '100%', 
+                                                  height: '70px', 
+                                                  objectFit: 'cover'
+                                                }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  e.target.nextElementSibling.style.display = 'flex';
+                                                }}
+                                              />
+                                              <div style={{ 
+                                                display: 'none', 
+                                                height: '70px', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center',
+                                                backgroundColor: '#f0f0f0',
+                                                fontSize: '24px'
+                                              }}>
+                                                🖼️
+                                              </div>
+                                            </>
+                                          )}
+                                          <div style={{ padding: '4px', fontSize: '9px', lineHeight: '1.2' }}>
+                                            {cardBody?.text?.substring(0, 30) || ''}...
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {carouselComponent.cards.length > 3 && (
+                                      <div style={{
+                                        minWidth: '100px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '10px',
+                                        color: '#6b7280'
+                                      }}>
+                                        +{carouselComponent.cards.length - 3} more
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Body text if exists */}
+                                  {(() => {
+                                    const bodyComp = components.find(c => c.type === 'BODY');
+                                    if (bodyComp && bodyComp.text) {
+                                      return (
+                                        <p className="mb-0 small text-muted mt-2" style={{ fontSize: '11px' }}>
+                                          {bodyComp.text}
+                                        </p>
+                                      );
+                                    }
+                                  })()}
+                                </div>
+                              );
+                            }
+                            
+                            // Regular template with header (image/video), body, footer
+                            const headerComponent = components.find(c => c.type === 'HEADER');
+                            const bodyComponent = components.find(c => c.type === 'BODY');
+                            const footerComponent = components.find(c => c.type === 'FOOTER');
+                            const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+                            
+                            return (
+                              <div>
+                                {/* Header - Image or Video */}
+                                {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+                                  <div style={{ marginBottom: '8px' }}>
+                                    <img 
+                                      src={headerComponent.example.header_handle[0]} 
+                                      alt="Template header"
+                                      style={{ 
+                                        width: '100%', 
+                                        maxHeight: '120px', 
+                                        objectFit: 'cover',
+                                        borderRadius: '4px'
+                                      }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextElementSibling.style.display = 'block';
+                                      }}
+                                    />
+                                    <div style={{ 
+                                      display: 'none',
+                                      padding: '15px',
+                                      textAlign: 'center',
+                                      backgroundColor: '#f0f0f0',
+                                      borderRadius: '4px',
+                                      fontSize: '28px'
+                                    }}>
+                                      🖼️
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+                                  <div style={{ marginBottom: '8px', position: 'relative' }}>
+                                    <video 
+                                      src={headerComponent.example.header_handle[0]} 
+                                      style={{ 
+                                        width: '100%', 
+                                        maxHeight: '120px',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#000'
+                                      }}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextElementSibling.style.display = 'block';
+                                      }}
+                                    />
+                                    <div style={{ 
+                                      display: 'none',
+                                      padding: '15px',
+                                      textAlign: 'center',
+                                      backgroundColor: '#000',
+                                      color: '#fff',
+                                      borderRadius: '4px',
+                                      fontSize: '28px'
+                                    }}>
+                                      🎥
+                                    </div>
+                                    {/* Play icon overlay */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '50%',
+                                      left: '50%',
+                                      transform: 'translate(-50%, -50%)',
+                                      fontSize: '24px',
+                                      color: '#fff',
+                                      backgroundColor: 'rgba(0,0,0,0.5)',
+                                      borderRadius: '50%',
+                                      width: '36px',
+                                      height: '36px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}>
+                                      ▶️
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {headerComponent && headerComponent.format === 'TEXT' && (
+                                  <p className="mb-1 fw-bold small">{headerComponent.text}</p>
+                                )}
+                                
+                                {/* Body */}
+                                {bodyComponent && (
+                                  <p className="mb-1 small text-muted" style={{ whiteSpace: 'pre-wrap', fontSize: '11px' }}>
+                                    {bodyComponent.text
+                                      ?.replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+                                      .replace('{{2}}', 'Course Name') || ''}
+                                  </p>
+                                )}
+                                
+                                {/* Footer */}
+                                {footerComponent && (
+                                  <p className="mb-0 small text-muted" style={{ fontSize: '10px', opacity: 0.7 }}>
+                                    {footerComponent.text}
+                                  </p>
+                                )}
+                                
+                                {/* Buttons indicator */}
+                                {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+                                  <div style={{ 
+                                    marginTop: '6px',
+                                    paddingTop: '6px',
+                                    borderTop: '1px solid #dee2e6',
+                                    fontSize: '10px',
+                                    color: '#007bff'
+                                  }}>
+                                    <i className="fas fa-hand-pointer me-1"></i>
+                                    {buttonsComponent.buttons.length} button{buttonsComponent.buttons.length > 1 ? 's' : ''}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="sessionExpiredMsg">
-              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
-            </div>
-          </ul>
-        </section>
+            {/* Message Input or Template Send Button */}
+            {selectedWhatsappTemplate ? (
+              // Template Selected - Show Send Button
+              <button 
+                className="btn flex-grow-1"
+                onClick={handleWhatsappSendTemplate}
+                disabled={isSendingWhatsapp}
+                style={{ 
+                  height: '42px',
+                  backgroundColor: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '24px',
+                  fontWeight: '500',
+                  fontSize: '15px'
+                }}
+              >
+                {isSendingWhatsapp ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane me-2"></i>
+                    Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+                  </>
+                )}
+              </button>
+            ) : hasActiveSession ? (
+              // Active Session - Show Input
+              <>
+                <div className="position-relative flex-grow-1">
+                  <input 
+                    type="text"
+                    className="form-control"
+                    value={whatsappNewMessage}
+                    onChange={(e) => setWhatsappNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+                    placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] || 'Ravi Prakash'}...`}
+                    style={{ 
+                      height: '42px', 
+                      paddingRight: '50px',
+                      borderRadius: '24px',
+                      border: '1px solid #E9EDEF',
+                      fontSize: '15px',
+                      backgroundColor: '#F0F2F5'
+                    }}
+                  />
+                  <button 
+                    className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+                    onClick={() => {
+                      setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+                      setShowWhatsappTemplateMenu(false);
+                    }}
+                    style={{ 
+                      height: '42px', 
+                      width: '42px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#54656F'
+                    }}
+                  >
+                    <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+                  </button>
 
-        <section className="footer-container">
-          <div className="footer-box">
-            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-              <textarea
-                placeholder="Choose a template"
-                className="disabled-style message-input"
-                disabled
-                rows="1"
-                id="message-input"
-                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-              ></textarea>
-            </div>
-            <hr className="divider" />
-            <div className="message-container-input">
-              <div className="left-footer">
-                <span className="disabled-style margin-bottom-5">
-                  <a className="margin-right-10" href="#" title="Emoji">
-                    <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
-                  </a>
-                </span>
-                <span className="disabled-style">
-                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
-                </span>
-                <span className="input-template">
-                  <a title="Whatsapp Template">
-                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
-                  </a>
-                </span>
+                  {/* Emoji Picker */}
+                  {showWhatsappEmojiPicker && (
+                    <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+                      <div className="d-flex flex-wrap gap-2" style={{ width: '250px' }}>
+                        {emojis.map((emoji, index) => (
+                          <button
+                            key={index}
+                            className="btn btn-light btn-sm"
+                            onClick={() => handleWhatsappEmojiClick(emoji)}
+                            style={{ fontSize: '20px', width: '40px', height: '40px', padding: 0 }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Send/Voice Button */}
+                {whatsappNewMessage.trim() ? (
+                  <button 
+                    onClick={handleWhatsappSendMessage}
+                    style={{ 
+                      width: '42px', 
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setWhatsappMessages([...whatsappMessages, {
+                        id: whatsappMessages.length + 1,
+                        text: '🎤 Voice message',
+                        sender: 'agent',
+                        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        type: 'voice'
+                      }]);
+                    }}
+                    style={{ 
+                      width: '42px', 
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                    title="Voice Message"
+                  >
+                    <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+                  </button>
+                )}
+              </>
+            ) : (
+              // No Session - Disabled
+              <div className="flex-grow-1 bg-light border border-2 border-dashed rounded d-flex align-items-center justify-content-center" style={{ height: '45px' }}>
+                <p className="mb-0 small text-muted">
+                  <i className="fas fa-info-circle me-2"></i>
+                  Session message sirf active session me bhej sakte hain
+                </p>
               </div>
-              <div className="right-footer">
-                <span className="disabled-style">
-                  <a className="send-button" href="#" title="Send">
-                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
-                  </a>
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-        </section>
+        </div>
       </div>
     );
 
@@ -13838,6 +14947,17 @@ animation: pulse 1.5s infinite;
 0% { transform: scale(1); }
 50% { transform: scale(1.05); }
 100% { transform: scale(1); }
+}
+
+@keyframes slideInFromRight {
+0% { 
+  opacity: 0; 
+  transform: translateX(30px); 
+}
+100% { 
+  opacity: 1; 
+  transform: translateX(0); 
+}
 }
 
 .recordings-list {
