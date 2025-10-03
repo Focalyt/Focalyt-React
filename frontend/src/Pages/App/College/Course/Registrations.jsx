@@ -3304,35 +3304,856 @@ const CRMDashboard = () => {
     setShowWhatsappEmojiPicker(false);
   };
 
-  const handleWhatsappSelectTemplate = (template) => {
-    setSelectedWhatsappTemplate(template);
-    setShowWhatsappTemplateMenu(false);
+  const handleWhatsappSelectTemplate =  (template) => {
+   setSelectedWhatsappTemplate(template);
+     handlePreparingSendingTemplate(template);
+     setShowWhatsappTemplateMenu(false);
+   
+  };
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
+  const [isCloneMode, setIsCloneMode] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: 'UTILITY',
+    language: 'en',
+    bodyText: '',
+    headerText: '',
+    footerText: '',
+    headerType: 'None',
+    headerImage: null,
+    headerVideo: null,
+    headerDocument: null,
+    buttons: [],
+    templateType: 'Custom',
+    // Flow configuration fields
+    flowId: '',
+    flowAction: '',
+    navigateScreen: '',
+    // Authentication configuration fields
+    codeDeliveryMethod: 'copy_code',
+    // Carousel configuration fields
+    carouselMessage: '',
+    carouselHeaderType: '',
+    carouselCards: [],
+    carouselVariables: [],
+    // Order details configuration fields
+    orderButtonText: 'Review and Pay',
+    // Order status configuration fields
+    orderStatusButtons: ['Track Order', 'Cancel Order'],
+    // Variables configuration fields
+    variables: []
+
+  });
+  const formatTemplateName = (name) => {
+
+    if (!name) return '';
+
+
+
+    let formatted = name
+
+      .toLowerCase() // Convert to lowercase
+
+      .replace(/\s+/g, '_') // Replace all spaces with underscores
+
+      .replace(/[^a-z0-9_]/g, '') // Remove special characters except underscores
+
+      .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+
+      .replace(/^|$/g, ''); // Remove leading/trailing underscores
+
+
+
+
+
+    return formatted;
+
   };
 
+  const handlePreparingSendingTemplate = (template) => {
+
+    setEditingTemplate(template);
+
+
+
+    // Extract template data for editing
+
+    const templateData = template.template || template;
+
+    const bodyComponent = templateData.components?.find(comp => comp.type === 'BODY');
+
+    const headerComponent = templateData.components?.find(comp => comp.type === 'HEADER');
+
+    const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
+
+    const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
+
+    // Determine template type based on buttons or other indicators
+
+    let templateType = 'Custom';
+
+    if (buttonsComponent?.buttons?.some(btn => btn.type === 'CATALOG')) {
+
+      templateType = 'Catalog';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'FLOW')) {
+
+      templateType = 'Flows';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'OTP')) {
+
+      templateType = 'Authentication';
+
+    } else if (templateData.carouselCards && templateData.carouselCards.length > 0) {
+
+      templateType = 'Carousel';
+
+    } else if (templateData.components.some(comp => (comp.type === 'carousel' || comp.type === 'CAROUSEL') && comp.cards && comp.cards.length > 0)) {
+
+      templateType = 'Carousel';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Review and Pay')) {
+
+      templateType = 'Order details';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Track Order')) {
+
+      templateType = 'Order Status';
+
+    }
+
+    // Extract carousel data from components
+    let carouselCards = [];
+    let carouselMessage = '';
+
+    if (templateType === 'Carousel') {
+      // First try to get carousel message from BODY component
+      const bodyComponent = templateData.components.find(comp => comp.type === 'BODY' || comp.type === 'body');
+      carouselMessage = bodyComponent?.text || '';
+
+      // Then find carousel component
+      const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+
+      console.log('Carousel Component Found:', carouselComponent);
+      console.log('Carousel Cards:', carouselComponent?.cards);
+
+      if (carouselComponent && carouselComponent.cards) {
+        carouselCards = carouselComponent.cards.map((card, index) => {
+          const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+          const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
+          const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
+
+
+
+          return {
+            id: Date.now() + index,
+            bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
+            buttons: card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons || [],
+            headerType: headerComponent?.format || 'None',
+            headerImage: headerImage,
+            headerVideo: headerVideo
+          };
+        });
+      }
+    }
+
+    // Extract header text
+
+    const headerText = headerComponent?.text ||
+
+      headerComponent?.example?.header_text?.[0] ||
+
+      headerComponent?.example?.header_text_named_params?.[0] ||
+
+      '';
+
+
+
+    // Map header type
+
+    const headerType = headerComponent?.format === 'TEXT' ? 'Text' :
+
+      headerComponent?.format === 'IMAGE' ? 'IMAGE' :
+
+        headerComponent?.format === 'VIDEO' ? 'VIDEO' :
+
+          headerComponent?.format === 'DOCUMENT' ? 'DOCUMENT' :
+
+            headerComponent ? 'Text' : 'None';
+
+
+
+    // Extract variables from body text
+
+    const bodyText = bodyComponent?.text || '';
+
+    const variableMatches = bodyText.match(/\{\{\d+\}\}/g) || [];
+
+    const variables = variableMatches.map((match, index) => ({
+
+      id: Date.now() + index,
+
+      placeholder: match,
+
+      value: ''
+
+    }));
+
+
+
+    // Clone the template with all data
+
+    setEditForm({
+
+      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+
+      category: templateData.category || 'UTILITY',
+
+      language: templateData.language || 'en',
+
+      bodyText: bodyText,
+
+      headerText: headerText,
+
+      footerText: footerComponent?.text || '',
+
+      headerType: headerType,
+
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      buttons: buttonsComponent?.buttons || [],
+
+      templateType: templateType,
+
+      // Flow configuration fields
+
+      flowId: templateData.flowId || '',
+
+      flowAction: templateData.flowAction || '',
+
+      navigateScreen: templateData.navigateScreen || '',
+
+      // Authentication configuration fields
+
+      codeDeliveryMethod: templateData.codeDeliveryMethod || 'copy_code',
+
+      // Carousel configuration fields
+
+      carouselMessage: carouselMessage || templateData.carouselMessage || '',
+
+      carouselHeaderType: carouselCards.length > 0 ? carouselCards[0].headerType : (templateData.carouselHeaderType || ''),
+
+      carouselCards: carouselCards.length > 0 ? carouselCards : (templateData.carouselCards || []),
+
+      carouselVariables: templateData.carouselVariables || [],
+
+      // Order details configuration fields
+
+      orderButtonText: templateData.orderButtonText || 'Review and Pay',
+
+      // Order status configuration fields
+
+      orderStatusButtons: templateData.orderStatusButtons || ['Track Order', 'Cancel Order'],
+
+      // Variables configuration fields
+
+      variables: variables
+
+    });
+
+    console.log('EditForm set with:', {
+      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+      headerType,
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      bodyText: bodyText,
+      footerText: footerComponent?.text || ''
+    });
+
+    // Reset carousel index
+
+    setCurrentCarouselIndex(0);
+
+    // Set clone mode and open create modal
+    setIsCloneMode(true);
+    setShowCreateModal(true);
+
+    console.log('Template cloned:', templateData.name, 'Type:', templateType);
+    console.log('Header component:', headerComponent);
+    console.log('Extracted header data:', {
+      headerType,
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null
+    });
+
+  };
+  // const handleWhatsappSendTemplate = async () => {
+  //   if (!selectedWhatsappTemplate) return;
+    
+  //   setIsSendingWhatsapp(true);
+    
+  //   let content = selectedWhatsappTemplate.content
+  //     .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+  //     .replace('{{2}}', 'Course Name');
+    
+  //   setWhatsappMessages([...whatsappMessages, {
+  //     id: whatsappMessages.length + 1,
+  //     text: content,
+  //     sender: 'agent',
+  //     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //     type: 'template'
+  //   }]);
+    
+  //   // Template bhejne ke baad session activate ho jata hai
+  //   setHasActiveSession(true);
+  //   setSelectedWhatsappTemplate(null);
+    
+  //   setTimeout(() => {
+  //     setIsSendingWhatsapp(false);
+  //   }, 1000);
+  // };
   const handleWhatsappSendTemplate = async () => {
     if (!selectedWhatsappTemplate) return;
     
+    // Validate required data
+    if (!selectedProfile?._candidate?.mobile) {
+      alert('Phone number not found for this candidate');
+      return;
+    }
+    
+    if (!selectedWhatsappTemplate.name) {
+      alert('Template name is missing');
+      return;
+    }
+    
+
     setIsSendingWhatsapp(true);
     
-    let content = selectedWhatsappTemplate.content
-      .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
-      .replace('{{2}}', 'Course Name');
-    
-    setWhatsappMessages([...whatsappMessages, {
-      id: whatsappMessages.length + 1,
-      text: content,
-      sender: 'agent',
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      type: 'template'
-    }]);
-    
-    // Template bhejne ke baad session activate ho jata hai
-    setHasActiveSession(true);
-    setSelectedWhatsappTemplate(null);
-    
-    setTimeout(() => {
-      setIsSendingWhatsapp(false);
-    }, 1000);
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+
+
+
+
+
+
+      // Validate required fields
+      const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
+
+      if (!editForm.name || !editForm.category || !editForm.language || !hasBodyText) {
+
+        alert('Please fill in all required fields (Name, Category, Language, and Body Text).');
+
+        return;
+
+      }
+
+
+
+      // Validate body text length (WhatsApp has a limit of 1024 characters)
+      const bodyTextToValidate = editForm.bodyText || editForm.carouselMessage || '';
+
+      if (bodyTextToValidate.length > 1024) {
+
+        alert('Body text is too long. Please keep it under 1024 characters.');
+
+        return;
+
+      }
+
+      // Validate carousel-specific requirements
+      if (editForm.templateType === 'Carousel') {
+        if (!editForm.carouselCards || editForm.carouselCards.length < 2) {
+          alert('Carousel templates must have at least 2 cards.');
+          return;
+        }
+
+        if (editForm.carouselCards.length > 10) {
+          alert('Carousel templates can have maximum 10 cards.');
+          return;
+        }
+
+        // Validate that each card has required fields
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          if (!card.buttons || card.buttons.length === 0) {
+            alert(`Card ${i + 1} must have at least one button.`);
+            return;
+          }
+        }
+      }
+      // Show loading state
+
+
+
+
+      // Prepare the template data for API
+
+      const templateData = {
+
+        name: editForm.name,
+
+        language: editForm.language,
+
+        category: editForm.category,
+
+        components: [
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'Text' && editForm.headerText ? [{
+
+            type: 'HEADER',
+
+            format: 'TEXT',
+
+            text: editForm.headerText
+
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'IMAGE' ? [{
+
+            type: 'HEADER',
+
+            format: 'IMAGE'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'VIDEO' ? [{
+
+            type: 'HEADER',
+
+            format: 'VIDEO'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'DOCUMENT' ? [{
+
+            type: 'HEADER',
+
+            format: 'DOCUMENT'
+          }] : []),
+
+          {
+
+            type: 'BODY',
+
+            text: editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText,
+
+            ...((editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText).includes('{{') ? {
+
+              example: {
+
+                body_text: [
+
+                  ["User"]
+
+                ]
+
+              }
+
+            } : {})
+
+          },
+
+          ...(editForm.footerText ? [{
+
+            type: 'FOOTER',
+
+            text: editForm.footerText
+
+          }] : []),
+
+          // Handle carousel templates separately
+          ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
+            type: 'carousel',
+            cards: editForm.carouselCards.map(card => ({
+              components: [
+                // Header component for each card
+                ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
+                  type: 'header',
+                  format: editForm.carouselHeaderType.toLowerCase(),
+                  example: {
+                    header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
+                  }
+                }] : []),
+                // Card body if exists
+                ...(card.bodyText ? [{
+                  type: 'body',
+                  text: card.bodyText
+                }] : []),
+                // Buttons for each card
+                ...(card.buttons && card.buttons.length > 0 ? [{
+                  type: 'buttons',
+                  buttons: card.buttons.map(button => ({
+                    type: button.type === 'quick_reply' ? 'quick_reply' :
+                      button.type === 'call_to_action' ? 'url' : 'quick_reply',
+                    text: button.text || 'Button',
+                    ...(button.type === 'call_to_action' && button.url ? {
+                      url: button.url,
+                      example: [button.url]
+                    } : {})
+                  }))
+                }] : [])
+              ]
+            }))
+          }] : []),
+          // Handle other template types
+          ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
+
+            type: 'BUTTONS',
+
+            buttons: editForm.templateType === 'Catalog'
+
+              ? [{ type: 'CATALOG', text: 'View catalog' }]
+
+              : editForm.templateType === 'Flows' && editForm.flowId
+
+                ? [{
+
+                  type: 'FLOW',
+
+                  text: 'Start Flow',
+
+                  flow_id: editForm.flowId,
+
+                  flow_action: editForm.flowAction || 'NAVIGATE',
+
+                  navigate_screen: editForm.navigateScreen || 'REGISTRATION'
+
+                }]
+
+                : editForm.templateType === 'Authentication'
+
+                  ? [{
+
+                    type: 'OTP',
+
+                    text: editForm.codeDeliveryMethod === 'copy_code' ? 'Copy Code' : 'Authenticate',
+
+                    otp_type: editForm.codeDeliveryMethod
+
+                  }]
+
+                  : editForm.templateType === 'Order details'
+
+                    ? [
+
+                      { type: 'URL', text: editForm.orderButtonText || 'Review and Pay', url: '#' },
+
+                      { type: 'URL', text: 'Pay now', url: '#' }
+
+                    ]
+
+                    : editForm.templateType === 'Order Status'
+
+                      ? (editForm.orderStatusButtons || []).map(buttonText => ({
+
+                        type: 'URL',
+
+                        text: buttonText,
+
+                        url: '#'
+
+                      }))
+
+                      : (editForm.buttons || []).map(button => {
+
+                        // Map button types to WhatsApp API format
+
+                        let mappedButton = {
+
+                          text: button.text
+
+                        };
+
+
+
+                        switch (button.type) {
+
+                          case 'CALL_TO_ACTION':
+
+                            mappedButton.type = 'URL';
+
+                            mappedButton.url = button.url || '#';
+
+                            break;
+
+                          case 'PHONE_NUMBER':
+
+                            mappedButton.type = 'PHONE_NUMBER';
+
+                            mappedButton.phone_number = button.phone_number || '+1234567890';
+
+                            break;
+
+                          case 'COPY_CODE':
+
+                            mappedButton.type = 'OTP';
+
+                            mappedButton.otp_type = 'copy_code';
+
+                            break;
+
+                          default:
+
+                            mappedButton.type = 'QUICK_REPLY';
+
+                        }
+
+
+
+                        return mappedButton;
+
+                      })
+
+          }] : [])
+
+        ]
+
+      };
+
+
+
+      // Add base64File if there's an image, video, or document header
+      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) ||
+        (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
+        (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
+        // Get the appropriate file based on header type
+        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage :
+          editForm.headerType === 'VIDEO' ? editForm.headerVideo :
+            editForm.headerDocument;
+        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' :
+          editForm.headerType === 'VIDEO' ? 'header_video.mp4' :
+            'header_document.pdf';
+
+        // Extract file name from the file or use a default name
+        const fileName = file.name || defaultName;
+
+        // If file is a File object, convert to base64
+        if (file instanceof File) {
+          const base64String = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string' && file.startsWith('data:')) {
+          // If it's already a data URL, extract the base64 part
+          const base64String = file.split(',')[1];
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string') {
+          // If it's already a base64 string
+          templateData.base64File = {
+            name: fileName,
+            body: file
+          };
+        }
+      }
+
+      // Handle carousel file uploads
+      if (editForm.templateType === 'Carousel' && editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None') {
+        // For carousel, we need to upload files for each card
+        const carouselFiles = [];
+
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          let file = null;
+          let defaultName = '';
+
+          if (editForm.carouselHeaderType === 'IMAGE' && card.headerImage) {
+            file = card.headerImage;
+            defaultName = `card_${i + 1}_image.png`;
+          } else if (editForm.carouselHeaderType === 'VIDEO' && card.headerVideo) {
+            file = card.headerVideo;
+            defaultName = `card_${i + 1}_video.mp4`;
+          }
+
+          if (file) {
+            const fileName = file.name || defaultName;
+
+            // Convert file to base64
+            if (file instanceof File) {
+              const base64String = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string' && file.startsWith('data:')) {
+              const base64String = file.split(',')[1];
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string') {
+              carouselFiles.push({
+                name: fileName,
+                body: file,
+                cardIndex: i
+              });
+            }
+          }
+        }
+
+        if (carouselFiles.length > 0) {
+          templateData.carouselFiles = carouselFiles;
+        }
+      }
+
+
+
+      // Make API call to create template
+
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, templateData, {
+
+        headers: { 'x-auth': token }
+
+      });
+
+
+
+      if (response.data.success) {
+
+        // Refresh templates list
+
+        await fetchWhatsappTemplates();
+
+
+
+        // Close the modal
+
+        setEditingTemplate(null);
+
+        setEditForm({
+
+          name: '',
+
+          category: 'UTILITY',
+
+          language: '',
+
+          bodyText: '',
+
+          headerText: '',
+
+          footerText: '',
+
+          headerType: 'None',
+
+          headerImage: null,
+
+          headerVideo: null,
+
+          headerDocument: null,
+
+          buttons: [],
+
+          templateType: 'Custom',
+
+          flowId: '',
+
+          flowAction: '',
+
+          navigateScreen: '',
+
+          codeDeliveryMethod: 'copy_code',
+
+          carouselMessage: '',
+
+          carouselHeaderType: '',
+
+          carouselCards: [],
+
+          orderButtonText: 'Review and Pay',
+
+          orderStatusButtons: ['Track Order', 'Cancel Order'],
+
+          variables: []
+
+        });
+
+
+
+        alert('Template sent successfully!');
+
+
+      } else {
+
+        throw new Error(response.data.message || 'Failed to create template');
+
+      }
+
+    } catch (error) {
+
+      console.error('Error creating template:', error);
+
+      console.log('Full error response:', error.response?.data);
+
+
+
+      // Extract detailed error message
+
+      let errorMessage = 'Error creating template. Please try again.';
+
+
+
+      if (error.response?.data?.error?.error_user_msg) {
+
+        errorMessage = error.response.data.error.error_user_msg;
+
+      } else if (error.response?.data?.detail) {
+
+        errorMessage = error.response.data.detail;
+
+      } else if (error.response?.data?.message) {
+
+        errorMessage = error.response.data.message;
+
+      } else if (error.message) {
+
+        errorMessage = error.message;
+
+      }
+
+
+
+      alert(`Error: ${errorMessage}`);
+
+    } finally {
+
+    setIsSendingWhatsapp(false);
+      
+
+    }
   };
 
   // Click outside to close WhatsApp dropdowns
@@ -4821,7 +5642,7 @@ const CRMDashboard = () => {
 
               {/* Template Dropdown */}
               {showWhatsappTemplateMenu && (
-                <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '350px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
                   <div className="p-3 border-bottom bg-light">
                     <h6 className="mb-0 fw-bold">Select Template to Send</h6>
                     <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
@@ -4844,7 +5665,7 @@ const CRMDashboard = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <div className="d-flex justify-content-between align-items-start mb-2">
+                        <div className="d-flex justify-content-between align-items-center">
                           <h6 className="mb-0 fw-semibold">{template.name}</h6>
                           <div className="d-flex gap-1">
                             <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
@@ -4852,218 +5673,6 @@ const CRMDashboard = () => {
                               <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
                             )}
                           </div>
-                        </div>
-                        <div className="bg-light p-2 rounded">
-                          {/* Template Preview in Dropdown */}
-                          {(() => {
-                            const components = template.components || [];
-                            
-                            // Check if it's a carousel template
-                            const carouselComponent = components.find(c => c.type === 'CAROUSEL');
-                            if (carouselComponent && carouselComponent.cards) {
-                              return (
-                                <div>
-                                  <p className="mb-2 small fw-semibold text-primary">
-                                    <i className="fas fa-images me-1"></i>
-                                    Carousel Template ({carouselComponent.cards.length} cards)
-                                  </p>
-                                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
-                                    {carouselComponent.cards.slice(0, 3).map((card, idx) => {
-                                      const cardHeader = card.components.find(c => c.type === 'HEADER');
-                                      const cardBody = card.components.find(c => c.type === 'BODY');
-                                      const imageUrl = cardHeader?.example?.header_handle?.[0];
-                                      
-                                      return (
-                                        <div key={idx} style={{ 
-                                          minWidth: '100px',
-                                          maxWidth: '100px',
-                                          border: '1px solid #dee2e6', 
-                                          borderRadius: '6px',
-                                          overflow: 'hidden',
-                                          backgroundColor: '#fff'
-                                        }}>
-                                          {imageUrl && (
-                                            <>
-                                              <img 
-                                                src={imageUrl} 
-                                                alt={`Card ${idx + 1}`}
-                                                style={{ 
-                                                  width: '100%', 
-                                                  height: '70px', 
-                                                  objectFit: 'cover'
-                                                }}
-                                                onError={(e) => {
-                                                  e.target.style.display = 'none';
-                                                  e.target.nextElementSibling.style.display = 'flex';
-                                                }}
-                                              />
-                                              <div style={{ 
-                                                display: 'none', 
-                                                height: '70px', 
-                                                alignItems: 'center', 
-                                                justifyContent: 'center',
-                                                backgroundColor: '#f0f0f0',
-                                                fontSize: '24px'
-                                              }}>
-                                                🖼️
-                                              </div>
-                                            </>
-                                          )}
-                                          <div style={{ padding: '4px', fontSize: '9px', lineHeight: '1.2' }}>
-                                            {cardBody?.text?.substring(0, 30) || ''}...
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                    {carouselComponent.cards.length > 3 && (
-                                      <div style={{
-                                        minWidth: '100px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '10px',
-                                        color: '#6b7280'
-                                      }}>
-                                        +{carouselComponent.cards.length - 3} more
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* Body text if exists */}
-                                  {(() => {
-                                    const bodyComp = components.find(c => c.type === 'BODY');
-                                    if (bodyComp && bodyComp.text) {
-                                      return (
-                                        <p className="mb-0 small text-muted mt-2" style={{ fontSize: '11px' }}>
-                                          {bodyComp.text}
-                                        </p>
-                                      );
-                                    }
-                                  })()}
-                                </div>
-                              );
-                            }
-                            
-                            // Regular template with header (image/video), body, footer
-                            const headerComponent = components.find(c => c.type === 'HEADER');
-                            const bodyComponent = components.find(c => c.type === 'BODY');
-                            const footerComponent = components.find(c => c.type === 'FOOTER');
-                            const buttonsComponent = components.find(c => c.type === 'BUTTONS');
-                            
-                            return (
-                              <div>
-                                {/* Header - Image or Video */}
-                                {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
-                                  <div style={{ marginBottom: '8px' }}>
-                                    <img 
-                                      src={headerComponent.example.header_handle[0]} 
-                                      alt="Template header"
-                                      style={{ 
-                                        width: '100%', 
-                                        maxHeight: '120px', 
-                                        objectFit: 'cover',
-                                        borderRadius: '4px'
-                                      }}
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        e.target.nextElementSibling.style.display = 'block';
-                                      }}
-                                    />
-                                    <div style={{ 
-                                      display: 'none',
-                                      padding: '15px',
-                                      textAlign: 'center',
-                                      backgroundColor: '#f0f0f0',
-                                      borderRadius: '4px',
-                                      fontSize: '28px'
-                                    }}>
-                                      🖼️
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
-                                  <div style={{ marginBottom: '8px', position: 'relative' }}>
-                                    <video 
-                                      src={headerComponent.example.header_handle[0]} 
-                                      style={{ 
-                                        width: '100%', 
-                                        maxHeight: '120px',
-                                        borderRadius: '4px',
-                                        backgroundColor: '#000'
-                                      }}
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        e.target.nextElementSibling.style.display = 'block';
-                                      }}
-                                    />
-                                    <div style={{ 
-                                      display: 'none',
-                                      padding: '15px',
-                                      textAlign: 'center',
-                                      backgroundColor: '#000',
-                                      color: '#fff',
-                                      borderRadius: '4px',
-                                      fontSize: '28px'
-                                    }}>
-                                      🎥
-                                    </div>
-                                    {/* Play icon overlay */}
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '50%',
-                                      left: '50%',
-                                      transform: 'translate(-50%, -50%)',
-                                      fontSize: '24px',
-                                      color: '#fff',
-                                      backgroundColor: 'rgba(0,0,0,0.5)',
-                                      borderRadius: '50%',
-                                      width: '36px',
-                                      height: '36px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}>
-                                      ▶️
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {headerComponent && headerComponent.format === 'TEXT' && (
-                                  <p className="mb-1 fw-bold small">{headerComponent.text}</p>
-                                )}
-                                
-                                {/* Body */}
-                                {bodyComponent && (
-                                  <p className="mb-1 small text-muted" style={{ whiteSpace: 'pre-wrap', fontSize: '11px' }}>
-                                    {bodyComponent.text
-                                      ?.replace('{{1}}', selectedProfile?._candidate?.name || 'User')
-                                      .replace('{{2}}', 'Course Name') || ''}
-                                  </p>
-                                )}
-                                
-                                {/* Footer */}
-                                {footerComponent && (
-                                  <p className="mb-0 small text-muted" style={{ fontSize: '10px', opacity: 0.7 }}>
-                                    {footerComponent.text}
-                                  </p>
-                                )}
-                                
-                                {/* Buttons indicator */}
-                                {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
-                                  <div style={{ 
-                                    marginTop: '6px',
-                                    paddingTop: '6px',
-                                    borderTop: '1px solid #dee2e6',
-                                    fontSize: '10px',
-                                    color: '#007bff'
-                                  }}>
-                                    <i className="fas fa-hand-pointer me-1"></i>
-                                    {buttonsComponent.buttons.length} button{buttonsComponent.buttons.length > 1 ? 's' : ''}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
                         </div>
                       </div>
                     ))
@@ -8516,6 +9125,10 @@ const CRMDashboard = () => {
           height: 100%;
         }
         @media (max-width: 767px) {
+        .whatappMaxWidth{
+        width:300px!important;
+        max-width:300px!important;
+        }
           .scrollable-container {
             display: block;
             width: 100%;
