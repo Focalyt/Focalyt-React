@@ -655,7 +655,7 @@ function AddCourseContent() {
                             className="btn btn-success px-lg-4 waves-effect waves-light"
                             disabled={isSubmitting || !selectedCourseId}
                         >
-                            {isSubmitting ? 'Saving...' : 'Save Content'}
+                            {isSubmitting ? 'Saving...' : 'Save'}
                         </button>
                     </div>
                 </div>

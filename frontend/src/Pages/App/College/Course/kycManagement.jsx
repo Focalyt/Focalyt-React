@@ -223,6 +223,148 @@ const useScrollBlur = (navbarHeight = 140) => {
   return { isScrolled, scrollY, contentRef };
 };
 const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
+  // Mobile-specific styles
+  const mobileStyles = `
+    @media (max-width: 767.98px) {
+      .main-tabs-container .d-flex {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 8px;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .main-tabs-container .d-flex::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .main-tabs-container .btn {
+        min-height: 44px;
+        padding: 8px 12px;
+        font-size: 14px;
+        touch-action: manipulation;
+        border-radius: 8px;
+        margin-right: 8px;
+      }
+      
+      .main-tabs-container .btn i {
+        font-size: 12px;
+      }
+      
+      .input-group .form-control {
+        min-height: 44px;
+        font-size: 16px;
+        border-radius: 8px;
+      }
+      
+      .input-group .btn {
+        min-height: 44px;
+        padding: 8px 16px;
+        border-radius: 0 8px 8px 0;
+      }
+      
+      .w-100.btn {
+        min-height: 44px;
+        padding: 12px 16px;
+        font-size: 16px;
+        border-radius: 8px;
+      }
+      
+      .milestoneResponsive {
+        font-size: 10px !important;
+        padding: 2px 4px !important;
+        top: -8px !important;
+        border-radius: 4px !important;
+      }
+      
+      .milestoneResponsive span {
+        font-size: 10px !important;
+        margin-left: 2px !important;
+      }
+      
+      /* Improve touch targets */
+      .btn-group .btn {
+        min-width: 44px;
+        min-height: 44px;
+      }
+      
+      /* Better spacing for mobile */
+      .d-flex.flex-column.gap-2 {
+        gap: 12px !important;
+      }
+      
+      .mb-3 {
+        margin-bottom: 16px !important;
+      }
+      
+      /* Container adjustments for mobile */
+      .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+      
+      /* Navbar adjustments */
+      .position-relative nav {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      
+      /* Better button spacing */
+      .flex-shrink-0 {
+        flex-shrink: 0;
+      }
+      
+      /* Improve text readability on small screens */
+      .btn-sm {
+        font-size: 13px;
+        line-height: 1.2;
+      }
+      
+      /* Better badge positioning */
+      .badge {
+        font-size: 11px;
+        padding: 4px 6px;
+      }
+    }
+    
+    /* Extra small devices (phones, less than 576px) */
+    @media (max-width: 575.98px) {
+      .main-tabs-container .btn {
+        padding: 6px 8px;
+        font-size: 12px;
+        min-height: 40px;
+      }
+      
+      .main-tabs-container .btn i {
+        font-size: 10px;
+      }
+      
+      .input-group .form-control {
+        min-height: 40px;
+        font-size: 14px;
+      }
+      
+      .input-group .btn {
+        min-height: 40px;
+        padding: 6px 12px;
+      }
+      
+      .w-100.btn {
+        min-height: 40px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      
+      .container-fluid {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      
+      .position-relative nav {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+      }
+    }
+  `;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -2696,57 +2838,57 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
               </div>
 
               {/* Document Actions */}
-           
-              
+
+
               {
-              (
-                (permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') ||
-                permissions?.permission_type === 'Admin'
-              )
-              &&(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
-                <div className="document-actions mt-4">
-                  {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-success me-2"
-                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                      >
-                        <i className="fas fa-check"></i> Approve Document
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        onClick={handleRejectClick}
-                      >
-                        <i className="fas fa-times"></i> Reject Document
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="8"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
+                (
+                  (permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') ||
+                  permissions?.permission_type === 'Admin'
+                )
+                && (latestUpload?.status || selectedDocument?.status) === 'Pending' && (
+                  <div className="document-actions mt-4">
+                    {!showRejectionForm ? (
+                      <div className="action-buttons">
+                        <button
+                          className="btn btn-success me-2"
+                          onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+                        >
+                          <i className="fas fa-check"></i> Approve Document
+                        </button>
                         <button
                           className="btn btn-danger"
-                          onClick={handleConfirmRejection}
+                          onClick={handleRejectClick}
                         >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={handleCancelRejection}
-                        >
-                          Cancel
+                          <i className="fas fa-times"></i> Reject Document
                         </button>
                       </div>
-                    </div>
-                  )}
-                </div>)}
-              
+                    ) : (
+                      <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                        <textarea
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          placeholder="Please provide a detailed reason for rejection..."
+                          rows="8"
+                          className="form-control mb-3"
+                        />
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-danger"
+                            onClick={handleConfirmRejection}
+                          >
+                            Confirm Rejection
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={handleCancelRejection}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>)}
+
 
 
             </div>
@@ -2992,6 +3134,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   return (
     <div className="container-fluid">
+      {/* Mobile-specific styles */}
+      <style>{mobileStyles}</style>
+
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
@@ -3028,18 +3173,22 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
               transition: 'all 0.3s ease'
             }}>
               <div className="container-fluid py-2">
-                <div className="row align-items-center justify-content-between">
-                  <div className="col-md-6 d-md-block d-sm-none">
+                {/* Mobile Layout - Stack vertically */}
+                <div className="d-md-none" style={{margin: '15px'}}>
+                  {/* Filter Tabs - Mobile with horizontal scroll */}
+                  <div className="mb-3">
                     <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                      <div className="btn-group" role="group" aria-label="eKYC Filters">
+                      <div className="d-flex overflow-auto">
                         {ekycFilters.map((filter, index) => (
-                          <div key={filter._id} className="position-relative d-inline-block me-2">
+                          <div key={filter._id} className="position-relative flex-shrink-0 me-2">
                             <button
                               className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
                               onClick={() => handleCrmFilterClick(filter, index)}
+                              style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
                             >
                               <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
-                              {filter.name}
+                              <span className="d-none d-sm-inline">{filter.name}</span>
+                              <span className="d-sm-none">{filter.name.split(' ')[0]}</span>
                               <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
                             </button>
                             {filter.milestone && (
@@ -3068,45 +3217,206 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                     </div>
                   </div>
 
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                  {/* Search and Filter Controls - Mobile */}
+                  <div className="d-flex flex-column gap-2">
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        name="name"
+                        className="form-control"
+                        placeholder="Quick search..."
+                        value={filterData.name}
+                        onChange={handleFilterChange}
+                      />
+                      <button
+                        onClick={() => fetchProfileData()}
+                        className="btn btn-outline-primary"
+                      >
+                        <i className="fas fa-search"></i>
+                      </button>
+                    </div>
 
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
+                    <button
+                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                      className={`btn w-100 ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                    >
+                      <i className={`fas fa-filter me-2 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                      Filters
+                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                        <span className="badge bg-light text-dark ms-2">
+                          {Object.values(filterData).filter(val => val && val !== 'true').length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Desktop Layout - Original horizontal layout */}
+                <div className="d-none d-lg-block">
+                  <div className="row align-items-center justify-content-between">
+                    <div className="col-lg-6">
+                      <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
+                        <div className="btn-group" role="group" aria-label="eKYC Filters">
+                          {ekycFilters.map((filter, index) => (
+                            <div key={filter._id} className="position-relative d-inline-block me-2">
+                              <button
+                                className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                                onClick={() => handleCrmFilterClick(filter, index)}
+                              >
+                                <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
+                                {filter.name}
+                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                              </button>
+                              {filter.milestone && (
+                                <span
+                                  className="bg-success d-flex align-items-center milestoneResponsive"
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'white',
+                                    verticalAlign: 'middle',
+                                    padding: '0.25em 0.5em',
+                                    transform: 'translate(15%, -100%)',
+                                    position: 'absolute',
+                                    borderRadius: '3px',
+                                    top: '-10px',
+                                    left: '50%',
+                                    zIndex: 1
+                                  }}
+                                  title={`Milestone: ${filter.milestone}`}
+                                >
+                                  🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="col-lg-6">
+                      <div className="d-flex justify-content-end align-items-center gap-2">
+                        <div className="input-group" style={{ maxWidth: '300px' }}>
+
+                          <input
+                            type="text"
+                            name="name"
+                            className="form-control border-start-0 m-0"
+                            placeholder="Quick search..."
+                            value={filterData.name}
+                            onChange={handleFilterChange}
+                          />
+                          <button
+                            onClick={() => fetchProfileData()}
+                            className={`btn btn-outline-primary`}
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            <i className={`fas fa-search me-1`}></i>
+                            Search
+
+                          </button>
+                        </div>
+
+
                         <button
-                          onClick={() => fetchProfileData()}
-                          className={`btn btn-outline-primary`}
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
                           style={{ whiteSpace: 'nowrap' }}
                         >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
+                          <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                          Filters
+                          {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                            <span className="bg-light text-dark ms-1">
+                              {Object.values(filterData).filter(val => val && val !== 'true').length}
+                            </span>
+                          )}
+                        </button>
 
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Medium screen layout - Stack vertically to prevent overlap */}
+                <div className="d-none d-md-block d-lg-none">
+                  <div className="row">
+                    {/* Filter Tabs */}
+                    <div className="col-12 mb-3">
+                      <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
+                        <div className="d-flex flex-wrap gap-2">
+                          {ekycFilters.map((filter, index) => (
+                            <div key={filter._id} className="position-relative">
+                              <button
+                                className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                                onClick={() => handleCrmFilterClick(filter, index)}
+                                style={{ whiteSpace: 'nowrap' }}
+                              >
+                                <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
+                                {filter.name}
+                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                              </button>
+                              {filter.milestone && (
+                                <span
+                                  className="bg-success d-flex align-items-center milestoneResponsive"
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'white',
+                                    verticalAlign: 'middle',
+                                    padding: '0.25em 0.5em',
+                                    transform: 'translate(15%, -100%)',
+                                    position: 'absolute',
+                                    borderRadius: '3px',
+                                    top: '-10px',
+                                    left: '50%',
+                                    zIndex: 1
+                                  }}
+                                  title={`Milestone: ${filter.milestone}`}
+                                >
+                                  🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search and Filter Controls */}
+                    <div className="col-12">
+                      <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
+                        <div className="input-group" style={{ maxWidth: '250px', minWidth: '200px' }}>
+                          <input
+                            type="text"
+                            name="name"
+                            className="form-control border-start-0 m-0"
+                            placeholder="Quick search..."
+                            value={filterData.name}
+                            onChange={handleFilterChange}
+                          />
+                          <button
+                            onClick={() => fetchProfileData()}
+                            className={`btn btn-outline-primary`}
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            <i className={`fas fa-search me-1`}></i>
+                            Search
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                          Filters
+                          {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                            <span className="bg-light text-dark ms-1">
+                              {Object.values(filterData).filter(val => val && val !== 'true').length}
+                            </span>
+                          )}
                         </button>
                       </div>
-
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-
-
                     </div>
                   </div>
                 </div>
@@ -3550,10 +3860,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                       <div className="row align-items-center justify-content-between">
                                         <div className="col-md-7">
                                           <div className="d-flex align-items-center">
-                                            <div className="form-check me-3">
+                                            <div className="form-check me-md-3 me-sm-1 me-1">
                                               <input className="form-check-input" type="checkbox" />
                                             </div>
-                                            <div className="me-3">
+                                            <div className="me-md-3 me-md-1 me-1">
                                               <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                                 <svg width="40" height="40">
                                                   <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -3566,18 +3876,20 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                               <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
                                               <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                             </div>
-                                            <div style={{ marginLeft: '15px' }}>
-                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                            <div className='pendingkyc'>
+                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' , marginBottom: '0.35rem' }}>
                                                 <i className="fas fa-phone"></i>
                                               </button>
                                               <img
                                                 src="/Assets/public_assets/images/kyc_done.png"
                                                 alt="ekyc done"
+                                                className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === true || profile?.docCounts?.totalRequired === 0 ? 'inline-block' : 'none' }}
                                               />
                                               <img
                                                 src="/Assets/public_assets/images/ekyc_pending.png"
                                                 alt="ekyc pending"
+                                                className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
                                               />
                                             </div>
@@ -5488,7 +5800,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         html body .content .content-wrapper {
           padding: calc(0.9rem - 0.1rem) 1.2rem
         }
-
+          .pendingkyc{
+          margin-left:15px;
+          }
 
         .bg-gradient-primary {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -5747,9 +6061,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -6295,6 +6609,9 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+          html body .content .content-wrapper{
+            padding: 1.8rem 0.9rem 0 !important;
+          }
           .resume-document-body {
             flex-direction: column;
           }
@@ -6563,10 +6880,6 @@ background: #fd2b5a;
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
 
-
-    .btn-group {
-        flex-wrap: wrap;
-    }
 
     .input-group {
         max-width: 100% !important;
@@ -8333,7 +8646,13 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 250px!important;
+          }
+          .pendingkyc{
+          margin-left:5px;
+          }
+          .ekycimg{
+          width:75px!important
           }
         }
 

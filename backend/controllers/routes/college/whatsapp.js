@@ -145,7 +145,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 		const { name, language, category, components, base64File, carouselFiles } = req.body;
 		let files = req.files;
 
-    console.log(req.body, "req.body");
+    // console.log(req.body, "req.body");
 		console.log("Files", files);
 
 		// Validate required fields
@@ -561,5 +561,23 @@ router.delete('/delete-template/:id', isCollege, async (req, res) => {
 });
 
 
+
+
+router.post('/send-template', [isCollege], async (req, res) => {
+	try {
+		const { name, language, category, components, base64File, carouselFiles } = req.body;
+		let files = req.files;
+
+		console.log(req.body, "req.body");
+		console.log(files, "files");
+
+	} catch (error) {
+		console.error('Error sending WhatsApp template:', error);
+		res.status(500).json({
+			success: false,
+			error: error.response?.data || error.message
+		});
+	}
+});
 
 module.exports = router; 

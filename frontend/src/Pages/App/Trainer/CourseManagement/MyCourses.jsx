@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 function MyCourses() {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
-  
+
     const courses = [
         {
             id: 1,
@@ -81,7 +81,7 @@ function MyCourses() {
 
     const getStatusBadge = (status) => {
         const badges = {
-            
+
         };
         return badges[status] || 'primary';
     };
@@ -109,7 +109,7 @@ function MyCourses() {
                             </div>
                         </div>
                     </div>
-                   
+
                 </div>
 
                 {/* Stats Cards */}
@@ -150,41 +150,25 @@ function MyCourses() {
                             </div>
                         </div>
                     </div>
-                    
+
                 </div>
 
                 {/* Filter & View Toggle */}
                 <div className="row mb-3">
                     <div className="col-12">
-                        <div className="card">
-                            <div className="card-body py-2">
-                                <div className="row align-items-center">
-                                  
-                                    <div className="col-md-6 col-12">
-                                        <div className="d-flex justify-content-end align-items-center">
-                                            <input 
-                                                type="text" 
-                                                className="form-control form-control-sm mr-2" 
-                                                placeholder="Search courses..."
-                                                style={{maxWidth: '200px'}}
-                                            />
-                                            <div className="btn-group btn-group-sm" role="group">
-                                                <button 
-                                                    type="button" 
-                                                    className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-primary'}`}
-                                                    onClick={() => setViewMode('grid')}
-                                                >
-                                                    <i className="feather icon-grid"></i>
-                                                </button>
-                                                <button 
-                                                    type="button" 
-                                                    className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-primary'}`}
-                                                    onClick={() => setViewMode('list')}
-                                                >
-                                                    <i className="feather icon-list"></i>
-                                                </button>
-                                            </div>
-                                        </div>
+                        <div className="search-container">
+                            <div className="row align-items-center justify-content-end">
+                                <div className="col-md-6 col-12">
+                                    <div className="d-flex justify-content-end align-items-center">
+                                        <input
+                                            type="text"
+                                            className="search-input mr-2"
+                                            placeholder="Search courses..."
+                                        />
+                                        <button className="search-button">
+                                            <i className="fas fa-search"></i>
+                                            Search
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -199,19 +183,19 @@ function MyCourses() {
                             <div className="col-xl-4 col-md-6 col-12 mb-4" key={course.id}>
                                 <div className="card course-card">
                                     <div className="card-img-top-wrapper">
-                                        <img 
-                                            src={course.image} 
+                                        <img
+                                            src={course.image}
                                             alt={course.title}
                                             className="card-img-top"
                                         />
-                                                                             
+
                                         <div className="courseCategory">
                                             <p className='courseType'>FFTl</p>
                                             <div className='coursedes'>
-                                            <p className="course-fee">Rs: 100</p>
-                                            <p className="course-duration">3 Months</p>
+                                                <p className="course-fee">Rs: 100</p>
+                                                <p className="course-duration">3 Months</p>
                                             </div>
-                                            
+
                                         </div>
                                     </div>
                                     <div className="card-body">
@@ -226,7 +210,7 @@ function MyCourses() {
                                             <Link to="" className="btn btn-sm btn-outline-primary">
                                                 <i className="feather icon-eye mr-1"></i>
                                                 View
-                                            </Link>                                           
+                                            </Link>
                                         </div>
                                     </div>
                                 </div>
@@ -259,11 +243,11 @@ function MyCourses() {
                                                     <tr key={course.id}>
                                                         <td>
                                                             <div className="d-flex align-items-center">
-                                                                <img 
-                                                                    src={course.image} 
+                                                                <img
+                                                                    src={course.image}
                                                                     alt={course.title}
                                                                     className="rounded mr-3"
-                                                                    style={{width: '60px', height: '60px', objectFit: 'cover'}}
+                                                                    style={{ width: '60px', height: '60px', objectFit: 'cover' }}
                                                                 />
                                                                 <div>
                                                                     <h6 className="mb-0">{course.title}</h6>
@@ -282,10 +266,10 @@ function MyCourses() {
                                                         <td className="align-middle">{course.duration}</td>
                                                         <td className="align-middle">
                                                             <div className="d-flex align-items-center">
-                                                                <div className="progress flex-grow-1 mr-2" style={{height: '8px'}}>
-                                                                    <div 
-                                                                        className="progress-bar bg-primary" 
-                                                                        style={{width: `${course.progress}%`}}
+                                                                <div className="progress flex-grow-1 mr-2" style={{ height: '8px' }}>
+                                                                    <div
+                                                                        className="progress-bar bg-primary"
+                                                                        style={{ width: `${course.progress}%` }}
                                                                     ></div>
                                                                 </div>
                                                                 <small className="font-weight-bold">{course.progress}%</small>
@@ -293,7 +277,7 @@ function MyCourses() {
                                                         </td>
                                                         <td className="align-middle">
                                                             <span className={`badge badge-${getStatusBadge(course.status)}`}>
-                                                              
+
                                                             </span>
                                                         </td>
                                                         <td className="align-middle">
@@ -301,7 +285,7 @@ function MyCourses() {
                                                                 <button className="btn btn-outline-primary">
                                                                     <i className="feather icon-eye"></i>
                                                                 </button>
-                                                              
+
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -315,7 +299,7 @@ function MyCourses() {
                     </div>
                 )}
 
-            
+
             </div>
 
             {/* Custom CSS */}
@@ -650,6 +634,93 @@ function MyCourses() {
 
                 .table-responsive::-webkit-scrollbar-thumb:hover {
                     background: #e0204f;
+                }
+
+                /* Search Component Styling */
+                .search-container {
+                    background: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    padding: 12px 16px;
+                    border: 1px solid #e9ecef;
+                }
+
+                .search-input {
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                    background: #fff;
+                    color: #374151;
+                    max-width: 200px;
+                    border-top-right-radius: 0px;
+                    border-bottom-right-radius: 0px;
+                }
+
+                .search-input::placeholder {
+                    color: #9ca3af;
+                    font-size: 14px;
+                }
+
+                .search-button {
+                    background: #fff;
+                    border: 1px solid #3b82f6;
+                    border-radius: 6px;
+                    color: #3b82f6;
+                    padding: 8px 16px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                    white-space: nowrap;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    border-top-left-radius: 0px;
+                    border-bottom-left-radius: 0px
+                }
+
+                .search-button:hover {
+                    background: #3b82f6;
+                    color: #fff;
+                }
+
+                .search-button:active {
+                    transform: translateY(0);
+                    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+                }
+
+                .search-button i {
+                    font-size: 14px;
+                }
+
+                /* Responsive search styling */
+                @media (max-width: 768px) {
+                    .search-input {
+                        max-width: 150px;
+                        font-size: 13px;
+                    }
+                    
+                    .search-button {
+                        padding: 8px 12px;
+                        font-size: 13px;
+                    }
+                }
+
+                @media (max-width: 576px) {
+                    .search-container .d-flex {
+                        flex-direction: column;
+                        gap: 8px;
+                    }
+                    
+                    .search-input {
+                        max-width: 100%;
+                    }
+                    
+                    .search-button {
+                        width: 100%;
+                        justify-content: center;
+                    }
                 }
             `}</style>
         </>

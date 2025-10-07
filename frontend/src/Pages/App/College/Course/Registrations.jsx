@@ -891,6 +891,20 @@ const CRMDashboard = () => {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
+  // WhatsApp Panel states
+  const [whatsappMessages, setWhatsappMessages] = useState([
+    { id: 1, text: 'Hi, I am interested in your course', sender: 'lead', time: '10:25 AM', type: 'session' },
+    { id: 2, text: 'Hello! Thank you for your interest. I would be happy to help you.', sender: 'agent', time: '10:26 AM', type: 'session' }
+  ]);
+  const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
+  const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
+  const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
+  const [showWhatsappEmojiPicker, setShowWhatsappEmojiPicker] = useState(false);
+  const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
+  const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
+  const whatsappMessagesEndRef = useRef(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -3155,6 +3169,1035 @@ const CRMDashboard = () => {
     }
   };
 
+  // Fetch WhatsApp Templates from backend
+  const fetchWhatsappTemplates = async () => {
+
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+
+
+      // Get environment variables for Facebook API
+      const businessAccountId = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const accessToken = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
+
+      if (!businessAccountId || !accessToken) {
+        alert('WhatsApp Business Account ID or Access Token not configured in environment variables.');
+        return;
+      }
+
+      // Fetch templates directly from Facebook Graph API
+      const response = await axios.get(
+        `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
+          }
+        }
+      );
+      
+      if (response.data && response.data.data) {
+        // downloadTemplatesJSON(response.data.data);
+        console.log('templates', response.data.data);
+        
+        const formattedTemplates = response.data.data
+          .filter(template => template.status === 'APPROVED') // Only show approved templates
+          .map((template) => {
+            // Extract BODY text from components
+            let bodyText = '';
+            let headerText = '';
+            let footerText = '';
+            let hasButtons = false;
+            
+            if (template.components && Array.isArray(template.components)) {
+              template.components.forEach(component => {
+                if (component.type === 'BODY') {
+                  bodyText = component.text || '';
+                } else if (component.type === 'HEADER') {
+                  if (component.format === 'TEXT') {
+                    headerText = component.text || '';
+                  } else {
+                    headerText = `[${component.format}]`;
+                  }
+                } else if (component.type === 'FOOTER') {
+                  footerText = component.text || '';
+                } else if (component.type === 'BUTTONS') {
+                  hasButtons = true;
+                } else if (component.type === 'CAROUSEL') {
+                  bodyText = '[Carousel Template]';
+                }
+              });
+            }
+            
+            // Combine all text parts
+            let fullContent = '';
+            if (headerText) fullContent += headerText + '\n\n';
+            fullContent += bodyText;
+            if (footerText) fullContent += '\n\n' + footerText;
+            if (hasButtons) fullContent += '\n[Interactive Buttons]';
+            
+            return {
+              id: template.id,
+              name: template.name,
+              content: fullContent || 'No preview available',
+              category: template.category || 'General',
+              language: template.language || 'en',
+              status: template.status,
+              components: template.components // Keep original for sending
+            };
+          });
+        
+        setWhatsappTemplates(formattedTemplates);
+        console.log('Formatted templates:', formattedTemplates);
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching WhatsApp templates from Facebook:', error);
+      alert('Error fetching templates from Facebook. Please check your configuration.');
+
+    }
+
+  };
+
+  const downloadTemplatesJSON = (data) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `whatsapp-templates-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+
+  const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
+
+  const handleWhatsappSendMessage = () => {
+    if (whatsappNewMessage.trim() && hasActiveSession) {
+      setWhatsappMessages([...whatsappMessages, {
+        id: whatsappMessages.length + 1,
+        text: whatsappNewMessage,
+        sender: 'agent',
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        type: 'session'
+      }]);
+      setWhatsappNewMessage('');
+      setShowWhatsappEmojiPicker(false);
+    }
+  };
+
+  const handleWhatsappEmojiClick = (emoji) => {
+    setWhatsappNewMessage(whatsappNewMessage + emoji);
+    setShowWhatsappEmojiPicker(false);
+  };
+
+  const handleWhatsappSelectTemplate =  (template) => {
+   setSelectedWhatsappTemplate(template);
+     handlePreparingSendingTemplate(template);
+     setShowWhatsappTemplateMenu(false);
+   
+  };
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
+  const [isCloneMode, setIsCloneMode] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: 'UTILITY',
+    language: 'en',
+    bodyText: '',
+    headerText: '',
+    footerText: '',
+    headerType: 'None',
+    headerImage: null,
+    headerVideo: null,
+    headerDocument: null,
+    buttons: [],
+    templateType: 'Custom',
+    // Flow configuration fields
+    flowId: '',
+    flowAction: '',
+    navigateScreen: '',
+    // Authentication configuration fields
+    codeDeliveryMethod: 'copy_code',
+    // Carousel configuration fields
+    carouselMessage: '',
+    carouselHeaderType: '',
+    carouselCards: [],
+    carouselVariables: [],
+    // Order details configuration fields
+    orderButtonText: 'Review and Pay',
+    // Order status configuration fields
+    orderStatusButtons: ['Track Order', 'Cancel Order'],
+    // Variables configuration fields
+    variables: []
+
+  });
+  const formatTemplateName = (name) => {
+
+    if (!name) return '';
+
+
+
+    let formatted = name
+
+      .toLowerCase() // Convert to lowercase
+
+      .replace(/\s+/g, '_') // Replace all spaces with underscores
+
+      .replace(/[^a-z0-9_]/g, '') // Remove special characters except underscores
+
+      .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+
+      .replace(/^|$/g, ''); // Remove leading/trailing underscores
+
+
+
+
+
+    return formatted;
+
+  };
+
+  const handlePreparingSendingTemplate = (template) => {
+
+    setEditingTemplate(template);
+
+
+
+    // Extract template data for editing
+
+    const templateData = template.template || template;
+
+    const bodyComponent = templateData.components?.find(comp => comp.type === 'BODY');
+
+    const headerComponent = templateData.components?.find(comp => comp.type === 'HEADER');
+
+    const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
+
+    const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
+
+    // Determine template type based on buttons or other indicators
+
+    let templateType = 'Custom';
+
+    if (buttonsComponent?.buttons?.some(btn => btn.type === 'CATALOG')) {
+
+      templateType = 'Catalog';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'FLOW')) {
+
+      templateType = 'Flows';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'OTP')) {
+
+      templateType = 'Authentication';
+
+    } else if (templateData.carouselCards && templateData.carouselCards.length > 0) {
+
+      templateType = 'Carousel';
+
+    } else if (templateData.components.some(comp => (comp.type === 'carousel' || comp.type === 'CAROUSEL') && comp.cards && comp.cards.length > 0)) {
+
+      templateType = 'Carousel';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Review and Pay')) {
+
+      templateType = 'Order details';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Track Order')) {
+
+      templateType = 'Order Status';
+
+    }
+
+    // Extract carousel data from components
+    let carouselCards = [];
+    let carouselMessage = '';
+
+    if (templateType === 'Carousel') {
+      // First try to get carousel message from BODY component
+      const bodyComponent = templateData.components.find(comp => comp.type === 'BODY' || comp.type === 'body');
+      carouselMessage = bodyComponent?.text || '';
+
+      // Then find carousel component
+      const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+
+      console.log('Carousel Component Found:', carouselComponent);
+      console.log('Carousel Cards:', carouselComponent?.cards);
+
+      if (carouselComponent && carouselComponent.cards) {
+        carouselCards = carouselComponent.cards.map((card, index) => {
+          const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+          const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
+          const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
+
+
+
+          return {
+            id: Date.now() + index,
+            bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
+            buttons: card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons || [],
+            headerType: headerComponent?.format || 'None',
+            headerImage: headerImage,
+            headerVideo: headerVideo
+          };
+        });
+      }
+    }
+
+    // Extract header text
+
+    const headerText = headerComponent?.text ||
+
+      headerComponent?.example?.header_text?.[0] ||
+
+      headerComponent?.example?.header_text_named_params?.[0] ||
+
+      '';
+
+
+
+    // Map header type
+
+    const headerType = headerComponent?.format === 'TEXT' ? 'Text' :
+
+      headerComponent?.format === 'IMAGE' ? 'IMAGE' :
+
+        headerComponent?.format === 'VIDEO' ? 'VIDEO' :
+
+          headerComponent?.format === 'DOCUMENT' ? 'DOCUMENT' :
+
+            headerComponent ? 'Text' : 'None';
+
+
+
+    // Extract variables from body text
+
+    const bodyText = bodyComponent?.text || '';
+
+    const variableMatches = bodyText.match(/\{\{\d+\}\}/g) || [];
+
+    const variables = variableMatches.map((match, index) => ({
+
+      id: Date.now() + index,
+
+      placeholder: match,
+
+      value: ''
+
+    }));
+
+
+
+    // Clone the template with all data
+
+    setEditForm({
+
+      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+
+      category: templateData.category || 'UTILITY',
+
+      language: templateData.language || 'en',
+
+      bodyText: bodyText,
+
+      headerText: headerText,
+
+      footerText: footerComponent?.text || '',
+
+      headerType: headerType,
+
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      buttons: buttonsComponent?.buttons || [],
+
+      templateType: templateType,
+
+      // Flow configuration fields
+
+      flowId: templateData.flowId || '',
+
+      flowAction: templateData.flowAction || '',
+
+      navigateScreen: templateData.navigateScreen || '',
+
+      // Authentication configuration fields
+
+      codeDeliveryMethod: templateData.codeDeliveryMethod || 'copy_code',
+
+      // Carousel configuration fields
+
+      carouselMessage: carouselMessage || templateData.carouselMessage || '',
+
+      carouselHeaderType: carouselCards.length > 0 ? carouselCards[0].headerType : (templateData.carouselHeaderType || ''),
+
+      carouselCards: carouselCards.length > 0 ? carouselCards : (templateData.carouselCards || []),
+
+      carouselVariables: templateData.carouselVariables || [],
+
+      // Order details configuration fields
+
+      orderButtonText: templateData.orderButtonText || 'Review and Pay',
+
+      // Order status configuration fields
+
+      orderStatusButtons: templateData.orderStatusButtons || ['Track Order', 'Cancel Order'],
+
+      // Variables configuration fields
+
+      variables: variables
+
+    });
+
+    console.log('EditForm set with:', {
+      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+      headerType,
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      bodyText: bodyText,
+      footerText: footerComponent?.text || ''
+    });
+
+    // Reset carousel index
+
+    setCurrentCarouselIndex(0);
+
+    // Set clone mode and open create modal
+    setIsCloneMode(true);
+    setShowCreateModal(true);
+
+    console.log('Template cloned:', templateData.name, 'Type:', templateType);
+    console.log('Header component:', headerComponent);
+    console.log('Extracted header data:', {
+      headerType,
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null
+    });
+
+  };
+  // const handleWhatsappSendTemplate = async () => {
+  //   if (!selectedWhatsappTemplate) return;
+    
+  //   setIsSendingWhatsapp(true);
+    
+  //   let content = selectedWhatsappTemplate.content
+  //     .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+  //     .replace('{{2}}', 'Course Name');
+    
+  //   setWhatsappMessages([...whatsappMessages, {
+  //     id: whatsappMessages.length + 1,
+  //     text: content,
+  //     sender: 'agent',
+  //     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //     type: 'template'
+  //   }]);
+    
+  //   // Template bhejne ke baad session activate ho jata hai
+  //   setHasActiveSession(true);
+  //   setSelectedWhatsappTemplate(null);
+    
+  //   setTimeout(() => {
+  //     setIsSendingWhatsapp(false);
+  //   }, 1000);
+  // };
+  const handleWhatsappSendTemplate = async () => {
+    if (!selectedWhatsappTemplate) return;
+    
+    // Validate required data
+    if (!selectedProfile?._candidate?.mobile) {
+      alert('Phone number not found for this candidate');
+      return;
+    }
+    
+    if (!selectedWhatsappTemplate.name) {
+      alert('Template name is missing');
+      return;
+    }
+    
+
+    setIsSendingWhatsapp(true);
+    
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+
+
+
+
+
+
+      // Validate required fields
+      const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
+
+      if (!editForm.name || !editForm.category || !editForm.language || !hasBodyText) {
+
+        alert('Please fill in all required fields (Name, Category, Language, and Body Text).');
+
+        return;
+
+      }
+
+
+
+      // Validate body text length (WhatsApp has a limit of 1024 characters)
+      const bodyTextToValidate = editForm.bodyText || editForm.carouselMessage || '';
+
+      if (bodyTextToValidate.length > 1024) {
+
+        alert('Body text is too long. Please keep it under 1024 characters.');
+
+        return;
+
+      }
+
+      // Validate carousel-specific requirements
+      if (editForm.templateType === 'Carousel') {
+        if (!editForm.carouselCards || editForm.carouselCards.length < 2) {
+          alert('Carousel templates must have at least 2 cards.');
+          return;
+        }
+
+        if (editForm.carouselCards.length > 10) {
+          alert('Carousel templates can have maximum 10 cards.');
+          return;
+        }
+
+        // Validate that each card has required fields
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          if (!card.buttons || card.buttons.length === 0) {
+            alert(`Card ${i + 1} must have at least one button.`);
+            return;
+          }
+        }
+      }
+      // Show loading state
+
+
+
+
+      // Prepare the template data for API
+
+      const templateData = {
+
+        name: editForm.name,
+
+        language: editForm.language,
+
+        category: editForm.category,
+
+        components: [
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'Text' && editForm.headerText ? [{
+
+            type: 'HEADER',
+
+            format: 'TEXT',
+
+            text: editForm.headerText
+
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'IMAGE' ? [{
+
+            type: 'HEADER',
+
+            format: 'IMAGE'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'VIDEO' ? [{
+
+            type: 'HEADER',
+
+            format: 'VIDEO'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'DOCUMENT' ? [{
+
+            type: 'HEADER',
+
+            format: 'DOCUMENT'
+          }] : []),
+
+          {
+
+            type: 'BODY',
+
+            text: editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText,
+
+            ...((editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText).includes('{{') ? {
+
+              example: {
+
+                body_text: [
+
+                  ["User"]
+
+                ]
+
+              }
+
+            } : {})
+
+          },
+
+          ...(editForm.footerText ? [{
+
+            type: 'FOOTER',
+
+            text: editForm.footerText
+
+          }] : []),
+
+          // Handle carousel templates separately
+          ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
+            type: 'carousel',
+            cards: editForm.carouselCards.map(card => ({
+              components: [
+                // Header component for each card
+                ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
+                  type: 'header',
+                  format: editForm.carouselHeaderType.toLowerCase(),
+                  example: {
+                    header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
+                  }
+                }] : []),
+                // Card body if exists
+                ...(card.bodyText ? [{
+                  type: 'body',
+                  text: card.bodyText
+                }] : []),
+                // Buttons for each card
+                ...(card.buttons && card.buttons.length > 0 ? [{
+                  type: 'buttons',
+                  buttons: card.buttons.map(button => ({
+                    type: button.type === 'quick_reply' ? 'quick_reply' :
+                      button.type === 'call_to_action' ? 'url' : 'quick_reply',
+                    text: button.text || 'Button',
+                    ...(button.type === 'call_to_action' && button.url ? {
+                      url: button.url,
+                      example: [button.url]
+                    } : {})
+                  }))
+                }] : [])
+              ]
+            }))
+          }] : []),
+          // Handle other template types
+          ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
+
+            type: 'BUTTONS',
+
+            buttons: editForm.templateType === 'Catalog'
+
+              ? [{ type: 'CATALOG', text: 'View catalog' }]
+
+              : editForm.templateType === 'Flows' && editForm.flowId
+
+                ? [{
+
+                  type: 'FLOW',
+
+                  text: 'Start Flow',
+
+                  flow_id: editForm.flowId,
+
+                  flow_action: editForm.flowAction || 'NAVIGATE',
+
+                  navigate_screen: editForm.navigateScreen || 'REGISTRATION'
+
+                }]
+
+                : editForm.templateType === 'Authentication'
+
+                  ? [{
+
+                    type: 'OTP',
+
+                    text: editForm.codeDeliveryMethod === 'copy_code' ? 'Copy Code' : 'Authenticate',
+
+                    otp_type: editForm.codeDeliveryMethod
+
+                  }]
+
+                  : editForm.templateType === 'Order details'
+
+                    ? [
+
+                      { type: 'URL', text: editForm.orderButtonText || 'Review and Pay', url: '#' },
+
+                      { type: 'URL', text: 'Pay now', url: '#' }
+
+                    ]
+
+                    : editForm.templateType === 'Order Status'
+
+                      ? (editForm.orderStatusButtons || []).map(buttonText => ({
+
+                        type: 'URL',
+
+                        text: buttonText,
+
+                        url: '#'
+
+                      }))
+
+                      : (editForm.buttons || []).map(button => {
+
+                        // Map button types to WhatsApp API format
+
+                        let mappedButton = {
+
+                          text: button.text
+
+                        };
+
+
+
+                        switch (button.type) {
+
+                          case 'CALL_TO_ACTION':
+
+                            mappedButton.type = 'URL';
+
+                            mappedButton.url = button.url || '#';
+
+                            break;
+
+                          case 'PHONE_NUMBER':
+
+                            mappedButton.type = 'PHONE_NUMBER';
+
+                            mappedButton.phone_number = button.phone_number || '+1234567890';
+
+                            break;
+
+                          case 'COPY_CODE':
+
+                            mappedButton.type = 'OTP';
+
+                            mappedButton.otp_type = 'copy_code';
+
+                            break;
+
+                          default:
+
+                            mappedButton.type = 'QUICK_REPLY';
+
+                        }
+
+
+
+                        return mappedButton;
+
+                      })
+
+          }] : [])
+
+        ]
+
+      };
+
+
+
+      // Add base64File if there's an image, video, or document header
+      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) ||
+        (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
+        (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
+        // Get the appropriate file based on header type
+        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage :
+          editForm.headerType === 'VIDEO' ? editForm.headerVideo :
+            editForm.headerDocument;
+        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' :
+          editForm.headerType === 'VIDEO' ? 'header_video.mp4' :
+            'header_document.pdf';
+
+        // Extract file name from the file or use a default name
+        const fileName = file.name || defaultName;
+
+        // If file is a File object, convert to base64
+        if (file instanceof File) {
+          const base64String = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string' && file.startsWith('data:')) {
+          // If it's already a data URL, extract the base64 part
+          const base64String = file.split(',')[1];
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string') {
+          // If it's already a base64 string
+          templateData.base64File = {
+            name: fileName,
+            body: file
+          };
+        }
+      }
+
+      // Handle carousel file uploads
+      if (editForm.templateType === 'Carousel' && editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None') {
+        // For carousel, we need to upload files for each card
+        const carouselFiles = [];
+
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          let file = null;
+          let defaultName = '';
+
+          if (editForm.carouselHeaderType === 'IMAGE' && card.headerImage) {
+            file = card.headerImage;
+            defaultName = `card_${i + 1}_image.png`;
+          } else if (editForm.carouselHeaderType === 'VIDEO' && card.headerVideo) {
+            file = card.headerVideo;
+            defaultName = `card_${i + 1}_video.mp4`;
+          }
+
+          if (file) {
+            const fileName = file.name || defaultName;
+
+            // Convert file to base64
+            if (file instanceof File) {
+              const base64String = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string' && file.startsWith('data:')) {
+              const base64String = file.split(',')[1];
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string') {
+              carouselFiles.push({
+                name: fileName,
+                body: file,
+                cardIndex: i
+              });
+            }
+          }
+        }
+
+        if (carouselFiles.length > 0) {
+          templateData.carouselFiles = carouselFiles;
+        }
+      }
+
+
+
+      // Make API call to create template
+
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, templateData, {
+
+        headers: { 'x-auth': token }
+
+      });
+
+
+
+      if (response.data.success) {
+
+        // Refresh templates list
+
+        await fetchWhatsappTemplates();
+
+
+
+        // Close the modal
+
+        setEditingTemplate(null);
+
+        setEditForm({
+
+          name: '',
+
+          category: 'UTILITY',
+
+          language: '',
+
+          bodyText: '',
+
+          headerText: '',
+
+          footerText: '',
+
+          headerType: 'None',
+
+          headerImage: null,
+
+          headerVideo: null,
+
+          headerDocument: null,
+
+          buttons: [],
+
+          templateType: 'Custom',
+
+          flowId: '',
+
+          flowAction: '',
+
+          navigateScreen: '',
+
+          codeDeliveryMethod: 'copy_code',
+
+          carouselMessage: '',
+
+          carouselHeaderType: '',
+
+          carouselCards: [],
+
+          orderButtonText: 'Review and Pay',
+
+          orderStatusButtons: ['Track Order', 'Cancel Order'],
+
+          variables: []
+
+        });
+
+
+
+        alert('Template sent successfully!');
+
+
+      } else {
+
+        throw new Error(response.data.message || 'Failed to create template');
+
+      }
+
+    } catch (error) {
+
+      console.error('Error creating template:', error);
+
+      console.log('Full error response:', error.response?.data);
+
+
+
+      // Extract detailed error message
+
+      let errorMessage = 'Error creating template. Please try again.';
+
+
+
+      if (error.response?.data?.error?.error_user_msg) {
+
+        errorMessage = error.response.data.error.error_user_msg;
+
+      } else if (error.response?.data?.detail) {
+
+        errorMessage = error.response.data.detail;
+
+      } else if (error.response?.data?.message) {
+
+        errorMessage = error.response.data.message;
+
+      } else if (error.message) {
+
+        errorMessage = error.message;
+
+      }
+
+
+
+      alert(`Error: ${errorMessage}`);
+
+    } finally {
+
+    setIsSendingWhatsapp(false);
+      
+
+    }
+  };
+
+  // Click outside to close WhatsApp dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside template menu
+      if (showWhatsappTemplateMenu) {
+        const templateButton = event.target.closest('.whatsapp-template-trigger');
+        const templateMenu = event.target.closest('.whatsapp-template-menu');
+        if (!templateButton && !templateMenu) {
+          setShowWhatsappTemplateMenu(false);
+        }
+      }
+      // Check if click is outside emoji picker
+      if (showWhatsappEmojiPicker) {
+        const emojiButton = event.target.closest('.whatsapp-emoji-trigger');
+        const emojiMenu = event.target.closest('.whatsapp-emoji-menu');
+        if (!emojiButton && !emojiMenu) {
+          setShowWhatsappEmojiPicker(false);
+        }
+      }
+    };
+
+    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker]);
+
+  // Fetch templates when WhatsApp panel opens
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappTemplates.length === 0) {
+      fetchWhatsappTemplates();
+    }
+  }, [showPanel]);
+
+  // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappMessagesEndRef.current) {
+      whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showPanel, whatsappMessages, selectedWhatsappTemplate]);
 
 
   const openleadHistoryPanel = async (profile = null) => {
@@ -4004,236 +5047,792 @@ const CRMDashboard = () => {
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
     const panelContent = (
-      <div className="whatsapp-chat right-side-panel">
-        <section className="topbar-container">
-          <div className="left-topbar">
-            <div className="img-container">
-              <div className="small-avatar" title="Ram Ruhela">RR</div>
-            </div>
-            <div className="flex-column">
-              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
-              <span className="selected-number">Primary: 918875426236</span>
-            </div>
-          </div>
-          <div className="right-topbar">
-
-            <a className="margin-horizontal-5" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
-            </a>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={closePanel}
-              title="Close WhatsApp"
+      <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+        {/* WhatsApp Header */}
+        <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
+          
+          <div className="d-flex align-items-center mb-2">
+            <div 
+              className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+              style={{ 
+                width: '48px', 
+                height: '48px', 
+                fontSize: '20px', 
+                fontWeight: '600',
+                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                flexShrink: 0
+              }}
             >
-              <i className="fas fa-times"></i>
-            </button>
+              {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+            </div>
+            <div className="flex-grow-1">
+              <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+                {selectedProfile?._candidate?.name || 'Ravi Prakash'}
+              </h6>
+              <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+                {selectedProfile?._candidate?.mobile || '8957066852'}
+              </p>
+            </div>
+            <button 
+              className="btn-close" 
+              onClick={closePanel}
+              style={{ marginLeft: '8px' }}
+            ></button>
           </div>
-        </section>
 
-        <section className="chat-view">
-          <ul className="chat-container" id="messageList">
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>03/26/2025</span></div>
-              <div className="counselor-msg-0 counselor-msg macro">
-                <div className="text text-r">
-                  <div>
-                    <span className="message-header-name student-messages">Anjali</span><br />
-                    <div className="d-flex">
-                      <pre className="text-message">
-                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
-                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
-                          12:31 PM
-                          <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                        </span>
-                      </pre>
-                    </div>
-                  </div>
-                </div>
+          {/* Session Status Badge - Below name */}
+          <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+            {hasActiveSession ? (
+              <div 
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{ 
+                  backgroundColor: '#D1F4E0',
+                  border: '1px solid #25D366',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <div 
+                  className="rounded-circle me-1"
+                  style={{ 
+                    width: '6px', 
+                    height: '6px', 
+                    backgroundColor: '#25D366' 
+                  }}
+                ></div>
+                <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+                  Active
+                </span>
               </div>
-            </div>
-
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>04/07/2025</span></div>
-              <div className="counselor-msg-1 counselor-msg macro">
-                <div className="text text-r">
-                  <div className="d-flex">
-                    <pre className="text-message">
-                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
-                      <span><h6>Hello</h6></span>
-                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
-                        04:28 PM
-                        <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                      </span>
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sessionExpiredMsg">
-              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
-            </div>
-          </ul>
-        </section>
-
-        <section className="footer-container">
-          <div className="footer-box">
-            {templatePreview ? (
-              (() => {
-                const templateData = JSON.parse(templatePreview);
-                return (
-                  <div className="message-container" style={{ 
-                    padding: '15px', 
-                    backgroundColor: '#f8f9fa', 
-                    borderRadius: '12px', 
-                    marginBottom: '15px',
-                    border: '1px solid #e9ecef'
-                  }}>
-                    {/* Template Info Header */}
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      marginBottom: '10px',
-                      paddingBottom: '8px',
-                      borderBottom: '1px solid #dee2e6'
-                    }}>
-                      <div>
-                        <strong style={{ color: '#495057', fontSize: '14px' }}>{templateData.templateName}</strong>
-                        <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                          {templateData.category} • {templateData.status}
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => { setTemplatePreview(""); setSelectedTemplate(null); }}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          fontSize: '18px', 
-                          color: '#dc3545',
-                          cursor: 'pointer',
-                          padding: '4px'
-                        }}
-                        title="Clear template"
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    {/* WhatsApp Message Preview */}
-                    <div style={{ 
-                      backgroundColor: '#dcf8c6', 
-                      padding: '12px 16px', 
-                      borderRadius: '18px 18px 4px 18px', 
-                      maxWidth: '90%', 
-                      marginLeft: 'auto',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      position: 'relative'
-                    }}>
-                      {/* Media Preview */}
-                      {templateData.hasMedia && (
-                        <div style={{ 
-                          width: '100%', 
-                          height: '150px', 
-                          backgroundColor: '#ffffff',
-                          borderRadius: '8px',
-                          marginBottom: '10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexDirection: 'column',
-                          border: '1px solid #e9ecef'
-                        }}>
-                          {templateData.mediaType === 'image' && (
-                            <>
-                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🖼️</div>
-                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>IMAGE</div>
-                            </>
-                          )}
-                          {templateData.mediaType === 'video' && (
-                            <>
-                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎥</div>
-                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>VIDEO</div>
-                            </>
-                          )}
-                          {templateData.mediaType === 'document' && (
-                            <>
-                              <div style={{ fontSize: '40px', marginBottom: '8px' }}>📄</div>
-                              <div style={{ fontSize: '12px', color: '#6c757d', fontWeight: 'bold' }}>DOCUMENT</div>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Text Content */}
-                      <div style={{ 
-                        fontSize: '14px', 
-                        lineHeight: '1.5', 
-                        color: '#303030',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word'
-                      }}>
-                        {templateData.text || 'No text content available'}
-                      </div>
-
-                      {/* Message Footer */}
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#667781', 
-                        textAlign: 'right', 
-                        marginTop: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        gap: '4px'
-                      }}>
-                        <span>{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        <span style={{ color: '#4fc3f7' }}>✓✓</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
             ) : (
-              <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-                <textarea
-                  placeholder="Choose a template"
-                  className="message-input"
-                  disabled
-                  rows="1"
-                  id="message-input"
-                  style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-                ></textarea>
+              <div 
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{ 
+                  backgroundColor: '#FFF3CD',
+                  border: '1px solid #FFA500',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+                <span className="fw-semibold" style={{ color: '#856404' }}>
+                  No Session
+                </span>
               </div>
             )}
-            <hr className="divider" />
-            <div className="message-container-input">
-              <div className="left-footer">
-                <span className="disabled-style margin-bottom-5">
-                  <a className="margin-right-10" href="#" title="Emoji">
-                    <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
-                  </a>
-                </span>
-                <span className="disabled-style">
-                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
-                </span>
-                <span className="input-template position-relative">
-                  <a title="Whatsapp Template" onClick={(e) => { e.preventDefault(); setShowWhatsAppTemplates(!showWhatsAppTemplates); if (!showWhatsAppTemplates) fetchWhatsAppTemplates(); }} href="#">
-                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
-                  </a>
-                  {renderWhatsAppTemplatesDropdown()}
-                </span>
-              </div>
-              <div className="right-footer">
-                <span className="disabled-style">
-                  <a className="send-button" href="#" title="Send">
-                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
-                  </a>
-                </span>
+          </div>
+
+          {/* Info Banner */}
+          {!hasActiveSession && (
+            <div 
+              className="d-flex align-items-start mt-3 p-2 rounded"
+              style={{ 
+                backgroundColor: '#E3F2FD',
+                border: '1px solid #2196F3'
+              }}
+            >
+              <i className="fas fa-info-circle me-2 mt-1" style={{ color: '#1976D2', fontSize: '14px' }}></i>
+              <div style={{ fontSize: '12px', color: '#1565C0' }}>
+                <p className="mb-1 fw-semibold">WhatsApp Business API Rule:</p>
+                <p className="mb-0">No active session hai. Aap sirf <strong>approved template</strong> bhej sakte hain.</p>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Messages Area */}
+        <div 
+          className="flex-grow-1 overflow-auto p-3" 
+          style={{ 
+            backgroundColor: '#ECE5DD',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+            maxHeight: '55vh',
+            minHeight: '300px'
+          }}
+        >
+          {whatsappMessages.map(message => (
+            <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+              <div style={{ maxWidth: '75%' }}>
+                <div 
+                  className={`p-2 ${
+                    message.sender === 'agent' 
+                      ? 'text-white' 
+                      : 'bg-white text-dark'
+                  }`}
+                  style={{ 
+                    backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+                    color: message.sender === 'agent' ? '#000' : '#000',
+                    borderRadius: '8px',
+                    borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+                    borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+                    boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                    padding: '6px 10px 8px'
+                  }}
+                >
+                  <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                    {message.text}
+                  </p>
+                  <p 
+                    className="mb-0 text-end" 
+                    style={{ 
+                      fontSize: '11px', 
+                      color: '#667781',
+                      marginTop: '4px'
+                    }}
+                  >
+                    {message.time}
+                  </p>
+                </div>
+                {message.sender === 'agent' && message.type === 'template' && (
+                  <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                    <i className="fas fa-file-alt me-1"></i>Template Message
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Selected Template Preview in Chat */}
+          {selectedWhatsappTemplate && (
+            <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+              <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+                <div 
+                  className="rounded-3 overflow-hidden" 
+                  style={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Decorative gradient overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+                    pointerEvents: 'none'
+                  }}></div>
+                  
+                  {/* Header */}
+                  <div className="d-flex align-items-center justify-content-between p-3" style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.15)', 
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    <div className="d-flex align-items-center">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2" 
+                        style={{ 
+                          width: '32px', 
+                          height: '32px', 
+                          backgroundColor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+                      </div>
+                      <div>
+                        <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          WhatsApp Template
+                        </p>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                          {selectedWhatsappTemplate.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      className="btn btn-sm p-0"
+                      onClick={() => setSelectedWhatsappTemplate(null)}
+                      style={{ 
+                        width: '28px',
+                        height: '28px',
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        borderRadius: '50%',
+                        color: '#fff',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+                        e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                        e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                      }}
+                      title="Remove Template"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+                    {/* Category Badge */}
+                    <div className="mb-2">
+                      <span className="badge" style={{ 
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#fff',
+                        fontSize: '10px',
+                        padding: '5px 12px',
+                        fontWeight: '600',
+                        borderRadius: '20px',
+                        letterSpacing: '0.3px'
+                      }}>
+                        <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+                        {selectedWhatsappTemplate.category}
+                      </span>
+                    </div>
+                    
+                    {/* Template Content */}
+                    <div 
+                      className="rounded-3 p-3 mb-2"
+                      style={{ 
+                        backgroundColor: '#f8f9fa',
+                        border: '2px solid #e9ecef',
+                        borderLeft: '4px solid #667eea',
+                        position: 'relative'
+                      }}
+                    >
+                      {(() => {
+                        const components = selectedWhatsappTemplate.components || [];
+                        
+                        // Check if it's a carousel template
+                        const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+                        if (carouselComponent && carouselComponent.cards) {
+                          return (
+                            <div>
+                              {/* Carousel Body Text (if exists outside carousel) */}
+                              {(() => {
+                                const bodyComp = components.find(c => c.type === 'BODY');
+                                if (bodyComp && bodyComp.text) {
+                                  return (
+                                    <p className="mb-3" style={{ 
+                                      fontSize: '13px', 
+                                      color: '#2c3e50', 
+                                      fontWeight: '500'
+                                    }}>
+                                      {bodyComp.text}
+                                    </p>
+                                  );
+                                }
+                              })()}
+                              
+                              <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+                                <i className="fas fa-images me-1"></i>
+                                Carousel ({carouselComponent.cards.length} cards)
+                              </p>
+                              
+                              <div style={{ 
+                                display: 'flex', 
+                                gap: '12px', 
+                                overflowX: 'auto', 
+                                paddingBottom: '10px',
+                                scrollbarWidth: 'thin'
+                              }}>
+                                {carouselComponent.cards.map((card, idx) => {
+                                  const cardHeader = card.components.find(c => c.type === 'HEADER');
+                                  const cardBody = card.components.find(c => c.type === 'BODY');
+                                  const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+                                  const imageUrl = cardHeader?.example?.header_handle?.[0];
+                                  
+                                  return (
+                                    <div key={idx} style={{ 
+                                      minWidth: '200px',
+                                      maxWidth: '200px',
+                                      border: '2px solid #dee2e6', 
+                                      borderRadius: '12px',
+                                      overflow: 'hidden',
+                                      backgroundColor: '#fff',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}>
+                                      {imageUrl && (
+                                        <>
+                                          <img 
+                                            src={imageUrl} 
+                                            alt={`Card ${idx + 1}`}
+                                            style={{ 
+                                              width: '100%', 
+                                              height: '150px', 
+                                              objectFit: 'cover'
+                                            }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              e.target.nextElementSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                          <div style={{ 
+                                            display: 'none', 
+                                            height: '150px', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            backgroundColor: '#e9ecef',
+                                            fontSize: '48px'
+                                          }}>
+                                            🖼️
+                                          </div>
+                                        </>
+                                      )}
+                                      <div style={{ padding: '12px' }}>
+                                        <p className="mb-2" style={{ 
+                                          fontSize: '12px', 
+                                          lineHeight: '1.4',
+                                          color: '#2c3e50'
+                                        }}>
+                                          {cardBody?.text || ''}
+                                        </p>
+                                        {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+                                          <div style={{ 
+                                            borderTop: '1px solid #dee2e6',
+                                            paddingTop: '8px',
+                                            marginTop: '8px'
+                                          }}>
+                                            {cardButtons.buttons.map((btn, bidx) => (
+                                              <div 
+                                                key={bidx}
+                                                style={{
+                                                  padding: '6px',
+                                                  marginBottom: '4px',
+                                                  textAlign: 'center',
+                                                  fontSize: '11px',
+                                                  color: '#007bff',
+                                                  fontWeight: '500'
+                                                }}
+                                              >
+                                                {btn.type === 'QUICK_REPLY' && '↩️ '}
+                                                {btn.text}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        // Regular template with header (image/video), body, footer, buttons
+                        const headerComponent = components.find(c => c.type === 'HEADER');
+                        const bodyComponent = components.find(c => c.type === 'BODY');
+                        const footerComponent = components.find(c => c.type === 'FOOTER');
+                        const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+                        
+                        return (
+                          <div>
+                            {/* Header - Image or Video */}
+                            {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <img 
+                                  src={headerComponent.example.header_handle[0]} 
+                                  alt="Template header"
+                                  style={{ 
+                                    width: '100%', 
+                                    maxHeight: '200px', 
+                                    objectFit: 'cover',
+                                    borderRadius: '12px 12px 0 0'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                                <div style={{ 
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  backgroundColor: '#e9ecef',
+                                  fontSize: '64px'
+                                }}>
+                                  🖼️
+                                </div>
+                              </div>
+                            )}
+                            
+                            {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <video 
+                                  src={headerComponent.example.header_handle[0]} 
+                                  controls
+                                  style={{ 
+                                    width: '100%', 
+                                    maxHeight: '200px',
+                                    borderRadius: '12px 12px 0 0',
+                                    backgroundColor: '#000'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                >
+                                  Your browser does not support the video tag.
+                                </video>
+                                <div style={{ 
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  backgroundColor: '#000',
+                                  color: '#fff',
+                                  fontSize: '64px'
+                                }}>
+                                  🎥
+                                </div>
+                              </div>
+                            )}
+                            
+                            {headerComponent && headerComponent.format === 'TEXT' && (
+                              <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+                                {headerComponent.text}
+                              </p>
+                            )}
+                            
+                            {/* Body */}
+                            {bodyComponent && (
+                              <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{ 
+                                fontSize: '13px', 
+                                color: '#2c3e50', 
+                                lineHeight: '1.6',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {bodyComponent.text
+                                  ?.replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+                                  .replace('{{2}}', 'Course Name') || ''}
+                              </p>
+                            )}
+                            
+                            {/* Footer */}
+                            {footerComponent && (
+                              <p className="mb-2" style={{ 
+                                fontSize: '11px', 
+                                color: '#6b7280',
+                                fontStyle: 'italic'
+                              }}>
+                                {footerComponent.text}
+                              </p>
+                            )}
+                            
+                            {/* Buttons */}
+                            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+                              <div style={{ 
+                                marginTop: '12px',
+                                paddingTop: '12px',
+                                borderTop: '1px solid #dee2e6'
+                              }}>
+                                {buttonsComponent.buttons.map((button, idx) => (
+                                  <div 
+                                    key={idx}
+                                    style={{
+                                      padding: '8px 12px',
+                                      marginBottom: '6px',
+                                      textAlign: 'center',
+                                      fontSize: '12px',
+                                      color: '#007bff',
+                                      border: '1px solid #007bff',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#fff',
+                                      fontWeight: '500',
+                                      cursor: 'default'
+                                    }}
+                                  >
+                                    {button.type === 'QUICK_REPLY' && '↩️ '}
+                                    {button.type === 'URL' && '🔗 '}
+                                    {button.type === 'PHONE_NUMBER' && '📞 '}
+                                    {button.text}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center">
+                        <div 
+                          className="rounded-circle me-2"
+                          style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+                            animation: 'pulse 2s ease-in-out infinite'
+                          }}
+                        ></div>
+                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                          Ready to send
+                        </span>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+                        <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+                          Pre-approved
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Scroll anchor */}
+          <div ref={whatsappMessagesEndRef} />
+        </div>
+
+        {/* Bottom Input Area */}
+        <div className="bg-white border-top p-3">
+          <div className="d-flex align-items-center gap-2">
+            {/* File Upload Button */}
+            <button 
+              className="btn"
+              title="Attach File"
+              style={{ 
+                width: '42px', 
+                height: '42px',
+                backgroundColor: 'transparent',
+                color: '#54656F',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+            </button>
+
+            {/* Template Button */}
+            <div className="position-relative">
+              <button 
+                className="btn whatsapp-template-trigger"
+                onClick={() => {
+                  setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+                  setShowWhatsappEmojiPicker(false);
+                }}
+                title="Templates"
+                style={{ 
+                  width: '42px', 
+                  height: '42px',
+                  backgroundColor: '#0B66E4',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+              </button>
+
+              {/* Template Dropdown */}
+              {showWhatsappTemplateMenu && (
+                <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                  <div className="p-3 border-bottom bg-light">
+                    <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+                    <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+                  </div>
+                  
+                  {whatsappTemplates.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mb-0 small text-muted">Loading templates...</p>
+                    </div>
+                  ) : (
+                    whatsappTemplates.map(template => (
+                      <div 
+                        key={template.id}
+                        className="p-3 border-bottom"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleWhatsappSelectTemplate(template)}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <h6 className="mb-0 fw-semibold">{template.name}</h6>
+                          <div className="d-flex gap-1">
+                            <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+                            {template.language && (
+                              <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Message Input or Template Send Button */}
+            {selectedWhatsappTemplate ? (
+              // Template Selected - Show Send Button
+              <button 
+                className="btn flex-grow-1"
+                onClick={handleWhatsappSendTemplate}
+                disabled={isSendingWhatsapp}
+                style={{ 
+                  height: '42px',
+                  backgroundColor: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '24px',
+                  fontWeight: '500',
+                  fontSize: '15px'
+                }}
+              >
+                {isSendingWhatsapp ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane me-2"></i>
+                    Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+                  </>
+                )}
+              </button>
+            ) : hasActiveSession ? (
+              // Active Session - Show Input
+              <>
+                <div className="position-relative flex-grow-1">
+                  <input 
+                    type="text"
+                    className="form-control"
+                    value={whatsappNewMessage}
+                    onChange={(e) => setWhatsappNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+                    placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] || 'Ravi Prakash'}...`}
+                    style={{ 
+                      height: '42px', 
+                      paddingRight: '50px',
+                      borderRadius: '24px',
+                      border: '1px solid #E9EDEF',
+                      fontSize: '15px',
+                      backgroundColor: '#F0F2F5'
+                    }}
+                  />
+                  <button 
+                    className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+                    onClick={() => {
+                      setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+                      setShowWhatsappTemplateMenu(false);
+                    }}
+                    style={{ 
+                      height: '42px', 
+                      width: '42px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#54656F'
+                    }}
+                  >
+                    <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+                  </button>
+
+                  {/* Emoji Picker */}
+                  {showWhatsappEmojiPicker && (
+                    <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+                      <div className="d-flex flex-wrap gap-2" style={{ width: '250px' }}>
+                        {emojis.map((emoji, index) => (
+                          <button
+                            key={index}
+                            className="btn btn-light btn-sm"
+                            onClick={() => handleWhatsappEmojiClick(emoji)}
+                            style={{ fontSize: '20px', width: '40px', height: '40px', padding: 0 }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Send/Voice Button */}
+                {whatsappNewMessage.trim() ? (
+                  <button 
+                    onClick={handleWhatsappSendMessage}
+                    style={{ 
+                      width: '42px', 
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setWhatsappMessages([...whatsappMessages, {
+                        id: whatsappMessages.length + 1,
+                        text: '🎤 Voice message',
+                        sender: 'agent',
+                        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        type: 'voice'
+                      }]);
+                    }}
+                    style={{ 
+                      width: '42px', 
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                    title="Voice Message"
+                  >
+                    <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+                  </button>
+                )}
+              </>
+            ) : (
+              // No Session - Disabled
+              <div className="flex-grow-1 bg-light border border-2 border-dashed rounded d-flex align-items-center justify-content-center" style={{ height: '45px' }}>
+                <p className="mb-0 small text-muted">
+                  <i className="fas fa-info-circle me-2"></i>
+                  Session message sirf active session me bhej sakte hain
+                </p>
+              </div>
+            )}
           </div>
-        </section>
+        </div>
       </div>
     );
 
@@ -4784,13 +6383,14 @@ const CRMDashboard = () => {
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center mediaCrmFilters">
+                    <div className={`d-flex gap-2 align-items-center ${isMobile ? 'mobile-filter-scroll' : 'flex-wrap mediaCrmFilters'}`}>
                       {crmFilters.map((filter, index) => (
                         <div key={index} className="d-flex align-items-center gap-1">
                           <div className='d-flex position-relative'>
                             <button
                               className={`btn btn-sm btncrm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
                               onClick={() => handleCrmFilterClick(index)}
+                              style={isMobile ? { whiteSpace: 'nowrap', flexShrink: 0 } : {}}
                             >
                               {filter.name}
                               <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
@@ -5306,8 +6906,8 @@ const CRMDashboard = () => {
           }}>
             <section className="list-view">
               <div className="row">
-                <div className="d-flex justify-content-end gap-2">
-
+                {/* Desktop Layout */}
+                <div className="d-none d-md-flex justify-content-end gap-2">
                   <button className="btn btn-sm btn-outline-primary" style={{
                     padding: "6px 12px",
                     fontSize: "11px",
@@ -5378,7 +6978,93 @@ const CRMDashboard = () => {
                         Bulk Action
                       </button>
                     </>)}
+                </div>
 
+                {/* Mobile Layout */}
+                <div className="d-md-none">
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <button className="btn btn-sm btn-outline-primary w-100" style={{
+                        padding: "8px 6px",
+                        fontSize: "10px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px"
+                      }}
+                        onClick={downloadLeads}
+                      >
+                        <i className="fas fa-download" style={{ fontSize: "9px" }}></i>
+                        Download
+                      </button>
+                    </div>
+                    {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <div className="col-6">
+                        <button className="btn btn-sm btn-outline-primary w-100" style={{
+                          padding: "8px 6px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px"
+                        }}
+                          onClick={() => {
+                            openPanel(null, 'AddAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
+                          Add Leads
+                        </button>
+                      </div>
+                    )}
+                    {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-primary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => {
+                              openPanel(null, 'RefferAllLeads');
+                              console.log('selectedProfile', null);
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "9px" }}></i>
+                            Refer
+                          </button>
+                        </div>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-secondary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                          >
+                            <i className="fas fa-tasks" style={{ fontSize: "9px" }}></i>
+                            Bulk
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className='row'>
@@ -5410,10 +7096,10 @@ const CRMDashboard = () => {
                                 <div className="row align-items-center justify-content-around">
                                   <div className="col-md-7">
                                     <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
+                                      <div className="form-check me-md-3 me-sm-1 me-1">
                                         <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
                                       </div>
-                                      <div className="me-3">
+                                      <div className="me-md-3 me-sm-1 me-1">
                                         <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                           <svg width="40" height="40">
                                             <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -5427,7 +7113,7 @@ const CRMDashboard = () => {
                                         <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                         <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
                                       </div>
-                                      <div style={{ marginLeft: '15px' }}>
+                                      <div className='whatsappbutton'>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
                                           <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
                                             <i className="fas fa-phone"></i>
@@ -5455,7 +7141,7 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-3">
+                                  <div className="col-md-3 mt-3">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -7526,6 +9212,10 @@ const CRMDashboard = () => {
           height: 100%;
         }
         @media (max-width: 767px) {
+        .whatappMaxWidth{
+        width:300px!important;
+        max-width:300px!important;
+        }
           .scrollable-container {
             display: block;
             width: 100%;
@@ -7575,9 +9265,9 @@ const CRMDashboard = () => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -8392,9 +10082,9 @@ background: #fd2b5a;
 @media (max-width: 576px) {
 
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
+    // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -8860,7 +10550,9 @@ background: #fd2b5a;
     border-radius: 4px;
     resize: vertical;
 }
-
+.whatsappbutton{
+margin-left:15px;
+}
 /* .document-history {
     overflow-y: auto;
 } */
@@ -8894,6 +10586,9 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+ .whatsappbutton{
+    margin-left:5px;
+    }
     .document-modal-content {
         width: 98%;
         margin: 1rem;
@@ -10166,7 +11861,10 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0;
           }
         }
 
@@ -13032,6 +14730,50 @@ background: #fd2b5a;
         background: white;
     }
 }
+
+@media(max-width:992px){
+    .mobile-filter-scroll {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: #007bff #f1f1f1 !important;
+        padding-bottom: 5px !important;
+        gap: 8px !important;
+        white-space: nowrap !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar {
+        height: 4px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb {
+        background: #007bff !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb:hover {
+        background: #0056b3 !important;
+    }
+    
+    .mobile-filter-scroll .d-flex {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+    
+    .btncrm {
+        font-size: 0.8rem !important;
+        padding: 0.4rem 0.8rem !important;
+        margin: 2px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+}
           @media (max-width: 768px) {
 
               .enhanced-documents-panel {
@@ -13135,9 +14877,9 @@ background: #fd2b5a;
                   border-radius: 10px;
               }
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .btn-group .btn {
                   margin-bottom: 0.25rem;
@@ -13220,9 +14962,12 @@ background: #fd2b5a;
               .mobileResponsive{
               padding: 0;
               }
-              .content-body{
-               margin-top: 30px!important;
-              }
+             .content-body{
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0!important;
+          }
               .nav-tabs-main{
                   white-space: nowrap;
                   flex-wrap: nowrap;
@@ -13241,9 +14986,9 @@ background: #fd2b5a;
           @media (max-width: 576px) {
 
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .input-group {
                   max-width: 100% !important;
@@ -14093,6 +15838,17 @@ animation: pulse 1.5s infinite;
 0% { transform: scale(1); }
 50% { transform: scale(1.05); }
 100% { transform: scale(1); }
+}
+
+@keyframes slideInFromRight {
+0% { 
+  opacity: 0; 
+  transform: translateX(30px); 
+}
+100% { 
+  opacity: 1; 
+  transform: translateX(0); 
+}
 }
 
 .recordings-list {

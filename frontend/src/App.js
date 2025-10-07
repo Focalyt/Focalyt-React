@@ -126,7 +126,7 @@ import StudyMaterial from './Pages/App/Trainer/CourseManagement/StudyMaterial';
 import AllStudent from './Pages/App/Trainer/StudentManagement/AllStudents';
 import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgress';
 import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
-
+import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
 
 const Layout = () => {
   const location = useLocation();
@@ -292,6 +292,7 @@ const Layout = () => {
         {/* Training Module  */}
         <Route path='/trainer/login' element={<TrainerLogin />}/>
         <Route path="/trainer" element={<TrainerLayout />}>
+        <Route path='dashboard' element={<TrainerDashboard/>}/>
         <Route path='profile' element={<TrainerProfile/>}/>
         <Route path='mycourses' element={<MyCourses/>}/>
         <Route path='viewcourses' element={<ViewTrainerCourses/>}/>

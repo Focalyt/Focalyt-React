@@ -1925,7 +1925,7 @@ const MyFollowups = () => {
       if (!token) {
         return;
       }
-      
+
       const queryParams = new URLSearchParams({
         // Followup specific date range (if you want to add separate followup date filters)
         // You can add fromDate and toDate here if needed for followup date filtering
@@ -1933,7 +1933,7 @@ const MyFollowups = () => {
         ...(filters?.toDate && { toDate: filters.toDate }),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
-       
+
         ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
         ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
         ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
@@ -2418,10 +2418,13 @@ const MyFollowups = () => {
 
               {/* Header */}
               <div className="border-bottom pb-3 mb-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center">
+                <div className="d-flex align-items-center justify-content-between w-100">
+                  <div>
                     <span className="me-3 fs-5">📅</span>
                     <span className="fs-5 fw-bold text-dark">Followup Calendar</span>
+                  </div>
+                  <div className="d-xl-none">
+                    <button className="btn-close" aria-label="Close"></button>
                   </div>
 
                 </div>
@@ -3307,14 +3310,14 @@ const MyFollowups = () => {
                         onChange={handleFilterChange}
                       />
                       <button
-                          onClick={() => fetchProfileData() }
-                          className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' }}
-                        >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
+                        onClick={() => fetchProfileData()}
+                        className={`btn btn-outline-primary`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-search me-1`}></i>
+                        Search
 
-                        </button>
+                      </button>
                       {/* {filterData.name && (
                         <button
                           className="btn btn-outline-secondary border-start-0"
@@ -3637,7 +3640,7 @@ const MyFollowups = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '150px' }}>
+          <div className="content-body">
             <section className="list-view">
 
               <div className='row'>
@@ -5178,11 +5181,14 @@ const MyFollowups = () => {
         html body .content .content-wrapper {
     padding: calc(0.9rem - 0.1rem) 1.2rem
 }
+    .content-body{
+    margin-top:135px;
+    }
 
 .container-fluid.py-2 {
     position: sticky !important;
     top: 0;
-    z-index: 1020;
+    z-index: 10;
     background-color: white;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -5448,9 +5454,6 @@ const MyFollowups = () => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -5996,6 +5999,9 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+        .content-body{
+          margin-top:25px
+        }
           .resume-document-body {
             flex-direction: column;
           }
@@ -6294,9 +6300,6 @@ background: #fd2b5a;
         gap: 0.5rem;
     }
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
 
     .input-group {
         max-width: 100% !important;

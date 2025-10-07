@@ -205,9 +205,9 @@ function Source() {
             {/* Main Content */}
             <div className="content-body">
                 <section className="list-view">
-                    <div className="row">
+                    <div className="row source-main-row">
                         {/* Add Source Form */}
-                        <div className="col-6 equal-height-2">
+                        <div className="col-6 equal-height-2 source-form-col">
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
@@ -255,7 +255,7 @@ function Source() {
                                         
 
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
-                                                    <bu     tton
+                                                    <button
                                                         type="button"
                                                         className="btn btn-success font-small-3"
                                                         onClick={handleSubmit}
@@ -269,7 +269,7 @@ function Source() {
                                                         ) : (
                                                             isEditing ? 'Update' : 'Add'
                                                         )}
-                                                    </bu>
+                                                    </button>
 
                                                     {isEditing && (
                                                         <button
@@ -290,7 +290,7 @@ function Source() {
                         </div>
 
                         {/* Users List */}
-                        <div className="col-6 rounded equal-height-2 coloumn-2">
+                        <div className="col-6 rounded equal-height-2 coloumn-2 source-table-col">
                             <div className="card">
                                 <div className="row p-1">
                                     <div className="col-xl-6">
@@ -490,11 +490,13 @@ function Source() {
           }
           
           /* Mobile layout adjustments */
-          .row {
+          .source-main-row {
             margin: 0;
+            flex-direction: column;
           }
           
-          .col-6 {
+          .source-form-col,
+          .source-table-col {
             width: 100% !important;
             max-width: 100% !important;
             flex: 0 0 100% !important;
@@ -592,6 +594,51 @@ function Source() {
           .spinner-border-sm {
             width: 0.8rem;
             height: 0.8rem;
+          }
+        }
+
+        @media (max-width: 414px) {
+          .source-main-row {
+            flex-direction: column;
+          }
+          
+          .source-form-col,
+          .source-table-col {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 0 0 100% !important;
+            margin-bottom: 1rem;
+          }
+          
+          .equal-height-2 {
+            height: auto !important;
+          }
+          
+          .coloumn-2 {
+            margin-top: 0 !important;
+          }
+          
+          .table-responsive {
+            font-size: 0.8rem;
+          }
+          
+          .table th,
+          .table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.75rem;
+          }
+          
+          .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+          }
+          
+          .form-control {
+            font-size: 0.8rem;
+          }
+          
+          .card-body {
+            padding: 1rem 0.75rem;
           }
         }
         

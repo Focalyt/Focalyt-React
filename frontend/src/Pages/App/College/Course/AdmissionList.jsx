@@ -2408,7 +2408,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
             }}>
               <div className="container-fluid py-2">
                 <div className="row align-items-center justify-content-between">
-                  <div className="col-md-7 d-md-block d-sm-none">
+                  <div className="col-md-7 d-md-block">
                     <div className="main-tabs-container">
                       <ul className="nav nav-tabs nav-tabs-main border-0 gap-1">
 
@@ -2888,7 +2888,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
               <div className='row'>
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
-                    <div className="card px-3">
+                    <div className="card px-md-3 px-sm-0 px-0">
                       <div className="row" id="crm-main-row">
                         {isLoadingProfiles ? (
                           <div className="col-12 text-center py-5">
@@ -2909,10 +2909,10 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                     <div className="row align-items-center justify-content-between">
                                       <div className="col-md-7">
                                         <div className="d-flex align-items-center">
-                                          <div className="form-check me-3">
+                                          <div className="form-check me-md-3 me-sm-1 me-1">
                                             <input className="form-check-input" type="checkbox" />
                                           </div>
-                                          <div className="me-3">
+                                          <div className="me-md-3 me-sm-1 me-1">
                                             <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                               <svg width="40" height="40">
                                                 <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -2925,8 +2925,8 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                             <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
                                             <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                           </div>
-                                          <div style={{ marginLeft: '15px' }}>
-                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                          <div className="ekycImg">
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' , marginBottom: '8px'}}>
                                               <i className="fas fa-phone"></i>
                                             </button>
                                             <img
@@ -4951,15 +4951,17 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
           }
         }
-
+.ekycImg{
+margin-left: 15px;
+}
         .whatsapp-chat {
           height: 100%;
           min-width: 300px;
@@ -5499,6 +5501,13 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+        .ekycImg{
+        margin-left:5px
+        }
+        .ekycImg img{
+        margin: 0px !important;
+        width: 90px !important;
+        }
           .resume-document-body {
             flex-direction: column;
           }
@@ -5784,22 +5793,9 @@ background: #fd2b5a;
 
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
-
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .btn-group {
-        flex-wrap: wrap;
-    }
+        // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -7555,7 +7551,10 @@ height:min-content !important;
                   }
               }
               .nav-tabs-main > li > button{
-              padding: 15px 9px;
+              padding: 5px 8px;
+              }
+              .nav-tabs-main{
+              margin-bottom: 8px!important;
               }
 }
 

@@ -72,11 +72,11 @@ const TrainerLogin = () => {
                 password,
                 module: 'trainer'
             };
-            console.log("body" , body)
+            // console.log("body" , body)
 
             try {
                 const verifyRes = await axios.post(`${backendUrl}/college/trainee/login`, body);
-console.log("verifyRes" , verifyRes)
+// console.log("verifyRes" , verifyRes)
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
                     setSuccessMessage('Password verified');
@@ -111,7 +111,8 @@ console.log("verifyRes" , verifyRes)
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
                     setSuccessMessage('OTP verified');
-                    sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    sessionStorage.setItem("token", JSON.stringify(verifyRes.data.userData.token));
+                    sessionStorage.setItem("role", JSON.stringify(verifyRes.data.userData.role));
                     if (verifyRes.data.userData?.token) {
                         axios.defaults.headers.common['x-auth'] = verifyRes.data.userData.token;
                     }
@@ -146,7 +147,7 @@ console.log("verifyRes" , verifyRes)
                 userInput,
                 module: 'trainer'
             };
-console.log("mobile number", userInput)
+// console.log("mobile number", userInput)
             const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
 
             if (sendRes.data.status === true) {

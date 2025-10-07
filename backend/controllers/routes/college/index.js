@@ -1485,7 +1485,35 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 
 		// Execute aggregation
 		const response = await AppliedCourses.aggregate(aggregationPipeline);
-
+		
+		for (let doc of response) {
+			if (doc._candidate && doc._candidate.personalInfo) {
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
+					const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
+					if (state) {
+						doc._candidate.personalInfo.currentAddress.state = state.name;
+					}
+				}
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
+					const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
+					if (city) {
+						doc._candidate.personalInfo.currentAddress.city = city.name;
+					}
+				}
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+					const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+					if (state) {
+						doc._candidate.personalInfo.permanentAddress.state = state.name;
+					}
+				}
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
+					if (city) {
+						doc._candidate.personalInfo.permanentAddress.city = city.name;
+					}
+				}
+			}
+		}
 		// Process results for document counts and other formatting
 		const results = response.map(doc => {
 			let selectedSubstatus = null;

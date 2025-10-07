@@ -4,7 +4,13 @@ import { useNavigate } from "react-router-dom";
 import axios from 'axios';
 import TrainerHeader from './TrainerHeader/TrainerHeader'
 import TrainerFooter from './TrainerFooter/TrainerFooter'
-
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faUser, faBookOpen, faPlusCircle, faListCheck, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
+  faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn
+} from "@fortawesome/free-solid-svg-icons";
+import { faList, faTrendingUp } from '@fortawesome/free-solid-svg-icons';
 
 function TrainerLayout({ children }){
 
@@ -147,9 +153,9 @@ function TrainerLayout({ children }){
           <ul className="navigation navigation-main" id="main-menu-navigation">
 
            
-            <li className={`nav-item ${location.pathname === '/trainer/mycourses' ? 'active' : ''}`}>
-              <Link to="/trainer/mycourses" onClick={() => handleSidebarClose()}>
-                <i className="feather icon-home"></i>
+            <li className={`nav-item ${location.pathname === '/trainer/dashboard' ? 'active' : ''}`}>
+              <Link to="/trainer/dashboard " onClick={() => handleSidebarClose()}>
+              <FontAwesomeIcon icon={faChartLine} />
                 <span className="menu-title">Dashboard</span>
               </Link>
             </li>
@@ -157,7 +163,7 @@ function TrainerLayout({ children }){
             
             <li className={`nav-item ${location.pathname === '/trainer/profile' ? 'active' : ''}`}>
               <Link to="/trainer/profile" onClick={() => handleSidebarClose()}>
-                <i className="feather icon-user"></i>
+              <FontAwesomeIcon icon={faUser} />
                 <span className="menu-title">My Profile</span>
               </Link>
             </li>
@@ -165,7 +171,7 @@ function TrainerLayout({ children }){
             
             <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
               <a href="#" onClick={() => toggleSubmenu('courses')}>
-                <i className="feather icon-book"></i>
+              <FontAwesomeIcon icon={faBookOpen} />
                 <span className="menu-title">Courses Management</span>
                 <span className="dropdown-arrow">
                   <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.courses ? 'rotate-90' : ''}`}></i>
@@ -182,13 +188,13 @@ function TrainerLayout({ children }){
               >
                 <li className={`nav-item ${location.pathname === '/trainer/mycourses' ? 'active' : ''}`}>
                   <Link to="/trainer/mycourses" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-book-open"></i>
+                  <FontAwesomeIcon icon={faBookOpen} />
                     <span className="menu-title">My Courses</span>
                   </Link>
                 </li>
                 <li className={`nav-item ${location.pathname === '/trainer/courses/add-content' ? 'active' : ''}`}>
                   <Link to="/trainer/addcoursecontent" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-plus-circle"></i>
+                  <FontAwesomeIcon icon={faPlusCircle} />
                     <span className="menu-title">Add Course Content</span>
                   </Link>
                 </li>
@@ -210,7 +216,7 @@ function TrainerLayout({ children }){
           
             <li className={`nav-item has-sub ${openSubmenu.students ? 'open' : ''}`}>
               <a href="#" onClick={() => toggleSubmenu('students')}>
-                <i className="feather icon-users"></i>
+              <FontAwesomeIcon icon={faUserFriends} />
                 <span className="menu-title">Students Management</span>
                 <span className="dropdown-arrow">
                   <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.students ? 'rotate-90' : ''}`}></i>
@@ -227,13 +233,13 @@ function TrainerLayout({ children }){
               >
                 <li className={`nav-item ${location.pathname === '/trainer/allstudents' ? 'active' : ''}`}>
                   <Link to="/trainer/allstudents" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-list"></i>
+                  <FontAwesomeIcon icon={faListCheck} />
                     <span className="menu-title">All Students</span>
                   </Link>
                 </li>
                 <li className={`nav-item ${location.pathname === '/trainer/studentprogress' ? 'active' : ''}`}>
                   <Link to="/trainer/studentprogress" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-trending-up"></i>
+                  <FontAwesomeIcon icon={faGraduationCap} />
                     <span className="menu-title">Student Progress</span>
                   </Link>
                 </li>
@@ -468,7 +474,7 @@ function TrainerLayout({ children }){
            
             <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
               <a href="#" onClick={() => toggleSubmenu('settings')}>
-                <i className="feather icon-settings"></i>
+              <FontAwesomeIcon icon={faCogs} />
                 <span className="menu-title">Settings</span>
                 <span className="dropdown-arrow">
                   <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.settings ? 'rotate-90' : ''}`}></i>
@@ -533,6 +539,9 @@ function TrainerLayout({ children }){
   font-weight: 500;
   margin-right: 1rem;
   padding-bottom: 10px;
+}
+  .nav-item.active svg {
+    color: white;
 }
   .float-left {
   float: left !important;

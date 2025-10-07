@@ -3937,7 +3937,7 @@ router.route('/verification')
         return res.send({ status: false, message: "No such user found" })
       }
       let updatedData = await Candidate.findOneAndUpdate({ mobile }, { verified }, { new: true })
-      console.log('updated Verification============', updatedData)
+      // console.log('updated Verification============', updatedData)
       if (!updatedData) {
         return res.send({ status: false, message: "Verification failed" })
       }

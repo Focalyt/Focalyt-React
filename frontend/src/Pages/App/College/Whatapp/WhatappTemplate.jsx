@@ -2531,7 +2531,7 @@ const WhatsAppTemplate = () => {
 
   const renderTemplateTypes = () => (
 
-    <div className="container-fluid p-4" style={{ backgroundColor: '#f8f9fa' }}>
+    <div className="container-fluid p-md-4 p-sm-2" style={{ backgroundColor: '#f8f9fa' }}>
 
       {/* Header */}
 
@@ -8928,13 +8928,13 @@ const mobileStyles = `
 
     
     
-    .d-flex.align-items-center {
+    // .d-flex.align-items-center {
 
-      // flex-wrap: wrap;
+    //  flex-wrap: wrap;
 
-      gap: 0.5rem;
+    //   gap: 0.5rem;
 
-    }
+    // }
 
     
     
