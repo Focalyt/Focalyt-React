@@ -126,7 +126,35 @@ const B2BDashboard = () => {
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <div className="mb-4">
-        <div className="d-flex justify-content-between align-items-center">
+        {/* Mobile Layout */}
+        <div className="d-block d-lg-none">
+          <div className="mb-3">
+            <h1 className="h3 fw-bold text-dark mb-2">B2B Dashboard</h1>
+            <p className="text-muted small">Comprehensive analytics for your B2B lead management</p>
+          </div>
+          <div className="row g-2">
+            <div className="col-7">
+              <select 
+                className="form-select form-select-sm"
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+              >
+                <option value="last7">Last 7 Days</option>
+                <option value="last30">Last 30 Days</option>
+                <option value="last90">Last 90 Days</option>
+              </select>
+            </div>
+            <div className="col-5">
+              <button className="btn btn-primary btn-sm w-100">
+                <Plus size={16} />
+                <span className="ms-1">Add Lead</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="d-none d-lg-flex justify-content-between align-items-center">
           <div>
             <h1 className="display-5 fw-bold text-dark mb-2">B2B Dashboard</h1>
             <p className="text-muted">Comprehensive analytics for your B2B lead management</p>

@@ -209,7 +209,7 @@ module.exports.isTrainer = async (req, res, next) => {
   } catch (err) {
     const userAgent = req.get('User-Agent');
     const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
-    console.log("--- ERROR College", ipAddress, userAgent, err);
+    console.log("--- ERROR Trainer", ipAddress, userAgent, err);
     req.flash("error", err.message);
     return res.redirect("/institute/login");
   }

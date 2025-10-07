@@ -1481,7 +1481,7 @@ const CRMDashboard = (profile) => {
                             }}>
                             <div className="container-fluid py-2">
                                 <div className="row align-items-center justify-content-between">
-                                    <div className="col-md-12 d-md-block d-sm-none">
+                                    <div className="col-md-12 d-md-block">
                                         <div className="main-tabs-container">
                                             <ul className="nav nav-tabs nav-tabs-main border-0">
                                                 {/* kyc Management Tab */}
@@ -3967,9 +3967,9 @@ const CRMDashboard = (profile) => {
                   border-radius: 10px;
               }
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+            //   .btn-group {
+            //       flex-wrap: wrap;
+            //   }
 
               .btn-group .btn {
                   margin-bottom: 0.25rem;
@@ -4071,9 +4071,6 @@ const CRMDashboard = (profile) => {
           @media (max-width: 576px) {
 
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
 
               .input-group {
                   max-width: 100% !important;
@@ -4368,9 +4365,7 @@ const CRMDashboard = (profile) => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+         
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -5185,9 +5180,9 @@ background: #fd2b5a;
 @media (max-width: 576px) {
 
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
+    // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -6967,8 +6962,14 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 212px!important;
           }
+            .nav-tabs-main > li > button{
+              padding: 5px 8px;
+              }
+              .nav-tabs-main{
+              margin-bottom: 8px!important;
+              }
         }
 
 

@@ -195,9 +195,9 @@ function TypeCategory() {
             {/* Main Content */}
             <div className="content-body">
                 <section className="list-view">
-                    <div className="row">
+                    <div className="row category-main-row">
                         {/* Add B2B Form */}
-                        <div className="col-6 equal-height-2">
+                        <div className="col-6 equal-height-2 category-form-col">
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
@@ -277,7 +277,7 @@ function TypeCategory() {
                         </div>
 
                         {/* Category List */}
-                        <div className="col-6 rounded equal-height-2 coloumn-2">
+                        <div className="col-6 rounded equal-height-2 coloumn-2 category-table-col">
                             <div className="card">
                                 <div className="row p-1">
                                     <div className="col-xl-6">
@@ -483,6 +483,51 @@ function TypeCategory() {
           }
           
           
+        }
+
+        @media (max-width: 414px) {
+          .category-main-row {
+            flex-direction: column;
+          }
+          
+          .category-form-col,
+          .category-table-col {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 0 0 100% !important;
+            margin-bottom: 1rem;
+          }
+          
+          .equal-height-2 {
+            height: auto !important;
+          }
+          
+          .coloumn-2 {
+            margin-top: 0 !important;
+          }
+          
+          .table-responsive {
+            font-size: 0.8rem;
+          }
+          
+          .table th,
+          .table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.75rem;
+          }
+          
+          .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+          }
+          
+          .form-control {
+            font-size: 0.8rem;
+          }
+          
+          .card-body {
+            padding: 1rem 0.75rem;
+          }
         }
       `}</style>
         </div>

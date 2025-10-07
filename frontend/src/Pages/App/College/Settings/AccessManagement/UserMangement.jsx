@@ -385,7 +385,8 @@ const UserManagement = ({
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      {/* Desktop/Medium Screen Header */}
+      <div className="d-none d-md-flex justify-content-between align-items-center mb-4">
         <div className="d-flex align-items-center gap-3">
           <h4 className="mb-0">User Management</h4>
           <div className="btn-group" role="group">
@@ -429,6 +430,58 @@ const UserManagement = ({
             <Download size={16} />
             <span>Export</span>
           </button>
+        </div>
+      </div>
+
+      {/* Mobile/Small Screen Header */}
+      <div className="d-md-none mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h4 className="mb-0">User Management</h4>
+          <div className="d-flex gap-2">
+            <button className="btn btn-primary d-flex align-items-center gap-2" onClick={() => handleAddUser && handleAddUser()}>
+              <Plus size={16} />
+              <span></span>
+            </button>
+            <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+              <Filter size={16} />
+              <span></span>
+            </button>
+            <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+              <Download size={16} />
+              <span></span>
+            </button>
+          </div>
+        </div>
+        
+        <div className="d-flex align-items-center gap-3 mb-3">
+          <div className="btn-group" role="group">
+            <button
+              className={`btn btn-outline-primary ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={16} className="me-1" />
+              List View
+            </button>
+            <button
+              className={`btn btn-outline-primary ${viewMode === 'matrix' ? 'active' : ''}`}
+              onClick={() => setViewMode('matrix')}
+            >
+              <Grid size={16} className="me-1" />
+              Matrix View
+            </button>
+          </div>
+        </div>
+
+        <div className="position-relative">
+          <Search className="serachUser position-absolute start-0 top-50 translate-middle-y ms-3 text-muted" size={16} />
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="form-control ps-5"
+            style={{ paddingLeft: '2.5rem', minWidth: '50px' }}
+          />
         </div>
       </div>
 
@@ -587,6 +640,20 @@ const UserManagement = ({
           }} 
         />
       )}
+
+<style>
+  {
+    `
+    @media (max-width: 768px) {
+      .serachUser{
+        width:25px!important;
+        margin-top:0px!important;
+      }
+    }
+    `
+  }
+</style>
+
     </div>
   );
 };

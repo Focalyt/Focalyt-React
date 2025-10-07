@@ -153,8 +153,8 @@ function TrainerLayout({ children }){
           <ul className="navigation navigation-main" id="main-menu-navigation">
 
            
-            <li className={`nav-item ${location.pathname === '/trainer/mycourses' ? 'active' : ''}`}>
-              <Link to="/trainer/mycourses" onClick={() => handleSidebarClose()}>
+            <li className={`nav-item ${location.pathname === '/trainer/dashboard' ? 'active' : ''}`}>
+              <Link to="/trainer/dashboard " onClick={() => handleSidebarClose()}>
               <FontAwesomeIcon icon={faChartLine} />
                 <span className="menu-title">Dashboard</span>
               </Link>

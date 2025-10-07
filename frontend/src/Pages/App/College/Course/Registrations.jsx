@@ -6383,13 +6383,14 @@ const CRMDashboard = () => {
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center mediaCrmFilters">
+                    <div className={`d-flex gap-2 align-items-center ${isMobile ? 'mobile-filter-scroll' : 'flex-wrap mediaCrmFilters'}`}>
                       {crmFilters.map((filter, index) => (
                         <div key={index} className="d-flex align-items-center gap-1">
                           <div className='d-flex position-relative'>
                             <button
                               className={`btn btn-sm btncrm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
                               onClick={() => handleCrmFilterClick(index)}
+                              style={isMobile ? { whiteSpace: 'nowrap', flexShrink: 0 } : {}}
                             >
                               {filter.name}
                               <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
@@ -6905,8 +6906,8 @@ const CRMDashboard = () => {
           }}>
             <section className="list-view">
               <div className="row">
-                <div className="d-flex justify-content-end gap-2">
-
+                {/* Desktop Layout */}
+                <div className="d-none d-md-flex justify-content-end gap-2">
                   <button className="btn btn-sm btn-outline-primary" style={{
                     padding: "6px 12px",
                     fontSize: "11px",
@@ -6977,7 +6978,93 @@ const CRMDashboard = () => {
                         Bulk Action
                       </button>
                     </>)}
+                </div>
 
+                {/* Mobile Layout */}
+                <div className="d-md-none">
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <button className="btn btn-sm btn-outline-primary w-100" style={{
+                        padding: "8px 6px",
+                        fontSize: "10px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px"
+                      }}
+                        onClick={downloadLeads}
+                      >
+                        <i className="fas fa-download" style={{ fontSize: "9px" }}></i>
+                        Download
+                      </button>
+                    </div>
+                    {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <div className="col-6">
+                        <button className="btn btn-sm btn-outline-primary w-100" style={{
+                          padding: "8px 6px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px"
+                        }}
+                          onClick={() => {
+                            openPanel(null, 'AddAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
+                          Add Leads
+                        </button>
+                      </div>
+                    )}
+                    {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-primary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => {
+                              openPanel(null, 'RefferAllLeads');
+                              console.log('selectedProfile', null);
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "9px" }}></i>
+                            Refer
+                          </button>
+                        </div>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-secondary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                          >
+                            <i className="fas fa-tasks" style={{ fontSize: "9px" }}></i>
+                            Bulk
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className='row'>
@@ -7009,10 +7096,10 @@ const CRMDashboard = () => {
                                 <div className="row align-items-center justify-content-around">
                                   <div className="col-md-7">
                                     <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
+                                      <div className="form-check me-md-3 me-sm-1 me-1">
                                         <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
                                       </div>
-                                      <div className="me-3">
+                                      <div className="me-md-3 me-sm-1 me-1">
                                         <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                           <svg width="40" height="40">
                                             <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -7026,7 +7113,7 @@ const CRMDashboard = () => {
                                         <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                         <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
                                       </div>
-                                      <div style={{ marginLeft: '15px' }}>
+                                      <div className='whatsappbutton'>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
                                           <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
                                             <i className="fas fa-phone"></i>
@@ -7054,7 +7141,7 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-3">
+                                  <div className="col-md-3 mt-3">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -9178,9 +9265,9 @@ const CRMDashboard = () => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -9995,9 +10082,9 @@ background: #fd2b5a;
 @media (max-width: 576px) {
 
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
+    // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -10463,7 +10550,9 @@ background: #fd2b5a;
     border-radius: 4px;
     resize: vertical;
 }
-
+.whatsappbutton{
+margin-left:15px;
+}
 /* .document-history {
     overflow-y: auto;
 } */
@@ -10497,6 +10586,9 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+ .whatsappbutton{
+    margin-left:5px;
+    }
     .document-modal-content {
         width: 98%;
         margin: 1rem;
@@ -11769,7 +11861,10 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0;
           }
         }
 
@@ -14635,6 +14730,50 @@ background: #fd2b5a;
         background: white;
     }
 }
+
+@media(max-width:992px){
+    .mobile-filter-scroll {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: #007bff #f1f1f1 !important;
+        padding-bottom: 5px !important;
+        gap: 8px !important;
+        white-space: nowrap !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar {
+        height: 4px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb {
+        background: #007bff !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb:hover {
+        background: #0056b3 !important;
+    }
+    
+    .mobile-filter-scroll .d-flex {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+    
+    .btncrm {
+        font-size: 0.8rem !important;
+        padding: 0.4rem 0.8rem !important;
+        margin: 2px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+}
           @media (max-width: 768px) {
 
               .enhanced-documents-panel {
@@ -14738,9 +14877,9 @@ background: #fd2b5a;
                   border-radius: 10px;
               }
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .btn-group .btn {
                   margin-bottom: 0.25rem;
@@ -14823,9 +14962,12 @@ background: #fd2b5a;
               .mobileResponsive{
               padding: 0;
               }
-              .content-body{
-               margin-top: 30px!important;
-              }
+             .content-body{
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0!important;
+          }
               .nav-tabs-main{
                   white-space: nowrap;
                   flex-wrap: nowrap;
@@ -14844,9 +14986,9 @@ background: #fd2b5a;
           @media (max-width: 576px) {
 
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .input-group {
                   max-width: 100% !important;

@@ -707,12 +707,12 @@ const CalenderFolowupB2C = () => {
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <div className="mb-4">
-        <div className="d-flex justify-content-between align-items-center">
-          <div>
-            <h1 className="display-5 fw-bold text-dark mb-2">B2C Follow-up Calendar</h1>
-            <p className="text-muted">Manage and track your B2C follow-up events from Google Calendar</p>
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+          <div className="flex-grow-1">
+            <h1 className="display-6 display-lg-5 fw-bold text-dark mb-2">B2C Follow-up Calendar</h1>
+            <p className="text-muted mb-0">Manage and track your B2C follow-up events from Google Calendar</p>
           </div>
-          <div className="d-flex gap-2">
+          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
             {!userData.googleAuthToken?.accessToken ? (
               <button
                 className="btn btn-primary"
@@ -729,20 +729,21 @@ const CalenderFolowupB2C = () => {
                 ) : (
                   <>
                     <Calendar className="me-2" size={20} />
-                    Connect Google Calendar
+                    <span className="d-none d-sm-inline">Connect Google Calendar</span>
+                    <span className="d-sm-none">Connect</span>
                   </>
                 )}
               </button>
             ) : (
-              <div className="d-flex gap-2">
-                <div className="btn-group" role="group">
+              <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
+                <div className="btn-group w-100 w-sm-auto" role="group">
                   <button
                     type="button"
                     className={`btn btn-outline-secondary ${viewMode === 'list' ? 'active' : ''}`}
                     onClick={() => handleViewModeChange('list')}
                   >
                     <List className="me-1" size={16} />
-                    List
+                    <span className="d-none d-sm-inline">List</span>
                   </button>
                   <button
                     type="button"
@@ -750,11 +751,11 @@ const CalenderFolowupB2C = () => {
                     onClick={() => handleViewModeChange('calendar')}
                   >
                     <Grid className="me-1" size={16} />
-                    Calendar
+                    <span className="d-none d-sm-inline">Calendar</span>
                   </button>
                 </div>
                 <button
-                  className="btn btn-outline-primary"
+                  className="btn btn-outline-primary w-100 w-sm-auto"
                   onClick={fetchCalendarEvents}
                   disabled={isLoading}
                 >
@@ -763,12 +764,14 @@ const CalenderFolowupB2C = () => {
                       <div className="spinner-border spinner-border-sm me-2" role="status">
                         <span className="visually-hidden">Loading...</span>
                       </div>
-                      Refreshing...
+                      <span className="d-none d-sm-inline">Refreshing...</span>
+                      <span className="d-sm-none">Refresh</span>
                     </>
                   ) : (
                     <>
                       <RefreshCw className="me-2" size={20} />
-                      Refresh Events
+                      <span className="d-none d-sm-inline">Refresh Events</span>
+                      <span className="d-sm-none">Refresh</span>
                     </>
                   )}
                 </button>
@@ -798,7 +801,7 @@ const CalenderFolowupB2C = () => {
               {/* Search */}
               <div className="col-md-4">
                 <div className="position-relative">
-                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-2 text-muted" size={20} />
+                  <Search className="position-absolute top-50 start-0 translate-middle-y ms-2 text-muted b2cSearch" size={20} />
                   <input
                     type="text"
                     className="form-control ps-5"
@@ -1732,6 +1735,19 @@ const CalenderFolowupB2C = () => {
           </div>
         </div>
       )}
+
+      <style>
+        {
+          `
+          @media(max-width: 768px){
+            .b2cSearch{
+             width:25px!important;
+             margin-top: 0px !important;
+            }
+          }
+          `
+        }
+      </style>
     </div>
   );
 };

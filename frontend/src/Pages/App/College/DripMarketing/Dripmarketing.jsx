@@ -2006,18 +2006,16 @@ const DripMarketing = () => {
     return (
         <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa' }}>
 
-            <div className="row justify-content-between">
-                <div className="col-6">
-                    <div className="mb-4">
+            <div className="row justify-content-between align-items-center mb-4">
+                <div className="col-12 col-lg-6">
+                    <div className="mb-3 mb-lg-0">
                         <h3 className="display-5 fw-bold text-dark mb-2" style={{ fontSize: '1.9rem' }}>DRIP MARKETING RULES</h3>
                     </div>
                 </div>
-                <div className="col-6">
-                    <div className="d-flex gap-3 justify-content-end align-items-center">
-
-
+                <div className="col-12 col-lg-6">
+                    <div className="d-flex gap-3 justify-content-lg-end justify-content-start align-items-center">
                         {/* Search Input */}
-                        <div className="input-group" style={{ maxWidth: '300px' }}>
+                        <div className="input-group" style={{ maxWidth: '300px', width: '100%' }}>
                             <span className="input-group-text bg-white border-end-0 input-height">
                                 <i className="fas fa-search text-muted"></i>
                             </span>
@@ -2036,7 +2034,6 @@ const DripMarketing = () => {
                         </div>
                     </div>
                 </div>
-
             </div>
 
 
@@ -2045,33 +2042,30 @@ const DripMarketing = () => {
 
             <div className="row">
                 <div className="col-12">
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <td width={200}>
-                                    Description
-                                </td>
-
-                                <td width={150}>
-                                    Created By
-                                </td>
-                                <td width={200}>
-                                    Created On
-                                </td>
-                                <td width={200}>
-                                    Start Time
-                                </td>
-                                <td width={100}>
-                                    Active
-                                </td>
-                                <td width={50}>
-
-                                </td>
-                            </tr>
-                        </thead>
-
-                        <tbody>
+                    <div className="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <td width={200}>
+                                        Description
+                                    </td>
+                                    <td width={150}>
+                                        Created By
+                                    </td>
+                                    <td width={200}>
+                                        Created On
+                                    </td>
+                                    <td width={200}>
+                                        Start Time
+                                    </td>
+                                    <td width={100}>
+                                        Active
+                                    </td>
+                                    <td width={50}>
+                                    </td>
+                                </tr>
+                            </thead>
+                            <tbody>
                             {rules?.length > 0 && (
                                 rules.map((rule, index) => (
                                     <tr className='driprule' key={rule.id || index}>
@@ -2150,10 +2144,9 @@ const DripMarketing = () => {
                                     </tr>
                                 ))
                             )}
-                        </tbody>
-
-                    </table>
-
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -3384,51 +3377,64 @@ padding-left:5px;
 }
 /* Mobile Responsive Styles */
 @media (max-width: 768px) {
-
-    
+    html body .content .content-wrapper {
+    padding: 1.8rem 0.8rem 0!important;
+}
     .input-group {
         max-width: 100% !important;
         float: none !important;
     }
     
-    /* Table responsive */
-    table {
-        font-size: 12px;
+    /* Table responsive with horizontal scroll */
+    .table-responsive {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         overflow-x: auto;
-        display: block;
-        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
     }
     
-    table thead,
-    table tbody,
-    table tr {
-        display: table;
+    table {
+        font-size: 12px;
+        min-width: 600px;
         width: 100%;
-        table-layout: fixed;
+        margin-bottom: 0;
     }
     
     table td {
         padding: 8px 6px !important;
         font-size: 11px;
-        word-wrap: break-word;
-        white-space: normal;
+        white-space: nowrap;
+        vertical-align: middle;
     }
     
+    table thead td {
+        padding: 12px 6px !important;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    
+    /* Ensure minimum widths for better mobile experience */
     table td:first-child {
-        width: 40% !important;
+        min-width: 150px;
     }
     
     table td:nth-child(2) {
-        width: 20% !important;
+        min-width: 100px;
     }
     
     table td:nth-child(3),
     table td:nth-child(4) {
-        width: 15% !important;
+        min-width: 120px;
     }
     
     table td:nth-child(5) {
-        width: 10% !important;
+        min-width: 80px;
+    }
+    
+    table td:nth-child(6) {
+        min-width: 50px;
     }
     
     /* Floating add button */
@@ -3528,7 +3534,7 @@ padding-left:5px;
     .toggle-container,
     .toggle-container-then {
         font-size: 12px;
-        margin-left:30px;
+        margin-left:40px;
     }
     
     .toggle-option {
@@ -3586,6 +3592,25 @@ padding-left:5px;
     /* Title mobile */
     .display-5 {
         font-size: 1.5rem !important;
+    }
+    
+    /* Table scroll indicator */
+    .table-responsive::after {
+        content: "← Scroll horizontally to see more →";
+        display: block;
+        text-align: center;
+        font-size: 10px;
+        color: #6c757d;
+        padding: 5px;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    /* Dropdown positioning for mobile */
+    .drip_dropdowp {
+        right: 10px !important;
+        min-width: 100px;
+        z-index: 1050;
     }
 }
 

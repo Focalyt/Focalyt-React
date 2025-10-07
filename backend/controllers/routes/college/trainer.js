@@ -140,6 +140,101 @@ router.post('/addTrainer', async (req, res) => {
 
         }
 })
+router.put('/update/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, mobile, designation } = req.body;
+        
+        if (!name || !email || !mobile) {
+            return res.status(400).json({
+                success: false,
+                message: "All Fields are required"
+            });
+        }
+
+        
+        const existingTrainer = await User.findOne({
+            _id: id,
+            role: 4,
+            isDeleted: false
+        });
+
+        if (!existingTrainer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Trainer not found'
+            });
+        }
+
+       
+        const emailExists = await User.findOne({
+            email: email.toLowerCase(),
+            role: 4,
+            isDeleted: false,
+            _id: { $ne: id }
+        });
+
+        if (emailExists) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already exists for another trainer'
+            });
+        }
+
+        // Check if mobile is already taken by another trainer
+        const mobileExists = await User.findOne({
+            mobile: parseInt(mobile),
+            role: 4,
+            isDeleted: false,
+            _id: { $ne: id }
+        });
+
+        if (mobileExists) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mobile number already exists for another trainer'
+            });
+        }
+
+        // Update the trainer
+        const updatedTrainer = await User.findByIdAndUpdate(
+            id,
+            {
+                name: name.trim(),
+                email: email.toLowerCase().trim(),
+                mobile: parseInt(mobile),
+                designation: designation,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+
+        const userResponse = {
+            id: updatedTrainer._id,
+            name: updatedTrainer.name,
+            email: updatedTrainer.email,
+            mobile: updatedTrainer.mobile,
+            designation: updatedTrainer.designation,
+            role: updatedTrainer.role,
+            status: updatedTrainer.status,
+            updated_at: updatedTrainer.updatedAt
+        };
+
+        res.status(200).json({
+            status: true,
+            message: `Trainer "${name}" updated successfully`,
+            data: userResponse
+        });
+
+    } catch (err) {
+        console.log('Error in PUT /update:', err.message);
+        return res.status(500).json({
+            status: false,
+            message: "Internal server error",
+            error: err.message
+        });
+    }
+});
 
 router.get('/trainers', isCollege ,async (req, res) => {
     try {
