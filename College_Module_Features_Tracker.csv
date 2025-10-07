@@ -1,0 +1,38 @@
+Feature Category,Feature Name,Description,Status,Priority,Implementation Date,Notes,API Endpoints,Frontend Views
+Authentication & User Management,College Login,College user authentication with email/mobile and password,Active,High,Existing,Basic login functionality,/college/login,college/login.ejs
+Authentication & User Management,College Registration,New college registration with validation,Active,High,Existing,Includes college details and concern person,/college/register,college/register.ejs
+Authentication & User Management,Permission Management,Role-based access control for college users,Active,High,Existing,Admin View Only Custom permissions,/college/permission,college/permission.ejs
+Authentication & User Management,User Management,Manage college team members and their roles,Active,High,Existing,Add edit delete users,/college/users,college/users.ejs
+Authentication & User Management,Role Management,Create and manage custom roles with permissions,Active,Medium,Existing,Define role permissions,/college/roleManagement,college/roleManagement.ejs
+Candidate Management,Candidate Registration,Register new candidates with personal details,Active,High,Existing,Bulk and individual registration,/college/candidate,college/candidate/add.ejs
+Candidate Management,Candidate Listing,View and manage all registered candidates,Active,High,Existing,With advanced filtering,/college/candidate/listing,college/candidate/listing.ejs
+Candidate Management,Candidate Profile,Detailed candidate profile management,Active,High,Existing,Edit candidate information,/college/candidate/edit,college/candidate/edit.ejs
+Candidate Management,Bulk Upload,Import candidates via Excel/CSV files,Active,High,Existing,Template-based bulk upload,/college/candidate/bulkUpload,college/candidate/bulkUpload.ejs
+Course Management,Course Management,Create and manage courses offered by college,Active,High,Existing,Course details and configuration,/college/courses,college/courses.ejs
+Course Management,Batch Management,Create and manage course batches,Active,High,Existing,Batch scheduling and management,/college/batches,college/batches.ejs
+Course Management,Applied Courses,Track course applications and enrollments,Active,High,Existing,Application status tracking,/college/appliedCandidates,college/appliedCandidates.ejs
+Lead Management,Lead Assignment Rules,Automated lead assignment to counselors,Active,Medium,Existing,Rule-based lead distribution,/college/leadAssignmentRule,college/leadAssignmentRule.ejs
+Lead Management,Digital Lead Management,Manage digital leads and inquiries,Active,High,Existing,Lead processing and tracking,/college/digitalLead,college/digitalLead.ejs
+Lead Management,Status Management,Define and manage lead statuses,Active,High,Existing,Custom status workflow,/college/status,college/status.ejs
+Lead Management,Follow-up Management,Track and manage candidate follow-ups,Active,High,Existing,Follow-up scheduling,/college/followup,college/followup.ejs
+Communication,WhatsApp Integration,Send messages via WhatsApp Business API,Active,High,Existing,Template-based messaging,/college/whatsapp,college/whatsapp.ejs
+Communication,SMS Management,Send SMS to candidates,Active,Medium,Existing,SMS templates and bulk sending,/college/sms,college/sms.ejs
+Communication,Message Alerts,System notifications and alerts,Active,Medium,Existing,Internal messaging system,/college/messageAlert,college/messageAlert.ejs
+Communication,Drip Marketing,Automated marketing campaigns,Active,Medium,Existing,Email/SMS campaign automation,/college/dripmarketing,college/dripmarketing.ejs
+Training & Assessment,Skill Test Management,Create and conduct skill assessments,Active,High,Existing,Question bank and test creation,/college/skillTest,college/skillTest/index.ejs
+Training & Assessment,Mock Interview,Conduct mock interviews for candidates,Active,High,Existing,Interview scheduling and feedback,/college/mockInterview,college/mockInterview/index.ejs
+Training & Assessment,Attendance Tracking,Mark and track student attendance,Active,High,Existing,Daily attendance management,/college/attendance,college/attendance.ejs
+Training & Assessment,Classroom Media,Upload and manage training materials,Active,Medium,Existing,File upload and sharing,/college/classroomMedia,college/classroomMedia.ejs
+Training & Assessment,Trainer Management,Manage trainers and their schedules,Active,Medium,Existing,Trainer profiles and assignments,/college/trainer,college/trainer.ejs
+Career Development,Career Objective,Help candidates define career goals,Active,Medium,Existing,Career planning tools,/college/careerObjective,college/careerObjective/index.ejs
+Career Development,Cover Letter Builder,Create professional cover letters,Active,Medium,Existing,Template-based cover letters,/college/coverLetter,college/coverLetter/index.ejs
+Career Development,Resume Builder,Professional resume creation tool,Active,Medium,Existing,Resume templates and editing,/college/resumeBuilder,college/resumeBuilder.ejs
+Task Management,Todo Management,Task and reminder management,Active,Medium,Existing,Personal and team task tracking,/college/todo,college/todo.ejs
+B2B Features,B2B Lead Management,Manage business-to-business leads,Active,Medium,Existing,Corporate client management,/college/b2b,college/b2b.ejs
+B2B Features,B2B Status Management,B2B specific status workflow,Active,Medium,Existing,Corporate lead statuses,/college/statusB2b,college/statusB2b.ejs
+Reporting & Analytics,Reports Generation,Generate various reports,Active,Medium,Existing,Excel/PDF report export,/college/reports,college/reports.ejs
+Reporting & Analytics,Analytics Dashboard,Performance metrics and analytics,Active,Medium,Existing,Data visualization,/college/analytics,college/analytics.ejs
+Settings & Configuration,College Settings,Basic college configuration,Active,High,Existing,College profile management,/college/settings,college/settings.ejs
+Settings & Configuration,Profile Management,User profile editing,Active,Medium,Existing,Personal information update,/college/setting/editProfile,college/setting/editProfile.ejs
+Settings & Configuration,Password Change,Change user password,Active,Medium,Existing,Secure password update,/college/setting/changePass,college/setting/changePass.ejs
+
