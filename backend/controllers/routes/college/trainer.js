@@ -114,6 +114,15 @@ router.post('/addTrainer', async (req, res) => {
         });
         
         const savedUser = await newUser.save()
+        
+       
+        if (req.college && req.college._id) {
+            await College.findByIdAndUpdate(
+                req.college._id,
+                { $addToSet: { trainers: savedUser._id } },
+                { new: true }
+            );
+        }
 
         const userResponse ={
             id: savedUser._id,

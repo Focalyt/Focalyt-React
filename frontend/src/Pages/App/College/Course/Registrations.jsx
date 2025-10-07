@@ -3648,12 +3648,6 @@ const CRMDashboard = () => {
 
       }
 
-
-
-
-
-
-
       // Validate required fields
       const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
 
@@ -3664,8 +3658,6 @@ const CRMDashboard = () => {
         return;
 
       }
-
-
 
       // Validate body text length (WhatsApp has a limit of 1024 characters)
       const bodyTextToValidate = editForm.bodyText || editForm.carouselMessage || '';
@@ -3699,9 +3691,6 @@ const CRMDashboard = () => {
           }
         }
       }
-      // Show loading state
-
-
 
 
       // Prepare the template data for API

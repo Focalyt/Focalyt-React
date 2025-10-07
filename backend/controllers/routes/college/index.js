@@ -3,7 +3,7 @@ const uuid = require('uuid/v1');
 const cron = require('node-cron');
 const { Parser } = require("json2csv");
 
-const { isCollege, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
+const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
 const axios = require("axios");
 const mongoose = require('mongoose');
@@ -1485,7 +1485,7 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 
 		// Execute aggregation
 		const response = await AppliedCourses.aggregate(aggregationPipeline);
-		
+
 		for (let doc of response) {
 			if (doc._candidate && doc._candidate.personalInfo) {
 				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
@@ -5063,7 +5063,9 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 
 router.get('/all_courses', async (req, res) => {
 	try {
-		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 });
+		const courses = await Courses.find({ status: true })
+			.populate('trainers', 'name email mobile')
+			.sort({ createdAt: -1 });
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -5084,7 +5086,10 @@ router.get('/all_courses_centerwise', async (req, res) => {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
 
 		}
-		const courses = await Courses.find(filter).sort({ createdAt: -1 });
+		const courses = await Courses.find(filter)
+			.populate('trainers', 'name email mobile')
+			.populate('createdBy', 'name email')
+			.sort({ createdAt: -1 });
 		// Update the 'status' field based on the boolean value
 
 		res.json({ success: true, data: courses });
@@ -5171,7 +5176,10 @@ router.get('/get_batches', async (req, res) => {
 			filter.courseId = courseId;
 		}
 
-		const batches = await Batch.find(filter).sort({ createdAt: -1 });  // Sorting by createdAt
+		const batches = await Batch.find(filter)
+			.populate('trainers', 'name email mobile')
+			.populate('createdBy', 'name email')
+			.sort({ createdAt: -1 });  // Sorting by createdAt
 
 		res.json({
 			success: true,
@@ -11590,13 +11598,13 @@ router.post('/trainee/login', async (req, res) => {
 		// console.log("user", user)
 
 		const isMatch = await user.validPassword(password);
-		if(!isMatch){
+		if (!isMatch) {
 			return res.status(400).json({ status: false, error: "Invalid password" });
 		}
 		// console.log("Is Match", isMatch)
 
 		const token = await user.generateAuthToken();
-		return res.status(200).json({ status: true, message: "Login successful", token ,role:4  });
+		return res.status(200).json({ status: true, message: "Login successful", token, role: 4 });
 		// console.log("Token" , token)
 
 		// const isMatch = user.validPassword(password);
@@ -11611,5 +11619,122 @@ router.post('/trainee/login', async (req, res) => {
 		return res.status(500).json({ status: false, error: err.message });
 	}
 })
+
+router.post('/assigntrainerstocourse', isCollege, async (req, res) => {
+  try {
+    const { courseId, trainers } = req.body;
+    const user = req.user;
+    const collegeId = req.college._id;
+
+    if (!courseId || !trainers) {
+      return res.status(400).json({
+        status: false,
+        message: 'Course ID and trainers array are required'
+      });
+    }
+    const course = await Courses.findOne({
+      _id: courseId,
+      college: collegeId
+    });
+
+    if (!course) {
+      return res.status(404).json({
+        status: false,
+        message: 'Course not found'
+      });
+    }
+
+    const trainee = await User.find({
+      _id: { $in: trainers }, // array of trainers
+      role: 4,
+    });
+
+    // console.log("trainee", trainee);
+
+    course.trainers.push(...trainers);
+    await course.save();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Trainers successfully assigned to the course'
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+router.post('/assigntrainerstobatch', isCollege, async(req, res)=>{
+	
+	try{
+		const {batchId , trainers}= req.body
+	const user = req.user;
+	const collegeId = req.college._id;
+	// console.log("req.body" , req.body)
+	if(!batchId || !trainers){
+		return res.status(400).json({
+			status:false,
+			message:'BatchId and trainers are required'
+		})
+	}
+
+	const batch = await Batch.findOne({
+		_id: batchId,
+		college: collegeId
+	})
+
+	if(!batch){
+		return res.status(404).json({
+			staus: false,
+			message: 'Batch not found'
+		})
+
+	}
+	const trainee = await User.find({
+		_id: {$in: trainers},
+		role:4
+	})
+	batch.trainers.push(...trainers);
+	await batch.save()
+
+	return res.status(200).json({
+		status: true,
+		message: ' Trainers succesfully assign to the batch'
+	})
+	}
+	catch(err){
+		comsole.log(err)
+		return res.status({
+			status:false,
+			message: ''
+		})
+	}
+	
+})
+
+router.get('/gettrainersbycourse', isTrainer , async(req, res)=>{
+	try{
+		const { courseId } = req.query;
+
+		if (!courseId) {
+			return res.status(400).json({
+				status: false,
+				message: "Course ID is required"
+			});
+		}
+		console.log()
+	}
+	catch(err){
+		console.log(err)
+		return res.status.json({
+			status: false,
+			message: 'Errors while fetch trainers'			
+		})
+	}
+})
+
 
 module.exports = router;

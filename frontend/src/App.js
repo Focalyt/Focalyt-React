@@ -127,6 +127,7 @@ import AllStudent from './Pages/App/Trainer/StudentManagement/AllStudents';
 import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgress';
 import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
+import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
 
 const Layout = () => {
   const location = useLocation();
@@ -300,6 +301,7 @@ const Layout = () => {
         <Route path='studymaterial' element={<StudyMaterial/>}/>
         <Route path='allstudents' element={<AllStudent/>}/>
         <Route path='studentprogress' element={<StudentProgress/>}/>
+        <Route path='batchmanagement' element={<BatchMangement/>}/>
 
         </Route>
 
