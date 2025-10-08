@@ -119,13 +119,22 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
+  const [searchTerm , setSearchTerm] = useState('')
+  useEffect(()=>{
+    if(!isOpen){
+      setSearchTerm('')
+    }
+  },[isOpen])
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
     onChange(newValues);
   };
-
+  // Filter options based on search term
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
@@ -179,6 +188,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e)=>{setSearchTerm(e.target.value)}}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -186,7 +197,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -202,10 +213,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `No ${title.toLowerCase()} found for "${searchTerm}"` : `No ${title.toLowerCase()} available`}
                 </div>
               )}
             </div>
@@ -214,7 +225,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
                 </small>
               </div>
             )}

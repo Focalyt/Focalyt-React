@@ -262,9 +262,9 @@ function MyCourses() {
                                         </p>
 
                                         <div className="d-flex justify-content-between">
-                                            <Link to="/trainer/batchmanagement" className="btn btn-sm btn-outline-primary">
+                                            <Link to={`/trainer/batchmanagement?courseId=${course.id}`} className="btn btn-sm btn-outline-primary">
                                                 <i className="feather icon-eye mr-1"></i>
-                                                View
+                                                View 
                                             </Link>
                                         </div>
                                     </div>
@@ -324,9 +324,9 @@ function MyCourses() {
                                                         </td>
                                                         <td className="align-middle">
                                                             <div className="btn-group btn-group-sm">
-                                                                <button className="btn btn-outline-primary">
-                                                                    <i className="feather icon-eye"></i>
-                                                                </button>
+                                                                <Link to={`/trainer/batchmanagement?courseId=${course.id}`} className="btn btn-outline-primary">
+                                                                    <i className="feather icon-eye"></i> View Batches
+                                                                </Link>
                                                             </div>
                                                         </td>
                                                     </tr>

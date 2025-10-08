@@ -11715,26 +11715,161 @@ router.post('/assigntrainerstobatch', isCollege, async(req, res)=>{
 	
 })
 
-router.get('/gettrainersbycourse', isTrainer , async(req, res)=>{
-	try{
+router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
+	try {
+	  const { courseId } = req.query;
+	  const user = req.user;
+	  const collegeId = req.college._id;
+
+	  if (courseId) {
+		const course = await Courses.findOne({ _id: courseId }).populate('trainers');
+  
+		if (!course) {
+		  return res.status(404).json({
+			status: false,
+			message: 'Course not found'
+		  });
+		}
+  
+		return res.status(200).json({
+		  status: true,
+		  message: 'Trainers fetched successfully',
+		  data: [{
+			_id: 'course-trainers',
+			name: 'Course Trainers',
+			assignedCourses: [{
+			  _id: course._id,
+			  name: course.name,
+			  image: course.image,
+			  description: course.description
+			}]
+		  }]
+		});
+	  }
+
+
+	  const courses = await Courses.find({
+		college: collegeId,
+		trainers: {$exists: true}
+	  }).select('trainers name _id image description');
+
+	  const trainerIds = [...new Set(
+		courses.flatMap(course => course.trainers.map(id => id.toString()))
+	  )].map(id => new mongoose.Types.ObjectId(id));
+
+	  const trainers = await User.find({
+		_id: { $in: trainerIds },
+		role: 4
+	  }).select('name email mobile _id');
+
+	  
+	  const trainersWithCourses = trainers.map(trainer => {
+		const assignedCourses = courses
+		  .filter(course => course.trainers.some(trainerId => trainerId.toString() === trainer._id.toString()))
+		  .map(course => ({
+			_id: course._id,
+			name: course.name,
+			image: course.image,
+			description: course.description
+		  }));
+
+		return {
+		  _id: trainer._id,
+		  name: trainer.name,
+		  email: trainer.email,
+		  mobile: trainer.mobile,
+		  assignedCourses: assignedCourses
+		};
+	  });
+
+	  return res.status(200).json({
+		status: true,
+		message: 'Trainers fetched successfully',
+		data: trainersWithCourses,
+		count: trainersWithCourses.length
+	  });
+	} catch (err) {
+	  console.log(err);
+	  return res.status(500).json({
+		status: false,
+		message: 'Error while fetching trainers'
+	  });
+	}
+});
+
+// router.get('/gettrainersbycourse', isTrainer , async(req, res)=>{
+// 	try{
+// 		const { courseId } = req.query;
+// 		const user = req.user;
+// 		const collegeId = req.college._id;
+// console.log("courseId" , req.body)
+// 		if (!courseId) {
+// 			return res.status(400).json({
+// 				status: false,
+// 				message: "Course ID is required"
+// 			});
+// 		}
+// 		console.log()
+// 	}
+// 	catch(err){
+// 		console.log(err)
+// 		return res.status.json({
+// 			status: false,
+// 			message: 'Errors while fetch trainers'			
+// 		})
+// 	}
+// })
+
+router.get('/getbatchesbytrainerandcourse', isTrainer, async (req, res) => {
+	try {
 		const { courseId } = req.query;
+		const user = req.user;
+		const collegeId = req.college._id;
 
 		if (!courseId) {
 			return res.status(400).json({
 				status: false,
-				message: "Course ID is required"
+				message: 'Course ID is required'
 			});
 		}
-		console.log()
-	}
-	catch(err){
-		console.log(err)
-		return res.status.json({
-			status: false,
-			message: 'Errors while fetch trainers'			
-		})
-	}
-})
 
+		
+		const batches = await Batch.find({
+			courseId: courseId,
+			college: collegeId,
+			trainers: user._id
+		})
+		.populate('centerId', 'name address')
+		.populate('trainers', 'name email mobile')
+		.sort({ createdAt: -1 });
+
+		
+		const course = await Courses.findOne({ _id: courseId, college: collegeId })
+			.select('name description image');
+
+		if (!course) {
+			return res.status(404).json({
+				status: false,
+				message: 'Course not found'
+			});
+		}
+
+		return res.status(200).json({
+			status: true,
+			message: 'Batches fetched successfully',
+			data: {
+				course: course,
+				batches: batches,
+				totalBatches: batches.length
+			}
+		});
+	} catch (err) {
+		console.log(err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching batches'
+		});
+	}
+});
 
 module.exports = router;

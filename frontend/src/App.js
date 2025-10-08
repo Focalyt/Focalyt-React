@@ -128,7 +128,7 @@ import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgre
 import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
 import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
-
+import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -302,7 +302,7 @@ const Layout = () => {
         <Route path='allstudents' element={<AllStudent/>}/>
         <Route path='studentprogress' element={<StudentProgress/>}/>
         <Route path='batchmanagement' element={<BatchMangement/>}/>
-
+        <Route path='timetable' element={<TimeTable/>}/>
         </Route>
 
 
