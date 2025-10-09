@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function TimeTable() {
     // State Management
@@ -9,87 +10,434 @@ function TimeTable() {
     const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
     const [draggedSession, setDraggedSession] = useState(null);
     const [selectedSession, setSelectedSession] = useState(null);
-    
-    // Form States
+    const [trainers, setTrainers] = useState([]);
+
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const token = JSON.parse(sessionStorage.getItem('token'));
+    const [courses, setCourses] = useState([]);
+    const [batches, setBatches] = useState([]);
+    const [selectedCourse, setSelectedCourse] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // Advanced Features State
+    const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [attendanceSession, setAttendanceSession] = useState(null);
+    const [attendanceData, setAttendanceData] = useState({
+        totalStudents: 0,
+        presentStudents: 0,
+        absentStudents: 0
+    });
+
+
     const [scheduleForm, setScheduleForm] = useState({
         title: '',
+        trainerId: '',
+        trainerName: '',
+        batchId: '',
         batchName: '',
         subject: '',
         date: '',
         startTime: '',
         endTime: '',
         duration: '',
-        recurring: 'none',
         description: '',
-        color: '#3498db'
+        color: '#3498db',
+        scheduleType: 'single',
+        isRecurring: false,
+        recurringType: '',
+        recurringEndDate: '',
+        weekTopics: {
+            monday: '',
+            tuesday: '',
+            wednesday: '',
+            thursday: '',
+            friday: '',
+            saturday: '',
+            sunday: ''
+        },
+        monthTopics: {
+            week1: {
+                monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+            },
+            week2: {
+                monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+            },
+            week3: {
+                monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+            },
+            week4: {
+                monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+            }
+        }
     });
 
+    const clearScheduledData = () => {
+        setScheduleForm({
+            title: '',
+            trainerId: '',
+            trainerName: '',
+            batchId: '',
+            batchName: '',
+            subject: '',
+            date: '',
+            startTime: '',
+            endTime: '',
+            duration: '',
+            description: '',
+            color: '#3498db',
+            scheduleType: 'single',
+            isRecurring: false,
+            recurringType: '',
+            recurringEndDate: '',
+            weekTopics: {
+                monday: '',
+                tuesday: '',
+                wednesday: '',
+                thursday: '',
+                friday: '',
+                saturday: '',
+                sunday: ''
+            },
+            monthTopics: {
+                week1: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week2: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week3: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week4: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                }
+            }
+        });
+    };
+
+
     const [availabilityForm, setAvailabilityForm] = useState({
-        status: 'available', // available, busy, leave
+        status: 'available',
         startDate: '',
         endDate: '',
         startTime: '09:00',
         endTime: '18:00',
         breakStart: '13:00',
         breakEnd: '14:00',
-        workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        reason: ''
     });
 
     const [availability, setAvailability] = useState([]);
 
-    // Sample batches and subjects for demo
-    const batches = ['Batch A', 'Batch B', 'Batch C', 'Batch D'];
-    const subjects = ['JavaScript', 'React', 'Node.js', 'MongoDB', 'Python', 'Data Science'];
+
     const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
 
-    // Load sample data on mount
-    useEffect(() => {
-        loadSampleData();
-    }, []);
-
-    const loadSampleData = () => {
-        // Sample sessions
-        const sampleSessions = [
-            {
-                id: 1,
-                title: 'React Fundamentals',
-                batchName: 'Batch A',
-                subject: 'React',
-                date: new Date(),
-                startTime: '09:00',
-                endTime: '11:00',
-                duration: '2 hours',
-                color: '#3498db',
-                description: 'Introduction to React components'
-            },
-            {
-                id: 2,
-                title: 'JavaScript Advanced',
-                batchName: 'Batch B',
-                subject: 'JavaScript',
-                date: new Date(),
-                startTime: '14:00',
-                endTime: '16:00',
-                duration: '2 hours',
-                color: '#e74c3c',
-                description: 'Advanced JS concepts'
-            }
-        ];
-        setSessions(sampleSessions);
-
-        // Sample availability
-        setAvailability([{
-            status: 'available',
-            startDate: new Date(),
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            startTime: '09:00',
-            endTime: '18:00',
-            breakStart: '13:00',
-            breakEnd: '14:00',
-            workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-        }]);
+    // Attendance Handler
+    const handleMarkAttendance = (session) => {
+        setAttendanceSession(session);
+        setAttendanceData({
+            totalStudents: session.attendance?.totalStudents || 0,
+            presentStudents: session.attendance?.presentStudents || 0,
+            absentStudents: session.attendance?.absentStudents || 0
+        });
+        setShowAttendanceModal(true);
     };
 
+    const handleAttendanceSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const attendancePercentage = attendanceData.totalStudents > 0
+                ? ((attendanceData.presentStudents / attendanceData.totalStudents) * 100).toFixed(2)
+                : 0;
+
+            // Here you would make API call to save attendance
+            console.log('Saving attendance:', {
+                sessionId: attendanceSession.id,
+                ...attendanceData,
+                attendancePercentage
+            });
+
+            // Update local session
+            const updatedSessions = sessions.map(s => {
+                if (s.id === attendanceSession.id) {
+                    return {
+                        ...s,
+                        attendance: {
+                            ...attendanceData,
+                            attendancePercentage: parseFloat(attendancePercentage)
+                        },
+                        status: 'completed'
+                    };
+                }
+                return s;
+            });
+
+            setSessions(updatedSessions);
+            setShowAttendanceModal(false);
+            alert('Attendance marked successfully!');
+        } catch (err) {
+            console.error('Error saving attendance:', err);
+            alert('Failed to save attendance');
+        }
+    };
+
+    useEffect(() => {
+        fetchCourses();
+        fetchTrainers();
+    }, []);
+
+
+    useEffect(() => {
+        if (selectedCourse) {
+            fetchBatches(selectedCourse);
+        } else {
+            setBatches([]);
+        }
+    }, [selectedCourse]);
+
+
+    const fetchCourses = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/gettrainersbycourse`, {
+                headers: {
+                    'x-auth': token
+                }
+            });
+
+            // console.log('Courses response:', response.data);
+
+            if (response.data && response.data.status && response.data.data) {
+                const allCourses = [];
+                response.data.data.forEach(trainer => {
+                    if (trainer.assignedCourses && trainer.assignedCourses.length > 0) {
+                        trainer.assignedCourses.forEach(course => {
+                            if (!allCourses.find(c => c._id === course._id)) {
+                                allCourses.push(course);
+                            }
+                        });
+                    }
+                });
+                setCourses(allCourses);
+            }
+        } catch (error) {
+            console.error('Error fetching courses:', error);
+            alert('Failed to fetch courses. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchBatches = async (courseId) => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/getbatchesbytrainerandcourse`, {
+                params: { courseId },
+                headers: {
+                    'x-auth': token
+                }
+            });
+
+            console.log('Batches response:', response.data);
+
+            if (response.data && response.data.status && response.data.data) {
+                setBatches(response.data.data.batches || []);
+            }
+        } catch (error) {
+            console.error('Error fetching batches:', error);
+            alert('Failed to fetch batches. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchTrainers = async () => {
+        try {
+            setLoading(true);
+
+            const response = await axios.get(
+                `${backendUrl}/college/trainers`,
+                {
+                    headers: {
+                        'x-auth': token,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            // console.log("response" , response.data)
+
+
+            if (response.data.status && response.data.data) {
+                setTrainers(response.data.data);
+            } else {
+                setTrainers([]);
+                alert(response.data.message || 'No trainers found');
+            }
+
+        } catch (error) {
+            console.error('Error fetching trainers:', error);
+            alert(
+                error?.response?.data?.message || 'Failed to fetch trainers',
+                'error'
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+    const handleScheduleSubmit = async (e) => {
+        e.preventDefault()
+        try {
+            const sessionData = {
+                trainerId: scheduleForm.trainerId,
+                trainerName: scheduleForm.trainerName,
+                batchId: scheduleForm.batchId,
+                batchName: scheduleForm.batchName,
+                courseId: selectedCourse,
+                courseName: courses.find(c => c._id === selectedCourse)?.name || '',
+                subject: scheduleForm.subject,
+                date: scheduleForm.date,
+                startTime: scheduleForm.startTime,
+                endTime: scheduleForm.endTime,
+                title: scheduleForm.title,
+                description: scheduleForm.description,
+                color: scheduleForm.color,
+                scheduleType: scheduleForm.scheduleType,
+
+                // Recurring fields
+                isRecurring: scheduleForm.isRecurring,
+                recurringType: scheduleForm.isRecurring ? scheduleForm.recurringType : null,
+                recurringEndDate: scheduleForm.isRecurring ? scheduleForm.recurringEndDate : null,
+            };
+
+            // Add schedule type specific data
+            if (scheduleForm.scheduleType === 'weekly') {
+                sessionData.weekTopics = scheduleForm.weekTopics;
+            } else if (scheduleForm.scheduleType === 'monthly') {
+                sessionData.monthTopics = scheduleForm.monthTopics;
+            }
+
+            console.log('Frontend sending data:', sessionData);
+
+            const response = await axios.post(`${backendUrl}/college/scheduledTimeTable`, sessionData, {
+                headers: {
+                    'x-auth': token
+                }
+            });
+
+            // console.log('response:', response.data);
+
+            if (response.data.status) {
+                alert('Schedule created successfully!');
+                clearScheduledData();
+                setShowScheduleModal(false);
+                setSelectedCourse('');
+                timeTable(); // Refresh timetable
+            } else {
+                alert(response.data.message || 'Failed to create schedule');
+            }
+
+        } catch (err) {
+            console.log('Error fetching timetable:', err);
+        }
+    }
+    useEffect(() => {
+        timeTable()
+    }, [])
+    const timeTable = async () => {
+        setLoading(true)
+        try {
+            const response = await axios.get(`${backendUrl}/college/trainerTimeTable`, {
+                headers: {
+                    'x-auth': token
+                }
+            });
+            // console.log("timetable", response.data);
+
+            if (response.data.status && response.data.data) {
+                const allSessions = [];
+
+                response.data.data.forEach((session, index) => {
+                    if (session.scheduleType === 'weekly' && session.weekTopics) {
+                        const baseDate = new Date(session.date);
+                        const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+                        weekDays.forEach((day, dayIndex) => {
+                            if (session.weekTopics[day] && session.weekTopics[day].trim() !== '') {
+                                const sessionDate = new Date(baseDate);
+                                sessionDate.setDate(baseDate.getDate() + (dayIndex - baseDate.getDay()));
+
+                                allSessions.push({
+                                    id: `${session._id}_${day}`,
+                                    originalId: session._id,
+                                    title: session.weekTopics[day],
+                                    trainerName: session.trainerId?.name,
+                                    batchName: session.batchName,
+                                    courseName: session.courseName,
+                                    subject: session.subject,
+                                    date: sessionDate,
+                                    startTime: session.startTime,
+                                    endTime: session.endTime,
+                                    description: `${session.description} - ${day.charAt(0).toUpperCase() + day.slice(1)}`,
+                                    color: session.color,
+                                    scheduleType: session.scheduleType,
+                                    weekTopics: session.weekTopics,
+                                    monthTopics: session.monthTopics,
+                                    status: session.status,
+                                    attendance: session.attendance,
+                                    isRecurring: session.isRecurring,
+                                    recurringType: session.recurringType,
+                                    recurringEndDate: session.recurringEndDate,
+                                    hasConflict: session.hasConflict,
+                                    isDeleted: session.isDeleted,
+                                    deletedAt: session.deletedAt,
+                                    createdAt: session.createdAt,
+                                    updatedAt: session.updatedAt,
+                                    dayOfWeek: day,
+                                    isWeeklySession: true
+                                });
+                            }
+                        });
+                    } else {
+                        allSessions.push({
+                            id: session._id,
+                            title: session.title,
+                            trainerName: session.trainerId?.name,
+                            batchName: session.batchName,
+                            courseName: session.courseName,
+                            subject: session.subject,
+                            date: new Date(session.date),
+                            startTime: session.startTime,
+                            endTime: session.endTime,
+                            description: session.description,
+                            color: session.color,
+                            scheduleType: session.scheduleType,
+                            weekTopics: session.weekTopics,
+                            monthTopics: session.monthTopics,
+                            status: session.status,
+                            attendance: session.attendance,
+                            isRecurring: session.isRecurring,
+                            recurringType: session.recurringType,
+                            recurringEndDate: session.recurringEndDate,
+                            hasConflict: session.hasConflict,
+                            isDeleted: session.isDeleted,
+                            deletedAt: session.deletedAt,
+                            createdAt: session.createdAt,
+                            updatedAt: session.updatedAt,
+                            isWeeklySession: false
+                        });
+                    }
+                });
+
+                setSessions(allSessions);
+            }
+            setLoading(false);
+        }
+        catch (err) {
+            console.error('Error fetching timetable:', err);
+            setLoading(false);
+        }
+    }
     // Date navigation
     const navigateDate = (direction) => {
         const newDate = new Date(currentDate);
@@ -107,49 +455,7 @@ function TimeTable() {
         setCurrentDate(new Date());
     };
 
-    // Schedule Management
-    const handleScheduleSubmit = (e) => {
-        e.preventDefault();
-        
-        // Check for conflicts
-        if (checkConflict(scheduleForm)) {
-            alert('⚠️ Conflict detected! You already have a session at this time.');
-            return;
-        }
 
-        const newSession = {
-            id: Date.now(),
-            ...scheduleForm,
-            date: new Date(scheduleForm.date)
-        };
-
-        // Handle recurring sessions
-        if (scheduleForm.recurring !== 'none') {
-            const recurringSessions = generateRecurringSessions(newSession);
-            setSessions([...sessions, ...recurringSessions]);
-        } else {
-            setSessions([...sessions, newSession]);
-        }
-
-        setShowScheduleModal(false);
-        resetScheduleForm();
-    };
-
-    const generateRecurringSessions = (session) => {
-        const sessions = [session];
-        const interval = session.recurring === 'daily' ? 1 : session.recurring === 'weekly' ? 7 : 30;
-        
-        for (let i = 1; i < 10; i++) { // Generate next 10 occurrences
-            const newDate = new Date(session.date);
-            newDate.setDate(newDate.getDate() + (interval * i));
-            sessions.push({
-                ...session,
-                id: Date.now() + i,
-                date: newDate
-            });
-        }
-        return sessions;
-    };
 
     const checkConflict = (newSession) => {
         return sessions.some(session => {
@@ -160,7 +466,7 @@ function TimeTable() {
             const newEnd = timeToMinutes(newSession.endTime);
             const existingStart = timeToMinutes(session.startTime);
             const existingEnd = timeToMinutes(session.endTime);
-            
+
             return (newStart < existingEnd && newEnd > existingStart);
         });
     };
@@ -173,16 +479,46 @@ function TimeTable() {
     const resetScheduleForm = () => {
         setScheduleForm({
             title: '',
+            trainerId: '',
+            trainerName: '',
+            batchId: '',
             batchName: '',
             subject: '',
             date: '',
             startTime: '',
             endTime: '',
             duration: '',
-            recurring: 'none',
             description: '',
-            color: '#3498db'
+            color: '#3498db',
+            scheduleType: 'single',
+            isRecurring: false,
+            recurringType: '',
+            recurringEndDate: '',
+            weekTopics: {
+                monday: '',
+                tuesday: '',
+                wednesday: '',
+                thursday: '',
+                friday: '',
+                saturday: '',
+                sunday: ''
+            },
+            monthTopics: {
+                week1: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week2: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week3: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                },
+                week4: {
+                    monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: ''
+                }
+            }
         });
+        setSelectedCourse('');
     };
 
     // Drag and Drop
@@ -221,12 +557,7 @@ function TimeTable() {
         setShowAvailabilityModal(false);
     };
 
-    // Delete session
-    const deleteSession = (id) => {
-        if (window.confirm('Are you sure you want to delete this session?')) {
-            setSessions(sessions.filter(s => s.id !== id));
-        }
-    };
+
 
     // Get week days
     const getWeekDays = () => {
@@ -243,7 +574,7 @@ function TimeTable() {
 
     // Get sessions for a specific date
     const getSessionsForDate = (date) => {
-        return sessions.filter(session => 
+        return sessions.filter(session =>
             session.date.toDateString() === date.toDateString()
         ).sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
     };
@@ -254,18 +585,18 @@ function TimeTable() {
 
     // Format date
     const formatDate = (date) => {
-        return date.toLocaleDateString('en-US', { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
         });
     };
 
     // Render Calendar Views
     const renderDayView = () => {
         const daySession = getSessionsForDate(currentDate);
-        
+
         return (
             <div className="day-view">
                 <div className="time-grid">
@@ -284,9 +615,9 @@ function TimeTable() {
                                     >
                                         <div className="session-header">
                                             <strong>{session.title}</strong>
-                                            <button 
+                                            <button
                                                 className="btn-delete"
-                                                onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                                                onClick={(e) => { e.stopPropagation(); }}
                                             >
                                                 ×
                                             </button>
@@ -298,6 +629,19 @@ function TimeTable() {
                                             <span className="time">{session.startTime} - {session.endTime}</span>
                                         </div>
                                         <div className="session-subject">{session.subject}</div>
+                                        {session.monthTopics && (
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                marginTop: '0.25rem',
+                                                fontSize: '0.75rem',
+                                                color: '#4caf50'
+                                            }}>
+                                                <i className="fas fa-calendar-week" style={{ fontSize: '0.7rem' }}></i>
+                                                <span>Monthly Topics Available</span>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -310,7 +654,7 @@ function TimeTable() {
 
     const renderWeekView = () => {
         const weekDays = getWeekDays();
-        
+
         return (
             <div className="week-view">
                 <div className="week-grid">
@@ -330,8 +674,8 @@ function TimeTable() {
                                 {weekDays.map(day => {
                                     const daySessions = getSessionsForDate(day).filter(s => s.startTime === time);
                                     return (
-                                        <div 
-                                            key={`${day}-${time}`} 
+                                        <div
+                                            key={`${day}-${time}`}
                                             className="day-cell"
                                             onDrop={() => handleDrop(day, time)}
                                             onDragOver={(e) => e.preventDefault()}
@@ -347,6 +691,15 @@ function TimeTable() {
                                                 >
                                                     <div className="mini-session-title">{session.title}</div>
                                                     <div className="mini-session-batch">{session.batchName}</div>
+                                                    {session.monthTopics && (
+                                                        <div style={{
+                                                            fontSize: '0.6rem',
+                                                            color: 'rgba(255,255,255,0.9)',
+                                                            marginTop: '0.1rem'
+                                                        }}>
+                                                            📅 Monthly Topics
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -367,10 +720,10 @@ function TimeTable() {
         const lastDay = new Date(year, month + 1, 0);
         const startDate = new Date(firstDay);
         startDate.setDate(startDate.getDate() - startDate.getDay());
-        
+
         const days = [];
         const current = new Date(startDate);
-        
+
         for (let i = 0; i < 42; i++) {
             days.push(new Date(current));
             current.setDate(current.getDate() + 1);
@@ -389,10 +742,10 @@ function TimeTable() {
                             const daySessions = getSessionsForDate(day);
                             const isCurrentMonth = day.getMonth() === month;
                             const isToday = day.toDateString() === new Date().toDateString();
-                            
+
                             return (
-                                <div 
-                                    key={idx} 
+                                <div
+                                    key={idx}
                                     className={`month-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}`}
                                 >
                                     <div className="cell-date">{day.getDate()}</div>
@@ -404,7 +757,18 @@ function TimeTable() {
                                                 style={{ backgroundColor: session.color }}
                                                 onClick={() => setSelectedSession(session)}
                                             >
-                                                {session.title}
+                                                <div style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                                                    {session.title}
+                                                </div>
+                                                {session.monthTopics && (
+                                                    <div style={{
+                                                        fontSize: '0.6rem',
+                                                        opacity: '0.8',
+                                                        marginTop: '0.1rem'
+                                                    }}>
+                                                        📅
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                         {daySessions.length > 3 && (
@@ -462,8 +826,10 @@ function TimeTable() {
                         <i className="fas fa-users"></i>
                     </div>
                     <div className="stat-content">
-                        <div className="stat-value">{[...new Set(sessions.map(s => s.batchName))].length}</div>
-                        <div className="stat-label">Active Batches</div>
+                        <div className="stat-value">
+                            {selectedCourse ? batches.length : [...new Set(sessions.map(s => s.batchName))].length}
+                        </div>
+                        <div className="stat-label">{selectedCourse ? 'Available Batches' : 'Active Batches'}</div>
                     </div>
                 </div>
                 <div className="stat-card stat-warning">
@@ -489,7 +855,7 @@ function TimeTable() {
                         Set Availability
                     </button>
                 </div>
-                
+
                 <div className="controls-center">
                     <button className="btn-nav" onClick={() => navigateDate(-1)}>
                         <i className="fas fa-chevron-left"></i>
@@ -499,7 +865,7 @@ function TimeTable() {
                         <i className="fas fa-chevron-right"></i>
                     </button>
                     <div className="current-date">
-                        {viewMode === 'month' 
+                        {viewMode === 'month'
                             ? currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                             : formatDate(currentDate)
                         }
@@ -508,19 +874,19 @@ function TimeTable() {
 
                 <div className="controls-right">
                     <div className="view-switcher">
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'day' ? 'active' : ''}`}
                             onClick={() => setViewMode('day')}
                         >
                             Day
                         </button>
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'week' ? 'active' : ''}`}
                             onClick={() => setViewMode('week')}
                         >
                             Week
                         </button>
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'month' ? 'active' : ''}`}
                             onClick={() => setViewMode('month')}
                         >
@@ -539,14 +905,20 @@ function TimeTable() {
 
             {/* Schedule Modal */}
             {showScheduleModal && (
-                <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
+                <div className="modal-overlay" onClick={() => {
+                    setShowScheduleModal(false);
+                    resetScheduleForm();
+                }}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3>
                                 <i className="fas fa-calendar-plus me-2"></i>
                                 Create New Schedule
                             </h3>
-                            <button className="btn-close" onClick={() => setShowScheduleModal(false)}>×</button>
+                            <button className="btn-close" onClick={() => {
+                                setShowScheduleModal(false);
+                                resetScheduleForm();
+                            }}>×</button>
                         </div>
                         <form onSubmit={handleScheduleSubmit}>
                             <div className="modal-body">
@@ -557,40 +929,99 @@ function TimeTable() {
                                             type="text"
                                             className="form-control"
                                             value={scheduleForm.title}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, title: e.target.value})}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })}
                                             required
                                         />
                                     </div>
                                 </div>
 
                                 <div className="form-row">
+
                                     <div className="form-group">
-                                        <label>Batch *</label>
+                                        <label>Course *</label>
                                         <select
                                             className="form-control"
-                                            value={scheduleForm.batchName}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, batchName: e.target.value})}
+                                            value={selectedCourse}
+                                            onChange={(e) => setSelectedCourse(e.target.value)}
                                             required
+                                            disabled={loading || courses.length === 0}
                                         >
-                                            <option value="">Select Batch</option>
-                                            {batches.map(batch => (
-                                                <option key={batch} value={batch}>{batch}</option>
+                                            <option value="">
+                                                {loading ? 'Loading courses...' : courses.length === 0 ? 'No courses available' : 'Select Course'}
+                                            </option>
+                                            {courses.map(course => (
+                                                <option key={course._id} value={course._id}>
+                                                    {course.name}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>Subject *</label>
+                                        <label>Trainer *</label>
                                         <select
                                             className="form-control"
-                                            value={scheduleForm.subject}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, subject: e.target.value})}
+                                            value={scheduleForm.trainerId || ''}
+                                            onChange={(e) => {
+                                                const selectedTrainer = trainers.find(t => t._id === e.target.value);
+                                                setScheduleForm({
+                                                    ...scheduleForm,
+                                                    trainerId: e.target.value,
+                                                    trainerName: selectedTrainer ? selectedTrainer.name : ''
+                                                });
+                                            }}
                                             required
+                                            disabled={loading || trainers.length === 0}
                                         >
-                                            <option value="">Select Subject</option>
-                                            {subjects.map(subject => (
-                                                <option key={subject} value={subject}>{subject}</option>
+                                            <option value="">
+                                                {loading ? 'Loading trainers...' : trainers.length === 0 ? 'No trainers available' : 'Select Trainer'}
+                                            </option>
+                                            {trainers.map(trainer => (
+                                                <option key={trainer._id} value={trainer._id}>
+                                                    {trainer.name}
+                                                </option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Batch *</label>
+                                        <select
+                                            className="form-control"
+                                            value={scheduleForm.batchId}
+                                            onChange={(e) => {
+                                                const selectedBatch = batches.find(b => b._id === e.target.value);
+                                                setScheduleForm({
+                                                    ...scheduleForm,
+                                                    batchId: e.target.value,
+                                                    batchName: selectedBatch ? selectedBatch.name : ''
+                                                });
+                                            }}
+                                            required
+                                            disabled={!selectedCourse || batches.length === 0}
+                                        >
+                                            <option value="">
+                                                {!selectedCourse ? 'Select Course First' : batches.length === 0 ? 'No Batches Available' : 'Select Batch'}
+                                            </option>
+                                            {batches.map(batch => (
+                                                <option key={batch._id} value={batch._id}>
+                                                    {batch.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Topics *</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={scheduleForm.subject}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, subject: e.target.value })}
+                                            placeholder="Topics"
+                                            required
+                                        />
+
                                     </div>
                                 </div>
 
@@ -601,7 +1032,7 @@ function TimeTable() {
                                             type="date"
                                             className="form-control"
                                             value={scheduleForm.date}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, date: e.target.value})}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -614,7 +1045,7 @@ function TimeTable() {
                                                     type="button"
                                                     className={`color-option ${scheduleForm.color === color ? 'active' : ''}`}
                                                     style={{ backgroundColor: color }}
-                                                    onClick={() => setScheduleForm({...scheduleForm, color})}
+                                                    onClick={() => setScheduleForm({ ...scheduleForm, color })}
                                                 />
                                             ))}
                                         </div>
@@ -628,7 +1059,7 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={scheduleForm.startTime}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, startTime: e.target.value})}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, startTime: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -638,37 +1069,179 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={scheduleForm.endTime}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, endTime: e.target.value})}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })}
                                             required
                                         />
                                     </div>
-                                    <div className="form-group">
-                                        <label>Duration</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            value={scheduleForm.duration}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, duration: e.target.value})}
-                                            placeholder="e.g., 2 hours"
-                                        />
-                                    </div>
+
                                 </div>
 
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label>Recurring</label>
+                                        <label>Schedule Type *</label>
                                         <select
                                             className="form-control"
-                                            value={scheduleForm.recurring}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, recurring: e.target.value})}
+                                            value={scheduleForm.scheduleType}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, scheduleType: e.target.value })}
+                                            required
                                         >
-                                            <option value="none">None</option>
-                                            <option value="daily">Daily</option>
-                                            <option value="weekly">Weekly</option>
-                                            <option value="monthly">Monthly</option>
+                                            <option value="single">Single Session</option>
+                                            <option value="weekly">Weekly Schedule (7 days)</option>
+                                            <option value="monthly">Monthly Schedule (4 weeks)</option>
                                         </select>
+                                        <small className="form-text text-muted">
+                                            Choose schedule type based on your planning needs
+                                        </small>
                                     </div>
                                 </div>
+
+                                {/* Recurring Option */}
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={scheduleForm.isRecurring}
+                                                onChange={(e) => setScheduleForm({
+                                                    ...scheduleForm,
+                                                    isRecurring: e.target.checked,
+                                                    recurringType: e.target.checked ? 'weekly' : '',
+                                                    recurringEndDate: ''
+                                                })}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                            />
+                                            Make this a Recurring Session
+                                        </label>
+                                        <small className="form-text text-muted">
+                                            📅 Create repeating sessions automatically
+                                        </small>
+                                    </div>
+                                </div>
+
+                                {scheduleForm.isRecurring && (
+                                    <div className="form-row" style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#fff3cd',
+                                        borderRadius: '8px',
+                                        border: '2px solid #ffc107'
+                                    }}>
+                                        <div className="form-group">
+                                            <label>Recurring Pattern *</label>
+                                            <select
+                                                className="form-control"
+                                                value={scheduleForm.recurringType}
+                                                onChange={(e) => setScheduleForm({ ...scheduleForm, recurringType: e.target.value })}
+                                                required
+                                            >
+                                                <option value="">Select Pattern</option>
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Repeat Until *</label>
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                value={scheduleForm.recurringEndDate}
+                                                onChange={(e) => setScheduleForm({ ...scheduleForm, recurringEndDate: e.target.value })}
+                                                min={scheduleForm.date}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {scheduleForm.scheduleType === 'weekly' && (
+                                    <div className="form-row">
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Week Topics *</label>
+                                            <div className="week-topics-grid">
+                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, idx) => (
+                                                    <div key={idx} className="week-topic-group">
+                                                        <label className="week-topic-label">
+                                                            {day}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control week-topic-input"
+                                                            value={scheduleForm.weekTopics[day.toLowerCase()]}
+                                                            onChange={(e) => setScheduleForm({
+                                                                ...scheduleForm,
+                                                                weekTopics: {
+                                                                    ...scheduleForm.weekTopics,
+                                                                    [day.toLowerCase()]: e.target.value
+                                                                }
+                                                            })}
+                                                            placeholder={`Enter topics for ${day}...`}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <small className="form-text text-muted">
+                                                📝 <strong>Note:</strong> Only days with topics will create sessions. Leave empty to skip that day.
+                                            </small>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Monthly Schedule UI */}
+                                {scheduleForm.scheduleType === 'monthly' && (
+                                    <div className="form-row">
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Monthly Topics (4 Weeks) *</label>
+                                            <div style={{
+                                                border: '2px solid #e0e0e0',
+                                                borderRadius: '8px',
+                                                padding: '1rem',
+                                                backgroundColor: '#f9fafb'
+                                            }}>
+                                                {['week1', 'week2', 'week3', 'week4'].map((week, weekIdx) => (
+                                                    <div key={week} style={{ marginBottom: '1.5rem' }}>
+                                                        <h4 style={{
+                                                            color: '#2c3e50',
+                                                            marginBottom: '1rem',
+                                                            padding: '0.5rem',
+                                                            backgroundColor: '#e3f2fd',
+                                                            borderRadius: '6px'
+                                                        }}>
+                                                            Week {weekIdx + 1}
+                                                        </h4>
+                                                        <div className="week-topics-grid">
+                                                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                                                                <div key={day} className="week-topic-group">
+                                                                    <label className="week-topic-label">
+                                                                        {day}
+                                                                    </label>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="form-control week-topic-input"
+                                                                        value={scheduleForm.monthTopics[week][day.toLowerCase()]}
+                                                                        onChange={(e) => setScheduleForm({
+                                                                            ...scheduleForm,
+                                                                            monthTopics: {
+                                                                                ...scheduleForm.monthTopics,
+                                                                                [week]: {
+                                                                                    ...scheduleForm.monthTopics[week],
+                                                                                    [day.toLowerCase()]: e.target.value
+                                                                                }
+                                                                            }
+                                                                        })}
+                                                                        placeholder={`Topics for ${day}...`}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <small className="form-text text-muted">
+                                                📅 <strong>Monthly Planning:</strong> Plan your entire month ahead. Leave empty for days without sessions.
+                                            </small>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="form-row">
                                     <div className="form-group">
@@ -677,19 +1250,22 @@ function TimeTable() {
                                             className="form-control"
                                             rows="3"
                                             value={scheduleForm.description}
-                                            onChange={(e) => setScheduleForm({...scheduleForm, description: e.target.value})}
+                                            onChange={(e) => setScheduleForm({ ...scheduleForm, description: e.target.value })}
                                             placeholder="Add notes or description..."
                                         />
                                     </div>
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-outline" onClick={() => setShowScheduleModal(false)}>
+                                <button type="button" className="btn btn-outline" onClick={() => {
+                                    setShowScheduleModal(false);
+                                    resetScheduleForm();
+                                }}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" disabled={loading}>
                                     <i className="fas fa-save me-2"></i>
-                                    Create Schedule
+                                    {loading ? 'Loading...' : 'Create Schedule'}
                                 </button>
                             </div>
                         </form>
@@ -716,15 +1292,47 @@ function TimeTable() {
                                         <select
                                             className="form-control"
                                             value={availabilityForm.status}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, status: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, status: e.target.value })}
                                             required
+                                            style={{
+                                                backgroundColor:
+                                                    availabilityForm.status === 'available' ? '#e8f5e9' :
+                                                        availabilityForm.status === 'busy' ? '#fff3e0' :
+                                                            availabilityForm.status === 'leave' ? '#ffebee' :
+                                                                availabilityForm.status === 'sick' ? '#ffe0b2' :
+                                                                    '#f3e5f5',
+                                                fontWeight: '600'
+                                            }}
                                         >
-                                            <option value="available">Available</option>
-                                            <option value="busy">Busy</option>
-                                            <option value="leave">On Leave</option>
+                                            <option value="available">✅ Available</option>
+                                            <option value="busy">⏰ Busy</option>
+                                            <option value="leave">🏖️ On Leave</option>
+                                            <option value="sick">🤒 Sick Leave</option>
+                                            <option value="vacation">🌴 Vacation</option>
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* Show reason/notes if not available */}
+                                {availabilityForm.status !== 'available' && (
+                                    <div className="form-row" style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#fff3cd',
+                                        borderRadius: '8px',
+                                        border: '1px solid #ffc107'
+                                    }}>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Reason / Notes</label>
+                                            <textarea
+                                                className="form-control"
+                                                rows="2"
+                                                value={availabilityForm.reason || ''}
+                                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, reason: e.target.value })}
+                                                placeholder="Please provide a reason for your unavailability..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="form-row">
                                     <div className="form-group">
@@ -733,7 +1341,7 @@ function TimeTable() {
                                             type="date"
                                             className="form-control"
                                             value={availabilityForm.startDate}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, startDate: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, startDate: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -743,7 +1351,7 @@ function TimeTable() {
                                             type="date"
                                             className="form-control"
                                             value={availabilityForm.endDate}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, endDate: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, endDate: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -756,7 +1364,7 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={availabilityForm.startTime}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, startTime: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, startTime: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -766,7 +1374,7 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={availabilityForm.endTime}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, endTime: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, endTime: e.target.value })}
                                             required
                                         />
                                     </div>
@@ -779,7 +1387,7 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={availabilityForm.breakStart}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, breakStart: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, breakStart: e.target.value })}
                                         />
                                     </div>
                                     <div className="form-group">
@@ -788,7 +1396,7 @@ function TimeTable() {
                                             type="time"
                                             className="form-control"
                                             value={availabilityForm.breakEnd}
-                                            onChange={(e) => setAvailabilityForm({...availabilityForm, breakEnd: e.target.value})}
+                                            onChange={(e) => setAvailabilityForm({ ...availabilityForm, breakEnd: e.target.value })}
                                         />
                                     </div>
                                 </div>
@@ -806,7 +1414,7 @@ function TimeTable() {
                                                             const days = e.target.checked
                                                                 ? [...availabilityForm.workingDays, day]
                                                                 : availabilityForm.workingDays.filter(d => d !== day);
-                                                            setAvailabilityForm({...availabilityForm, workingDays: days});
+                                                            setAvailabilityForm({ ...availabilityForm, workingDays: days });
                                                         }}
                                                     />
                                                     {day}
@@ -852,6 +1460,12 @@ function TimeTable() {
                                     {selectedSession.batchName}
                                 </span>
                             </div>
+                            {selectedSession.trainerName && (
+                                <div className="detail-row">
+                                    <strong>Trainer:</strong>
+                                    <span>{selectedSession.trainerName}</span>
+                                </div>
+                            )}
                             <div className="detail-row">
                                 <strong>Subject:</strong>
                                 <span>{selectedSession.subject}</span>
@@ -876,22 +1490,224 @@ function TimeTable() {
                                     <span>{selectedSession.description}</span>
                                 </div>
                             )}
+                            {selectedSession.attendance && selectedSession.attendance.totalStudents > 0 && (
+                                <div className="detail-row">
+                                    <strong>Attendance:</strong>
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        <span style={{
+                                            padding: '0.5rem 1rem',
+                                            backgroundColor: '#4caf50',
+                                            color: 'white',
+                                            borderRadius: '6px',
+                                            fontWeight: '600'
+                                        }}>
+                                            {selectedSession.attendance.attendancePercentage}%
+                                        </span>
+                                        <span>
+                                            Present: {selectedSession.attendance.presentStudents} /
+                                            Total: {selectedSession.attendance.totalStudents}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {selectedSession.monthTopics && (
+                                <div className="detail-row">
+                                    <strong>Month-wise Topics:</strong>
+                                    <div style={{
+                                        marginTop: '1rem',
+                                        border: '2px solid #e3f2fd',
+                                        borderRadius: '8px',
+                                        padding: '1rem',
+                                        backgroundColor: '#f8f9fa'
+                                    }}>
+                                        {Object.entries(selectedSession.monthTopics).map(([week, topics]) => (
+                                            <div key={week} style={{
+                                                marginBottom: '1.5rem',
+                                                padding: '1rem',
+                                                backgroundColor: 'white',
+                                                borderRadius: '6px',
+                                                border: '1px solid #e0e0e0'
+                                            }}>
+                                                <h5 style={{
+                                                    color: '#2c3e50',
+                                                    marginBottom: '1rem',
+                                                    padding: '0.5rem',
+                                                    backgroundColor: '#e3f2fd',
+                                                    borderRadius: '6px',
+                                                    fontSize: '1rem',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {week.charAt(0).toUpperCase() + week.slice(1).replace('week', ' Week ')}
+                                                </h5>
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                                    gap: '0.75rem'
+                                                }}>
+                                                    {Object.entries(topics).map(([day, topic]) => (
+                                                        <div key={day} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            padding: '0.5rem',
+                                                            backgroundColor: topic ? '#e8f5e9' : '#f5f5f5',
+                                                            borderRadius: '4px',
+                                                            border: `1px solid ${topic ? '#c8e6c9' : '#e0e0e0'}`
+                                                        }}>
+                                                            <span style={{
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                minWidth: '70px',
+                                                                fontSize: '0.9rem'
+                                                            }}>
+                                                                {day.charAt(0).toUpperCase() + day.slice(1)}:
+                                                            </span>
+                                                            <span style={{
+                                                                color: topic ? '#2e7d32' : '#757575',
+                                                                fontSize: '0.9rem',
+                                                                marginLeft: '0.5rem',
+                                                                flex: 1
+                                                            }}>
+                                                                {topic || 'No topic assigned'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="modal-footer">
-                            <button 
-                                className="btn btn-danger" 
+                            {/* <button
+                                className="btn btn-primary"
                                 onClick={() => {
-                                    deleteSession(selectedSession.id);
                                     setSelectedSession(null);
+                                    handleMarkAttendance(selectedSession);
                                 }}
+                                style={{ backgroundColor: '#4caf50', borderColor: '#4caf50' }}
                             >
-                                <i className="fas fa-trash me-2"></i>
-                                Delete
-                            </button>
+                                <i className="fas fa-user-check me-2"></i>
+                                Mark Attendance
+                            </button> */}
                             <button className="btn btn-outline" onClick={() => setSelectedSession(null)}>
                                 Close
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Attendance Modal */}
+            {showAttendanceModal && attendanceSession && (
+                <div className="modal-overlay" onClick={() => setShowAttendanceModal(false)}>
+                    <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header" style={{ borderBottom: '4px solid #4caf50' }}>
+                            <h3>
+                                <i className="fas fa-user-check me-2" style={{ color: '#4caf50' }}></i>
+                                Mark Attendance
+                            </h3>
+                            <button className="btn-close" onClick={() => setShowAttendanceModal(false)}>×</button>
+                        </div>
+                        <form onSubmit={handleAttendanceSubmit}>
+                            <div className="modal-body">
+                                <div style={{
+                                    padding: '1rem',
+                                    backgroundColor: '#e8f5e9',
+                                    borderRadius: '8px',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    <h4 style={{ margin: 0, marginBottom: '0.5rem', color: '#2c3e50' }}>
+                                        {attendanceSession.title}
+                                    </h4>
+                                    <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>
+                                        <div>Batch: {attendanceSession.batchName}</div>
+                                        <div>Date: {formatDate(attendanceSession.date)}</div>
+                                        <div>Time: {attendanceSession.startTime} - {attendanceSession.endTime}</div>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Total Students *</label>
+                                        <input
+                                            type="number"
+                                            className="form-control"
+                                            value={attendanceData.totalStudents}
+                                            onChange={(e) => {
+                                                const total = parseInt(e.target.value) || 0;
+                                                setAttendanceData({
+                                                    ...attendanceData,
+                                                    totalStudents: total,
+                                                    absentStudents: Math.max(0, total - attendanceData.presentStudents)
+                                                });
+                                            }}
+                                            min="0"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Present Students *</label>
+                                        <input
+                                            type="number"
+                                            className="form-control"
+                                            value={attendanceData.presentStudents}
+                                            onChange={(e) => {
+                                                const present = parseInt(e.target.value) || 0;
+                                                setAttendanceData({
+                                                    ...attendanceData,
+                                                    presentStudents: present,
+                                                    absentStudents: Math.max(0, attendanceData.totalStudents - present)
+                                                });
+                                            }}
+                                            min="0"
+                                            max={attendanceData.totalStudents}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Absent Students</label>
+                                        <input
+                                            type="number"
+                                            className="form-control"
+                                            value={attendanceData.absentStudents}
+                                            readOnly
+                                            style={{ backgroundColor: '#f5f7fa' }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {attendanceData.totalStudents > 0 && (
+                                    <div style={{
+                                        padding: '1rem',
+                                        backgroundColor: '#d1ecf1',
+                                        borderRadius: '8px',
+                                        marginTop: '1rem'
+                                    }}>
+                                        <strong style={{ color: '#0c5460' }}>Attendance Percentage: </strong>
+                                        <span style={{
+                                            fontSize: '1.5rem',
+                                            fontWeight: '700',
+                                            color: '#0c5460'
+                                        }}>
+                                            {((attendanceData.presentStudents / attendanceData.totalStudents) * 100).toFixed(2)}%
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-outline" onClick={() => setShowAttendanceModal(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#4caf50', borderColor: '#4caf50' }}>
+                                    <i className="fas fa-save me-2"></i>
+                                    Save Attendance
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
@@ -1559,7 +2375,40 @@ function TimeTable() {
                 }
 
                 .detail-row span {
-                    color: #7f8c8d;
+                    color: #000;
+                }
+
+                .week-topics-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 1rem;
+                    margin-top: 0.5rem;
+                }
+
+                .week-topic-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .week-topic-label {
+                    font-weight: 600;
+                    color: #2c3e50;
+                    font-size: 0.9rem;
+                }
+
+                .week-topic-input {
+                    padding: 0.75rem;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    transition: all 0.3s;
+                }
+
+                .week-topic-input:focus {
+                    outline: none;
+                    border-color: #3498db;
+                    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
                 }
 
                 @media (max-width: 768px) {

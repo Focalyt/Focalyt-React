@@ -92,7 +92,7 @@ module.exports.DripMarketingRule = require("./dripMarkettingRule");
 module.exports.ReEnquire = require("./reEnquire");
 // module.exports.Manager = required("");
 module.exports.Traine = require("./trainer")
-
+module.exports.TrainerTimeTable = require("./trainerTimeTable");
 
 //b2b models
 module.exports.TypeOfB2B = require("./b2b/typeOfB2B");

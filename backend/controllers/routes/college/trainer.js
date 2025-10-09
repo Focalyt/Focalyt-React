@@ -39,7 +39,7 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC typ
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable } = require("../../models");
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -245,7 +245,7 @@ router.put('/update/:id', async (req, res) => {
     }
 });
 
-router.get('/trainers', isCollege ,async (req, res) => {
+router.get('/trainers', isTrainer ,async (req, res) => {
     try {
         const user = req.user;
         // console.log("user" , user)

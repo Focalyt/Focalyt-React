@@ -74,6 +74,21 @@ const CandidateLogin = () => {
         }
     }, [user, returnUrl]);
 
+        useEffect(() => {
+        // Add external CSS and script dynamically
+        const cssLink = document.createElement("link");
+        cssLink.rel = "stylesheet";
+        cssLink.href = "https://app.helloyubo.com/assets/focalyt_bot.bot.css";
+        document.head.appendChild(cssLink);
+    
+        return () => {
+          // Cleanup CSS and script when component unmounts
+          if (cssLink.parentNode) {
+            document.head.removeChild(cssLink);
+          }
+        
+        };
+      }, []);
     useEffect(() => {
         if (!showExtraFields) return;
 

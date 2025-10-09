@@ -646,22 +646,22 @@ const AddLeads = () => {
                       </div>
 
                       <div className={`row align-items-center ${!showOtpActions ? 'd-none' : ''}`} id="otp-actions">
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                          <button
-                            className="btn btn-success float-right btn-inline waves-effect waves-light text-white btn-block"
-                            id="verify-login-btn"
-                            onClick={handleVerifyOtp}
-                          >
-                            Verify
-                          </button>
-                        </div>
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                        <div className="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2">
                           <button
                             className="btn btn-success btn-block waves-effect waves-light text-white btn-block"
                             id="resend-btn"
                             onClick={handleResendOtp}
                           >
                             Resend OTP
+                          </button>
+                        </div>
+                        <div className="col-xl-1 col-lg-1 col-md-1 col-sm-1 col-1">
+                          <button
+                            className="btn btn-success float-right btn-inline waves-effect waves-light text-white btn-block"
+                            id="verify-login-btn"
+                            onClick={handleVerifyOtp}
+                          >
+                            Verify
                           </button>
                         </div>
                       </div>

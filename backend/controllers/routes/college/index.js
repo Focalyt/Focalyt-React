@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -11621,179 +11621,179 @@ router.post('/trainee/login', async (req, res) => {
 })
 
 router.post('/assigntrainerstocourse', isCollege, async (req, res) => {
-  try {
-    const { courseId, trainers } = req.body;
-    const user = req.user;
-    const collegeId = req.college._id;
+	try {
+		const { courseId, trainers } = req.body;
+		const user = req.user;
+		const collegeId = req.college._id;
 
-    if (!courseId || !trainers) {
-      return res.status(400).json({
-        status: false,
-        message: 'Course ID and trainers array are required'
-      });
-    }
-    const course = await Courses.findOne({
-      _id: courseId,
-      college: collegeId
-    });
+		if (!courseId || !trainers) {
+			return res.status(400).json({
+				status: false,
+				message: 'Course ID and trainers array are required'
+			});
+		}
+		const course = await Courses.findOne({
+			_id: courseId,
+			college: collegeId
+		});
 
-    if (!course) {
-      return res.status(404).json({
-        status: false,
-        message: 'Course not found'
-      });
-    }
+		if (!course) {
+			return res.status(404).json({
+				status: false,
+				message: 'Course not found'
+			});
+		}
 
-    const trainee = await User.find({
-      _id: { $in: trainers }, // array of trainers
-      role: 4,
-    });
+		const trainee = await User.find({
+			_id: { $in: trainers }, // array of trainers
+			role: 4,
+		});
 
-    // console.log("trainee", trainee);
+		// console.log("trainee", trainee);
 
-    course.trainers.push(...trainers);
-    await course.save();
+		course.trainers.push(...trainers);
+		await course.save();
 
-    return res.status(200).json({
-      status: true,
-      message: 'Trainers successfully assigned to the course'
-    });
-  } catch (err) {
-    console.log(err);
-    return res.status(500).json({
-      status: false,
-      message: 'Internal server error'
-    });
-  }
+		return res.status(200).json({
+			status: true,
+			message: 'Trainers successfully assigned to the course'
+		});
+	} catch (err) {
+		console.log(err);
+		return res.status(500).json({
+			status: false,
+			message: 'Internal server error'
+		});
+	}
 });
 
-router.post('/assigntrainerstobatch', isCollege, async(req, res)=>{
-	
-	try{
-		const {batchId , trainers}= req.body
-	const user = req.user;
-	const collegeId = req.college._id;
-	// console.log("req.body" , req.body)
-	if(!batchId || !trainers){
-		return res.status(400).json({
-			status:false,
-			message:'BatchId and trainers are required'
-		})
-	}
+router.post('/assigntrainerstobatch', isCollege, async (req, res) => {
 
-	const batch = await Batch.findOne({
-		_id: batchId,
-		college: collegeId
-	})
+	try {
+		const { batchId, trainers } = req.body
+		const user = req.user;
+		const collegeId = req.college._id;
+		// console.log("req.body" , req.body)
+		if (!batchId || !trainers) {
+			return res.status(400).json({
+				status: false,
+				message: 'BatchId and trainers are required'
+			})
+		}
 
-	if(!batch){
-		return res.status(404).json({
-			staus: false,
-			message: 'Batch not found'
+		const batch = await Batch.findOne({
+			_id: batchId,
+			college: collegeId
 		})
 
-	}
-	const trainee = await User.find({
-		_id: {$in: trainers},
-		role:4
-	})
-	batch.trainers.push(...trainers);
-	await batch.save()
+		if (!batch) {
+			return res.status(404).json({
+				staus: false,
+				message: 'Batch not found'
+			})
 
-	return res.status(200).json({
-		status: true,
-		message: ' Trainers succesfully assign to the batch'
-	})
+		}
+		const trainee = await User.find({
+			_id: { $in: trainers },
+			role: 4
+		})
+		batch.trainers.push(...trainers);
+		await batch.save()
+
+		return res.status(200).json({
+			status: true,
+			message: ' Trainers succesfully assign to the batch'
+		})
 	}
-	catch(err){
+	catch (err) {
 		comsole.log(err)
 		return res.status({
-			status:false,
+			status: false,
 			message: ''
 		})
 	}
-	
+
 })
 
 router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 	try {
-	  const { courseId } = req.query;
-	  const user = req.user;
-	  const collegeId = req.college._id;
+		const { courseId } = req.query;
+		const user = req.user;
+		const collegeId = req.college._id;
 
-	  if (courseId) {
-		const course = await Courses.findOne({ _id: courseId }).populate('trainers');
-  
-		if (!course) {
-		  return res.status(404).json({
-			status: false,
-			message: 'Course not found'
-		  });
+		if (courseId) {
+			const course = await Courses.findOne({ _id: courseId }).populate('trainers');
+
+			if (!course) {
+				return res.status(404).json({
+					status: false,
+					message: 'Course not found'
+				});
+			}
+
+			return res.status(200).json({
+				status: true,
+				message: 'Trainers fetched successfully',
+				data: [{
+					_id: 'course-trainers',
+					name: 'Course Trainers',
+					assignedCourses: [{
+						_id: course._id,
+						name: course.name,
+						image: course.image,
+						description: course.description
+					}]
+				}]
+			});
 		}
-  
-		return res.status(200).json({
-		  status: true,
-		  message: 'Trainers fetched successfully',
-		  data: [{
-			_id: 'course-trainers',
-			name: 'Course Trainers',
-			assignedCourses: [{
-			  _id: course._id,
-			  name: course.name,
-			  image: course.image,
-			  description: course.description
-			}]
-		  }]
+
+
+		const courses = await Courses.find({
+			college: collegeId,
+			trainers: { $exists: true }
+		}).select('trainers name _id image description');
+
+		const trainerIds = [...new Set(
+			courses.flatMap(course => course.trainers.map(id => id.toString()))
+		)].map(id => new mongoose.Types.ObjectId(id));
+
+		const trainers = await User.find({
+			_id: { $in: trainerIds },
+			role: 4
+		}).select('name email mobile _id');
+
+
+		const trainersWithCourses = trainers.map(trainer => {
+			const assignedCourses = courses
+				.filter(course => course.trainers.some(trainerId => trainerId.toString() === trainer._id.toString()))
+				.map(course => ({
+					_id: course._id,
+					name: course.name,
+					image: course.image,
+					description: course.description
+				}));
+
+			return {
+				_id: trainer._id,
+				name: trainer.name,
+				email: trainer.email,
+				mobile: trainer.mobile,
+				assignedCourses: assignedCourses
+			};
 		});
-	  }
 
-
-	  const courses = await Courses.find({
-		college: collegeId,
-		trainers: {$exists: true}
-	  }).select('trainers name _id image description');
-
-	  const trainerIds = [...new Set(
-		courses.flatMap(course => course.trainers.map(id => id.toString()))
-	  )].map(id => new mongoose.Types.ObjectId(id));
-
-	  const trainers = await User.find({
-		_id: { $in: trainerIds },
-		role: 4
-	  }).select('name email mobile _id');
-
-	  
-	  const trainersWithCourses = trainers.map(trainer => {
-		const assignedCourses = courses
-		  .filter(course => course.trainers.some(trainerId => trainerId.toString() === trainer._id.toString()))
-		  .map(course => ({
-			_id: course._id,
-			name: course.name,
-			image: course.image,
-			description: course.description
-		  }));
-
-		return {
-		  _id: trainer._id,
-		  name: trainer.name,
-		  email: trainer.email,
-		  mobile: trainer.mobile,
-		  assignedCourses: assignedCourses
-		};
-	  });
-
-	  return res.status(200).json({
-		status: true,
-		message: 'Trainers fetched successfully',
-		data: trainersWithCourses,
-		count: trainersWithCourses.length
-	  });
+		return res.status(200).json({
+			status: true,
+			message: 'Trainers fetched successfully',
+			data: trainersWithCourses,
+			count: trainersWithCourses.length
+		});
 	} catch (err) {
-	  console.log(err);
-	  return res.status(500).json({
-		status: false,
-		message: 'Error while fetching trainers'
-	  });
+		console.log(err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching trainers'
+		});
 	}
 });
 
@@ -11833,17 +11833,17 @@ router.get('/getbatchesbytrainerandcourse', isTrainer, async (req, res) => {
 			});
 		}
 
-		
+
 		const batches = await Batch.find({
 			courseId: courseId,
 			college: collegeId,
 			trainers: user._id
 		})
-		.populate('centerId', 'name address')
-		.populate('trainers', 'name email mobile')
-		.sort({ createdAt: -1 });
+			.populate('centerId', 'name address')
+			.populate('trainers', 'name email mobile')
+			.sort({ createdAt: -1 });
 
-		
+
 		const course = await Courses.findOne({ _id: courseId, college: collegeId })
 			.select('name description image');
 
@@ -11868,6 +11868,161 @@ router.get('/getbatchesbytrainerandcourse', isTrainer, async (req, res) => {
 		return res.status(500).json({
 			status: false,
 			message: 'Error while fetching batches'
+		});
+	}
+});
+
+router.get('/trainers', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		// console.log("user" , user)
+
+		const trainers = await User.find({
+			role: 4,
+			isDeleted: false
+		})
+
+		res.status(200).json({
+			status: true,
+			message: "Trainers retrieved successfully",
+			data: trainers,
+			count: trainers.length
+		});
+
+	} catch (err) {
+		console.log('Error in GET /trainers:', err.message);
+		return res.status(500).json({
+			status: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+})
+router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
+	try {
+		const { 
+			batchId,
+			batchName, 
+			courseId,
+			courseName, 
+			subject, 
+			date, 
+			startTime, 
+			endTime, 
+			scheduleType, 
+			weekTopics, 
+			monthTopics, 
+			title, 
+			description,
+			color,
+			isRecurring,
+			recurringType,
+			recurringEndDate
+		} = req.body;
+		
+		const trainerId = req.user._id;
+		const collegeId = req.user.collegeId;
+
+		console.log('Received schedule data:', req.body);
+		if (!title || !subject || !date || !startTime || !endTime || !scheduleType) {
+			return res.status(400).json({
+				status: false,
+				message: 'Title, subject, date, time, and schedule type are required'
+			});
+		}
+
+		if (scheduleType === 'weekly' && (!weekTopics || Object.keys(weekTopics).length === 0)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Week topics are required for weekly schedule'
+			});
+		}
+
+		if (scheduleType === 'monthly' && (!monthTopics || Object.keys(monthTopics).length === 0)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Month topics are required for monthly schedule'
+			});
+		}
+
+		if (isRecurring && (!recurringType || !recurringEndDate)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Recurring type and end date are required for recurring sessions'
+			});
+		}
+
+		const trainerTimeTable = new TrainerTimeTable({
+			trainerId,
+			collegeId,
+			batchId,
+			batchName,
+			courseId,
+			courseName,
+			subject,
+			date,
+			startTime,
+			endTime,
+			scheduleType,
+			title,
+			description: description || '',
+			color: color || '#3498db',
+			isRecurring: isRecurring || false,
+			recurringType: isRecurring ? recurringType : null,
+			recurringEndDate: isRecurring ? recurringEndDate : null,
+			createdBy: trainerId
+		});
+
+		if (scheduleType === 'weekly') {
+			trainerTimeTable.weekTopics = weekTopics;
+		} else if (scheduleType === 'monthly') {
+			trainerTimeTable.monthTopics = monthTopics;
+		}
+
+		await trainerTimeTable.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Trainer time table created successfully',
+			data: trainerTimeTable
+		});
+
+		
+	}
+	catch (err) {
+		console.log('Error in POST /trainerTimeTable:', err.message);
+		return res.status(500).json({
+			status: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+})
+router.get('/trainerTimeTable', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const trainerId = req.user._id;
+		if (!trainerId) {
+			return res.status(400).json({
+				status: false,
+				message: 'trainer Id is required'
+			})
+		}
+		const scheduledTimeTable = await TrainerTimeTable.find({
+			trainerId: trainerId,
+		}).populate('trainerId', 'name')
+
+		return res.status(200).json({
+			status: true,
+			message: 'Timetable fetched successfully',
+			data: scheduledTimeTable,
+		});
+	} catch (error) {
+		console.error('Error fetching trainer timetable:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error fetching timetable',
+			error: error.message
 		});
 	}
 });
