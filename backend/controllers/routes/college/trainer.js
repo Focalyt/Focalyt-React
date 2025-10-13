@@ -62,7 +62,7 @@ router.post('/trinerValidation' ,isTrainer,  async(req, res)=>{
 })
 
 
-router.post('/addTrainer', async (req, res) => {
+router.post('/addTrainer', isCollege, async (req, res) => {
     try {
         const { name, email, mobile, designation } = req.body;
         
@@ -149,7 +149,7 @@ router.post('/addTrainer', async (req, res) => {
 
         }
 })
-router.put('/update/:id', async (req, res) => {
+router.put('/update/:id', isCollege, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, email, mobile, designation } = req.body;
@@ -245,7 +245,7 @@ router.put('/update/:id', async (req, res) => {
     }
 });
 
-router.get('/trainers', isTrainer ,async (req, res) => {
+router.get('/trainers', isCollege ,async (req, res) => {
     try {
         const user = req.user;
         // console.log("user" , user)
@@ -272,5 +272,101 @@ router.get('/trainers', isTrainer ,async (req, res) => {
     }
 })
 
+router.route("/mark-attendance").post(isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const { 
+			appliedCourseId, 
+			date, 
+			status, 
+			period = 'regularPeriod', 
+			remarks = '' 
+		} = req.body;
 
+		console.log("req.body", req.body);
+
+		// Validate required fields
+		if (!appliedCourseId || !date || !status) {
+			return res.status(400).json({
+				status: false,
+				message: "appliedCourseId, date, and status are required"
+			});
+		}
+
+		// Validate status
+		if (!['Present', 'Absent'].includes(status)) {
+			return res.status(400).json({
+				status: false,
+				message: "Status must be 'Present' or 'Absent'"
+			});
+		}
+
+		// Validate period
+		if (!['zeroPeriod', 'regularPeriod'].includes(period)) {
+			return res.status(400).json({
+				status: false,
+				message: "Period must be 'zeroPeriod' or 'regularPeriod'"
+			});
+		}
+
+		// Find the applied course
+		const appliedCourse = await AppliedCourses.findById(appliedCourseId)
+			.populate('_course')
+			.populate('batch');
+
+		if (!appliedCourse) {
+			return res.status(404).json({
+				status: false,
+				message: "Applied course not found"
+			});
+		}
+
+		// Verify that the course belongs to the college
+		const college = await College.findOne({
+			'trainers': user._id 
+		});
+
+		if (!college) {
+			return res.status(403).json({
+				status: false,
+				message: "College not found"
+			});
+		}
+
+		if (String(appliedCourse._course.college) !== String(college._id)) {
+			return res.status(403).json({
+				status: false,
+				message: "You don't have permission to mark attendance for this course"
+			});
+		}
+
+		// Mark attendance using the schema method
+		await appliedCourse.markAttendance(date, status, period, user._id, remarks);
+
+		// Get updated attendance data
+		const updatedCourse = await AppliedCourses.findById(appliedCourseId)
+			.populate('_course')
+			.populate('batch');
+
+		res.status(200).json({
+			status: true,
+			message: "Attendance marked successfully",
+			data: {
+				appliedCourseId,
+				date,
+				status,
+				period,
+				markedBy: user._id,
+				attendance: updatedCourse.attendance
+			}
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			status: false,
+			message: err.message || "Server Error"
+		});
+	}
+});
 module.exports = router;

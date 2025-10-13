@@ -1,0 +1,747 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+
+
+function Students() {
+    const [loading, setLoadingData] = useState(true);
+    const [allProfiles, setAllProfiles] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [activeTab] = useState('batchFreeze'); 
+    const [searchQuery, setSearchQuery] = useState('');
+    const [batchFreezeCount, setBatchFreezeCount] = useState(0);
+    const [selectedBatch, setSelectedBatch] = useState(null);
+    const [batchName, setBatchName] = useState('');
+    const [courseId, setCourseId] = useState('');
+    const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [attendanceData, setAttendanceData] = useState({});
+    const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const token = JSON.parse(sessionStorage.getItem('token'));
+    const location = useLocation();
+    const navigate = useNavigate();
+    const searchParams = new URLSearchParams(location.search);
+    const batchId = searchParams.get('batchId');
+    const batchNameParam = searchParams.get('batchName');
+    const courseIdParam = searchParams.get('courseId');
+
+    useEffect(() => {
+        if (batchId) {
+            setSelectedBatch({ _id: batchId });
+            setBatchName(decodeURIComponent(batchNameParam || 'Batch'));
+            if (courseIdParam) {
+                setCourseId(courseIdParam);
+            }
+        }
+    }, [batchId, batchNameParam, courseIdParam]);
+
+    useEffect(() => {
+        if (batchId) {
+            fetchProfileData();
+        }
+    }, [batchId, currentPage, activeTab, searchQuery]);
+
+    const fetchProfileData = async () => {
+        try {
+            setLoadingData(true);
+            if (!token) {
+                console.warn("No token found in session storage.");
+                setLoadingData(false);
+                return;
+            }
+
+            // Build query parameters
+            const queryParams = new URLSearchParams({
+                page: currentPage.toString(),
+                limit: '50',
+                status: activeTab,
+            });
+
+            // Add search query
+            if (searchQuery.trim()) {
+                queryParams.append('search', searchQuery.trim());
+            }
+
+            const response = await axios.get(
+                `${backendUrl}/college/traineradmission-list/${batchId}?${queryParams.toString()}`,
+                {
+                    headers: {
+                        "x-auth": token,
+                    },
+                }
+            );
+
+            if (response.data.success && response.data.data) {
+                console.log('response.data.data', response.data.data);
+                setAllProfiles(response.data.data);
+                setTotalPages(response.data.totalPages);
+
+                // Update batch freeze count if available
+                if (response.data.filterCounts) {
+                    setBatchFreezeCount(response.data.filterCounts.batchFreeze || 0);
+                }
+            } else {
+                console.error("Failed to fetch profile data", response.data.message);
+            }
+        } catch (error) {
+            console.error("Error fetching profile data:", error);
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    const handleSearch = (e) => {
+        setSearchQuery(e.target.value);
+        setCurrentPage(1);
+    };
+
+    // Attendance Management Functions
+    const handleAttendanceManagement = () => {
+        setShowAttendanceModal(true);
+        fetchAttendanceData();
+    };
+
+    const fetchAttendanceData = async () => {
+        try {
+            setLoadingAttendance(true);
+            if (!batchId) return;
+
+            const response = await axios.get(
+                `${backendUrl}/college/getattendancebybatch/${batchId}`,
+                {
+                    headers: {
+                        "x-auth": token,
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                setAttendanceData(response.data.data || {});
+            }
+        } catch (error) {
+            console.error("Error fetching attendance data:", error);
+        } finally {
+            setLoadingAttendance(false);
+        }
+    };
+
+    const markAttendance = async (studentId, status) => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const response = await axios.post(
+                `${backendUrl}/college/trainer/mark-attendance`,
+                {
+                    appliedCourseId: studentId,
+                    date: today,
+                    status: status,
+                    period: 'regularPeriod', // Since we're dealing with batch freeze students
+                    remarks: ''
+                },
+                {
+                    headers: {
+                        "x-auth": token,
+                    },
+                }
+            );
+
+            if (response.data.status) {
+                alert(response.data.message || 'Attendance marked successfully!');
+                fetchProfileData(); 
+                fetchAttendanceData(); 
+            } else {
+                alert(response.data.message || 'Failed to mark attendance');
+            }
+        } catch (error) {
+            console.error("Error marking attendance:", error);
+            alert(error.response?.data?.message || "Failed to mark attendance");
+        }
+    };
+
+    const getAttendanceStatus = (studentId, date) => {
+        const today = new Date().toISOString().split('T')[0];
+        const studentAttendance = attendanceData[studentId];
+        if (!studentAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
+        
+        const dayAttendance = studentAttendance[today];
+        if (!dayAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
+        
+        const status = dayAttendance.status?.toLowerCase();
+        const statusMap = {
+            'present': { symbol: 'P', class: 'present' },
+            'absent': { symbol: 'A', class: 'absent' },
+        };
+        
+        return statusMap[status] || { status: 'not-marked', symbol: '-', class: 'not-marked' };
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const getStatusBadge = (profile) => {
+        if (profile.dropout) {
+            return <span className="badge bg-danger">Dropout</span>;
+        }
+        if (profile.isBatchFreeze) {
+            return <span className="badge bg-warning">Batch Freeze</span>;
+        }
+        if (profile.isZeroPeriodAssigned) {
+            return <span className="badge bg-info">Zero Period</span>;
+        }
+        if (profile.admissionDone) {
+            return <span className="badge bg-success">Admitted</span>;
+        }
+        return <span className="badge bg-secondary">Unknown</span>;
+    };
+
+    if (loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
+                <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container-fluid p-4">
+            {/* Header */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div className="d-flex align-items-center mb-2">
+                                <button 
+                                    onClick={() => navigate(-1)}
+                                    className="btn btn-sm btn-outline-secondary me-3"
+                                >
+                                    <i className="feather icon-arrow-left me-1"></i> Back to Batches
+                                </button>
+                                <h2 className="mb-0">Student Management</h2>
+                            </div>
+                            <p className="text-muted mb-0">
+                                <i className="fas fa-layer-group me-1"></i>
+                                Batch: <strong>{batchName}</strong>
+                            </p>
+                        </div>
+                        <div className="d-flex gap-2">
+                            <button
+                                className="btn btn-outline-primary"
+                                onClick={fetchProfileData}
+                            >
+                                <i className="fas fa-sync-alt me-1"></i> Refresh
+                            </button>
+                            <button
+                                className="btn btn-success"
+                                onClick={handleAttendanceManagement}
+                            >
+                                <i className="fas fa-calendar-check me-1"></i> Attendance
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Statistics Card - Batch Freeze Only */}
+            <div className="row mb-4">
+                <div className="col-md-12">
+                    <div className="card bg-warning text-white border-0 shadow-sm">
+                        <div className="card-body">
+                            <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h2 className="card-title mb-1">
+                                        <i className="fas fa-snowflake me-2"></i>
+                                        Batch Freeze Students
+                                    </h2>
+                                    <p className="card-text mb-0 opacity-75">
+                                        Students with frozen batch status in {batchName}
+                                    </p>
+                                </div>
+                                <div className="text-end">
+                                    <h1 className="display-3 mb-0 fw-bold">{batchFreezeCount}</h1>
+                                    <p className="mb-0 small">Total Students</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="input-group">
+                        <span className="input-group-text">
+                            <i className="fas fa-search"></i>
+                        </span>
+                        <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Search students by name, email, phone..."
+                            value={searchQuery}
+                            onChange={handleSearch}
+                        />
+                        {searchQuery && (
+                            <button
+                                className="btn btn-outline-secondary"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <i className="fas fa-times"></i>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Students Table */}
+            <div className="card border-0 shadow-sm">
+                <div className="card-body p-0">
+                    {allProfiles.length === 0 ? (
+                        <div className="text-center py-5">
+                            <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h4 className="text-muted">No students found</h4>
+                            <p className="text-muted">
+                                {searchQuery 
+                                    ? 'Try adjusting your search criteria'
+                                    : 'No students have been enrolled in this batch yet'
+                                }
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="table table-hover mb-0">
+                                <thead className="bg-light">
+                                    <tr>
+                                        <th>S.No</th>
+                                        <th>Student Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Course</th>
+                                        <th>Center</th>
+                                        <th>Registered Date</th>
+                                        <th>Today's Attendance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allProfiles.map((profile, index) => (
+                                        <tr key={profile._id}>
+                                            <td className="align-middle">
+                                                {(currentPage - 1) * 50 + index + 1}
+                                            </td>
+                                            <td className="align-middle">
+                                                <div className="d-flex align-items-center">
+                                                    <div className="avatar-circle me-2">
+                                                        {profile._candidate?.name ? (
+                                                            profile._candidate.name.charAt(0).toUpperCase()
+                                                        ) : 'N'}
+                                                    </div>
+                                                    <div>
+                                                        <div className="fw-bold">
+                                                            {profile._candidate?.name || 'N/A'}
+                                                        </div>
+                                                        {profile._candidate?.fatherName && (
+                                                            <small className="text-muted">
+                                                                S/O: {profile._candidate.fatherName}
+                                                            </small>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="align-middle">
+                                                {profile._candidate?.email || 'N/A'}
+                                            </td>
+                                            <td className="align-middle">
+                                                {profile._candidate?.mobile || 'N/A'}
+                                            </td>
+                                            <td className="align-middle">
+                                                {profile._course?.name || 'N/A'}
+                                            </td>
+                                            <td className="align-middle">
+                                                {profile._center?.name || 'N/A'}
+                                            </td>
+                                            <td className="align-middle">
+                                                {formatDate(profile.createdAt)}
+                                            </td>
+                                            <td className="align-middle">
+                                                <div className="d-flex gap-1 mb-1">
+                                                    <button 
+                                                        className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-secondary'}`}
+                                                        onClick={() => markAttendance(profile._id, 'Present')}
+                                                        title="Mark Present"
+                                                    >
+                                                        P
+                                                    </button>
+                                                    <button 
+                                                        className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
+                                                        onClick={() => markAttendance(profile._id, 'Absent')}
+                                                        title="Mark Absent"
+                                                    >
+                                                        A
+                                                    </button>
+                                                </div>
+                                                <small className="text-muted">
+                                                    Status: {getAttendanceStatus(profile._id).symbol}
+                                                </small>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="row mt-4">
+                    <div className="col-12">
+                        <nav>
+                            <ul className="pagination justify-content-center">
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <button
+                                        className="page-link"
+                                        onClick={() => setCurrentPage(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <i className="fas fa-chevron-left"></i> Previous
+                                    </button>
+                                </li>
+                                
+                                {[...Array(totalPages)].map((_, i) => {
+                                    const pageNum = i + 1;
+                                    // Show first page, last page, current page, and pages around current
+                                    if (
+                                        pageNum === 1 ||
+                                        pageNum === totalPages ||
+                                        (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+                                    ) {
+                                        return (
+                                            <li
+                                                key={pageNum}
+                                                className={`page-item ${currentPage === pageNum ? 'active' : ''}`}
+                                            >
+                                                <button
+                                                    className="page-link"
+                                                    onClick={() => setCurrentPage(pageNum)}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            </li>
+                                        );
+                                    } else if (
+                                        pageNum === currentPage - 3 ||
+                                        pageNum === currentPage + 3
+                                    ) {
+                                        return (
+                                            <li key={pageNum} className="page-item disabled">
+                                                <span className="page-link">...</span>
+                                            </li>
+                                        );
+                                    }
+                                    return null;
+                                })}
+
+                                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                                    <button
+                                        className="page-link"
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        Next <i className="fas fa-chevron-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                        <p className="text-center text-muted">
+                            Page {currentPage} of {totalPages} | Showing {allProfiles.length} students
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            <style>
+                {
+                    `
+
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #0d6efd;
+    border-color: transparent;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    background-color: transparent;
+    border-color: transparent transparent #0d6efd;
+    font-weight: 600;
+}
+
+.table thead th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    border-bottom: 2px solid #dee2e6;
+    padding: 1rem;
+}
+
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+    cursor: pointer;
+}
+
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus {
+    border-color: #ced4da;
+    box-shadow: none;
+}
+
+.badge {
+    padding: 0.35rem 0.65rem;
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+.pagination {
+    margin-bottom: 0;
+}
+
+.page-link {
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+    margin: 0 2px;
+    border-radius: 4px;
+}
+
+.page-link:hover {
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+    border-color: #0d6efd;
+}
+
+.page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.page-item.disabled .page-link {
+    color: #adb5bd;
+    background-color: #fff;
+    border-color: #dee2e6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table {
+        font-size: 0.875rem;
+    }
+    
+    .avatar-circle {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+    
+    .nav-tabs .nav-link {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner-border {
+    animation: spin 1s linear infinite;
+}
+
+
+                    `
+                }
+            </style>
+            {/* Attendance Management Modal */}
+            {showAttendanceModal && (
+                <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-xl">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    <i className="fas fa-calendar-check me-2"></i>
+                                    Attendance Management - {batchName}
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={() => setShowAttendanceModal(false)}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                {loadingAttendance ? (
+                                    <div className="text-center py-4">
+                                        <div className="spinner-border text-primary" role="status">
+                                            <span className="visually-hidden">Loading attendance...</span>
+                                        </div>
+                                        <p className="mt-2">Loading attendance data...</p>
+                                    </div>
+                                ) : (
+                                    <div className="table-responsive">
+                                        <table className="table table-striped">
+                                            <thead className="bg-primary text-white">
+                                                <tr>
+                                                    <th>S.No</th>
+                                                    <th>Student Name</th>
+                                                    <th>Email</th>
+                                                    <th>Phone</th>
+                                                    <th>Today's Date</th>
+                                                    <th>Attendance Status</th>
+                                                    <th>Mark Attendance</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {allProfiles.map((profile, index) => (
+                                                    <tr key={profile._id}>
+                                                        <td>{index + 1}</td>
+                                                        <td>
+                                                            <div className="d-flex align-items-center">
+                                                                <div className="avatar-circle me-2">
+                                                                    {profile._candidate?.name ? (
+                                                                        profile._candidate.name.charAt(0).toUpperCase()
+                                                                    ) : 'N'}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="fw-bold">
+                                                                        {profile._candidate?.name || 'N/A'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>{profile._candidate?.email || 'N/A'}</td>
+                                                        <td>{profile._candidate?.mobile || 'N/A'}</td>
+                                                        <td>{new Date().toLocaleDateString()}</td>
+                                                        <td>
+                                                            <span className={`badge ${getAttendanceStatus(profile._id).class === 'present' ? 'bg-success' : getAttendanceStatus(profile._id).class === 'absent' ? 'bg-danger' : 'bg-secondary'}`}>
+                                                                {getAttendanceStatus(profile._id).symbol}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div className="d-flex gap-2">
+                                                                <button 
+                                                                    className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : 'btn-outline-success'}`}
+                                                                    onClick={() => markAttendance(profile._id, 'Present')}
+                                                                >
+                                                                    <i className="fas fa-check me-1"></i>Present
+                                                                </button>
+                                                                <button 
+                                                                    className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
+                                                                    onClick={() => markAttendance(profile._id, 'Absent')}
+                                                                >
+                                                                    <i className="fas fa-times me-1"></i>Absent
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowAttendanceModal(false)}
+                                >
+                                    Close
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary"
+                                    onClick={fetchAttendanceData}
+                                >
+                                    <i className="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default Students;

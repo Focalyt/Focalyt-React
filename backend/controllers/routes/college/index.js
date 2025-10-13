@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -72,7 +72,7 @@ router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
 router.use("/dripmarketing", isCollege, dripmarketingRoutes);
-router.use("/trainer", isCollege, trainerRoutes)
+router.use("/trainer", trainerRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -8252,7 +8252,313 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 	}
 });
+router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = req.college;
+		let { batchId } = req.params;
+		
+		if (!batchId) {
+			return res.status(400).json({ success: false, message: 'Batch ID is required' });
+		}
 
+		// Convert string IDs to ObjectId for aggregation
+		if (typeof batchId === 'string') {
+			batchId = new mongoose.Types.ObjectId(batchId);
+		}
+
+		// Verify trainer has access to this batch
+		const batch = await Batch.findById(batchId);
+		if (!batch) {
+			return res.status(404).json({ success: false, message: 'Batch not found' });
+		}
+
+		// Check if trainer is assigned to this batch
+		const isTrainerAssigned = batch.trainers.some(trainerId => trainerId.toString() === user._id.toString());
+		if (!isTrainerAssigned) {
+			return res.status(403).json({ success: false, message: 'You are not assigned to this batch' });
+		}
+
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 50;
+		const skip = (page - 1) * limit;
+
+		// Extract filter parameters from query
+		const { search } = req.query;
+
+		// Build aggregation pipeline
+		let aggregationPipeline = [];
+
+		// Base match stage
+		let baseMatchStage = {
+			admissionDone: { $in: [true] },
+			batch: batchId
+		};
+
+		// Add date filters to base match
+		if (req.query.fromDate) {
+			baseMatchStage.createdAt = { $gte: new Date(req.query.fromDate) };
+		}
+		if (req.query.toDate) {
+			baseMatchStage.createdAt = { ...baseMatchStage.createdAt, $lte: new Date(req.query.toDate) };
+		}
+		if (req.query.createdFromDate) {
+			baseMatchStage.createdAt = { ...baseMatchStage.createdAt, $gte: new Date(req.query.createdFromDate) };
+		}
+		if (req.query.createdToDate) {
+			baseMatchStage.createdAt = { ...baseMatchStage.createdAt, $lte: new Date(req.query.createdToDate) };
+		}
+
+		// Status filters
+		if (req.query.status && req.query.status !== 'all') {
+			if (req.query.status === "admission") {
+				baseMatchStage.admissionDone = { $in: [true] };
+				baseMatchStage.isZeroPeriodAssigned = { $in: [false] };
+				baseMatchStage.isBatchFreeze = { $in: [false] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+			if (req.query.status === "dropout") {
+				baseMatchStage.dropout = { $in: [true] };
+			}
+			if (req.query.status === "zeroPeriod") {
+				baseMatchStage.isZeroPeriodAssigned = true;
+				baseMatchStage.isBatchFreeze = { $in: [false] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+			if (req.query.status === "batchFreeze") {
+				baseMatchStage.isBatchFreeze = { $in: [true] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+		}
+
+		// Add base match stage
+		aggregationPipeline.push({ $match: baseMatchStage });
+
+		// Lookup stages for all related collections
+		aggregationPipeline.push(
+			// Course lookup with sectors population
+			{
+				$lookup: {
+					from: 'courses',
+					localField: '_course',
+					foreignField: '_id',
+					as: '_course',
+					pipeline: [
+						{
+							$lookup: {
+								from: 'sectors',
+								localField: 'sectors',
+								foreignField: '_id',
+								as: 'sectors'
+							}
+						}
+					]
+				}
+			},
+			{ $unwind: '$_course' },
+
+			// Lead Status lookup
+			{
+				$lookup: {
+					from: 'status',
+					localField: '_leadStatus',
+					foreignField: '_id',
+					as: '_leadStatus'
+				}
+			},
+			{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+
+			// Center lookup
+			{
+				$lookup: {
+					from: 'centers',
+					localField: '_center',
+					foreignField: '_id',
+					as: '_center'
+				}
+			},
+			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+			// Batch lookup
+			{
+				$lookup: {
+					from: 'batches',
+					localField: 'batch',
+					foreignField: '_id',
+					as: 'batch'
+				}
+			},
+			{ $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+
+			// Registered By lookup
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'registeredBy',
+					foreignField: '_id',
+					as: 'registeredBy'
+				}
+			},
+			{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+
+			// Candidate lookup with applied courses
+			{
+				$lookup: {
+					from: 'candidateprofiles',
+					localField: '_candidate',
+					foreignField: '_id',
+					as: '_candidate',
+					pipeline: [
+						{
+							$lookup: {
+								from: 'appliedcourses',
+								localField: '_appliedCourses',
+								foreignField: '_id',
+								as: '_appliedCourses',
+								pipeline: [
+									{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course' } },
+									{ $lookup: { from: 'users', localField: 'registeredBy', foreignField: '_id', as: 'registeredBy' } },
+									{ $lookup: { from: 'centers', localField: '_center', foreignField: '_id', as: '_center' } },
+									{ $lookup: { from: 'status', localField: '_leadStatus', foreignField: '_id', as: '_leadStatus' } }
+								]
+							}
+						}
+					]
+				}
+			},
+			{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
+		);
+
+		// Filter by college
+		aggregationPipeline.push({
+			$match: {
+				'_course.college': college._id
+			}
+		});
+
+		// Search filter
+		if (search && search.trim()) {
+			aggregationPipeline.push({
+				$match: {
+					$or: [
+						{ '_candidate.name': { $regex: search.trim(), $options: 'i' } },
+						{ '_candidate.email': { $regex: search.trim(), $options: 'i' } },
+						{ '_candidate.mobile': { $regex: search.trim(), $options: 'i' } },
+						{ '_candidate.fatherName': { $regex: search.trim(), $options: 'i' } }
+					]
+				}
+			});
+		}
+
+		// Get total count for pagination
+		const countPipeline = [...aggregationPipeline];
+		countPipeline.push({ $count: 'total' });
+		const countResult = await AppliedCourses.aggregate(countPipeline);
+		const totalCount = countResult.length > 0 ? countResult[0].total : 0;
+		const totalPages = Math.ceil(totalCount / limit);
+
+		// Add sorting, pagination
+		aggregationPipeline.push(
+			{ $sort: { createdAt: -1 } },
+			{ $skip: skip },
+			{ $limit: limit }
+		);
+
+		// Execute aggregation
+		const data = await AppliedCourses.aggregate(aggregationPipeline);
+
+		// Calculate filter counts
+		const filterCountsPipeline = [
+			{
+				$match: {
+					admissionDone: { $in: [true] },
+					batch: batchId
+				}
+			},
+			{
+				$lookup: {
+					from: 'courses',
+					localField: '_course',
+					foreignField: '_id',
+					as: '_course'
+				}
+			},
+			{ $unwind: '$_course' },
+			{
+				$match: {
+					'_course.college': college._id
+				}
+			},
+			{
+				$facet: {
+					admission: [
+						{
+							$match: {
+								admissionDone: { $in: [true] },
+								isZeroPeriodAssigned: { $in: [false] },
+								isBatchFreeze: { $in: [false] },
+								dropout: { $in: [false] }
+							}
+						},
+						{ $count: 'count' }
+					],
+					dropout: [
+						{ $match: { dropout: { $in: [true] } } },
+						{ $count: 'count' }
+					],
+					zeroPeriod: [
+						{
+							$match: {
+								isZeroPeriodAssigned: true,
+								isBatchFreeze: { $in: [false] },
+								dropout: { $in: [false] }
+							}
+						},
+						{ $count: 'count' }
+					],
+					batchFreeze: [
+						{
+							$match: {
+								isBatchFreeze: { $in: [true] },
+								dropout: { $in: [false] }
+							}
+						},
+						{ $count: 'count' }
+					],
+					all: [
+						{ $count: 'count' }
+					]
+				}
+			}
+		];
+
+		const filterCountsResult = await AppliedCourses.aggregate(filterCountsPipeline);
+		const filterCounts = {
+			admission: filterCountsResult[0].admission[0]?.count || 0,
+			dropout: filterCountsResult[0].dropout[0]?.count || 0,
+			zeroPeriod: filterCountsResult[0].zeroPeriod[0]?.count || 0,
+			batchFreeze: filterCountsResult[0].batchFreeze[0]?.count || 0,
+			all: filterCountsResult[0].all[0]?.count || 0
+		};
+
+		return res.json({
+			success: true,
+			data: data,
+			totalCount: totalCount,
+			totalPages: totalPages,
+			currentPage: page,
+			filterCounts: filterCounts
+		});
+
+	} catch (err) {
+		console.error("Error in trainer admission-list:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
 // Add this helper function after calculateKycFilterCounts
 async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
 	const counts = {
@@ -10426,6 +10732,288 @@ router.route("/admission-list/:batchId").get(isCollege, async (req, res) => {
 	}
 });
 
+// Trainer-specific admission list endpoint
+router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = req.college;
+		let { batchId } = req.params;
+		
+		console.log('Trainer admission-list called for batchId:', batchId);
+		console.log('Trainer user:', user.name, user._id);
+		console.log('College:', college?.name, college?._id);
+		
+		if (!batchId) {
+			return res.status(400).json({ success: false, message: 'Batch ID is required' });
+		}
+
+		// Convert string IDs to ObjectId for aggregation
+		if (typeof batchId === 'string') {
+			batchId = new mongoose.Types.ObjectId(batchId);
+		}
+
+		// Verify trainer has access to this batch
+		const batch = await Batch.findById(batchId);
+		if (!batch) {
+			return res.status(404).json({ success: false, message: 'Batch not found' });
+		}
+
+		console.log('Batch found:', batch.name);
+		console.log('Batch trainers:', batch.trainers);
+
+		// Check if trainer is assigned to this batch
+		const isTrainerAssigned = batch.trainers.some(trainerId => trainerId.toString() === user._id.toString());
+		if (!isTrainerAssigned) {
+			return res.status(403).json({ success: false, message: 'You are not assigned to this batch' });
+		}
+
+		console.log('Trainer is assigned to batch');
+
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 50;
+		const skip = (page - 1) * limit;
+
+		// Extract filter parameters from query
+		const { search } = req.query;
+
+		// Build aggregation pipeline
+		let aggregationPipeline = [];
+
+		// Base match stage
+		let baseMatchStage = {
+			admissionDone: { $in: [true] },
+			batch: batchId
+		};
+
+		console.log('Base match stage:', JSON.stringify(baseMatchStage));
+
+		// Status filters
+		if (req.query.status && req.query.status !== 'all') {
+			if (req.query.status === "admission") {
+				baseMatchStage.admissionDone = { $in: [true] };
+				baseMatchStage.isZeroPeriodAssigned = { $in: [false] };
+				baseMatchStage.isBatchFreeze = { $in: [false] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+			if (req.query.status === "dropout") {
+				baseMatchStage.dropout = { $in: [true] };
+			}
+			if (req.query.status === "zeroPeriod") {
+				baseMatchStage.isZeroPeriodAssigned = true;
+				baseMatchStage.isBatchFreeze = { $in: [false] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+			if (req.query.status === "batchFreeze") {
+				baseMatchStage.isBatchFreeze = { $in: [true] };
+				baseMatchStage.dropout = { $in: [false] };
+			}
+		}
+
+		// Add base match stage
+		aggregationPipeline.push({ $match: baseMatchStage });
+
+		// Lookup stages for all related collections
+		aggregationPipeline.push(
+			// Course lookup with sectors population
+			{
+				$lookup: {
+					from: 'courses',
+					localField: '_course',
+					foreignField: '_id',
+					as: '_course',
+					pipeline: [
+						{
+							$lookup: {
+								from: 'sectors',
+								localField: 'sectors',
+								foreignField: '_id',
+								as: 'sectors'
+							}
+						}
+					]
+				}
+			},
+			{ $unwind: '$_course' },
+
+			// Lead Status lookup
+			{
+				$lookup: {
+					from: 'status',
+					localField: '_leadStatus',
+					foreignField: '_id',
+					as: '_leadStatus'
+				}
+			},
+			{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+
+			// Center lookup
+			{
+				$lookup: {
+					from: 'centers',
+					localField: '_center',
+					foreignField: '_id',
+					as: '_center'
+				}
+			},
+			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+			// Batch lookup
+			{
+				$lookup: {
+					from: 'batches',
+					localField: 'batch',
+					foreignField: '_id',
+					as: 'batch'
+				}
+			},
+			{ $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+
+			// Registered By lookup
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'registeredBy',
+					foreignField: '_id',
+					as: 'registeredBy'
+				}
+			},
+			{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+
+			// Candidate lookup with applied courses
+			{
+				$lookup: {
+					from: 'candidateprofiles',
+					localField: '_candidate',
+					foreignField: '_id',
+					as: '_candidate',
+					pipeline: [
+						{
+							$lookup: {
+								from: 'appliedcourses',
+								localField: '_appliedCourses',
+								foreignField: '_id',
+								as: '_appliedCourses',
+								pipeline: [
+									{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course' } },
+									{ $lookup: { from: 'users', localField: 'registeredBy', foreignField: '_id', as: 'registeredBy' } },
+									{ $lookup: { from: 'centers', localField: '_center', foreignField: '_id', as: '_center' } },
+									{ $lookup: { from: 'status', localField: '_leadStatus', foreignField: '_id', as: '_leadStatus' } }
+								]
+							}
+						}
+					]
+				}
+			},
+			{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
+		);
+
+		// Filter by college
+		aggregationPipeline.push({
+			$match: {
+				'_course.college': college._id
+			}
+		});
+
+		// Search filter
+		if (search && search.trim()) {
+			const searchTerm = search.trim();
+			const searchRegex = new RegExp(searchTerm, 'i');
+			aggregationPipeline.push({
+				$match: {
+					$or: [
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.email': searchRegex },
+						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.fatherName': searchRegex }
+					]
+				}
+			});
+		}
+
+		// Sort by creation date
+		aggregationPipeline.push({
+			$sort: { createdAt: -1 }
+		});
+
+		// Get total count before pagination
+		const totalResults = await AppliedCourses.aggregate(aggregationPipeline);
+		const totalCount = totalResults.length;
+		const totalPages = Math.ceil(totalCount / limit);
+
+		console.log('Total count:', totalCount);
+
+		// Add pagination
+		aggregationPipeline.push(
+			{ $skip: skip },
+			{ $limit: limit }
+		);
+
+		// Execute aggregation with pagination
+		const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
+
+		console.log('Applied courses count:', appliedCourses.length);
+
+		// Calculate filter counts
+		const calculateFilterCounts = async () => {
+			let baseMatch = {
+				admissionDone: { $in: [true] },
+				batch: batchId
+			};
+
+			let countPipeline = [
+				{ $match: baseMatch },
+				{
+					$lookup: {
+						from: 'courses',
+						localField: '_course',
+						foreignField: '_id',
+						as: '_course'
+					}
+				},
+				{ $unwind: '$_course' },
+				{
+					$match: {
+						'_course.college': college._id
+					}
+				}
+			];
+
+			const allResults = await AppliedCourses.aggregate(countPipeline);
+
+			const counts = {
+				all: allResults.length,
+				dropout: allResults.filter(doc => doc.dropout === true).length,
+				zeroPeriod: allResults.filter(doc => (doc.isZeroPeriodAssigned === true && doc.isBatchFreeze === false && doc.dropout === false)).length,
+				batchFreeze: allResults.filter(doc => (doc.isBatchFreeze === true && doc.dropout === false)).length,
+				admission: allResults.filter(doc => (doc.admissionDone === true && doc.isZeroPeriodAssigned === false && doc.isBatchFreeze === false && doc.dropout === false)).length,
+			};
+
+			return counts;
+		};
+
+		const filterCounts = await calculateFilterCounts();
+
+		console.log('Filter counts:', filterCounts);
+
+		return res.json({
+			success: true,
+			data: appliedCourses,
+			totalCount: totalCount,
+			totalPages: totalPages,
+			currentPage: page,
+			filterCounts: filterCounts
+		});
+
+	} catch (err) {
+		console.error("Error in trainer admission-list:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
 router.route('/refer-leads')
 	.get(isCollege, async (req, res) => {
 		try {
@@ -11720,14 +12308,18 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		const { courseId } = req.query;
 		const user = req.user;
 		const collegeId = req.college._id;
+		const trainerId = user._id;
 
 		if (courseId) {
-			const course = await Courses.findOne({ _id: courseId }).populate('trainers');
+			const course = await Courses.findOne({ 
+				_id: courseId,
+				trainers: trainerId
+			}).populate('trainers');
 
 			if (!course) {
 				return res.status(404).json({
 					status: false,
-					message: 'Course not found'
+					message: 'Course not found or you are not assigned to this course'
 				});
 			}
 
@@ -11750,58 +12342,57 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 
 		const courses = await Courses.find({
 			college: collegeId,
-			trainers: { $exists: true }
-		}).select('trainers name _id image description');
+			trainers: trainerId
+		}).select('name description image trainers');
 
-		const trainerIds = [...new Set(
-			courses.flatMap(course => course.trainers.map(id => id.toString()))
-		)].map(id => new mongoose.Types.ObjectId(id));
-
-		const trainers = await User.find({
-			_id: { $in: trainerIds },
+		const trainer = await User.findOne({
+			_id: trainerId,
 			role: 4
 		}).select('name email mobile _id');
 
+		if (!trainer) {
+			return res.status(404).json({
+				status: false,
+				message: 'Trainer not found'
+			});
+		}
 
-		const trainersWithCourses = trainers.map(trainer => {
-			const assignedCourses = courses
-				.filter(course => course.trainers.some(trainerId => trainerId.toString() === trainer._id.toString()))
-				.map(course => ({
-					_id: course._id,
-					name: course.name,
-					image: course.image,
-					description: course.description
-				}));
+		const assignedCourses = courses.map(course => ({
+			_id: course._id,
+			name: course.name,
+			image: course.image,
+			description: course.description
+		}));
 
-			return {
-				_id: trainer._id,
-				name: trainer.name,
-				email: trainer.email,
-				mobile: trainer.mobile,
-				assignedCourses: assignedCourses
-			};
-		});
+		const trainerWithCourses = {
+			_id: trainer._id,
+			name: trainer.name,
+			email: trainer.email,
+			mobile: trainer.mobile,
+			assignedCourses: assignedCourses
+		};
 
 		return res.status(200).json({
 			status: true,
-			message: 'Trainers fetched successfully',
-			data: trainersWithCourses,
-			count: trainersWithCourses.length
+			message: 'Trainer courses fetched successfully',
+			data: [trainerWithCourses],
+			count: assignedCourses.length
 		});
 	} catch (err) {
 		console.log(err);
 		return res.status(500).json({
 			status: false,
-			message: 'Error while fetching trainers'
+			message: 'Error while fetching trainer courses'
 		});
 	}
 });
 
-// router.get('/gettrainersbycourse', isTrainer , async(req, res)=>{
+// router.get('/allassigncoursestotrainers', isTrainer , async(req, res)=>{
 // 	try{
 // 		const { courseId } = req.query;
 // 		const user = req.user;
 // 		const collegeId = req.college._id;
+// const trainerId = req.user._id;
 // console.log("courseId" , req.body)
 // 		if (!courseId) {
 // 			return res.status(400).json({
@@ -11809,7 +12400,15 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 // 				message: "Course ID is required"
 // 			});
 // 		}
-// 		console.log()
+// 		const assignedCourses = await Courses.find({
+		// 	college: collegeId,
+		// 	trainers: trainerId
+		// });
+		// return res.status(200).json({
+		// 	status: true,
+		// 	message: 'Assigned courses fetched successfully',
+		// 	data: assignedCourses
+		// });
 // 	}
 // 	catch(err){
 // 		console.log(err)
@@ -11923,7 +12522,7 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 		const trainerId = req.user._id;
 		const collegeId = req.user.collegeId;
 
-		console.log('Received schedule data:', req.body);
+		// console.log('Received schedule data:', req.body);
 		if (!title || !subject || !date || !startTime || !endTime || !scheduleType) {
 			return res.status(400).json({
 				status: false,
@@ -12022,6 +12621,321 @@ router.get('/trainerTimeTable', isTrainer, async (req, res) => {
 		return res.status(500).json({
 			status: false,
 			message: 'Error fetching timetable',
+			error: error.message
+		});
+	}
+});
+
+router.post('/addNewChapter', isTrainer, async (req, res) => {
+	try {
+		const { 
+			courseId, 
+			batchId, 
+			courseName, 
+			batchName,
+			chapterNumber, 
+			chapterTitle, 
+			description, 
+			duration, 
+			objectives 
+		} = req.body;
+		if (!courseId || !batchId || !chapterNumber || !chapterTitle) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required fields: courseId, batchId, chapterNumber, chapterTitle'
+			});
+		}
+		const userId = req.user.id;
+		let curriculum = await Curriculum.findOne({ 
+			courseId, 
+			batchId 
+		});
+
+		if (!curriculum) {
+			curriculum = new Curriculum({
+				courseId,
+				batchId,
+				courseName,
+				batchName,
+				chapters: [],
+				createdBy: userId
+			});
+		}
+
+		const existingChapter = curriculum.chapters.find(
+			ch => ch.chapterNumber === parseInt(chapterNumber)
+		);
+
+		if (existingChapter) {
+			return res.status(400).json({
+				status: false,
+				message: `Chapter ${chapterNumber} already exists`
+			});
+		}
+
+		const newChapter = {
+			chapterNumber: parseInt(chapterNumber),
+			chapterTitle,
+			description: description || '',
+			duration: duration || '',
+			objectives: objectives || '',
+			topics: []
+		};
+
+		curriculum.chapters.push(newChapter)
+		await curriculum.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Chapter added successfully',
+			data: {
+				curriculumId: curriculum._id,
+				chapter: newChapter
+			}
+		});
+
+	} catch (error) {
+		console.error('Error adding new chapter:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error adding chapter',
+			error: error.message
+		});
+	}
+});
+
+router.post('/addNewTopic', isTrainer, async (req, res) => {
+	try {
+		const { 
+			courseId, 
+			batchId, 
+			chapterNumber,
+			topicNumber, 
+			topicTitle, 
+			description, 
+			duration, 
+			resources 
+		} = req.body;
+
+		if (!courseId || !batchId || !chapterNumber || !topicNumber || !topicTitle) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, topicTitle'
+			});
+		}
+
+		const curriculum = await Curriculum.findOne({ 
+			courseId, 
+			batchId 
+		});
+
+		if (!curriculum) {
+			return res.status(404).json({
+				status: false,
+				message: 'Curriculum not found. Please create a chapter first.'
+			});
+		}
+
+		const chapter = curriculum.chapters.find(
+			ch => ch.chapterNumber === parseInt(chapterNumber)
+		);
+
+		if (!chapter) {
+			return res.status(404).json({
+				status: false,
+				message: `Chapter ${chapterNumber} not found`
+			});
+		}
+
+		const existingTopic = chapter.topics.find(
+			topic => topic.topicNumber === topicNumber
+		);
+
+		if (existingTopic) {
+			return res.status(400).json({
+				status: false,
+				message: `Topic ${topicNumber} already exists in Chapter ${chapterNumber}`
+			});
+		}
+		const newTopic = {
+			topicNumber,
+			topicTitle,
+			description: description || '',
+			duration: duration || '',
+			resources: resources || '',
+			subTopics: []
+		};
+
+		chapter.topics.push(newTopic);
+		await curriculum.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Topic added successfully',
+			data: {
+				curriculumId: curriculum._id,
+				chapterNumber: parseInt(chapterNumber),
+				topic: newTopic
+			}
+		});
+
+	} catch (error) {
+		console.error('Error adding new topic:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error adding topic',
+			error: error.message
+		});
+	}
+});
+
+router.post('/addNewSubTopic', isTrainer, async (req, res) => {
+	try {
+		const { 
+			courseId, 
+			batchId, 
+			chapterNumber,
+			topicNumber,
+			subTopicTitle, 
+			description, 
+			duration, 
+			content 
+		} = req.body;
+
+		if (!courseId || !batchId || !chapterNumber || !topicNumber || !subTopicTitle) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, subTopicTitle'
+			});
+		}
+		const curriculum = await Curriculum.findOne({ 
+			courseId, 
+			batchId 
+		});
+
+		if (!curriculum) {
+			return res.status(404).json({
+				status: false,
+				message: 'Curriculum not found. Please create a chapter first.'
+			});
+		}
+
+		const chapter = curriculum.chapters.find(
+			ch => ch.chapterNumber === parseInt(chapterNumber)
+		);
+
+		if (!chapter) {
+			return res.status(404).json({
+				status: false,
+				message: `Chapter ${chapterNumber} not found`
+			});
+		}
+
+		const topic = chapter.topics.find(
+			t => t.topicNumber === topicNumber
+		);
+
+		if (!topic) {
+			return res.status(404).json({
+				status: false,
+				message: `Topic ${topicNumber} not found in Chapter ${chapterNumber}`
+			});
+		}
+
+		const existingSubTopic = topic.subTopics.find(
+			subTopic => subTopic.subTopicTitle.toLowerCase() === subTopicTitle.toLowerCase()
+		);
+
+		if (existingSubTopic) {
+			return res.status(400).json({
+				status: false,
+				message: `Sub-topic "${subTopicTitle}" already exists in Topic ${topicNumber}`
+			});
+		}
+
+		const newSubTopic = {
+			subTopicTitle,
+			description: description || '',
+			duration: duration || '',
+			content: content || ''
+		};
+
+		topic.subTopics.push(newSubTopic);
+		await curriculum.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Sub-topic added successfully',
+			data: {
+				curriculumId: curriculum._id,
+				chapterNumber: parseInt(chapterNumber),
+				topicNumber: topicNumber,
+				subTopic: newSubTopic
+			}
+		});
+
+	} catch (error) {
+		console.error('Error adding new sub-topic:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error adding sub-topic',
+			error: error.message
+		});
+	}
+});
+
+router.get('/getCurriculum', isTrainer, async (req, res) => {
+	try {
+		const { courseId, batchId } = req.query;
+
+		if (!courseId || !batchId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required parameters: courseId, batchId'
+			});
+		}
+
+		const curriculum = await Curriculum.findOne({ 
+			courseId, 
+			batchId 
+		}).populate('courseId', 'name').populate('batchId', 'name').populate('createdBy', 'name');
+
+		if (!curriculum) {
+			return res.status(200).json({
+				status: true,
+				message: 'No curriculum found for this course and batch',
+				data: []
+			});
+		}
+		curriculum.chapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+
+		curriculum.chapters.forEach(chapter => {
+			chapter.topics.sort((a, b) => {
+				const aNum = parseFloat(a.topicNumber);
+				const bNum = parseFloat(b.topicNumber);
+				return aNum - bNum;
+			});
+			
+			chapter.topics.forEach(topic => {
+				if (topic.subTopics && topic.subTopics.length > 0) {
+					topic.subTopics.sort((a, b) => {
+						return a.subTopicTitle.localeCompare(b.subTopicTitle);
+					});
+				}
+			});
+		});
+
+		return res.status(200).json({
+			status: true,
+			message: 'Curriculum fetched successfully',
+			data: curriculum
+		});
+
+	} catch (error) {
+		console.error('Error fetching curriculum:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error fetching curriculum',
 			error: error.message
 		});
 	}

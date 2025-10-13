@@ -207,17 +207,16 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
   const handleAssignTrainer = async () =>{
     try{
-      // if (!selectedCourse || !selectedCourse._id) {
-      //   showAlert('Please select a course first', 'error');
-      //   return;
-      // }
+      if (!selectedCourse || !selectedCourse._id) {
+        showAlert('Please select a course first', 'error');
+        return;
+      }
 
-      // if (selectedTrainers.length === 0) {
-      //   showAlert('Please select at least one trainer', 'warning');
-      //   return;
-      // }
-
-      setAssigningTrainers(true);
+      if (selectedTrainers.length === 0) {
+        showAlert('Please select at least one trainer', 'warning');
+        return;
+      }
+      setLoading(true);
       const response = await axios.post(`${backendUrl}/college/assigntrainerstocourse`, {
         courseId: selectedCourse._id,
         trainers: selectedTrainers
@@ -227,26 +226,25 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           'Content-Type': 'application/json'
         }
       });
-      
-      // if(response.data.status){
-      //   showAlert(response.data.message, 'success');
-      //   setIsTrainerDropdownOpen(false);
-      //   setSelectedTrainers([]);
-      //   setSelectedCourse(null);
+      if(response.data.status){
+        showAlert(response.data.message, 'success');
+        setIsTrainerDropdownOpen(false);
+        setSelectedTrainers([]);
+        setSelectedCourse(null);
         
-      //   // Refresh courses list
-      //   await fetchCourses();
-      // }
-      // else{
-      //   showAlert(response.data.message, 'error');
-      // }
+        // Refresh courses list
+        await fetchCourses();
+      }
+      else{
+        showAlert(response.data.message, 'error');
+      }
     }
     catch(err){
       console.error('Error in handleAssignTrainer:', err);
       showAlert(err?.response?.data?.message || 'Failed to assign trainers', 'error');
     }
     finally {
-      setAssigningTrainers(false);
+      setLoading(false);
     }
   }
 

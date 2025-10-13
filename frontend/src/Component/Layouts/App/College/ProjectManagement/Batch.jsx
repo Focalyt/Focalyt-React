@@ -370,7 +370,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     try {
       setLoading(true);
       
-      console.log('Assigning trainers:', selectedTrainers);
+      // console.log('Assigning trainers:', selectedTrainers);
       const response = await axios.post(`${backendUrl}/college/assigntrainerstobatch`, {
         batchId: selectedBatchForTrainer._id,
         trainers: selectedTrainers
@@ -1298,7 +1298,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       });
 
       if (!response.ok) throw new Error('Failed to add project');
-      alert('Batch added successfully')
+      window.alert('Batch added successfully')
       resetForm()
       setShowAddForm(false);
     }
@@ -1701,8 +1701,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
     return (
       <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
+        <div className="modal-dialog modal-dialog-centered justify-content-center mx-auto">
+          <div className="modal-content p-0">
             <div className="modal-header bg-danger text-white">
               <h5 className="modal-title">Confirm Delete</h5>
               <button type="button" className="btn-close btn-close-white" onClick={() => setShowDeleteModal(false)}></button>

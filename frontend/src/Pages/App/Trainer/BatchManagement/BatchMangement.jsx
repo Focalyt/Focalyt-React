@@ -330,9 +330,12 @@ function BatchMangement() {
                                             <i className="fas fa-clock me-1"></i>
                                             {formatDate(batch.createdAt)}
                                         </small>
-                                        <button className="btn btn-sm btn-outline-primary">
+                                        <Link 
+                                            to={`/trainer/students?batchId=${batch._id}&batchName=${encodeURIComponent(batch.name)}&courseId=${courseId || ''}`} 
+                                            className="btn btn-sm btn-outline-primary"
+                                        >
                                             <i className="fas fa-eye me-1"></i> View Details
-                                        </button>
+                                        </Link>
                                     </div>
                                 </div>
                             </div>
@@ -391,9 +394,12 @@ function BatchMangement() {
                                                         </span>
                                                     </td>
                                                     <td className="align-middle">
-                                                        <button className="btn btn-sm btn-outline-primary">
+                                                        <Link 
+                                                            to={`/trainer/students?batchId=${batch._id}&batchName=${encodeURIComponent(batch.name)}&courseId=${courseId || ''}`}
+                                                            className="btn btn-sm btn-outline-primary"
+                                                        >
                                                             <i className="fas fa-eye"></i> View
-                                                        </button>
+                                                        </Link>
                                                     </td>
                                                 </tr>
                                             ))}
