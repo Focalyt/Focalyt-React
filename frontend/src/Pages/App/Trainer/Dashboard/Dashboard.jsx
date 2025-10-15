@@ -1,159 +1,434 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { LineChart, Line, BarChart, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, BarChart, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart } from 'recharts';
 import { Calendar, TrendingUp, Users, BookOpen, Clock, Target, CheckCircle, XCircle, Star, Award, BarChart3, Activity, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays, Download, Filter, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const MultiSelectCheckbox = ({
+    title,
+    options,
+    selectedValues,
+    onChange,
+    icon = "fas fa-list",
+    isOpen,
+    onToggle
+}) => {
+    const handleCheckboxChange = (value) => {
+        const newValues = selectedValues.includes(value)
+            ? selectedValues.filter(v => v !== value)
+            : [...selectedValues, value];
+        onChange(newValues);
+    };
+
+    // Get display text for selected items
+    const getDisplayText = () => {
+        if (selectedValues.length === 0) {
+            return `Select ${title}`;
+        } else if (selectedValues.length === 1) {
+            const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+            return selectedOption ? selectedOption.label : selectedValues[0];
+        } else if (selectedValues.length <= 2) {
+            const selectedLabels = selectedValues.map(val => {
+                const option = options.find(opt => opt.value === val);
+                return option ? option.label : val;
+            });
+            return selectedLabels.join(', ');
+        } else {
+            return `${selectedValues.length} items selected`;
+        }
+    };
+
+    return (
+        <div className="multi-select-container-new">
+            <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+                <i className={`${icon} me-1 text-primary`}></i>
+                {title}
+                {selectedValues.length > 0 && (
+                    <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+                )}
+            </label>
+
+            <div className="multi-select-dropdown-new">
+                <button
+                    type="button"
+                    className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+                    onClick={onToggle}
+                    style={{ cursor: 'pointer', textAlign: 'left' }}
+                >
+                    <span className="select-display-text">
+                        {getDisplayText()}
+                    </span>
+                    <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+                </button>
+
+                {isOpen && (
+                    <div className="multi-select-options-new">
+                        {/* Search functionality (optional) */}
+                        <div className="options-search">
+                            <div className="input-group input-group-sm">
+                                <span className="input-group-text" style={{ height: '40px' }}>
+                                    <i className="fas fa-search"></i>
+                                </span>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    placeholder={`Search ${title.toLowerCase()}...`}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Options List */}
+                        <div className="options-list-new">
+                            {options.map((option) => (
+                                <label key={option.value} className="option-item-new">
+                                    <input
+                                        type="checkbox"
+                                        className="form-check-input me-2"
+                                        checked={selectedValues.includes(option.value)}
+                                        onChange={() => handleCheckboxChange(option.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className="option-label-new">{option.label}</span>
+                                    {selectedValues.includes(option.value) && (
+                                        <i className="fas fa-check text-primary ms-auto"></i>
+                                    )}
+                                </label>
+                            ))}
+
+                            {options.length === 0 && (
+                                <div className="no-options">
+                                    <i className="fas fa-info-circle me-2"></i>
+                                    No {title.toLowerCase()} available
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer with count */}
+                        {selectedValues.length > 0 && (
+                            <div className="options-footer">
+                                <small className="text-muted">
+                                    {selectedValues.length} of {options.length} selected
+                                </small>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 function Dashboard() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-    const token = userData.token;
+    const token = JSON.parse(sessionStorage.getItem('token'));
 
-    // State Management
     const [loading, setLoading] = useState(true);
-    const [selectedDateRange, setSelectedDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
-    });
-    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+    const [coursesData, setCoursesData] = useState([]);
+    const [batchesData, setBatchesData] = useState([]);
+    const [studentsData, setStudentsData] = useState([]);
 
-    // Analytics Data
+
     const [overviewStats, setOverviewStats] = useState({
         totalStudents: 0,
         activeCourses: 0,
-        completedSessions: 0,
-        totalHours: 0,
-        averageRating: 0,
-        attendanceRate: 0
+        totalBatches: 0,
+        activeBatches: 0,
+        averageAttendance: 0,
+        batchFreezeStudents: 0
     });
 
-    const [performanceData, setPerformanceData] = useState([]);
-    const [studentProgress, setStudentProgress] = useState([]);
-    const [courseAnalytics, setCourseAnalytics] = useState([]);
-    const [sessionAnalytics, setSessionAnalytics] = useState([]);
-    const [attendanceData, setAttendanceData] = useState([]);
-    const [studentList, setStudentList] = useState([]);
-    const [assignmentStats, setAssignmentStats] = useState([]);
+    const [courseWiseData, setCourseWiseData] = useState([]);
+    const [batchWiseData, setBatchWiseData] = useState([]);
+    const [recentStudents, setRecentStudents] = useState([]);
 
-    // Filter States
-    const [selectedCourses, setSelectedCourses] = useState([]);
-    const [selectedStudents, setSelectedStudents] = useState([]);
+    const [showFilters, setShowFilters] = useState(false);
+    const [selectedCourseFilter, setSelectedCourseFilter] = useState([]);
+    const [selectedBatchFilter, setSelectedBatchFilter] = useState([]);
+    const [selectedTrainerFilter, setSelectedTrainerFilter] = useState([]);
     const [courseOptions, setCourseOptions] = useState([]);
-    const [studentOptions, setStudentOptions] = useState([]);
+    const [batchOptions, setBatchOptions] = useState([]);
+    const [trainerOptions, setTrainerOptions] = useState([]);
+    const [dropdownStates, setDropdownStates] = useState({
+        course: false,
+        batch: false,
+        trainer: false
+    });
 
-    // Load mock data
+    // Close dropdowns when clicking outside
     useEffect(() => {
-        const fetchTrainerAnalytics = async () => {
+        const handleClickOutside = (event) => {
+            const anyDropdownOpen = Object.values(dropdownStates).some(state => state);
+            if (anyDropdownOpen && !event.target.closest('.multi-select-container-new')) {
+                setDropdownStates({
+                    course: false,
+                    batch: false,
+                    trainer: false
+                });
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [dropdownStates]);
+
+    useEffect(() => {
+        if (!showFilters) {
+            closeAllDropdowns();
+        }
+    }, [showFilters]);
+
+    useEffect(() => {
+        fetchAllTrainerData();
+    }, []);
+
+    const fetchAllTrainerData = async () => {
             try {
                 setLoading(true);
                 
-                // Simulate API delay
-                await new Promise(resolve => setTimeout(resolve, 1500));
+            const coursesResponse = await axios.get(`${backendUrl}/college/gettrainersbycourse`, {
+                headers: { 'x-auth': token }
+            });
 
-                // Mock Overview Stats
-                setOverviewStats({
-                    totalStudents: 45,
-                    activeCourses: 8,
-                    completedSessions: 156,
-                    totalHours: 1240,
-                    averageRating: 4.8,
-                    attendanceRate: 94
+            if (coursesResponse.data && coursesResponse.data.status && coursesResponse.data.data) {
+                const trainersData = coursesResponse.data.data;
+                setCoursesData(trainersData);
+
+                const allCourses = [];
+                trainersData.forEach(trainer => {
+                    if (trainer.assignedCourses && trainer.assignedCourses.length > 0) {
+                        trainer.assignedCourses.forEach(course => {
+                            allCourses.push({
+                                id: course._id,
+                                name: course.name,
+                                image: course.image,
+                                trainerName: trainer.name,
+                                trainerId: trainer._id
+                            });
+                        });
+                    }
                 });
 
-                // Mock Performance Data
-                setPerformanceData([
-                    { month: 'Jan', students: 35, sessions: 120, rating: 4.5, hours: 180 },
-                    { month: 'Feb', students: 38, sessions: 135, rating: 4.6, hours: 200 },
-                    { month: 'Mar', students: 42, sessions: 148, rating: 4.7, hours: 220 },
-                    { month: 'Apr', students: 45, sessions: 156, rating: 4.8, hours: 240 },
-                    { month: 'May', students: 48, sessions: 165, rating: 4.9, hours: 260 },
-                    { month: 'Jun', students: 45, sessions: 156, rating: 4.8, hours: 240 }
-                ]);
+                const allBatches = [];
+                const allStudents = [];
 
-                // Mock Student Progress Data
-                setStudentProgress([
-                    { name: 'Web Development', total: 15, completed: 13, progress: 87, avgScore: 85 },
-                    { name: 'Python Programming', total: 12, completed: 9, progress: 75, avgScore: 82 },
-                    { name: 'Data Science', total: 10, completed: 7, progress: 70, avgScore: 88 },
-                    { name: 'React JS', total: 8, completed: 6, progress: 75, avgScore: 90 },
-                    { name: 'JavaScript', total: 14, completed: 11, progress: 79, avgScore: 83 }
-                ]);
+                for (const course of allCourses) {
+                    try {
+                        const batchesResponse = await axios.get(`${backendUrl}/college/getbatchesbytrainerandcourse`, {
+                            params: { courseId: course.id },
+                            headers: { 'x-auth': token }
+                        });
 
-                // Mock Course Analytics
-                setCourseAnalytics([
-                    { name: 'Web Development', students: 15, sessions: 24, completed: 20, rating: 4.8, revenue: 75000 },
-                    { name: 'Python Programming', students: 12, sessions: 20, completed: 16, rating: 4.6, revenue: 60000 },
-                    { name: 'Data Science', students: 10, sessions: 18, completed: 12, rating: 4.9, revenue: 50000 },
-                    { name: 'React JS', students: 8, sessions: 16, completed: 8, rating: 4.7, revenue: 40000 },
-                    { name: 'JavaScript', students: 14, sessions: 22, completed: 18, rating: 4.5, revenue: 70000 }
-                ]);
+                        if (batchesResponse.data && batchesResponse.data.status && batchesResponse.data.data) {
+                            const batches = batchesResponse.data.data.batches || [];
 
-                // Mock Session Analytics
-                setSessionAnalytics([
-                    { date: '2024-01-15', course: 'Web Development', duration: 2, students: 15, attendance: 14, rating: 4.8 },
-                    { date: '2024-01-16', course: 'Python Programming', duration: 1.5, students: 12, attendance: 11, rating: 4.6 },
-                    { date: '2024-01-17', course: 'Data Science', duration: 2, students: 10, attendance: 9, rating: 4.9 },
-                    { date: '2024-01-18', course: 'React JS', duration: 2, students: 8, attendance: 8, rating: 4.7 },
-                    { date: '2024-01-19', course: 'JavaScript', duration: 1.5, students: 14, attendance: 13, rating: 4.5 }
-                ]);
+                            batches.forEach(batch => {
+                                allBatches.push({
+                                    ...batch,
+                                    courseName: course.name,
+                                    courseId: course.id
+                                });
+                            });
 
-                // Mock Attendance Data
-                setAttendanceData([
-                    { course: 'Web Development', present: 14, absent: 1, percentage: 93 },
-                    { course: 'Python Programming', present: 11, absent: 1, percentage: 92 },
-                    { course: 'Data Science', present: 9, absent: 1, percentage: 90 },
-                    { course: 'React JS', present: 8, absent: 0, percentage: 100 },
-                    { course: 'JavaScript', present: 13, absent: 1, percentage: 93 }
-                ]);
+                            for (const batch of batches) {
+                                try {
+                                    const studentsResponse = await axios.get(
+                                        `${backendUrl}/college/traineradmission-list/${batch._id}?page=1&limit=1000&status=batchFreeze`,
+                                        {
+                                            headers: { "x-auth": token }
+                                        }
+                                    );
 
-                // Mock Student List
-                setStudentList([
-                    { id: 1, name: 'Rahul Sharma', course: 'Web Development', progress: 85, attendance: 92, lastActive: '2 hours ago', rating: 4.8 },
-                    { id: 2, name: 'Priya Singh', course: 'Python Programming', progress: 72, attendance: 88, lastActive: '4 hours ago', rating: 4.6 },
-                    { id: 3, name: 'Amit Kumar', course: 'Data Science', progress: 68, attendance: 95, lastActive: '1 day ago', rating: 4.9 },
-                    { id: 4, name: 'Sneha Patel', course: 'React JS', progress: 45, attendance: 90, lastActive: '6 hours ago', rating: 4.7 },
-                    { id: 5, name: 'Rajesh Verma', course: 'JavaScript', progress: 79, attendance: 93, lastActive: '3 hours ago', rating: 4.5 }
-                ]);
+                                    if (studentsResponse.data.success && studentsResponse.data.data) {
+                                        const students = studentsResponse.data.data;
+                                        students.forEach(student => {
+                                            allStudents.push({
+                                                ...student,
+                                                batchName: batch.name,
+                                                batchId: batch._id,
+                                                courseName: course.name,
+                                                courseId: course.id
+                                            });
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error(`Error fetching students for batch ${batch._id}:`, error);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching batches for course ${course.id}:`, error);
+                    }
+                }
 
-                // Mock Assignment Stats
-                setAssignmentStats([
-                    { title: 'React Component Assignment', course: 'React JS', dueDate: '2024-01-18', submitted: 6, total: 8, avgScore: 85 },
-                    { title: 'Python Data Analysis', course: 'Python Programming', dueDate: '2024-01-20', submitted: 10, total: 12, avgScore: 82 },
-                    { title: 'Web API Project', course: 'Web Development', dueDate: '2024-01-22', submitted: 12, total: 15, avgScore: 88 },
-                    { title: 'Machine Learning Model', course: 'Data Science', dueDate: '2024-01-25', submitted: 5, total: 10, avgScore: 90 }
-                ]);
+                setBatchesData(allBatches);
+                setStudentsData(allStudents);
 
-                // Set filter options
-                setCourseOptions(['Web Development', 'Python Programming', 'Data Science', 'React JS', 'JavaScript']);
-                setStudentOptions(['Rahul Sharma', 'Priya Singh', 'Amit Kumar', 'Sneha Patel', 'Rajesh Verma']);
+                processAnalyticsData(allCourses, allBatches, allStudents);
+            }
 
                 setLoading(false);
             } catch (error) {
-                console.error('Error fetching trainer analytics:', error);
+            console.error('Error fetching trainer data:', error);
                 setLoading(false);
             }
         };
 
-        fetchTrainerAnalytics();
-    }, [selectedDateRange]);
+    const processAnalyticsData = (courses, batches, students) => {
+        const uniqueCourses = [...new Set(courses.map(c => ({ id: c.id, name: c.name })))];
+        setCourseOptions(uniqueCourses.map(c => ({ value: c.id, label: c.name })));
 
-    // Filter handlers
-    const handleDateRangeChange = (dateRange) => {
-        setSelectedDateRange(dateRange);
+        const uniqueBatches = [...new Set(batches.map(b => ({ id: b._id, name: b.name, courseId: b.courseId })))];
+        setBatchOptions(uniqueBatches.map(b => ({ value: b.id, label: b.name, courseId: b.courseId })));
+
+        const uniqueTrainers = [...new Set(courses.map(c => c.trainerName))].filter(Boolean);
+        setTrainerOptions(uniqueTrainers.map(name => ({ value: name, label: name })));
+
+        const activeBatches = batches.filter(b => b.status === 'active').length;
+        const batchFreezeCount = students.filter(s => s.isBatchFreeze).length;
+
+        setOverviewStats({
+            totalStudents: students.length,
+            activeCourses: courses.length,
+            totalBatches: batches.length,
+            activeBatches: activeBatches,
+            averageAttendance: 0,
+            batchFreezeStudents: batchFreezeCount
+        });
+
+        const courseWise = courses.map(course => {
+            const courseBatches = batches.filter(b => b.courseId === course.id);
+            const courseStudents = students.filter(s => s.courseId === course.id);
+
+            return {
+                courseId: course.id,
+                courseName: course.name,
+                trainerName: course.trainerName,
+                totalBatches: courseBatches.length,
+                activeBatches: courseBatches.filter(b => b.status === 'active').length,
+                totalStudents: courseStudents.length,
+                batchFreezeStudents: courseStudents.filter(s => s.isBatchFreeze).length
+            };
+        });
+        setCourseWiseData(courseWise);
+
+        const batchWise = batches.map(batch => {
+            const batchStudents = students.filter(s => s.batchId === batch._id);
+
+            return {
+                batchId: batch._id,
+                batchName: batch.name,
+                courseName: batch.courseName,
+                courseId: batch.courseId,
+                status: batch.status,
+                startDate: batch.startDate,
+                endDate: batch.endDate,
+                maxStudents: batch.maxStudents,
+                currentStudents: batchStudents.length,
+                batchFreezeStudents: batchStudents.filter(s => s.isBatchFreeze).length,
+                centerName: batch.centerId?.name || 'N/A'
+            };
+        });
+        setBatchWiseData(batchWise);
+
+        const sortedStudents = [...students].sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        ).slice(0, 10);
+        setRecentStudents(sortedStudents);
     };
 
-    const handleFilterChange = (filterType, values) => {
-        switch (filterType) {
-            case 'courses':
-                setSelectedCourses(values);
-                break;
-            case 'students':
-                setSelectedStudents(values);
-                break;
+    const handleRefresh = () => {
+        setRefreshing(true);
+        fetchAllTrainerData().finally(() => setRefreshing(false));
+    };
+
+    // Filter Functions
+    const handleClearFilters = () => {
+        setSelectedCourseFilter([]);
+        setSelectedBatchFilter([]);
+        setSelectedTrainerFilter([]);
+        closeAllDropdowns();
+    };
+
+    const handleApplyFilters = () => {
+        closeAllDropdowns();
+        setShowFilters(false);
+    };
+
+    const toggleDropdown = (dropdownName) => {
+        setDropdownStates(prev => ({
+            ...prev,
+            [dropdownName]: !prev[dropdownName]
+        }));
+    };
+
+    // Close all dropdowns
+    const closeAllDropdowns = () => {
+        setDropdownStates({
+            course: false,
+            batch: false,
+            trainer: false
+        });
+    };
+
+    // Apply filters to data
+    const filteredCourseWiseData = useMemo(() => {
+        let filtered = [...courseWiseData];
+        
+        if (selectedCourseFilter.length > 0) {
+            filtered = filtered.filter(c => selectedCourseFilter.includes(c.courseId));
         }
-    };
+        
+        if (selectedTrainerFilter.length > 0) {
+            filtered = filtered.filter(c => selectedTrainerFilter.includes(c.trainerName));
+        }
+        
+        return filtered;
+    }, [courseWiseData, selectedCourseFilter, selectedTrainerFilter]);
 
-    // Chart colors
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+    const filteredBatchWiseData = useMemo(() => {
+        let filtered = [...batchWiseData];
+        
+        if (selectedCourseFilter.length > 0) {
+            filtered = filtered.filter(b => selectedCourseFilter.includes(b.courseId));
+        }
+        
+        if (selectedBatchFilter.length > 0) {
+            filtered = filtered.filter(b => selectedBatchFilter.includes(b.batchId));
+        }
+        
+        return filtered;
+    }, [batchWiseData, selectedCourseFilter, selectedBatchFilter]);
+
+    const filteredStudents = useMemo(() => {
+        let filtered = [...recentStudents];
+        
+        if (selectedCourseFilter.length > 0) {
+            filtered = filtered.filter(s => selectedCourseFilter.includes(s.courseId));
+        }
+        
+        if (selectedBatchFilter.length > 0) {
+            filtered = filtered.filter(s => selectedBatchFilter.includes(s.batchId));
+        }
+        
+        return filtered;
+    }, [recentStudents, selectedCourseFilter, selectedBatchFilter]);
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B9D', '#C44569', '#FFA502'];
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
 
     if (loading) {
         return (
@@ -162,7 +437,7 @@ function Dashboard() {
                     <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
                     </div>
-                    <p className="mt-3 text-muted">Loading trainer analytics...</p>
+                    <p className="mt-3 text-muted">Loading trainer dashboard...</p>
                 </div>
             </div>
         );
@@ -170,398 +445,969 @@ function Dashboard() {
 
     return (
         <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-            {/* Header */}
-            <div className="mb-4">
-                <h1 className="display-5 fw-bold text-dark mb-2">Trainer Analytics Dashboard</h1>
-                <p className="text-muted">Comprehensive performance tracking and student progress analytics</p>
-            </div>
 
-            {/* Date Range Selector */}
-            <div className="card shadow-sm mb-4">
-                <div className="card-body">
-                    <div className="row align-items-end">
-                        <div className="col-md-4">
-                            <label className="form-label fw-medium">Date Range:</label>
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 className="display-6 fw-bold text-dark mb-2">
+                                <Activity className="me-2" size={36} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                                Trainer Dashboard
+                            </h1>
+                            <p className="text-muted mb-0">Course-wise, Batch-wise & Student Progress Analytics</p>
+                        </div>
+                        <div className="d-flex gap-2">
                             <button
-                                className="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center"
-                                onClick={() => setShowDatePicker(!showDatePicker)}
+                                className="btn btn-outline-primary" 
+                                onClick={() => setShowFilters(!showFilters)}
                             >
-                                <div className="d-flex align-items-center">
-                                    <CalendarDays className="me-2" size={20} />
-                                    <span>
-                                        {selectedDateRange.startDate} to {selectedDateRange.endDate}
+                                <i className="fas fa-filter me-2"></i>
+                                Filters
+                                {(selectedCourseFilter.length > 0 || selectedBatchFilter.length > 0 || selectedTrainerFilter.length > 0) && (
+                                    <span className="badge bg-danger ms-2">
+                                        {selectedCourseFilter.length + selectedBatchFilter.length + selectedTrainerFilter.length}
                                     </span>
-                                </div>
-                                <ChevronRight size={16} />
+                                )}
                             </button>
-                        </div>
-
-                        <div className="col-md-4">
-                            <label className="form-label fw-medium">Courses:</label>
-                            <select 
-                                className="form-select"
-                                value={selectedCourses[0] || ''}
-                                onChange={(e) => setSelectedCourses(e.target.value ? [e.target.value] : [])}
+                            {/* <button
+                                className="btn btn-primary"
+                                onClick={handleRefresh}
+                                disabled={refreshing}
                             >
-                                <option value="">All Courses</option>
-                                {courseOptions.map(course => (
-                                    <option key={course} value={course}>{course}</option>
-                                ))}
-                            </select>
+                                {refreshing ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Refreshing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-sync-alt me-2"></i>
+                                        Refresh Data
+                                    </>
+                                )}
+                            </button> */}
+                        </div>
+                    </div>
+                </div>
                         </div>
 
+            {showFilters && (
+                <div 
+                    className="modal fade show d-block" 
+                    style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            closeAllDropdowns();
+                            setShowFilters(false);
+                        }
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered modal-lg">
+                        <div className="modal-content">
+                            {/* Modal Header */}
+                            <div className="modal-header bg-primary text-white">
+                                <h5 className="modal-title d-flex align-items-center">
+                                    <Filter className="me-2" size={20} />
+                                    Filter Dashboard Data
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close btn-close-white" 
+                                    onClick={() => {
+                                        closeAllDropdowns();
+                                        setShowFilters(false);
+                                    }}
+                                ></button>
+                        </div>
+
+                            {/* Modal Body */}
+                            <div className="modal-body">
+                                <div className="row g-4">
                         <div className="col-md-4">
+                                        <MultiSelectCheckbox
+                                            title="Course"
+                                            options={courseOptions}
+                                            selectedValues={selectedCourseFilter}
+                                            onChange={(values) => {
+                                                setSelectedCourseFilter(values);
+                                                setSelectedBatchFilter([]);
+                                            }}
+                                            icon="fas fa-graduation-cap"
+                                            isOpen={dropdownStates.course}
+                                            onToggle={() => toggleDropdown('course')}
+                                        />
+                                    </div>
+
+                                    <div className="col-md-4">
+                                        <MultiSelectCheckbox
+                                            title="Batch"
+                                            options={batchOptions.filter(batch => 
+                                                selectedCourseFilter.length === 0 || 
+                                                selectedCourseFilter.includes(batch.courseId)
+                                            )}
+                                            selectedValues={selectedBatchFilter}
+                                            onChange={setSelectedBatchFilter}
+                                            icon="fas fa-layer-group"
+                                            isOpen={dropdownStates.batch}
+                                            onToggle={() => toggleDropdown('batch')}
+                                        />
+                                    </div>
+
+                                    <div className="col-md-4">
+                                        <MultiSelectCheckbox
+                                            title="Trainer"
+                                            options={trainerOptions}
+                                            selectedValues={selectedTrainerFilter}
+                                            onChange={setSelectedTrainerFilter}
+                                            icon="fas fa-user-tie"
+                                            isOpen={dropdownStates.trainer}
+                                            onToggle={() => toggleDropdown('trainer')}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Active Filters Summary */}
+                                {(selectedCourseFilter.length > 0 || selectedBatchFilter.length > 0 || selectedTrainerFilter.length > 0) && (
+                                    <div className="row mt-4">
+                                        <div className="col-12">
+                                            <div className="alert alert-info mb-0">
+                                                <div className="d-flex align-items-start">
+                                                    <AlertCircle className="me-2 mt-1" size={20} />
+                                                    <div className="flex-grow-1">
+                                                        <strong className="d-block mb-2">Active Filters:</strong>
+                                                        <div className="d-flex flex-wrap gap-2">
+                                                            {selectedCourseFilter.length > 0 && (
+                                                                <div>
+                                                                    <small className="text-muted d-block mb-1">Courses:</small>
+                                                                    {selectedCourseFilter.map(courseId => {
+                                                                        const course = courseOptions.find(c => c.value === courseId);
+                                                                        return (
+                                                                            <span key={courseId} className="badge bg-primary me-1 mb-1">
+                                                                                {course?.label || courseId}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {selectedBatchFilter.length > 0 && (
+                                                                <div>
+                                                                    <small className="text-muted d-block mb-1">Batches:</small>
+                                                                    {selectedBatchFilter.map(batchId => {
+                                                                        const batch = batchOptions.find(b => b.value === batchId);
+                                                                        return (
+                                                                            <span key={batchId} className="badge bg-success me-1 mb-1">
+                                                                                {batch?.label || batchId}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {selectedTrainerFilter.length > 0 && (
+                                                                <div>
+                                                                    <small className="text-muted d-block mb-1">Trainers:</small>
+                                                                    {selectedTrainerFilter.map(trainer => (
+                                                                        <span key={trainer} className="badge bg-warning me-1 mb-1">
+                                                                            {trainer}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="modal-footer">
                             <button
-                                className="btn btn-primary w-100 d-flex align-items-center justify-content-center"
-                                onClick={() => window.location.reload()}
-                            >
-                                <Search className="me-2" size={16} />
+                                    type="button" 
+                                    className="btn btn-outline-secondary"
+                                    onClick={handleClearFilters}
+                                >
+                                    <i className="fas fa-times me-1"></i>
+                                    Clear Filters
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary"
+                                    onClick={handleApplyFilters}
+                                >
+                                    <i className="fas fa-check me-1"></i>
                                 Apply Filters
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Overview Stats */}
             <div className="row mb-4">
-                <div className="col-md-2">
-                    <div className="card bg-primary text-white h-100">
-                        <div className="card-body text-center">
-                            <Users className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.totalStudents}</h3>
-                            <p className="mb-0">Total Students</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-2">
-                    <div className="card bg-success text-white h-100">
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-primary text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <BookOpen className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.activeCourses}</h3>
-                            <p className="mb-0">Active Courses</p>
+                            <h3 className="mb-1 fw-bold">{overviewStats.activeCourses}</h3>
+                            <p className="mb-0 small">Active Courses</p>
                         </div>
                     </div>
                 </div>
-                <div className="col-md-2">
-                    <div className="card bg-info text-white h-100">
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-success text-white border-0 shadow-sm h-100">
+                        <div className="card-body text-center">
+                            <Users className="mb-2" size={32} />
+                            <h3 className="mb-1 fw-bold">{overviewStats.totalBatches}</h3>
+                            <p className="mb-0 small">Total Batches</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-info text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <CheckCircle className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.completedSessions}</h3>
-                            <p className="mb-0">Completed Sessions</p>
+                            <h3 className="mb-1 fw-bold">{overviewStats.activeBatches}</h3>
+                            <p className="mb-0 small">Active Batches</p>
                         </div>
                     </div>
                 </div>
-                <div className="col-md-2">
-                    <div className="card bg-warning text-white h-100">
-                        <div className="card-body text-center">
-                            <Clock className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.totalHours}</h3>
-                            <p className="mb-0">Total Hours</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-2">
-                    <div className="card bg-danger text-white h-100">
-                        <div className="card-body text-center">
-                            <Star className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.averageRating}</h3>
-                            <p className="mb-0">Avg Rating</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-2">
-                    <div className="card bg-dark text-white h-100">
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-warning text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <Target className="mb-2" size={32} />
-                            <h3 className="mb-1">{overviewStats.attendanceRate}%</h3>
-                            <p className="mb-0">Attendance Rate</p>
+                            <h3 className="mb-1 fw-bold">{overviewStats.totalStudents}</h3>
+                            <p className="mb-0 small">Total Students</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-danger text-white border-0 shadow-sm h-100">
+                        <div className="card-body text-center">
+                            <AlertTriangle className="mb-2" size={32} />
+                            <h3 className="mb-1 fw-bold">{overviewStats.batchFreezeStudents}</h3>
+                            <p className="mb-0 small">Batch Freeze</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-md-2 col-sm-6 mb-3">
+                    <div className="card bg-gradient-dark text-white border-0 shadow-sm h-100">
+                        <div className="card-body text-center">
+                            <TrendingUp className="mb-2" size={32} />
+                            <h3 className="mb-1 fw-bold">{courseWiseData.length > 0 ? Math.round(studentsData.length / courseWiseData.length) : 0}</h3>
+                            <p className="mb-0 small">Avg/Course</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Performance Trends */}
+            {/* Course-wise Analytics */}
             <div className="row mb-4">
                 <div className="col-md-8">
                     <div className="card shadow-sm h-100">
-                        <div className="card-header">
+                        <div className="card-header bg-white">
                             <h5 className="mb-0 d-flex align-items-center">
-                                <TrendingUp className="me-2" size={20} />
-                                Performance Trends
+                                <BarChart3 className="me-2" size={20} />
+                                Course-wise Student Distribution
                             </h5>
                         </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={performanceData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="month" />
-                                    <YAxis yAxisId="left" />
-                                    <YAxis yAxisId="right" orientation="right" />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar yAxisId="left" dataKey="students" fill="#8884d8" name="Students" />
-                                    <Bar yAxisId="left" dataKey="sessions" fill="#82ca9d" name="Sessions" />
-                                    <Line yAxisId="right" type="monotone" dataKey="rating" stroke="#ff7300" name="Rating" strokeWidth={3} />
-                                    <Line yAxisId="right" type="monotone" dataKey="hours" stroke="#ff0000" name="Hours" strokeWidth={3} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                         <div className="card-body">
+                             {filteredCourseWiseData.length > 0 ? (
+                             <ResponsiveContainer width="100%" height={400}>
+                                     <BarChart data={filteredCourseWiseData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                         <XAxis 
+                                             dataKey="courseName" 
+                                             tick={{ fontSize: 12, fill: '#666' }}
+                                             height={60}
+                                             interval={0}
+                                         />
+                                     <YAxis 
+                                         tick={{ fontSize: 12, fill: '#666' }}
+                                         label={{ value: 'Number of Students', angle: -90, position: 'insideLeft' }}
+                                     />
+                                     <Tooltip 
+                                         contentStyle={{ 
+                                             backgroundColor: '#fff', 
+                                             border: '1px solid #ddd', 
+                                             borderRadius: '8px',
+                                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                         }}
+                                         formatter={(value, name, props) => {
+                                             if (name === 'totalStudents') {
+                                                 return [value, 'Total Students'];
+                                             } else if (name === 'batchFreezeStudents') {
+                                                 return [value, 'Batch Freeze'];
+                                             }
+                                             return [value, name];
+                                         }}
+                                     />
+                                     <Legend 
+                                         wrapperStyle={{ paddingTop: '20px' }}
+                                     />
+                                         <Bar 
+                                             dataKey="totalStudents" 
+                                             fill="#4F46E5" 
+                                             name="Total Students"
+                                             radius={[4, 4, 0, 0]}
+                                             maxBarSize={60}
+                                         >
+                                             {filteredCourseWiseData.map((entry, index) => (
+                                                 <Cell key={`cell-${index}`} fill="#4F46E5" />
+                                             ))}
+                                         </Bar>
+                                         <Bar 
+                                             dataKey="batchFreezeStudents" 
+                                             fill="#F59E0B" 
+                                             name="Batch Freeze"
+                                             radius={[4, 4, 0, 0]}
+                                             maxBarSize={60}
+                                         >
+                                             {filteredCourseWiseData.map((entry, index) => (
+                                                 <Cell key={`cell-${index}`} fill="#F59E0B" />
+                                             ))}
+                                         </Bar>
+                                 </BarChart>
+                             </ResponsiveContainer>
+                             ) : (
+                                 <div className="text-center py-5 text-muted">
+                                     <i className="fas fa-chart-bar fa-3x mb-3 opacity-50"></i>
+                                     <p>No course data available</p>
+                                 </div>
+                             )}
+                         </div>
                     </div>
                 </div>
                 <div className="col-md-4">
                     <div className="card shadow-sm h-100">
-                        <div className="card-header">
-                            <h5 className="mb-0 d-flex align-items-center">
-                                Course Distribution
-                            </h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Student Progress & Course Analytics */}
-            <div className="row mb-4">
-                <div className="col-md-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header">
-                            <h5 className="mb-0 d-flex align-items-center">
-                                <BarChart3 className="me-2" size={20} />
-                                Student Progress by Course
-                            </h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={studentProgress}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="progress" fill="#8884d8" name="Progress %" />
-                                    <Bar dataKey="avgScore" fill="#82ca9d" name="Avg Score" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header">
-                            <h5 className="mb-0 d-flex align-items-center">
-                                <Activity className="me-2" size={20} />
-                                Course Performance
-                            </h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <AreaChart data={courseAnalytics}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Area type="monotone" dataKey="students" stackId="1" stroke="#8884d8" fill="#8884d8" name="Students" />
-                                    <Area type="monotone" dataKey="completed" stackId="1" stroke="#82ca9d" fill="#82ca9d" name="Completed" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Attendance & Assignment Analytics */}
-            <div className="row mb-4">
-                <div className="col-md-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header">
-                            <h5 className="mb-0 d-flex align-items-center">
-                                <UserCheck className="me-2" size={20} />
-                                Attendance Analytics
-                            </h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={attendanceData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="course" angle={-45} textAnchor="end" height={100} />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="present" fill="#28a745" name="Present" />
-                                    <Bar dataKey="absent" fill="#dc3545" name="Absent" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header">
-                            <h5 className="mb-0 d-flex align-items-center">
-                                <FileCheck className="me-2" size={20} />
-                                Assignment Statistics
-                            </h5>
-                        </div>
-                        <div className="card-body">
-                            <div className="table-responsive">
-                                <table className="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Assignment</th>
-                                            <th>Course</th>
-                                            <th>Submitted</th>
-                                            <th>Avg Score</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {assignmentStats.map((assignment, index) => (
-                                            <tr key={index}>
-                                                <td>{assignment.title}</td>
-                                                <td>{assignment.course}</td>
-                                                <td>{assignment.submitted}/{assignment.total}</td>
-                                                <td>{assignment.avgScore}%</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Student List */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="card shadow-sm">
-                        <div className="card-header d-flex justify-content-between align-items-center">
+                        <div className="card-header bg-white">
                             <h5 className="mb-0 d-flex align-items-center">
                                 <Users className="me-2" size={20} />
-                                Student Progress Details
+                                Student Distribution
                             </h5>
-                            <button className="btn btn-outline-primary btn-sm">
-                                <Download className="me-2" size={16} />
-                                Export
-                            </button>
+                        </div>
+                         <div className="card-body">
+                             {filteredCourseWiseData.length > 0 ? (
+                             <ResponsiveContainer width="100%" height={350}>
+                                     <PieChart>
+                                         <Pie
+                                             data={filteredCourseWiseData}
+                                             dataKey="totalStudents"
+                                             nameKey="courseName"
+                                             cx="50%"
+                                             cy="50%"
+                                             outerRadius={100}
+                                             innerRadius={30}
+                                             label={({ courseName, totalStudents, percent }) => 
+                                                 `${courseName}: ${totalStudents} (${(percent * 100).toFixed(1)}%)`
+                                             }
+                                             labelLine={false}
+                                         >
+                                             {filteredCourseWiseData.map((entry, index) => (
+                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                             ))}
+                                         </Pie>
+                                     <Tooltip 
+                                         contentStyle={{ 
+                                             backgroundColor: '#fff', 
+                                             border: '1px solid #ddd', 
+                                             borderRadius: '8px',
+                                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                         }}
+                                         formatter={(value, name, props) => [
+                                             value, 
+                                             props.payload.courseName
+                                         ]}
+                                     />
+                                     <Legend 
+                                         verticalAlign="bottom" 
+                                         height={36}
+                                         formatter={(value, entry) => (
+                                             <span style={{ color: entry.color, fontSize: '12px' }}>
+                                                 {value}
+                                             </span>
+                                         )}
+                                     />
+                                     </PieChart>
+                             </ResponsiveContainer>
+                             ) : (
+                                 <div className="text-center py-5 text-muted">
+                                     <i className="fas fa-chart-pie fa-3x mb-3 opacity-50"></i>
+                                     <p>No student data available</p>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Course-wise Details Table */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card shadow-sm">
+                        <div className="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 className="mb-0 d-flex align-items-center">
+                                <BookOpen className="me-2" size={20} />
+                                Course-wise Progress Report
+                            </h5>
+                            {/* <Link to="/trainer/mycourses" className="btn btn-sm btn-outline-primary">
+                                View All Courses
+                            </Link> */}
                         </div>
                         <div className="card-body">
+                            {filteredCourseWiseData.length > 0 ? (
                             <div className="table-responsive">
-                                <table className="table table-hover">
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th>Student Name</th>
-                                            <th>Course</th>
-                                            <th>Progress</th>
-                                            <th>Attendance</th>
-                                            <th>Last Active</th>
-                                            <th>Rating</th>
-                                            <th>Actions</th>
+                                    <table className="table table-hover">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th>Course Name</th>
+                                                <th className="text-center">Total Batches</th>
+                                                <th className="text-center">Active Batches</th>
+                                                <th className="text-center">Total Students</th>
+                                                <th className="text-center">Batch Freeze</th>
+                                                {/* <th className="text-center">Progress</th>
+                                                <th>Actions</th> */}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {studentList.map((student) => (
-                                            <tr key={student.id}>
-                                                <td>
-                                                    <div className="d-flex align-items-center">
-                                                        <div className="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
-                                                            {student.name.charAt(0)}
+                                            {filteredCourseWiseData.map((course, index) => (
+                                            <tr key={index}>
+                                                    <td>
+                                                        <div className="d-flex align-items-center">
+                                                            <div className="avatar-sm bg-primary text-white rounded d-flex align-items-center justify-content-center me-2">
+                                                                {course.courseName.charAt(0)}
+                                                            </div>
+                                                            <strong>{course.courseName}</strong>
                                                         </div>
-                                                        {student.name}
-                                                    </div>
-                                                </td>
-                                                <td>{student.course}</td>
-                                                <td>
-                                                    <div className="d-flex align-items-center">
-                                                        <div className="progress me-2" style={{ width: '100px', height: '8px' }}>
-                                                            <div
-                                                                className="progress-bar"
-                                                                style={{ width: `${student.progress}%` }}
-                                                            ></div>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-secondary">{course.totalBatches}</span>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-success">{course.activeBatches}</span>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-primary">{course.totalStudents}</span>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-warning">{course.batchFreezeStudents}</span>
+                                                    </td>
+                                                    {/* <td className="text-center">
+                                                        <div className="d-flex align-items-center justify-content-center">
+                                                            <div className="progress me-2" style={{ width: '100px', height: '8px' }}>
+                                                                <div
+                                                                    className="progress-bar bg-success"
+                                                                    style={{ width: `${course.totalStudents > 0 ? ((course.totalStudents - course.batchFreezeStudents) / course.totalStudents * 100) : 0}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <small>{course.totalStudents > 0 ? Math.round((course.totalStudents - course.batchFreezeStudents) / course.totalStudents * 100) : 0}%</small>
                                                         </div>
-                                                        <span>{student.progress}%</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className={`badge ${student.attendance >= 90 ? 'bg-success' : student.attendance >= 80 ? 'bg-warning' : 'bg-danger'}`}>
-                                                        {student.attendance}%
-                                                    </span>
-                                                </td>
-                                                <td>{student.lastActive}</td>
-                                                <td>
-                                                    <div className="d-flex align-items-center">
-                                                        <Star className="text-warning me-1" size={16} />
-                                                        {student.rating}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-outline-primary">View Details</button>
-                                                </td>
+                                                    </td> */}
+                                                    {/* <td>
+                                                        <Link
+                                                            to={`/trainer/batchmanagement?courseId=${course.courseId}`}
+                                                            className="btn btn-sm btn-outline-primary"
+                                                        >
+                                                            <i className="fas fa-eye me-1"></i>View Batches
+                                                        </Link>
+                                                    </td> */}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
+                            ) : (
+                                <div className="text-center py-4 text-muted">
+                                    <BookOpen size={48} className="mb-3 opacity-50" />
+                                    <p>No courses assigned yet</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Session Analytics */}
+            {/* Batch-wise Analytics */}
             <div className="row mb-4">
-                <div className="col-12">
+                <div className="col-md-12">
                     <div className="card shadow-sm">
-                        <div className="card-header">
+                        <div className="card-header bg-white">
                             <h5 className="mb-0 d-flex align-items-center">
-                                <Calendar className="me-2" size={20} />
-                                Recent Session Analytics
+                                <Users className="me-2" size={20} />
+                                Batch-wise Progress Report
                             </h5>
                         </div>
                         <div className="card-body">
+                            {filteredBatchWiseData.length > 0 ? (
                             <div className="table-responsive">
                                 <table className="table table-hover">
                                     <thead className="table-light">
                                         <tr>
-                                            <th>Date</th>
+                                                <th>Batch Name</th>
                                             <th>Course</th>
-                                            <th>Duration (hrs)</th>
-                                            <th>Students</th>
-                                            <th>Attendance</th>
-                                            <th>Rating</th>
-                                            <th>Status</th>
+                                                <th>Center</th>
+                                                <th className="text-center">Status</th>
+                                                <th className="text-center">Students</th>
+                                                <th className="text-center">Capacity</th>
+                                                <th className="text-center">Batch Freeze</th>
+                                                <th>Start Date</th>
+                                            {/* <th>Actions</th> */}
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {sessionAnalytics.map((session, index) => (
-                                            <tr key={index}>
-                                                <td>{session.date}</td>
-                                                <td>{session.course}</td>
-                                                <td>{session.duration}</td>
-                                                <td>{session.students}</td>
-                                                <td>{session.attendance}/{session.students}</td>
+                                            {filteredBatchWiseData.slice(0, 10).map((batch, index) => (
+                                                <tr key={index}>
                                                 <td>
                                                     <div className="d-flex align-items-center">
-                                                        <Star className="text-warning me-1" size={16} />
-                                                        {session.rating}
+                                                            <i className="fas fa-layer-group me-2 text-primary"></i>
+                                                            <strong>{batch.batchName}</strong>
                                                     </div>
                                                 </td>
-                                                <td>
-                                                    <span className="badge bg-success">Completed</span>
+                                                    <td>
+                                                        <small className="text-muted">{batch.courseName}</small>
                                                 </td>
+                                                <td>
+                                                        <small>{batch.centerName}</small>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className={`badge ${batch.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                                                            {batch.status || 'Active'}
+                                                    </span>
+                                                </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-info">{batch.currentStudents}</span>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-secondary">{batch.maxStudents || 'N/A'}</span>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <span className="badge bg-warning">{batch.batchFreezeStudents}</span>
+                                                    </td>
+                                                    <td>
+                                                        <small>{formatDate(batch.startDate)}</small>
+                                                </td>
+                                                {/* <td>
+                                                        <Link
+                                                            to={`/trainer/students?batchId=${batch.batchId}&batchName=${encodeURIComponent(batch.batchName)}&courseId=${batch.courseId}`}
+                                                            className="btn btn-sm btn-outline-primary"
+                                                        >
+                                                            <i className="fas fa-users me-1"></i>View Students
+                                                        </Link>
+                                                </td> */}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
+                            ) : (
+                                <div className="text-center py-4 text-muted">
+                                    <Users size={48} className="mb-3 opacity-50" />
+                                    <p>No batches assigned yet</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Recent Students */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card shadow-sm">
+                        <div className="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 className="mb-0 d-flex align-items-center">
+                                <UserCheck className="me-2" size={20} />
+                                Recent Student Enrollments
+                            </h5>
+                            <span className="badge bg-primary">{studentsData.length} Total Students</span>
+                        </div>
+                        <div className="card-body">
+                            {filteredStudents.length > 0 ? (
+                            <div className="table-responsive">
+                                <table className="table table-hover">
+                                    <thead className="table-light">
+                                        <tr>
+                                                <th>Student Name</th>
+                                            <th>Course</th>
+                                                <th>Batch</th>
+                                                <th>Center</th>
+                                                <th>Email</th>
+                                                <th>Phone</th>
+                                            <th>Status</th>
+                                                <th>Enrolled On</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                            {filteredStudents.map((student, index) => (
+                                            <tr key={index}>
+                                                <td>
+                                                    <div className="d-flex align-items-center">
+                                                            <div className="avatar-circle me-2" style={{
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                borderRadius: '50%',
+                                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                                color: 'white',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontWeight: 'bold',
+                                                                fontSize: '0.9rem'
+                                                            }}>
+                                                                {student._candidate?.name ? student._candidate.name.charAt(0).toUpperCase() : 'N'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="fw-bold">{student._candidate?.name || 'N/A'}</div>
+                                                                {student._candidate?.fatherName && (
+                                                                    <small className="text-muted">S/O: {student._candidate.fatherName}</small>
+                                                                )}
+                                                            </div>
+                                                    </div>
+                                                </td>
+                                                    <td><small>{student.courseName}</small></td>
+                                                    <td><small>{student.batchName}</small></td>
+                                                    <td><small>{student._center?.name || 'N/A'}</small></td>
+                                                    <td><small>{student._candidate?.email || 'N/A'}</small></td>
+                                                    <td><small>{student._candidate?.mobile || 'N/A'}</small></td>
+                                                    <td>
+                                                        {student.isBatchFreeze ? (
+                                                            <span className="badge bg-warning">Batch Freeze</span>
+                                                        ) : student.dropout ? (
+                                                            <span className="badge bg-danger">Dropout</span>
+                                                        ) : (
+                                                            <span className="badge bg-success">Active</span>
+                                                        )}
+                                                </td>
+                                                    <td><small>{formatDate(student.createdAt)}</small></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            ) : (
+                                <div className="text-center py-4 text-muted">
+                                    <UserCheck size={48} className="mb-3 opacity-50" />
+                                    <p>No students enrolled yet</p>
+                        </div>
+                            )}
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            {/* Quick Stats Summary */}
+            <div className="row mb-4">
+                <div className="col-md-6">
+                    <div className="card shadow-sm">
+                        <div className="card-header bg-white">
+                            <h5 className="mb-0 d-flex align-items-center">
+                                <BarChart3 className="me-2" size={20} />
+                                Batch Capacity Analysis
+                            </h5>
+                        </div>
+                         <div className="card-body">
+                             {filteredBatchWiseData.length > 0 ? (
+                                 <ResponsiveContainer width="100%" height={300}>
+                                     <BarChart data={filteredBatchWiseData.slice(0, 8)} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                         <XAxis 
+                                             dataKey="batchName" 
+                                             angle={-45} 
+                                             textAnchor="end" 
+                                             height={120}
+                                             tick={{ fontSize: 12, fill: '#666' }}
+                                             interval={0}
+                                         />
+                                         <YAxis 
+                                             tick={{ fontSize: 12, fill: '#666' }}
+                                             label={{ value: 'Number of Students', angle: -90, position: 'insideLeft' }}
+                                         />
+                                         <Tooltip 
+                                             contentStyle={{ 
+                                                 backgroundColor: '#fff', 
+                                                 border: '1px solid #ddd', 
+                                                 borderRadius: '8px',
+                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                             }}
+                                         />
+                                         <Legend 
+                                             wrapperStyle={{ paddingTop: '20px' }}
+                                         />
+                                         <Bar 
+                                             dataKey="currentStudents" 
+                                             fill="#00C49F" 
+                                             name="Current Students"
+                                             radius={[4, 4, 0, 0]}
+                                             maxBarSize={50}
+                                         />
+                                         <Bar 
+                                             dataKey="maxStudents" 
+                                             fill="#0088FE" 
+                                             name="Max Capacity"
+                                             radius={[4, 4, 0, 0]}
+                                             maxBarSize={50}
+                                         />
+                                     </BarChart>
+                                 </ResponsiveContainer>
+                             ) : (
+                                 <div className="text-center py-5 text-muted">
+                                     <i className="fas fa-chart-bar fa-3x mb-3 opacity-50"></i>
+                                     <p>No batch data available</p>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+                </div>
+                <div className="col-md-6">
+                    <div className="card shadow-sm">
+                        <div className="card-header bg-white">
+                            <h5 className="mb-0 d-flex align-items-center">
+                                <Activity className="me-2" size={20} />
+                                Batch Status Distribution
+                            </h5>
+                        </div>
+                         <div className="card-body">
+                             {filteredBatchWiseData.length > 0 ? (
+                                 <ResponsiveContainer width="100%" height={300}>
+                                     <PieChart>
+                                         <Pie
+                                             data={[
+                                                 { name: 'Active Batches', value: filteredBatchWiseData.filter(b => b.status === 'active').length },
+                                                 { name: 'Inactive Batches', value: filteredBatchWiseData.filter(b => b.status !== 'active').length }
+                                             ]}
+                                             dataKey="value"
+                                             nameKey="name"
+                                             cx="50%"
+                                             cy="50%"
+                                             outerRadius={100}
+                                             innerRadius={30}
+                                             label={({ name, value, percent }) => 
+                                                 `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
+                                             }
+                                             labelLine={false}
+                                         >
+                                             <Cell fill="#28a745" />
+                                             <Cell fill="#dc3545" />
+                                         </Pie>
+                                         <Tooltip 
+                                             contentStyle={{ 
+                                                 backgroundColor: '#fff', 
+                                                 border: '1px solid #ddd', 
+                                                 borderRadius: '8px',
+                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                             }}
+                                         />
+                                         <Legend 
+                                             verticalAlign="bottom" 
+                                             height={36}
+                                             formatter={(value, entry) => (
+                                                 <span style={{ color: entry.color, fontSize: '12px' }}>
+                                                     {value}
+                                                 </span>
+                                             )}
+                                         />
+                                     </PieChart>
+                                 </ResponsiveContainer>
+                             ) : (
+                                 <div className="text-center py-5 text-muted">
+                                     <i className="fas fa-chart-pie fa-3x mb-3 opacity-50"></i>
+                                     <p>No batch data available</p>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Custom Styles */}
+            <style>{`
+                .bg-gradient-primary {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                .bg-gradient-success {
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                }
+                .bg-gradient-info {
+                    background: linear-gradient(135deg, #17a2b8 0%, #00cfe8 100%);
+                }
+                .bg-gradient-warning {
+                    background: linear-gradient(135deg, #ffc107 0%, #ff9f43 100%);
+                }
+                .bg-gradient-danger {
+                    background: linear-gradient(135deg, #dc3545 0%, #ea5455 100%);
+                }
+                .bg-gradient-dark {
+                    background: linear-gradient(135deg, #343a40 0%, #5e5873 100%);
+                }
+                
+                .card {
+                    transition: all 0.3s ease;
+                    border: none;
+                }
+                
+                .card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1) !important;
+                }
+                
+                .table thead th {
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    font-size: 0.75rem;
+                    letter-spacing: 0.5px;
+                    color: #6c757d;
+                    border-bottom: 2px solid #dee2e6;
+                }
+                
+                .table tbody tr {
+                    transition: all 0.2s ease;
+                }
+                
+                .table tbody tr:hover {
+                    background-color: rgba(0, 123, 255, 0.05);
+                }
+                
+                .avatar-sm {
+                    width: 32px;
+                    height: 32px;
+                    font-size: 0.9rem;
+                }
+                
+                .badge {
+                    padding: 0.35rem 0.65rem;
+                    font-weight: 500;
+                    font-size: 0.75rem;
+                }
+                
+                .card-header {
+                    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                    padding: 1rem 1.25rem;
+                }
+                
+                .progress {
+                    background-color: #e9ecef;
+                    border-radius: 10px;
+                }
+                
+                .progress-bar {
+                    border-radius: 10px;
+                    transition: width 0.6s ease;
+                }
+                
+                @media (max-width: 768px) {
+                    .table {
+                        font-size: 0.875rem;
+                    }
+                    
+                    .display-6 {
+                        font-size: 1.5rem;
+                    }
+                }
+
+                /* MultiSelectCheckbox Styles */
+                .multi-select-container-new {
+                    position: relative;
+                }
+
+                .multi-select-dropdown-new {
+                    position: relative;
+                }
+
+                .multi-select-trigger {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    width: 100%;
+                    padding: 0.5rem 1rem;
+                    background: white;
+                    border: 1px solid #dee2e6;
+                    border-radius: 0.375rem;
+                    transition: all 0.2s ease;
+                }
+
+                .multi-select-trigger:hover {
+                    border-color: #0d6efd;
+                    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.1);
+                }
+
+                .multi-select-trigger.open {
+                    border-color: #0d6efd;
+                    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+                }
+
+                .select-display-text {
+                    flex: 1;
+                    text-align: left;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .dropdown-arrow {
+                    margin-left: 0.5rem;
+                    transition: transform 0.2s ease;
+                    font-size: 0.75rem;
+                }
+
+                .multi-select-options-new {
+                    position: absolute;
+                    top: calc(100% + 4px);
+                    left: 0;
+                    right: 0;
+                    background: white;
+                    border: 1px solid #dee2e6;
+                    border-radius: 0.375rem;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    z-index: 1050;
+                    max-height: 300px;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .options-search {
+                    padding: 0.75rem;
+                    border-bottom: 1px solid #e9ecef;
+                }
+
+                .options-list-new {
+                    overflow-y: auto;
+                    max-height: 200px;
+                }
+
+                .option-item-new {
+                    display: flex;
+                    align-items: center;
+                    padding: 0.625rem 1rem;
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+                    margin: 0;
+                }
+
+                .option-item-new:hover {
+                    background-color: #f8f9fa;
+                }
+
+                .option-label-new {
+                    flex: 1;
+                    font-size: 0.875rem;
+                }
+
+                .options-footer {
+                    padding: 0.5rem 1rem;
+                    border-top: 1px solid #e9ecef;
+                    background-color: #f8f9fa;
+                }
+
+                .no-options {
+                    padding: 1rem;
+                    text-align: center;
+                    color: #6c757d;
+                    font-size: 0.875rem;
+                }
+            `}</style>
         </div>
     );
 }

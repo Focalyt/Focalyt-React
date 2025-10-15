@@ -189,7 +189,7 @@ router
 		try {
 			const { files } = req;
 			let body = req.body;
-			console.log(body, 'body')
+			// console.log(body, 'body')
 
 			const courseName = body.name || 'unnamed';
 			const bucketName = process.env.AWS_BUCKET_NAME;
@@ -334,7 +334,7 @@ router
 router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
 	const { courseId, docId } = req.params;
 
-	console.log("courseId", courseId, "docId", docId)
+	// console.log("courseId", courseId, "docId", docId)
 
 	try {
 		const course = await Courses.findOneAndUpdate(
@@ -408,7 +408,7 @@ router
 			if (!existingCourse) {
 				return res.status(404).json({ status: false, message: "Course not found" });
 			}
-			console.log(body, 'body 1');
+			// console.log(body, 'body 1');
 
 
 			if (Object.keys(body).length === 1 && body.status !== undefined) {
@@ -518,7 +518,7 @@ router.put('/remove_course_media/:courseId', async (req, res) => {
 		const { courseId } = req.params;
 		const { fileType, fileUrl } = req.body;
 		const course = await Courses.findById(courseId);
-		console.log(course, 'course');
+		// console.log(course, 'course');
 		if (!course) {
 			console.log('course not found');
 			return res.status(404).json({ status: false, message: "Course not found" });
@@ -797,7 +797,7 @@ router.route('/get-branches')
 			const { courseId } = req.query;
 			const branches = await Courses.findById(courseId).populate('center').select('center');
 
-			console.log("branches", branches)
+			// console.log("branches", branches)
 
 			res.status(200).json({ status: true, data: branches.center });
 		} catch (err) {
@@ -808,12 +808,12 @@ router.route('/get-branches')
 
 
 router.put('/update-branch/:profileId', async (req, res) => {
-	console.log("api hitting....")
+	// console.log("api hitting....")
 	try {
 		const { profileId } = req.params;
 		const { centerId } = req.body;
-		console.log("profileId", profileId)
-		console.log(req.body, 'req.body')
+		// console.log("profileId", profileId)
+		// console.log(req.body, 'req.body')
 		// Find the course
 		const appliedCourse = await AppliedCourses.findById(profileId);
 		if (!appliedCourse) {
@@ -822,7 +822,7 @@ router.put('/update-branch/:profileId', async (req, res) => {
 		appliedCourse._center = centerId;
 		const updatedAppliedCourse = await appliedCourse.save();
 
-		console.log("updatedAppliedCourse", updatedAppliedCourse)
+		// console.log("updatedAppliedCourse", updatedAppliedCourse)
 
 		res.json({ success: true, data: updatedAppliedCourse });
 	} catch (error) {
@@ -919,7 +919,7 @@ router.get('/course_centers', async (req, res) => {
 			});
 		}
 
-		console.log("course.center", course.center);
+		// console.log("course.center", course.center);
 		res.status(200).json({
 			status: true,
 			data: course.center || []
@@ -931,11 +931,11 @@ router.get('/course_centers', async (req, res) => {
 
 router.post('/candidate-visit-calendar', async (req, res) => {
 	try {
-		console.log('req.body123')
+		// console.log('req.body123')
 		const { visitDate, visitType, appliedCourseId } = req.body;
 
-		console.log('req.body123', req.body)
-		console.log('visitType received:', visitType);
+		// console.log('req.body123', req.body)
+		// console.log('visitType received:', visitType);
 
 		if (!visitDate || !visitType || !appliedCourseId) {
 			return res.status(400).json({ error: 'Missing required fields' });

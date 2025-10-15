@@ -12,7 +12,7 @@ const courseSchema = new Schema({
   description: { type: String }, // ✅ Added to support short course summary
   duration: String,
   students: { type: Number, default: 0 }, // ✅ Added to track enrollment count
-
+  trainers: [ { type: ObjectId, ref: 'User' } ],
   status: { type: Boolean, default:true}, // ✅ Added to reflect course status
   sequence: {
     type: Number,

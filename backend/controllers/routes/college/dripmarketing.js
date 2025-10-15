@@ -430,7 +430,7 @@ router.put('/update-dripmarketing-rule/:id', [isCollege], async (req, res) => {
 try{
 	let {name, startDate, startTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState} = req.body;
 
-	console.log("req.body",req.body)
+	// console.log("req.body",req.body)
 	const collegeId = req.user.college._id;
 	const user = req.user;
 

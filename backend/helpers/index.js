@@ -199,12 +199,13 @@ module.exports.isTrainer = async (req, res, next) => {
 
     user = await User.findById(decoded.id);
     if (!user || user.role !== 4) throw error;
-
-    const college = await College.findOne({ '_concernPerson._id': user._id })
+    const college = await College.findOne({ trainers: user._id })
     req.user = user
     req.college = college
     user.college = college
+console.log('user' , user)
 
+console.log('college' , college)
     return next();
   } catch (err) {
     const userAgent = req.get('User-Agent');

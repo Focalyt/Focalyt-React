@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Schema, Types } = mongoose;
+const { Schema, Types, ObjectId } = mongoose;
 
 const BatchSchema = new Schema({
   name: { type: String, required: true },
@@ -10,6 +10,7 @@ const BatchSchema = new Schema({
   zeroPeriodStartDate: { type: Date, required: true },
   zeroPeriodEndDate: { type: Date, required: true },
   maxStudents: { type: Number, default: 0 },
+  trainers: [ { type: ObjectId, ref: 'User' } ],
   status: { type: String, enum: ['active', 'completed', 'inactive'], default: 'active' },
   courseId: { type: Types.ObjectId, ref: 'Course', required: true },
   centerId: { type: Types.ObjectId, ref: 'Center', required: true },

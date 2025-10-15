@@ -127,7 +127,10 @@ import AllStudent from './Pages/App/Trainer/StudentManagement/AllStudents';
 import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgress';
 import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
-
+import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
+import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
+import Students from './Pages/App/Trainer/Students/Students';
+import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -300,7 +303,10 @@ const Layout = () => {
         <Route path='studymaterial' element={<StudyMaterial/>}/>
         <Route path='allstudents' element={<AllStudent/>}/>
         <Route path='studentprogress' element={<StudentProgress/>}/>
-
+        <Route path='batchmanagement' element={<BatchMangement/>}/>
+        <Route path='timetable' element={<TimeTable/>}/>
+        <Route path='students' element={<Students/>}/>
+        <Route path='dailydiary' element={<DailyDiary/>}/>
         </Route>
 
 

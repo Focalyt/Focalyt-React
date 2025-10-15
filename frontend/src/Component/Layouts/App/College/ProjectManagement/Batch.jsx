@@ -305,6 +305,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
   const [selectedTrainers, setSelectedTrainers] = useState([]);
   const [isTrainerDropdownOpen, setIsTrainerDropdownOpen] = useState(false);
+  const [selectedBatchForTrainer, setSelectedBatchForTrainer] = useState(null);
   // Show alert
   const showAlert = (message, type) => {
     setAlert({ show: true, message, type });
@@ -346,6 +347,72 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         error?.response?.data?.message || 'Failed to fetch trainers',
         'error'
       );
+    }
+  };
+
+
+  // This was causing the modal to not open properly
+  // useEffect(()=>{
+  //   handleAssignTrainers()
+  // },[selectedBatchForTrainer])
+
+  const handleAssignTrainers = async () => {
+    if (!selectedBatchForTrainer) {
+      showAlert('Please select a batch first', 'error');
+      return;
+    }
+
+    if (selectedTrainers.length === 0) {
+      showAlert('Please select at least one trainer', 'warning');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // console.log('Assigning trainers:', selectedTrainers);
+      const response = await axios.post(`${backendUrl}/college/assigntrainerstobatch`, {
+        batchId: selectedBatchForTrainer._id,
+        trainers: selectedTrainers
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.status) {
+        showAlert('Trainers assigned successfully!', 'success');
+        setIsTrainerDropdownOpen(false);
+        setSelectedTrainers([]);
+        setSelectedBatchForTrainer(null);
+        
+        // Refresh batches list
+        const batchesResponse = await axios.get(`${backendUrl}/college/get_batches`, {
+          params: {
+            courseId: selectedCourse?._id,
+            centerId: selectedCenter?._id
+          },
+          headers: {
+            'x-auth': token
+          }
+        });
+        
+        if (batchesResponse.data.success) {
+          setBatches(batchesResponse.data.data);
+        }
+      } else {
+        showAlert(response.data.message || 'Failed to assign trainers', 'error');
+      }
+
+    } catch (error) {
+      console.error('Error in handleAssignTrainers:', error);
+      showAlert(
+        error?.response?.data?.message || 'Failed to assign trainers',
+        'error'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1231,7 +1298,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       });
 
       if (!response.ok) throw new Error('Failed to add project');
-      alert('Batch added successfully')
+      window.alert('Batch added successfully')
       resetForm()
       setShowAddForm(false);
     }
@@ -1634,8 +1701,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
     return (
       <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
+        <div className="modal-dialog modal-dialog-centered justify-content-center mx-auto">
+          <div className="modal-content p-0">
             <div className="modal-header bg-danger text-white">
               <h5 className="modal-title">Confirm Delete</h5>
               <button type="button" className="btn-close btn-close-white" onClick={() => setShowDeleteModal(false)}></button>
@@ -1864,6 +1931,12 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                 <i className="bi bi-person-fill me-1"></i>
                                 <strong>Instructor:</strong> {batch.instructor}
                               </p>
+                              {batch.trainers && batch.trainers.length > 0 && (
+                                <p className="text-muted small mb-1">
+                                  <i className="bi bi-people me-1"></i>
+                                  <strong>Trainers:</strong> {batch.trainers.map(t => t.name).join(', ')}
+                                </p>
+                              )}
                             </div>
                             <div className="d-flex flex-wrap gap-2 mb-2">
                               <span className={` ${batch.status === 'active' ? 'text-success' : 'text-secondary'}`}>
@@ -1872,6 +1945,12 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                               <span className={`${getModeColor(batch.mode)}`}>
                                 {batch.mode}
                               </span>
+                              {batch.trainers && batch.trainers.length > 0 && (
+                                <span className="badge bg-info text-dark">
+                                  <i className="bi bi-people-fill me-1"></i>
+                                  {batch.trainers.length} Trainer{batch.trainers.length > 1 ? 's' : ''}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="text-end d-flex">
@@ -1880,6 +1959,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                               title="Select Trainers"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setSelectedBatchForTrainer(batch);
+                                // Pre-select already assigned trainers
+                                const assignedTrainerIds = batch.trainers?.map(t => t._id) || [];
+                                setSelectedTrainers(assignedTrainerIds);
                                 setIsTrainerDropdownOpen(true);
                               }}
                             >
@@ -3640,20 +3723,45 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg  justify-content-center" style={{ margin: 'auto' }}>
                 <div className="modal-content p-0">
                   <div className="modal-header">
-                    <h1 className="modal-title fs-5">
-                      <i className="fas fa-users me-2"></i>
-                      Select Trainers
-                    </h1>
+                    <div>
+                      <h1 className="modal-title fs-5">
+                        <i className="fas fa-users me-2"></i>
+                        Select Trainers
+                      </h1>
+                      {selectedBatchForTrainer && (
+                        <small className="text-muted">
+                          Batch: <strong>{selectedBatchForTrainer.name}</strong> ({selectedBatchForTrainer.code})
+                        </small>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className="btn-close"
                       onClick={() => {
                         setIsTrainerDropdownOpen(false);
                         setSelectedTrainers([]);
+                        setSelectedBatchForTrainer(null);
                       }}
                     ></button>
                   </div>
-                  <div className="modal-body">
+                  <div className="modal-body" style={{minHeight: '200px'}}>
+                    {/* Currently assigned trainers info */}
+                    {selectedBatchForTrainer?.trainers && selectedBatchForTrainer.trainers.length > 0 && (
+                      <div className="alert alert-info mb-3">
+                        <h6 className="mb-2">
+                          <i className="fas fa-info-circle me-2"></i>
+                          Currently Assigned Trainers:
+                        </h6>
+                        <div className="d-flex flex-wrap gap-2">
+                          {selectedBatchForTrainer.trainers.map(trainer => (
+                            <span key={trainer._id} className="badge bg-primary fs-6 px-2 py-1">
+                              {trainer.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <MultiSelectCheckbox
                       title="Available Trainers"
                       options={trainers.map(trainer => ({
@@ -3695,6 +3803,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       onClick={() => {
                         setIsTrainerDropdownOpen(false);
                         setSelectedTrainers([]);
+                        setSelectedBatchForTrainer(null);
                       }}
                     >
                       <i className="fas fa-times me-2"></i>
@@ -3703,10 +3812,20 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     <button
                       type="button"
                       className="btn btn-primary"
-                      disabled={selectedTrainers.length === 0}
+                      disabled={selectedTrainers.length === 0 || loading}
+                      onClick={handleAssignTrainers}
                     >
-                      <i className="fas fa-check me-2"></i>
-                      Assign Trainer ({selectedTrainers.length})
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Assigning...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-check me-2"></i>
+                          Assign Trainer ({selectedTrainers.length})
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

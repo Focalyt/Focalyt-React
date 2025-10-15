@@ -660,7 +660,7 @@ console.log( "response callback" , response )
           onClick={() => setVideoSrc("")}
         >
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
+            <div className="modal-content modal-width">
               <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
               </button>
@@ -801,7 +801,7 @@ img.group1 {
 }
 video#courseVid {
     width: 100%;
-    height: auto;
+    height: 100%;
     border-radius: 6px;
 }
 .smallText{
@@ -1189,7 +1189,9 @@ button.close span {
 
     `
     
-element.style {
+.modal-width{
+width:25rem;
+height:15rem;
 }
 .shadow {
     box-shadow: 0 .5rem 1rem #00000026 !important;

@@ -97,6 +97,9 @@ module.exports.WhatsAppTemplate = require("./wATemplate");
 module.exports.WhatsAppMessage = require("./whatsappMessage");
 
 
+module.exports.TrainerTimeTable = require("./trainerTimeTable");
+module.exports.Curriculum = require("./curriculum");
+module.exports.DailyDiary = require("./dailyDiary");
 //b2b models
 module.exports.TypeOfB2B = require("./b2b/typeOfB2B");
 module.exports.LeadCategory = require("./b2b/leadCategory");

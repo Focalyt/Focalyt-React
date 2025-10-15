@@ -1,87 +1,65 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom'
+import React, { useState , useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import axios from 'axios'
 function MyCourses() {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+    const [trainersData, setTrainersData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = JSON.parse(sessionStorage.getItem('token'))
 
 
-    const courses = [
-        {
-            id: 1,
-            title: "Artificial Intelligence & Machine Learning",
-            description: "Complete AI/ML course with hands-on projects",
-            image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=500",
-            students: 45,
-            lessons: 28,
-            duration: "3 Months",
-            status: "Active",
-            progress: 75,
-            category: "AI"
-        },
-        {
-            id: 2,
-            title: "Robotics Fundamentals",
-            description: "Learn robotics from basics to advanced concepts",
-            image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500",
-            students: 32,
-            lessons: 20,
-            duration: "2 Months",
-            status: "Active",
-            progress: 60,
-            category: "Robotics"
-        },
-        {
-            id: 3,
-            title: "Python Programming Masterclass",
-            description: "Master Python programming with real-world projects",
-            image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=500",
-            students: 58,
-            lessons: 35,
-            duration: "4 Months",
-            status: "Active",
-            progress: 90,
-            category: "Programming"
-        },
-        {
-            id: 4,
-            title: "Web Development Bootcamp",
-            description: "Full-stack web development with MERN stack",
-            image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500",
-            students: 42,
-            lessons: 30,
-            duration: "3 Months",
-            status: "Draft",
-            progress: 30,
-            category: "Web Dev"
-        },
-        {
-            id: 5,
-            title: "IoT & Smart Devices",
-            description: "Internet of Things and smart device programming",
-            image: "https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?w=500",
-            students: 28,
-            lessons: 22,
-            duration: "2 Months",
-            status: "Active",
-            progress: 50,
-            category: "IoT"
-        },
-        {
-            id: 6,
-            title: "Data Science with R",
-            description: "Complete data science course using R programming",
-            image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500",
-            students: 35,
-            lessons: 25,
-            duration: "3 Months",
-            status: "Inactive",
-            progress: 0,
-            category: "Data Science"
+    useEffect(()=>{
+        console.log("fetching courses")
+        fetchassignedtrainers()
+    },[])
+    const fetchassignedtrainers = async () =>{
+        setLoading(true);
+        try{
+            const res = await axios.get(`${backendUrl}/college/gettrainersbycourse`, {
+                headers: {
+                    'x-auth': token
+                }
+            }) 
+            console.log('res' , res)
+            if(res.data && res.data.status && res.data.data){
+                setTrainersData(res.data.data);
+            }
         }
-    ];
+        catch(err){
+            console.log(err)
+        }
+        finally{
+            setLoading(false);
+        }
+    }
+
+    const getCoursesFromTrainers = () => {
+        const allCourses = [];
+        trainersData.forEach(trainer => {
+            if(trainer.assignedCourses && trainer.assignedCourses.length > 0){
+                trainer.assignedCourses.forEach(course => {
+                    allCourses.push({
+                        id: course._id,
+                        title: course.name,
+                        image: course.image || "/Assets/images/logo/logo.png",
+                        trainerName: trainer.name,
+                        trainerId: trainer._id
+                    });
+                });
+            }
+        });
+        return allCourses;
+    };
+
+    const courses = getCoursesFromTrainers();
 
     const getStatusBadge = (status) => {
         const badges = {
-
+            'Active': 'success',
+            'Inactive': 'secondary',
+            'Draft': 'warning'
         };
         return badges[status] || 'primary';
     };
@@ -119,7 +97,15 @@ function MyCourses() {
                             <div className="card-body">
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h3 className="fw-bolder mb-1">{courses.length}</h3>
+                                        <h3 className="fw-bolder mb-1">
+                                            {loading ? (
+                                                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span className="sr-only">Loading...</span>
+                                                </div>
+                                            ) : (
+                                                courses.length
+                                            )}
+                                        </h3>
                                         <p className="card-text mb-0">Total Courses</p>
                                     </div>
                                     <div className="avatar bg-light-primary p-2">
@@ -137,9 +123,15 @@ function MyCourses() {
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h3 className="fw-bolder mb-1">
-                                            {courses.filter(c => c.status === 'Active').length}
+                                            {loading ? (
+                                                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span className="sr-only">Loading...</span>
+                                                </div>
+                                            ) : (
+                                                courses.length
+                                            )}
                                         </h3>
-                                        <p className="card-text mb-0">Active Courses</p>
+                                        <p className="card-text mb-0">Assigned Courses</p>
                                     </div>
                                     <div className="avatar bg-light-success p-2">
                                         <div className="avatar-content">
@@ -150,7 +142,56 @@ function MyCourses() {
                             </div>
                         </div>
                     </div>
-
+                    <div className="col-xl-3 col-md-6 col-12">
+                        <div className="card stats-card">
+                            <div className="card-body">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 className="fw-bolder mb-1">
+                                            {loading ? (
+                                                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span className="sr-only">Loading...</span>
+                                                </div>
+                                            ) : (
+                                                trainersData.length
+                                            )}
+                                        </h3>
+                                        <p className="card-text mb-0">Total Trainers</p>
+                                    </div>
+                                    <div className="avatar bg-light-info p-2">
+                                        <div className="avatar-content">
+                                            <i className="feather icon-users font-medium-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="col-xl-3 col-md-6 col-12">
+                        <div className="card stats-card">
+                            <div className="card-body">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 className="fw-bolder mb-1">
+                                            {loading ? (
+                                                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                    <span className="sr-only">Loading...</span>
+                                                </div>
+                                            ) : (
+                                                new Set(courses.map(c => c.trainerId)).size
+                                            )}
+                                        </h3>
+                                        <p className="card-text mb-0">Unique Trainers</p>
+                                    </div>
+                                    <div className="avatar bg-light-warning p-2">
+                                        <div className="avatar-content">
+                                            <i className="feather icon-user-check font-medium-5"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Filter & View Toggle */}
@@ -176,10 +217,25 @@ function MyCourses() {
                     </div>
                 </div>
 
+                {/* Loading State */}
+                {loading && (
+                    <div className="text-center py-5">
+                        <div className="spinner-border text-primary" role="status">
+                            <span className="sr-only">Loading...</span>
+                        </div>
+                        <p className="mt-2">Loading courses...</p>
+                    </div>
+                )}
+
                 {/* Grid View */}
-                {viewMode === 'grid' && (
+                {!loading && viewMode === 'grid' && (
                     <div className="row">
-                        {courses.map((course) => (
+                        {courses.length === 0 ? (
+                            <div className="col-12 text-center py-5">
+                                <p className="text-muted">No courses found</p>
+                            </div>
+                        ) : (
+                            courses.map((course) => (
                             <div className="col-xl-4 col-md-6 col-12 mb-4" key={course.id}>
                                 <div className="card course-card">
                                     <div className="card-img-top-wrapper">
@@ -192,8 +248,7 @@ function MyCourses() {
                                         <div className="courseCategory">
                                             <p className='courseType'>FFTl</p>
                                             <div className='coursedes'>
-                                                <p className="course-fee">Rs: 100</p>
-                                                <p className="course-duration">3 Months</p>
+                                                <p className="course-trainer">Trainer: {course.trainerName}</p>
                                             </div>
 
                                         </div>
@@ -207,20 +262,21 @@ function MyCourses() {
                                         </p>
 
                                         <div className="d-flex justify-content-between">
-                                            <Link to="" className="btn btn-sm btn-outline-primary">
+                                            <Link to={`/trainer/batchmanagement?courseId=${course.id}`} className="btn btn-sm btn-outline-primary">
                                                 <i className="feather icon-eye mr-1"></i>
-                                                View
+                                                View 
                                             </Link>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 )}
 
                 {/* List View */}
-                {viewMode === 'list' && (
+                {!loading && viewMode === 'list' && (
                     <div className="row">
                         <div className="col-12">
                             <div className="card">
@@ -230,16 +286,20 @@ function MyCourses() {
                                             <thead>
                                                 <tr>
                                                     <th>Course</th>
-                                                    <th>Students</th>
-                                                    <th>Lessons</th>
-                                                    <th>Duration</th>
-                                                    <th>Progress</th>
-                                                    <th>Status</th>
+                                                    <th>Trainer</th>
+                                                    <th>Course ID</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {courses.map((course) => (
+                                                {courses.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="4" className="text-center py-4">
+                                                            <p className="text-muted mb-0">No courses found</p>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    courses.map((course) => (
                                                     <tr key={course.id}>
                                                         <td>
                                                             <div className="d-flex align-items-center">
@@ -251,45 +311,27 @@ function MyCourses() {
                                                                 />
                                                                 <div>
                                                                     <h6 className="mb-0">{course.title}</h6>
-                                                                    <small className="text-muted">{course.category}</small>
+                                                                    <small className="text-muted">{course.description}</small>
                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td className="align-middle">
-                                                            <i className="feather icon-users text-primary mr-1"></i>
-                                                            {course.students}
+                                                            <i className="feather icon-user text-primary mr-1"></i>
+                                                            {course.trainerName}
                                                         </td>
                                                         <td className="align-middle">
-                                                            <i className="feather icon-file-text text-info mr-1"></i>
-                                                            {course.lessons}
-                                                        </td>
-                                                        <td className="align-middle">{course.duration}</td>
-                                                        <td className="align-middle">
-                                                            <div className="d-flex align-items-center">
-                                                                <div className="progress flex-grow-1 mr-2" style={{ height: '8px' }}>
-                                                                    <div
-                                                                        className="progress-bar bg-primary"
-                                                                        style={{ width: `${course.progress}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                                <small className="font-weight-bold">{course.progress}%</small>
-                                                            </div>
-                                                        </td>
-                                                        <td className="align-middle">
-                                                            <span className={`badge badge-${getStatusBadge(course.status)}`}>
-
-                                                            </span>
+                                                            <code>{course.id}</code>
                                                         </td>
                                                         <td className="align-middle">
                                                             <div className="btn-group btn-group-sm">
-                                                                <button className="btn btn-outline-primary">
-                                                                    <i className="feather icon-eye"></i>
-                                                                </button>
-
+                                                                <Link to={`/trainer/batchmanagement?courseId=${course.id}`} className="btn btn-outline-primary">
+                                                                    <i className="feather icon-eye"></i> View Batches
+                                                                </Link>
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                    ))
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -438,14 +480,14 @@ function MyCourses() {
                     align-items: center;
                 }
 
-                .courseCategory .course-fee {
+                .courseCategory .course-trainer {
                     font-size: 14px;
                     font-weight: 700;
                     color: #fc2b5a;
                     margin: 0;
                 }
 
-                .courseCategory .course-duration {
+                .courseCategory .course-id {
                     font-size: 11px;
                     opacity: 0.9;
                     margin: 0;

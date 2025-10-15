@@ -2415,7 +2415,7 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 
 router.get('/preVerifieedCount', [isCollege], async (req, res) => {
 	try {
-		console.log('verified api..')
+		// console.log('verified api..')
 		let { startDate, endDate } = req.query;
 
 
@@ -2468,7 +2468,7 @@ router.get('/preVerifieedCount', [isCollege], async (req, res) => {
 
 		})
 
-		console.log("unVerified", unVerified)
+		// console.log("unVerified", unVerified)
 
 		  return res.json({
 			success: true,
@@ -2889,7 +2889,7 @@ router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 		candidateVisitCalender.remarks = remarks;
 		await candidateVisitCalender.save();
 
-		console.log("candidateVisitCalender", candidateVisitCalender)
+		// console.log("candidateVisitCalender", candidateVisitCalender)
 
 		return res.status(200).json({
 			status: true,
@@ -2907,7 +2907,7 @@ router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 
 router.get('/misreport/:batchId', [isCollege], async (req, res) => {
 	try {
-		console.log("misreport api hitting..");
+		// console.log("misreport api hitting..");
 
 		const { batchId } = req.params;
 
@@ -2984,7 +2984,7 @@ router.get('/misreport/:batchId', [isCollege], async (req, res) => {
 			}
 		]);
 
-		console.log("appliedCourses:", appliedCourses);
+		// console.log("appliedCourses:", appliedCourses);
 		res.status(200).json({
 			status: true,
 			message: 'MIS report fetched successfully',
@@ -3006,7 +3006,7 @@ router.get('/reEnquireData', async(req , res)=>{
     try{
 
         const reEnquireData = await ReEnquire.find();
-        console.log("reEnquireData...", reEnquireData);
+        // console.log("reEnquireData...", reEnquireData);
         res.status(200).json({
             status: true,
             msg: "ReEnquire data retrieved successfully",

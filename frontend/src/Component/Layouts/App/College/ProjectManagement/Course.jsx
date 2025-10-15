@@ -154,6 +154,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [assigningTrainers, setAssigningTrainers] = useState(false);
   const [trainers, setTrainers] = useState([]);
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
@@ -198,8 +199,55 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         error?.response?.data?.message || 'Failed to fetch trainers',
         'error'
       );
+    } finally {
+      setLoading(false);
     }
   };
+
+
+  const handleAssignTrainer = async () =>{
+    try{
+      if (!selectedCourse || !selectedCourse._id) {
+        showAlert('Please select a course first', 'error');
+        return;
+      }
+
+      if (selectedTrainers.length === 0) {
+        showAlert('Please select at least one trainer', 'warning');
+        return;
+      }
+      setLoading(true);
+      const response = await axios.post(`${backendUrl}/college/assigntrainerstocourse`, {
+        courseId: selectedCourse._id,
+        trainers: selectedTrainers
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+      if(response.data.status){
+        showAlert(response.data.message, 'success');
+        setIsTrainerDropdownOpen(false);
+        setSelectedTrainers([]);
+        setSelectedCourse(null);
+        
+        // Refresh courses list
+        await fetchCourses();
+      }
+      else{
+        showAlert(response.data.message, 'error');
+      }
+    }
+    catch(err){
+      console.error('Error in handleAssignTrainer:', err);
+      showAlert(err?.response?.data?.message || 'Failed to assign trainers', 'error');
+    }
+    finally {
+      setLoading(false);
+    }
+  }
+
 
   // ======== NEW STATES FOR BATCH INTEGRATION ========
   // Add these new states for batch navigation
@@ -571,6 +619,17 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   }
   return (
     <div className="container py-4">
+      {/* Alert Display */}
+      {alert.show && (
+        <div className={`alert alert-${alert.type === 'error' ? 'danger' : alert.type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`} 
+             role="alert" 
+             style={{ zIndex: 9999, minWidth: '300px' }}>
+          <i className={`fas fa-${alert.type === 'success' ? 'check-circle' : alert.type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2`}></i>
+          {alert.message}
+          <button type="button" className="btn-close" onClick={() => setAlert({ show: false, message: '', type: '' })}></button>
+        </div>
+      )}
+
       {/* ======== ADD THIS: Back Button and Header ======== */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div className='d-md-block d-none'>
@@ -662,6 +721,14 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                           <p className="text-muted mb-1">{course.name}</p>
                         </div>
                       </div>
+                      <div className="mb-2">
+                        {course.trainers && course.trainers.length > 0 && (
+                          <p className="text-muted small mb-1">
+                            <i className="bi bi-people me-1"></i>
+                            <strong>Trainers:</strong> {course.trainers.map(t => t.name).join(', ')}
+                          </p>
+                        )}
+                      </div>
                       <div className="d-flex flex-wrap gap-2 mb-2">
                         <span className={`${course.status === 'active' ? 'text-success' : 'text-secondary'}`}>
                           {course.status}
@@ -669,6 +736,13 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
                         <span className="bg-primary">{course.sectors && course.sectors.length > 0 ? course.sectors[0].name : 'N/A'}
                         </span>
+                        
+                        {course.trainers && course.trainers.length > 0 && (
+                          <span className="badge bg-info text-dark">
+                            <i className="bi bi-people-fill me-1"></i>
+                            {course.trainers.length} Trainer{course.trainers.length > 1 ? 's' : ''}
+                          </span>
+                        )}
 
                       </div>
 
@@ -680,6 +754,10 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                         title="Select Trainers" 
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedCourse(course);
+                          // Pre-select already assigned trainers
+                          const assignedTrainerIds = course.trainers?.map(t => t._id) || [];
+                          setSelectedTrainers(assignedTrainerIds);
                           setIsTrainerDropdownOpen(true);
                         }}
                       >
@@ -720,7 +798,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
               <div className="modal-header">
                 <h1 className="modal-title fs-5">
                   <i className="fas fa-users me-2"></i>
-                  Select Trainers
+                  Select Trainers {selectedCourse && `for ${selectedCourse.name}`}
                 </h1>
                 <button 
                   type="button" 
@@ -728,10 +806,28 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                   onClick={() => {
                     setIsTrainerDropdownOpen(false);
                     setSelectedTrainers([]);
+                    setSelectedCourse(null);
                   }}
                 ></button>
               </div>
-              <div className="modal-body">
+              <div className="modal-body" style={{minHeight: '200px'}}>
+                {/* Currently assigned trainers info */}
+                {selectedCourse?.trainers && selectedCourse.trainers.length > 0 && (
+                  <div className="alert alert-info mb-3">
+                    <h6 className="mb-2">
+                      <i className="fas fa-info-circle me-2"></i>
+                      Currently Assigned Trainers:
+                    </h6>
+                    <div className="d-flex flex-wrap gap-2">
+                      {selectedCourse.trainers.map(trainer => (
+                        <span key={trainer._id} className="badge bg-primary fs-6 px-2 py-1">
+                          {trainer.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <MultiSelectCheckbox
                   title="Available Trainers"
                   options={trainers.map(trainer => ({
@@ -773,6 +869,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                   onClick={() => {
                     setIsTrainerDropdownOpen(false);
                     setSelectedTrainers([]);
+                    setSelectedCourse(null);
                   }}
                 >
                   <i className="fas fa-times me-2"></i>
@@ -781,10 +878,20 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                 <button 
                   type="button" 
                   className="btn btn-primary" 
-                  disabled={selectedTrainers.length === 0}
+                  disabled={selectedTrainers.length === 0 || assigningTrainers}
+                  onClick={handleAssignTrainer}
                 >
-                  <i className="fas fa-check me-2"></i>
-                  Assign Trainer ({selectedTrainers.length})
+                  {assigningTrainers ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-check me-2"></i>
+                      Assign Trainer ({selectedTrainers.length})
+                    </>
+                  )}
                 </button>
               </div>
             </div>
