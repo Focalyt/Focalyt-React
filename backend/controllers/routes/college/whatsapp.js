@@ -1907,7 +1907,7 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
  * POST /api/whatsapp/send
  * Send WhatsApp message with template
  */
-router.post('/send-template', async (req, res) => {
+router.post('/send-template',isCollege, async (req, res) => {
   try {
     const { templateName, to, collegeId } = req.body;
 
@@ -2244,6 +2244,11 @@ router.post('/webhook', async (req, res) => {
 						await handleIncomingMessages(value.messages, value.metadata);
 					}
 
+					// Handle template status updates (approval/rejection)
+					if (value.message_template_status_update) {
+						await handleTemplateStatusUpdate(value.message_template_status_update);
+					}
+
 					// Handle errors
 					if (value.errors) {
 						console.error('WhatsApp Error:', value.errors);
@@ -2357,6 +2362,78 @@ async function handleIncomingMessages(messages, metadata) {
 		}
 	} catch (error) {
 		console.error('Error handling incoming messages:', error);
+	}
+}
+
+/**
+ * Handle template status updates (approval/rejection)
+ */
+async function handleTemplateStatusUpdate(templateStatusUpdates) {
+	try {
+		for (const templateUpdate of templateStatusUpdates) {
+			const templateId = templateUpdate.id;
+			const templateName = templateUpdate.name;
+			const status = templateUpdate.status; // APPROVED, REJECTED, PENDING
+			const rejectionReason = templateUpdate.rejected_reason;
+			const timestamp = templateUpdate.timestamp;
+
+			console.log(`📋 Template Status Update: ${templateName} (${templateId}) - ${status}`);
+
+			// Find template in database by templateId or templateName
+			const updateData = {
+				status: status,
+				updatedAt: new Date(parseInt(timestamp) * 1000)
+			};
+
+			// Add rejection reason if template was rejected
+			if (status === 'REJECTED' && rejectionReason) {
+				updateData.rejectionReason = rejectionReason;
+				console.log(`❌ Template rejected: ${rejectionReason}`);
+			}
+
+			// Update template in database
+			const updatedTemplate = await WhatsAppTemplate.findOneAndUpdate(
+				{ 
+					$or: [
+						{ templateId: templateId },
+						{ templateName: templateName }
+					]
+				},
+				updateData,
+				{ new: true }
+			);
+
+			if (updatedTemplate) {
+				console.log(`✅ Template status updated in database: ${templateName} - ${status}`);
+
+				// Send WebSocket notification to frontend
+				if (global.wsServer) {
+					try {
+						global.wsServer.sendWhatsAppNotification(updatedTemplate.collegeId, {
+							type: 'template_status_update',
+							templateId: templateId,
+							templateName: templateName,
+							status: status,
+							rejectionReason: rejectionReason,
+							timestamp: new Date(parseInt(timestamp) * 1000),
+							message: status === 'APPROVED' 
+								? `Template "${templateName}" has been approved and is ready to use!`
+								: status === 'REJECTED'
+								? `Template "${templateName}" was rejected: ${rejectionReason}`
+								: `Template "${templateName}" status updated to ${status}`
+						});
+						console.log('🔔 Template status WebSocket notification sent to college:', updatedTemplate.collegeId);
+					} catch (wsError) {
+						console.error('Template status WebSocket notification failed:', wsError.message);
+					}
+				}
+			} else {
+				console.warn(`⚠️ Template not found in database: ${templateName} (${templateId})`);
+			}
+		}
+	} catch (error) {
+		console.error('Error handling template status updates:', error);
+		throw error;
 	}
 }
 

@@ -87,11 +87,23 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=focalyt_webhook_token_2024
 - `read` - Message read by recipient
 - `failed` - Message failed to deliver
 
+**Template Status Values:**
+- `APPROVED` - Template approved and ready to use
+- `REJECTED` - Template rejected with reason
+- `PENDING` - Template under review
+
 **What Happens:**
 1. ✅ Webhook receives status update
 2. ✅ Database updated (`whatsappMessageId` matched)
 3. ✅ WebSocket notification sent to college
 4. ✅ Frontend auto-updates status icon
+
+**Template Approval Flow:**
+1. ✅ Webhook receives template status update
+2. ✅ Database updated (template status changed)
+3. ✅ WebSocket notification sent to college
+4. ✅ Frontend shows approval/rejection notification
+5. ✅ Templates list refreshed automatically
 
 ---
 
@@ -218,8 +230,8 @@ WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
    (या जो भी आपने .env में set किया है)
 
 5. **Subscribe to webhook fields:**
-   - ✅ messages
-   - ✅ message_status
+   - ✅ messages (for incoming messages and status updates)
+   - ✅ message_template_status_update (for template approval/rejection)
 
 6. **Click Verify and Save**
 
@@ -298,10 +310,34 @@ After:  ✓✓ delivered
 ✅ Registered with WebSocket for college: 12345
 ```
 
+### Test 5: Template Approval Flow
+
+**Backend Logs:**
+```
+📨 Webhook received: {...}
+📋 Template Status Update: my_template (12345) - APPROVED
+✅ Template status updated in database: my_template - APPROVED
+🔔 Template status WebSocket notification sent to college: 12345
+```
+
+**Frontend Logs:**
+```
+📨 WebSocket message received: {type: 'template_status_update', ...}
+📋 Template status update: {status: 'APPROVED', ...}
+🎉 Template "my_template" has been approved and is ready to use!
+```
+
+**UI Changes:**
+```
+Before: Template status: PENDING
+After:  Template status: APPROVED + Success notification shown
+```
+
 ---
 
 ## 📊 Data Flow Diagram
 
+### Message Status Updates
 ```
 WhatsApp API
      │
@@ -326,6 +362,33 @@ Frontend Client
      ▼
 UI Re-render
  (Status Icon ✓✓)
+```
+
+### Template Approval Flow
+```
+WhatsApp API
+     │
+     │ Template Status Update
+     ▼
+Webhook Endpoint
+     │
+     │ Parse & Validate
+     ▼
+Database Update
+ (templateId/templateName)
+     │
+     │ Success
+     ▼
+WebSocket Server
+     │
+     │ Send to College
+     ▼
+Frontend Client
+     │
+     │ Show Notification
+     ▼
+UI Re-render
+ (Template Status + Notification)
 ```
 
 ---
@@ -546,6 +609,8 @@ whatsappMessageSchema.index({ whatsappMessageId: 1 }); // For webhook lookups
 - [ ] Status updates received
 - [ ] WebSocket connected
 - [ ] UI shows status icons
+- [ ] Template approval notifications
+- [ ] Template status updates in real-time
 
 ### Production
 - [ ] SSL certificate valid
