@@ -1909,7 +1909,7 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
  * POST /api/whatsapp/send
  * Send WhatsApp message with template
  */
-router.post('/send-template', async (req, res) => {
+router.post('/send-template', isCollege, async (req, res) => {
   try {
     const { templateName, to, collegeId } = req.body;
 
@@ -2080,7 +2080,7 @@ router.get('/verify-template/:templateName', async (req, res) => {
 });
 
 // Send regular WhatsApp message (not template)
-router.post('/send-message', async (req, res) => {
+router.post('/send-message', isCollege, async (req, res) => {
 	try {
 		const { to, message, collegeId } = req.body;
 
