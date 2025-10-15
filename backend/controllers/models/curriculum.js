@@ -65,6 +65,11 @@ const curriculumSchema = new Schema({
                 trim: true
             },
             subTopics: [{
+                subTopicNumber: {
+                    type: String,
+                    required: true,
+                    trim: true
+                },
                 subTopicTitle: {
                     type: String,
                     required: true,
@@ -81,8 +86,48 @@ const curriculumSchema = new Schema({
                 content: {
                     type: String,
                     trim: true
+                },
+                media: {
+                    videos: [{
+                        name: String,
+                        url: String,
+                        size: Number,
+                        uploadedAt: { type: Date, default: Date.now }
+                    }],
+                    images: [{
+                        name: String,
+                        url: String,
+                        size: Number,
+                        uploadedAt: { type: Date, default: Date.now }
+                    }],
+                    pdfs: [{
+                        name: String,
+                        url: String,
+                        size: Number,
+                        uploadedAt: { type: Date, default: Date.now }
+                    }]
                 }
-            }]
+            }],
+            media: {
+                videos: [{
+                    name: String,
+                    url: String,
+                    size: Number,
+                    uploadedAt: { type: Date, default: Date.now }
+                }],
+                images: [{
+                    name: String,
+                    url: String,
+                    size: Number,
+                    uploadedAt: { type: Date, default: Date.now }
+                }],
+                pdfs: [{
+                    name: String,
+                    url: String,
+                    size: Number,
+                    uploadedAt: { type: Date, default: Date.now }
+                }]
+            }
         }]
     }],
     createdBy: {

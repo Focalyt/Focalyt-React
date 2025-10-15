@@ -212,46 +212,6 @@ function TrainerLayout({ children }){
                 </li> */}
               </ul>
             </li>
-
-          
-            <li className={`nav-item has-sub ${openSubmenu.students ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('students')}>
-              <FontAwesomeIcon icon={faUserFriends} />
-                <span className="menu-title">Students Management</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.students ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.students}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.students,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/allstudents' ? 'active' : ''}`}>
-                  <Link to="/trainer/allstudents" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faListCheck} />
-                    <span className="menu-title">All Students</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/studentprogress' ? 'active' : ''}`}>
-                  <Link to="/trainer/studentprogress" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faGraduationCap} />
-                    <span className="menu-title">Student Progress</span>
-                  </Link>
-                </li>
-                {/* <li className={`nav-item ${location.pathname === '/trainer/students/enrolled' ? 'active' : ''}`}>
-                  <Link to="/trainer/students/enrolled" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-user-check"></i>
-                    <span className="menu-title">Enrolled Students</span>
-                  </Link>
-                </li> */}
-              </ul>
-            </li>
-
             
             {/* <li className={`nav-item ${location.pathname === '/trainer/classes' ? 'active' : ''}`}>
               <Link to="/trainer/classes" onClick={() => handleSidebarClose()}>

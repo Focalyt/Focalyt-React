@@ -1,774 +1,1223 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function AddCourseContent() {
-    // Mock existing courses - yeh API se fetch ho sakti hain
-    const existingCourses = [
-        { id: 1, title: 'Multi-copter Drone Building Course', status: 'Active' },
-        { id: 2, title: 'AI and Machine Learning Fundamentals', status: 'Active' },
-        { id: 3, title: 'Web Development Bootcamp', status: 'Draft' },
-        { id: 4, title: 'Digital Marketing Masterclass', status: 'Active' }
-    ];
-
-    const [selectedCourseId, setSelectedCourseId] = useState('');
-    const [course, setCourse] = useState({
-        status: 'Draft',
-        video: null,
-        thumbnail: null,
-        learnPoints: [''],
-        includes: [''],
-        sections: [
-            {
-                title: '',
-                lectures: [
-                    {
-                        title: '',
-                        components: ['']
-                    }
-                ],
-            },
-        ],
+    // State Management
+    const [curriculum, setCurriculum] = useState([]);
+    const [courses, setCourses] = useState([]);
+    const [batches, setBatches] = useState([]);
+    const [selectedCourse, setSelectedCourse] = useState('');
+    const [selectedBatch, setSelectedBatch] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [expandedChapters, setExpandedChapters] = useState([]);
+    const [expandedTopics, setExpandedTopics] = useState([]);
+    
+    // Media Upload Modal States
+    const [showMediaModal, setShowMediaModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [mediaFiles, setMediaFiles] = useState({
+        videos: [],
+        images: [],
+        pdfs: []
     });
+    const [uploadingFiles, setUploadingFiles] = useState(false);
 
-    const [submitSuccess, setSubmitSuccess] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [videoPreview, setVideoPreview] = useState(null);
-    const [thumbnailPreview, setThumbnailPreview] = useState(null);
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const token = JSON.parse(sessionStorage.getItem('token'));
 
-    const updateValue = (path, value) => {
-        setCourse((prev) => {
-            const next = { ...prev };
-            const keys = Array.isArray(path) ? path : path.split('.');
-            let ref = next;
-            for (let i = 0; i < keys.length - 1; i++) ref = ref[keys[i]];
-            ref[keys[keys.length - 1]] = value;
-            return next;
-        });
-    };
+    // Fetch Courses
+    useEffect(() => {
+        fetchCourses();
+    }, []);
 
-    // Course selection handler
-    const handleCourseSelection = (e) => {
-        const courseId = e.target.value;
-        setSelectedCourseId(courseId);
-        
-        // Optional: Auto-populate status based on selected course
-        const selectedCourse = existingCourses.find(c => c.id === parseInt(courseId));
+    // Fetch Batches when course is selected
+    useEffect(() => {
         if (selectedCourse) {
-            updateValue('status', selectedCourse.status);
+            fetchBatches(selectedCourse);
+        } else {
+            setBatches([]);
         }
-    };
+    }, [selectedCourse]);
 
-    // File upload handlers
-    const handleVideoUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (videoPreview) {
-                URL.revokeObjectURL(videoPreview);
-            }
-            const videoUrl = URL.createObjectURL(file);
-            setVideoPreview(videoUrl);
-            updateValue('video', file);
+    // Fetch Curriculum when both course and batch are selected
+    useEffect(() => {
+        if (selectedCourse && selectedBatch) {
+            fetchCurriculum();
         }
-    };
+    }, [selectedCourse, selectedBatch]);
 
-    const handleThumbnailUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (thumbnailPreview) {
-                URL.revokeObjectURL(thumbnailPreview);
-            }
-            const imageUrl = URL.createObjectURL(file);
-            setThumbnailPreview(imageUrl);
-            updateValue('thumbnail', file);
-        }
-    };
-
-    const removeFile = (fileType) => {
-        const confirm = window.confirm('Are you sure you want to remove this file?');
-        if (!confirm) return;
-
-        if (fileType === 'video') {
-            if (videoPreview) {
-                URL.revokeObjectURL(videoPreview);
-            }
-            setVideoPreview(null);
-            updateValue('video', null);
-            const videoInput = document.getElementById('video');
-            if (videoInput) videoInput.value = '';
-        } else if (fileType === 'thumbnail') {
-            if (thumbnailPreview) {
-                URL.revokeObjectURL(thumbnailPreview);
-            }
-            setThumbnailPreview(null);
-            updateValue('thumbnail', null);
-            const thumbnailInput = document.getElementById('thumbnail');
-            if (thumbnailInput) thumbnailInput.value = '';
-        }
-    };
-
-    const addLearn = () => updateValue('learnPoints', [...course.learnPoints, '']);
-    const removeLearn = (i) => updateValue('learnPoints', course.learnPoints.filter((_, idx) => idx !== i));
-
-    const addInclude = () => updateValue('includes', [...course.includes, '']);
-    const removeInclude = (i) => updateValue('includes', course.includes.filter((_, idx) => idx !== i));
-
-    const addSection = () => updateValue('sections', [...course.sections, { title: '', lectures: [{ title: '', components: [''] }] }]);
-    const removeSection = (sIdx) => updateValue('sections', course.sections.filter((_, idx) => idx !== sIdx));
-
-    const addLecture = (sIdx) => {
-        const copy = [...course.sections];
-        copy[sIdx].lectures.push({ title: '', components: [''] });
-        updateValue('sections', copy);
-    };
-
-    const removeLecture = (sIdx, lIdx) => {
-        const copy = [...course.sections];
-        copy[sIdx].lectures = copy[sIdx].lectures.filter((_, idx) => idx !== lIdx);
-        updateValue('sections', copy);
-    };
-
-    const addComponent = (sIdx, lIdx) => {
-        const copy = [...course.sections];
-        copy[sIdx].lectures[lIdx].components.push('');
-        updateValue('sections', copy);
-    };
-
-    const removeComponent = (sIdx, lIdx, cIdx) => {
-        const copy = [...course.sections];
-        copy[sIdx].lectures[lIdx].components = copy[sIdx].lectures[lIdx].components.filter((_, idx) => idx !== cIdx);
-        updateValue('sections', copy);
-    };
-
-    const resetForm = () => {
-        if (window.confirm('Are you sure you want to reset the form? All data will be lost.')) {
-            if (videoPreview) URL.revokeObjectURL(videoPreview);
-            if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
-
-            setSelectedCourseId('');
-            setCourse({
-                status: 'Draft',
-                video: null,
-                thumbnail: null,
-                learnPoints: [''],
-                includes: [''],
-                sections: [{ title: '', lectures: [{ title: '', components: [''] }] }]
+    const fetchCourses = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/gettrainersbycourse`, {
+                headers: { 'x-auth': token }
             });
-            setVideoPreview(null);
-            setThumbnailPreview(null);
-            setSubmitSuccess(false);
+
+            if (response.data && response.data.status && response.data.data) {
+                const allCourses = [];
+                response.data.data.forEach(trainer => {
+                    if (trainer.assignedCourses && trainer.assignedCourses.length > 0) {
+                        trainer.assignedCourses.forEach(course => {
+                            if (!allCourses.find(c => c._id === course._id)) {
+                                allCourses.push(course);
+                            }
+                        });
+                    }
+                });
+                setCourses(allCourses);
+            }
+        } catch (error) {
+            console.error('Error fetching courses:', error);
+            alert('Failed to fetch courses');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        
-        // Validation
-        if (!selectedCourseId) {
-            alert('Please select a course first!');
-            return;
+    const fetchBatches = async (courseId) => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/getbatchesbytrainerandcourse`, {
+                params: { courseId },
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data && response.data.status && response.data.data) {
+                setBatches(response.data.data.batches || []);
+            }
+        } catch (error) {
+            console.error('Error fetching batches:', error);
+            alert('Failed to fetch batches');
+        } finally {
+            setLoading(false);
         }
+    };
 
-        setIsSubmitting(true);
-
-        setTimeout(() => {
-            const selectedCourse = existingCourses.find(c => c.id === parseInt(selectedCourseId));
-            console.log('Adding content to course:', selectedCourse?.title);
-            console.log('Content payload:', course);
+    const fetchCurriculum = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/getCurriculum`, {
+                params: { 
+                    courseId: selectedCourse, 
+                    batchId: selectedBatch 
+                },
+                headers: { 'x-auth': token }
+            });
             
-            alert(`Content successfully added to "${selectedCourse?.title}"!`);
-            setSubmitSuccess(true);
-            setIsSubmitting(false);
-
-            setTimeout(() => setSubmitSuccess(false), 3000);
-        }, 500);
+            if (response.data.status) {
+                const curriculumData = response.data.data;
+                if (curriculumData && curriculumData.chapters) {
+                    const formattedCurriculum = curriculumData.chapters.map(chapter => ({
+                        id: Date.now() + Math.random(), 
+                        chapterNumber: chapter.chapterNumber,
+                        chapterTitle: chapter.chapterTitle,
+                        description: chapter.description,
+                        duration: chapter.duration,
+                        objectives: chapter.objectives,
+                        media: chapter.media || { videos: [], images: [], pdfs: [] },
+                        topics: chapter.topics.map(topic => ({
+                            id: Date.now() + Math.random(),
+                            topicNumber: topic.topicNumber,
+                            topicTitle: topic.topicTitle,
+                            description: topic.description,
+                            duration: topic.duration,
+                            resources: topic.resources,
+                            media: topic.media || { videos: [], images: [], pdfs: [] },
+                            subTopics: topic.subTopics.map(subTopic => ({
+                                id: Date.now() + Math.random(),
+                                subTopicTitle: subTopic.subTopicTitle,
+                                description: subTopic.description,
+                                duration: subTopic.duration,
+                                content: subTopic.content,
+                                media: subTopic.media || { videos: [], images: [], pdfs: [] }
+                            }))
+                        }))
+                    }));
+                    setCurriculum(formattedCurriculum);
+                } else {
+                    setCurriculum([]);
+                }
+            } else {
+                setCurriculum([]);
+            }
+        } catch (error) {
+            console.error('Error fetching curriculum:', error);
+            alert('Failed to fetch curriculum');
+            setCurriculum([]);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const toggleChapter = (chapterId) => {
+        setExpandedChapters(prev =>
+            prev.includes(chapterId)
+                ? prev.filter(id => id !== chapterId)
+                : [...prev, chapterId]
+        );
+    };
+
+    const toggleTopic = (topicId) => {
+        setExpandedTopics(prev =>
+            prev.includes(topicId)
+                ? prev.filter(id => id !== topicId)
+                : [...prev, topicId]
+        );
+    };
+
+    const openMediaModal = (item) => {
+        setSelectedItem(item);
+        setMediaFiles({
+            videos: [],
+            images: [],
+            pdfs: []
+        });
+        setShowMediaModal(true);
+    };
+
+    const handleFileSelect = (e, fileType) => {
+        const files = Array.from(e.target.files);
+        setMediaFiles(prev => ({
+            ...prev,
+            [fileType]: [...prev[fileType], ...files]
+        }));
+    };
+
+    const removeSelectedFile = (fileType, index) => {
+        setMediaFiles(prev => ({
+            ...prev,
+            [fileType]: prev[fileType].filter((_, i) => i !== index)
+        }));
+    };
+
+const handleUploadMedia = async () => {
+    setLoading(true)
+    try{
+        const response = await axios.post(`${backendUrl}/college/addcoursecontent`, {
+            courseId: selectedCourse,
+            batchId: selectedBatch,
+            content: curriculum,
+            files: mediaFiles
+        }, {
+            headers: { 'x-auth': token }
+        })
+    }
+    catch(err){
+        console.log('Error uploading media' , err)
+    }finally{
+        setLoading(false)
+    }
+}
 
     return (
-        <div className="content-body">
-            {/* Header with Breadcrumb */}
-            <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-                <div className="content-header-left col-md-9 col-12 mb-2">
-                    <div className="row breadcrumbs-top">
-                        <div className="col-12">
-                            <h3 className="content-header-title float-left mb-0">Add Course Content</h3>
-                            <div className="breadcrumb-wrapper col-12">
-                                <ol className="breadcrumb">
-                                    <li className="breadcrumb-item"><a href="/trainer/dashboard">Home</a></li>
-                                    <li className="breadcrumb-item active">Add Course Content</li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
+        <div className="curriculum-container">
+            {/* Header */}
+            <div className="curriculum-header">
+                <div className="header-left">
+                    <h2 className="page-title">
+                        <i className="fas fa-photo-video me-2"></i>
+                        Add Course Media & Content
+                    </h2>
+                    <p className="page-subtitle">Upload videos, images, and PDFs to chapters, topics, and sub-topics</p>
                 </div>
             </div>
 
-            {/* Success Message */}
-            {submitSuccess && (
-                <div className="alert alert-success mb-2" role="alert">
-                    <strong>Success!</strong> Course content added successfully!
+            {/* Course & Batch Selection */}
+            <div className="selection-bar">
+                <div className="selection-group">
+                    <label>Select Course *</label>
+                    <select
+                        className="form-control"
+                        value={selectedCourse}
+                        onChange={(e) => {
+                            setSelectedCourse(e.target.value);
+                            setSelectedBatch('');
+                            setCurriculum([]);
+                        }}
+                        disabled={loading || courses.length === 0}
+                    >
+                        <option value="">
+                            {loading ? 'Loading courses...' : courses.length === 0 ? 'No courses available' : 'Select Course'}
+                        </option>
+                        {courses.map(course => (
+                            <option key={course._id} value={course._id}>
+                                {course.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
-            )}
 
-            {/* Form */}
-            <div className="form-horizontal">
-                {/* Course Selection Section */}
-                <section id="course-selection">
-                    <div className="row">
-                        <div className="col-xl-12 col-lg-12">
-                            <div className="card">
-                                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                                    <h4 className="card-title pb-1">Select Course</h4>
-                                </div>
-                                <div className="card-content">
-                                    <div className="card-body">
-                                        <div className="row">
-                                            {/* Course Selector */}
-                                            <div className="col-xl-8 col-lg-8 col-md-8 col-sm-12 col-12 mb-1">
-                                                <label htmlFor="courseSelector">
-                                                    Select Course <span style={{ color: 'red' }}>*</span>
-                                                </label>
-                                                <select
-                                                    className="form-control"
-                                                    id="courseSelector"
-                                                    value={selectedCourseId}
-                                                    onChange={handleCourseSelection}
-                                                    style={{ 
-                                                        fontWeight: selectedCourseId ? '600' : 'normal',
-                                                        color: selectedCourseId ? '#28c76f' : '#6c757d'
-                                                    }}
-                                                >
-                                                    <option value="">-- Choose a course to add content --</option>
-                                                    {existingCourses.map(course => (
-                                                        <option key={course.id} value={course.id}>
-                                                            {course.title} ({course.status})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <small className="text-muted">
-                                                    Select the course where you want to add new content
-                                                </small>
-                                            </div>
+                <div className="selection-group">
+                    <label>Select Batch *</label>
+                    <select
+                        className="form-control"
+                        value={selectedBatch}
+                        onChange={(e) => setSelectedBatch(e.target.value)}
+                        disabled={!selectedCourse || batches.length === 0}
+                    >
+                        <option value="">
+                            {!selectedCourse ? 'Select Course First' : batches.length === 0 ? 'No Batches Available' : 'Select Batch'}
+                        </option>
+                        {batches.map(batch => (
+                            <option key={batch._id} value={batch._id}>
+                                {batch.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
 
-                                            {/* Status Display */}
-                                            <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-12 mb-1">
-                                                <label htmlFor="status">Course Status</label>
-                                                <select
-                                                    className="form-control"
-                                                    id="status"
-                                                    value={course.status}
-                                                    onChange={(e) => updateValue('status', e.target.value)}
-                                                    disabled={!selectedCourseId}
-                                                >
-                                                    <option value="Draft">Draft</option>
-                                                    <option value="Active">Active</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* Selected Course Info */}
-                                        {selectedCourseId && (
-                                            <div className="alert alert-info mt-2" style={{ backgroundColor: '#e3f2fd', border: 'none' }}>
-                                                <strong>Adding content to:</strong> {existingCourses.find(c => c.id === parseInt(selectedCourseId))?.title}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+            {/* Curriculum Content */}
+            {selectedCourse && selectedBatch && (
+                <div className="curriculum-content">
+                    <div className="table-of-contents">
+                        <div className="toc-header">
+                            <h3>
+                                <i className="fas fa-table me-2"></i>
+                                Course Curriculum - Add Media
+                            </h3>
+                            <p className="text-muted">Click on "Upload Media" button to add videos, images, and PDFs to any item</p>
                         </div>
-                    </div>
-                </section>
 
-                {/* What You'll Learn Section */}
-                <section id="learn-points">
-                    <div className="row">
-                        <div className="col-xl-12 col-lg-12">
-                            <div className="card">
-                                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                                    <h4 className="card-title pb-1">What You'll Learn</h4>
-                                </div>
-                                <div className="card-content">
-                                    <div className="card-body">
-                                        <div id="learnPointsContainer">
-                                            {course.learnPoints.map((p, i) => (
-                                                <div className="row align-items-center mb-2" key={`lp-${i}`}>
-                                                    <div className="col-xl-10 col-lg-10 col-md-9 col-sm-9 col-9">
-                                                        <input
-                                                            className="form-control"
-                                                            type="text"
-                                                            value={p}
-                                                            onChange={(e) => {
-                                                                const copy = [...course.learnPoints];
-                                                                copy[i] = e.target.value;
-                                                                updateValue('learnPoints', copy);
-                                                            }}
-                                                            placeholder={`Learning point ${i + 1}`}
-                                                        />
-                                                    </div>
-                                                    <div className="col-xl-2 col-lg-2 col-md-3 col-sm-3 col-3">
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-danger btn-sm w-100"
-                                                            onClick={() => removeLearn(i)}
-                                                            disabled={course.learnPoints.length === 1}
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
+                        {curriculum.length === 0 ? (
+                            <div className="empty-state">
+                                <i className="fas fa-book-open"></i>
+                                <h4>No Curriculum Found</h4>
+                                <p>Please add curriculum first from the Timetable page</p>
+                            </div>
+                        ) : (
+                            <div className="chapters-list">
+                                {curriculum.map((chapter) => (
+                                    <div key={chapter.id} className="chapter-item">
+                                        <div className="chapter-header">
+                                            <div className="chapter-left" onClick={() => toggleChapter(chapter.id)}>
+                                                <button className="expand-btn">
+                                                    <i className={`fas fa-chevron-${expandedChapters.includes(chapter.id) ? 'down' : 'right'}`}></i>
+                                                </button>
+                                                <div className="chapter-number">
+                                                    Chapter {chapter.chapterNumber}
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div className="col-xl-12 mb-1 px-0 text-right">
-                                            <button
-                                                type="button"
-                                                className="btn btn-success text-white"
-                                                onClick={addLearn}
-                                            >
-                                                + Add Learning Point
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Course Includes Section */}
-                <section id="course-includes">
-                    <div className="row">
-                        <div className="col-xl-12 col-lg-12">
-                            <div className="card">
-                                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                                    <h4 className="card-title pb-1">This Course Includes</h4>
-                                </div>
-                                <div className="card-content">
-                                    <div className="card-body">
-                                        <div id="includesContainer">
-                                            {course.includes.map((p, i) => (
-                                                <div className="row align-items-center mb-2" key={`inc-${i}`}>
-                                                    <div className="col-xl-10 col-lg-10 col-md-9 col-sm-9 col-9">
-                                                        <input
-                                                            className="form-control"
-                                                            type="text"
-                                                            value={p}
-                                                            onChange={(e) => {
-                                                                const copy = [...course.includes];
-                                                                copy[i] = e.target.value;
-                                                                updateValue('includes', copy);
-                                                            }}
-                                                            placeholder={`Item ${i + 1}`}
-                                                        />
-                                                    </div>
-                                                    <div className="col-xl-2 col-lg-2 col-md-3 col-sm-3 col-3">
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-danger btn-sm w-100"
-                                                            onClick={() => removeInclude(i)}
-                                                            disabled={course.includes.length === 1}
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
+                                                <div className="chapter-title">
+                                                    {chapter.chapterTitle}
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div className="col-xl-12 mb-1 px-0 text-right">
-                                            <button
-                                                type="button"
-                                                className="btn btn-success text-white"
-                                                onClick={addInclude}
-                                            >
-                                                + Add Item
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                                            </div>
+                                            <div className="chapter-actions">
+                                                <span className="media-badge">
+                                                    <i className="fas fa-video"></i> {chapter.media?.videos?.length || 0}
+                                                    <i className="fas fa-image ml-2"></i> {chapter.media?.images?.length || 0}
+                                                    <i className="fas fa-file-pdf ml-2"></i> {chapter.media?.pdfs?.length || 0}
+                                                </span>
 
-                {/* Sections & Lectures */}
-                <section id="sections-lectures">
-                    <div className="row">
-                        <div className="col-xl-12 col-lg-12">
-                            <div className="card">
-                                <div className="card-header border border-top-0 border-left-0 border-right-0 d-flex justify-content-between align-items-center">
-                                    <h4 className="card-title pb-1 mb-0">Sections & Lectures</h4>
-                                    <button
-                                        type="button"
-                                        className="btn btn-success text-white btn-sm"
-                                        onClick={addSection}
-                                    >
-                                        + Add Section
-                                    </button>
-                                </div>
-                                <div className="card-content">
-                                    <div className="card-body">
-                                        {course.sections.map((section, sIdx) => (
-                                            <div className="card mb-3" key={`sec-${sIdx}`} style={{ border: '1px solid #ddd' }}>
-                                                <div className="card-header" style={{ backgroundColor: '#f8f9fa' }}>
-                                                    <div className="row align-items-center">
-                                                        <div className="col-xl-10 col-lg-10 col-md-9 col-9">
-                                                            <input
-                                                                className="form-control"
-                                                                type="text"
-                                                                value={section.title}
-                                                                onChange={(e) => {
-                                                                    const copy = [...course.sections];
-                                                                    copy[sIdx].title = e.target.value;
-                                                                    updateValue('sections', copy);
-                                                                }}
-                                                                placeholder={`Section ${sIdx + 1} title`}
-                                                            />
-                                                        </div>
-                                                        <div className="col-xl-2 col-lg-2 col-md-3 col-3 text-right">
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-danger btn-sm"
-                                                                onClick={() => removeSection(sIdx)}
-                                                            >
-                                                                Remove Section
-                                                            </button>
+                                            </div>
+                                        </div>
+
+                                        {expandedChapters.includes(chapter.id) && (
+                                            <div className="chapter-content">
+                                                {chapter.description && (
+                                                    <div className="chapter-description">
+                                                        {chapter.description}
+                                                    </div>
+                                                )}
+
+                                                {/* Show Uploaded Media */}
+                                                {(chapter.media?.videos?.length > 0 || chapter.media?.images?.length > 0 || chapter.media?.pdfs?.length > 0) && (
+                                                    <div className="media-preview-section">
+                                                        <h5>Uploaded Media:</h5>
+                                                        <div className="media-grid">
+                                                            {chapter.media.videos?.map((video, idx) => (
+                                                                <div key={idx} className="media-item">
+                                                                    <i className="fas fa-video"></i>
+                                                                    <span>{video.name || `Video ${idx + 1}`}</span>
+                                                                </div>
+                                                            ))}
+                                                            {chapter.media.images?.map((image, idx) => (
+                                                                <div key={idx} className="media-item">
+                                                                    <i className="fas fa-image"></i>
+                                                                    <span>{image.name || `Image ${idx + 1}`}</span>
+                                                                </div>
+                                                            ))}
+                                                            {chapter.media.pdfs?.map((pdf, idx) => (
+                                                                <div key={idx} className="media-item">
+                                                                    <i className="fas fa-file-pdf"></i>
+                                                                    <span>{pdf.name || `PDF ${idx + 1}`}</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <div className="card-body">
-                                                    {section.lectures.map((lec, lIdx) => (
-                                                        <div className="card mb-2" key={`lec-${sIdx}-${lIdx}`} style={{ backgroundColor: '#fafafa' }}>
-                                                            <div className="card-body p-3">
-                                                                <div className="row align-items-center mb-2">
-                                                                    <div className="col-xl-10 col-lg-10 col-md-9 col-9">
-                                                                        <label className="mb-1"><strong>Lecture {lIdx + 1}</strong></label>
-                                                                        <input
-                                                                            className="form-control"
-                                                                            type="text"
-                                                                            value={lec.title}
-                                                                            onChange={(e) => {
-                                                                                const copy = [...course.sections];
-                                                                                copy[sIdx].lectures[lIdx].title = e.target.value;
-                                                                                updateValue('sections', copy);
-                                                                            }}
-                                                                            placeholder={`Lecture ${lIdx + 1} title`}
-                                                                        />
+                                                )}
+
+                                                {chapter.topics && chapter.topics.length > 0 ? (
+                                                    <div className="topics-list">
+                                                        {chapter.topics.map((topic) => (
+                                                            <div key={topic.id} className="topic-item">
+                                                                <div className="topic-header">
+                                                                    <div className="topic-left" onClick={() => toggleTopic(topic.id)}>
+                                                                        <button className="expand-btn">
+                                                                            <i className={`fas fa-chevron-${expandedTopics.includes(topic.id) ? 'down' : 'right'}`}></i>
+                                                                        </button>
+                                                                        <div className="topic-number">
+                                                                            {topic.topicNumber}
+                                                                        </div>
+                                                                        <div className="topic-title">
+                                                                            {topic.topicTitle}
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="col-xl-2 col-lg-2 col-md-3 col-3">
+                                                                    <div className="topic-actions">
+                                                                        <span className="media-badge small">
+                                                                            <i className="fas fa-video"></i> {topic.media?.videos?.length || 0}
+                                                                            <i className="fas fa-image ml-1"></i> {topic.media?.images?.length || 0}
+                                                                            <i className="fas fa-file-pdf ml-1"></i> {topic.media?.pdfs?.length || 0}
+                                                                        </span>
                                                                         <button
-                                                                            type="button"
-                                                                            className="btn btn-danger btn-sm w-100"
-                                                                            onClick={() => removeLecture(sIdx, lIdx)}
-                                                                            disabled={section.lectures.length === 1}
+                                                                            className="btn-action btn-upload small"
+                                                                            onClick={() => openMediaModal({ 
+                                                                                type: 'topic', 
+                                                                                data: topic,
+                                                                                chapterNumber: chapter.chapterNumber 
+                                                                            })}
+                                                                            title="Upload Media"
                                                                         >
-                                                                            Remove
+                                                                            <i className="fas fa-upload"></i>
                                                                         </button>
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="mt-2">
-                                                                    <label className="mb-1"><small>Components:</small></label>
-                                                                    {lec.components.map((c, cIdx) => (
-                                                                        <div className="row align-items-center mb-2" key={`comp-${sIdx}-${lIdx}-${cIdx}`}>
-                                                                            <div className="col-xl-10 col-lg-10 col-md-9 col-9">
-                                                                                <input
-                                                                                    className="form-control form-control-sm"
-                                                                                    type="text"
-                                                                                    value={c}
-                                                                                    onChange={(e) => {
-                                                                                        const copy = [...course.sections];
-                                                                                        copy[sIdx].lectures[lIdx].components[cIdx] = e.target.value;
-                                                                                        updateValue('sections', copy);
-                                                                                    }}
-                                                                                    placeholder={`Component ${cIdx + 1} (e.g., video URL, PDF link)`}
-                                                                                />
+                                                                {expandedTopics.includes(topic.id) && (
+                                                                    <div className="topic-content">
+                                                                        {topic.description && (
+                                                                            <div className="topic-description">
+                                                                                {topic.description}
                                                                             </div>
-                                                                            <div className="col-xl-2 col-lg-2 col-md-3 col-3">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="btn btn-outline-danger btn-sm w-100"
-                                                                                    onClick={() => removeComponent(sIdx, lIdx, cIdx)}
-                                                                                    disabled={lec.components.length === 1}
-                                                                                >
-                                                                                    ×
-                                                                                </button>
+                                                                        )}
+
+                                                                        {/* Show Uploaded Media */}
+                                                                        {(topic.media?.videos?.length > 0 || topic.media?.images?.length > 0 || topic.media?.pdfs?.length > 0) && (
+                                                                            <div className="media-preview-section">
+                                                                                <h6>Uploaded Media:</h6>
+                                                                                <div className="media-grid">
+                                                                                    {topic.media.videos?.map((video, idx) => (
+                                                                                        <div key={idx} className="media-item small">
+                                                                                            <i className="fas fa-video"></i>
+                                                                                            <span>{video.name || `Video ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {topic.media.images?.map((image, idx) => (
+                                                                                        <div key={idx} className="media-item small">
+                                                                                            <i className="fas fa-image"></i>
+                                                                                            <span>{image.name || `Image ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {topic.media.pdfs?.map((pdf, idx) => (
+                                                                                        <div key={idx} className="media-item small">
+                                                                                            <i className="fas fa-file-pdf"></i>
+                                                                                            <span>{pdf.name || `PDF ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
-                                                                    <button
-                                                                        type="button"
-                                                                        className="btn btn-outline-primary btn-sm"
-                                                                        onClick={() => addComponent(sIdx, lIdx)}
-                                                                    >
-                                                                        + Add Component
-                                                                    </button>
-                                                                </div>
+                                                                        )}
+
+                                                                       
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        </div>
-                                                    ))}
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-outline-success btn-sm"
-                                                        onClick={() => addLecture(sIdx)}
-                                                    >
-                                                        + Add Lecture
-                                                    </button>
-                                                </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="empty-topics">
+                                                        <p>No topics found</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Media Upload Modal */}
+            {showMediaModal && selectedItem && (
+                <div className="modal-overlay" onClick={() => setShowMediaModal(false)}>
+                    <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>
+                                <i className="fas fa-upload me-2"></i>
+                                Upload Media to {selectedItem.type === 'chapter' ? 'Chapter' : selectedItem.type === 'topic' ? 'Topic' : 'Sub-topic'}
+                            </h3>
+                            <button className="btn-close" onClick={() => setShowMediaModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="upload-info-box">
+                                <strong>Uploading to:</strong> {selectedItem.data.chapterTitle || selectedItem.data.topicTitle || selectedItem.data.subTopicTitle}
+                            </div>
+
+                            {/* Video Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-video me-2"></i>
+                                    Videos
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="video/*"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'videos')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.videos.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.videos.length} video(s) selected:</p>
+                                        {mediaFiles.videos.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-video"></i> {file.name}</span>
+                                                <button 
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('videos', idx)}
+                                                >
+                                                    ×
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
-                                </div>
+                                )}
+                            </div>
+
+                            {/* Image Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-image me-2"></i>
+                                    Images
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'images')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.images.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.images.length} image(s) selected:</p>
+                                        {mediaFiles.images.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-image"></i> {file.name}</span>
+                                                <button 
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('images', idx)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PDF Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-file-pdf me-2"></i>
+                                    PDFs
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'pdfs')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.pdfs.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.pdfs.length} PDF(s) selected:</p>
+                                        {mediaFiles.pdfs.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-file-pdf"></i> {file.name}</span>
+                                                <button 
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('pdfs', idx)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-                </section>
-
-                {/* Add Docs Section */}
-                <section id="add-docs">
-                    <div className="row">
-                        <div className="col-xl-12">
-                            <div className="card">
-                                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                                    <h4 className="card-title pb-1">Add Media</h4>
-                                </div>
-                                <div className="row">
-                                    {/* Video Upload */}
-                                    <div className="col-xl-4 col-lg-4 col-md-4">
-                                        <div className="uploadedVideos card m-2 p-1">
-                                            <h5 className="m-2 text-center">Course Video</h5>
-                                            <div className="innerUploadedVideos" style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                {videoPreview ? (
-                                                    <div className="position-relative w-100" style={{ height: '100%' }}>
-                                                        <video
-                                                            controls
-                                                            style={{ borderRadius: '5px' , width:"100%", height:"100%"}}
-                                                        >
-                                                            <source src={videoPreview} type="video/mp4" />
-                                                            Your browser does not support the video tag.
-                                                        </video>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-danger position-absolute"
-                                                            style={{ right: '5px', top: '5px', zIndex: 10 }}
-                                                            onClick={() => removeFile('video')}
-                                                        >
-                                                            <i className="fa fa-times"></i>
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-muted">No video uploaded</p>
-                                                )}
-                                            </div>
-                                            <div className="innerUploadedVideos" style={{ height: '70px', width: '100%' }}>
-                                                <div className="col-12 mb-1">
-                                                    <label htmlFor="video">
-                                                        {videoPreview ? 'Replace Video' : 'Add Video'}
-                                                    </label>
-                                                    <input
-                                                        name="video"
-                                                        id="video"
-                                                        type="file"
-                                                        accept="video/*"
-                                                        onChange={handleVideoUpload}
-                                                        style={{ width: '100%', fontSize: '12px' }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Thumbnail Upload */}
-                                    <div className="col-xl-4 col-lg-4 col-md-4">
-                                        <div className="thumbnails card m-2 p-1">
-                                            <h5 className="m-2 text-center">Course Thumbnail</h5>
-                                            <div className="innerUploadedThumbnails" style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                {thumbnailPreview ? (
-                                                    <div className="thumbnail-preview-container p-1 position-relative w-100">
-                                                        <img
-                                                            src={thumbnailPreview}
-                                                            alt="Thumbnail Preview"
-                                                            className="img-fluid rounded"
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '130px',
-                                                                objectFit: 'cover',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-danger position-absolute"
-                                                            style={{
-                                                                right: '5px',
-                                                                top: '5px',
-                                                                width: '25px',
-                                                                height: '25px',
-                                                                padding: '0',
-                                                                borderRadius: '50%',
-                                                                fontSize: '12px',
-                                                                zIndex: 10
-                                                            }}
-                                                            onClick={() => removeFile('thumbnail')}
-                                                            title="Remove thumbnail"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-muted">No thumbnail uploaded</p>
-                                                )}
-                                            </div>
-                                            <div className="innerUploadedThumbnails" style={{ height: '70px', width: '100%' }}>
-                                                <div className="col-12 mb-1">
-                                                    <label htmlFor="thumbnail">
-                                                        {thumbnailPreview ? 'Replace Thumbnail' : 'Add Thumbnail'}
-                                                    </label>
-                                                    <input
-                                                        type="file"
-                                                        id="thumbnail"
-                                                        name="thumbnail"
-                                                        accept="image/*"
-                                                        onChange={handleThumbnailUpload}
-                                                        style={{ width: '100%', fontSize: '12px' }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="modal-footer">
+                            <button 
+                                className="btn btn-outline" 
+                                onClick={() => setShowMediaModal(false)}
+                                disabled={uploadingFiles}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={handleUploadMedia}
+                                disabled={uploadingFiles}
+                            >
+                                {uploadingFiles ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin me-2"></i>
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-upload me-2"></i>
+                                        Upload Media
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    </div>
-                </section>
-
-                {/* Submit Buttons */}
-                <div className="row mt-3 mb-5">
-                    <div className="col-lg-12 col-md-12 col-sm-12 col-12 text-right">
-                        <button
-                            type="button"
-                            onClick={resetForm}
-                            className="btn btn-danger waves-effect waves-light mr-2"
-                            disabled={isSubmitting}
-                        >
-                            Reset
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            className="btn btn-success px-lg-4 waves-effect waves-light"
-                            disabled={isSubmitting || !selectedCourseId}
-                        >
-                            {isSubmitting ? 'Saving...' : 'Save'}
-                        </button>
                     </div>
                 </div>
-            </div>
+            )}
 
-            <style>{`
-                .form-control {
-                    padding: 0.6rem 0.7rem;
-                    height: 40px;
+            <style jsx>{`
+                .curriculum-container {
+                    padding: 2rem;
+                    background: #f5f7fa;
+                    min-height: 100vh;
                 }
-                
-                .form-control-sm {
-                    height: 35px;
-                    padding: 0.4rem 0.6rem;
+
+                .curriculum-header {
+                    margin-bottom: 2rem;
                 }
-                
-                .card .card-header {
+
+                .page-title {
+                    font-size: 2rem;
+                    font-weight: 700;
+                    color: #2c3e50;
+                    margin-bottom: 0.5rem;
+                }
+
+                .page-subtitle {
+                    color: #7f8c8d;
+                    font-size: 1rem;
+                }
+
+                .selection-bar {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 2rem;
+                    display: flex;
+                    gap: 1.5rem;
+                    align-items: flex-end;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    flex-wrap: wrap;
+                }
+
+                .selection-group {
+                    flex: 1;
+                    min-width: 250px;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .selection-group label {
+                    font-weight: 600;
+                    color: #2c3e50;
+                    margin-bottom: 0.5rem;
+                }
+
+                .curriculum-content {
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    overflow: hidden;
+                }
+
+                .table-of-contents {
+                    padding: 2rem;
+                }
+
+                .toc-header {
+                    margin-bottom: 2rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 3px solid #f5f7fa;
+                }
+
+                .toc-header h3 {
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    color: #2c3e50;
+                    margin: 0 0 0.5rem 0;
+                }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 4rem 2rem;
+                    color: #7f8c8d;
+                }
+
+                .empty-state i {
+                    font-size: 4rem;
+                    color: #e0e0e0;
+                    margin-bottom: 1rem;
+                }
+
+                .empty-state h4 {
+                    font-size: 1.5rem;
+                    margin-bottom: 0.5rem;
+                    color: #95a5a6;
+                }
+
+                .chapters-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
+                .chapter-item {
+                    border: 2px solid #e3f2fd;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    transition: all 0.3s;
+                }
+
+                .chapter-item:hover {
+                    border-color: #2196f3;
+                    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
+                }
+
+                .chapter-header {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 1.25rem 1.5rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                }
+
+                .chapter-left {
                     display: flex;
                     align-items: center;
-                    flex-wrap: wrap;
-                    justify-content: space-between;
-                    border-bottom: none;
-                    padding: 1.5rem 1.5rem 0;
-                    background-color: transparent;
+                    gap: 1rem;
+                    flex: 1;
                 }
-                
-                .card .card-header .card-title {
-                    margin-bottom: 0;
+
+                .expand-btn {
+                    background: rgba(255,255,255,0.2);
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    color: white;
                 }
-                
-                .card .card-title {
-                    font-size: 1rem !important;
-                    font-weight: 500;
-                    letter-spacing: 0.05rem;
+
+                .expand-btn:hover {
+                    background: rgba(255,255,255,0.3);
                 }
-                
-                .breadcrumb {
-                    background-color: transparent;
-                    padding: 0;
-                    margin-bottom: 0;
+
+                .chapter-number {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.5rem 1rem;
+                    border-radius: 6px;
+                    font-weight: 700;
+                    font-size: 0.9rem;
                 }
-                
-                .breadcrumb-item + .breadcrumb-item::before {
-                    content: "›";
-                }
-                
-                .content-header-title {
-                    font-size: 1.5rem;
+
+                .chapter-title {
+                    font-size: 1.2rem;
                     font-weight: 600;
                 }
-                
-                .alert {
-                    border-radius: 0.25rem;
-                }
-                
-                label {
-                    font-weight: 500;
-                    margin-bottom: 0.5rem;
-                    display: block;
-                }
-                
-                .w-100 {
-                    width: 100%;
-                }
-                
-                .mr-2 {
-                    margin-right: 0.5rem;
-                }
-                
-                .px-0 {
-                    padding-left: 0 !important;
-                    padding-right: 0 !important;
-                }
-                
-                .text-right {
-                    text-align: right;
-                }
-                
-                .text-center {
-                    text-align: center;
-                }
-                
-                .text-muted {
-                    color: #6c757d;
-                }
-                
-                .d-flex {
+
+                .chapter-actions {
                     display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
                 }
-                
-                .justify-content-between {
+
+                .media-badge {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.5rem 1rem;
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .media-badge.small {
+                    padding: 0.4rem 0.8rem;
+                    font-size: 0.75rem;
+                }
+
+                .media-badge i {
+                    margin-right: 0.25rem;
+                }
+
+                .ml-1 {
+                    margin-left: 0.5rem;
+                }
+
+                .ml-2 {
+                    margin-left: 1rem;
+                }
+
+                .btn-action {
+                    background: rgba(255,255,255,0.2);
+                    border: none;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    color: white;
+                }
+
+                .btn-action.small {
+                    width: 30px;
+                    height: 30px;
+                }
+
+                .btn-action:hover {
+                    background: rgba(255,255,255,0.3);
+                    transform: scale(1.1);
+                }
+
+                .btn-action.btn-upload:hover {
+                    background: #4caf50;
+                }
+
+                .chapter-content {
+                    padding: 1.5rem;
+                    background: #fafbfc;
+                }
+
+                .chapter-description {
+                    padding: 1rem;
+                    background: #e3f2fd;
+                    border-radius: 8px;
+                    margin-bottom: 1.5rem;
+                    color: #1565c0;
+                    font-style: italic;
+                }
+
+                .media-preview-section {
+                    background: #f9fafb;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin-bottom: 1rem;
+                }
+
+                .media-preview-section.small {
+                    padding: 0.75rem;
+                }
+
+                .media-preview-section h5, .media-preview-section h6 {
+                    margin: 0 0 0.75rem 0;
+                    color: #2c3e50;
+                    font-weight: 600;
+                }
+
+                .media-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 0.75rem;
+                }
+
+                .media-item {
+                    background: white;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    border: 1px solid #e0e0e0;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .media-item.small {
+                    padding: 0.5rem;
+                    font-size: 0.85rem;
+                }
+
+                .media-item i {
+                    color: #3498db;
+                }
+
+                .media-item span {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .topics-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                .topic-item {
+                    border: 2px solid #e8f5e9;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    background: white;
+                }
+
+                .topic-header {
+                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                    color: white;
+                    padding: 1rem 1.25rem;
+                    display: flex;
                     justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
                 }
-                
-                .align-items-center {
+
+                .topic-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    flex: 1;
+                }
+
+                .topic-number {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.4rem 0.8rem;
+                    border-radius: 6px;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                }
+
+                .topic-title {
+                    font-size: 1.05rem;
+                    font-weight: 600;
+                }
+
+                .topic-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .topic-content {
+                    padding: 1.25rem;
+                    background: #f9fafb;
+                }
+
+                .topic-description {
+                    padding: 0.75rem;
+                    background: #e8f5e9;
+                    border-radius: 6px;
+                    margin-bottom: 1rem;
+                    color: #2e7d32;
+                    font-style: italic;
+                    font-size: 0.95rem;
+                }
+
+                .subtopics-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+
+                .subtopic-item {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    background: white;
+                }
+
+                .subtopic-header {
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    color: white;
+                    padding: 0.75rem 1rem;
+                    display: flex;
+                    justify-content: space-between;
                     align-items: center;
                 }
-                
-                .position-relative {
-                    position: relative;
+
+                .subtopic-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    flex: 1;
                 }
-                
-                .position-absolute {
-                    position: absolute;
+
+                .subtopic-bullet {
+                    font-size: 1.5rem;
+                    font-weight: 700;
                 }
-                
-                .img-fluid {
-                    max-width: 100%;
-                    height: auto;
+
+                .subtopic-title {
+                    font-size: 0.95rem;
+                    font-weight: 600;
                 }
-                
-                .rounded {
-                    border-radius: 0.25rem;
+
+                .subtopic-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .empty-topics, .empty-subtopics {
+                    padding: 2rem;
+                    text-align: center;
+                    color: #95a5a6;
+                    font-style: italic;
+                }
+
+                .btn {
+                    padding: 0.6rem 1.2rem;
+                    border-radius: 8px;
+                    border: none;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    display: inline-flex;
+                    align-items: center;
+                }
+
+                .btn-primary {
+                    background: #3498db;
+                    color: white;
+                }
+
+                .btn-primary:hover:not(:disabled) {
+                    background: #2980b9;
+                    transform: translateY(-2px);
+                }
+
+                .btn-primary:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+
+                .btn-outline {
+                    background: white;
+                    color: #3498db;
+                    border: 2px solid #3498db;
+                }
+
+                .btn-outline:hover:not(:disabled) {
+                    background: #3498db;
+                    color: white;
+                }
+
+                .btn-outline:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+
+                .form-control {
+                    padding: 0.75rem;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 8px;
+                    font-size: 1rem;
+                    transition: all 0.3s;
+                    width: 100%;
+                }
+
+                .form-control:focus {
+                    outline: none;
+                    border-color: #3498db;
+                }
+
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                    padding: 1rem;
+                }
+
+                .modal-content {
+                    background: white;
+                    border-radius: 12px;
+                    max-width: 600px;
+                    width: 100%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                }
+
+                .modal-large {
+                    max-width: 700px;
+                }
+
+                .modal-header {
+                    padding: 1.5rem;
+                    border-bottom: 2px solid #f5f7fa;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .modal-header h3 {
+                    margin: 0;
+                    color: #2c3e50;
+                    font-size: 1.5rem;
+                }
+
+                .btn-close {
+                    background: transparent;
+                    border: none;
+                    font-size: 2rem;
+                    cursor: pointer;
+                    color: #95a5a6;
+                    line-height: 1;
+                    transition: all 0.3s;
+                }
+
+                .btn-close:hover {
+                    color: #e74c3c;
+                    transform: rotate(90deg);
+                }
+
+                .modal-body {
+                    padding: 1.5rem;
+                }
+
+                .modal-footer {
+                    padding: 1.5rem;
+                    border-top: 2px solid #f5f7fa;
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 1rem;
+                }
+
+                .upload-info-box {
+                    background: #e3f2fd;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin-bottom: 1.5rem;
+                    color: #1565c0;
+                }
+
+                .upload-section {
+                    margin-bottom: 2rem;
+                }
+
+                .upload-section h4 {
+                    color: #2c3e50;
+                    font-size: 1.1rem;
+                    margin-bottom: 1rem;
+                }
+
+                .file-input {
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 2px dashed #3498db;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+
+                .file-input:hover {
+                    border-color: #2980b9;
+                    background: #f8f9fa;
+                }
+
+                .selected-files {
+                    margin-top: 1rem;
+                    background: #f9fafb;
+                    padding: 1rem;
+                    border-radius: 8px;
+                }
+
+                .selected-count {
+                    font-weight: 600;
+                    color: #2c3e50;
+                    margin-bottom: 0.75rem;
+                }
+
+                .file-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.5rem;
+                    background: white;
+                    border-radius: 6px;
+                    margin-bottom: 0.5rem;
+                    border: 1px solid #e0e0e0;
+                }
+
+                .file-item span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .file-item i {
+                    color: #3498db;
+                }
+
+                .btn-remove-file {
+                    background: #e74c3c;
+                    color: white;
+                    border: none;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 1.2rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s;
+                }
+
+                .btn-remove-file:hover {
+                    background: #c0392b;
+                    transform: scale(1.1);
+                }
+
+                .me-2 {
+                    margin-right: 0.5rem;
+                }
+
+                .text-muted {
+                    color: #7f8c8d;
+                }
+
+                @media (max-width: 768px) {
+                    .curriculum-container {
+                        padding: 1rem;
+                    }
+
+                    .selection-bar {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .chapter-header, .topic-header, .subtopic-header {
+                        flex-direction: column;
+                        gap: 1rem;
+                        align-items: stretch;
+                    }
+
+                    .chapter-left, .topic-left, .subtopic-left {
+                        flex-wrap: wrap;
+                    }
+
+                    .chapter-actions, .topic-actions, .subtopic-actions {
+                        justify-content: flex-end;
+                    }
+
+                    .media-grid {
+                        grid-template-columns: 1fr;
+                    }
                 }
             `}</style>
         </div>

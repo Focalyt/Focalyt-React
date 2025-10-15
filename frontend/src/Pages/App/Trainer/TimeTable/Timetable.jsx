@@ -24,6 +24,16 @@ function TimeTable() {
     const [viewDetailModal, setViewDetailModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
 
+    // Media Upload Modal States
+    const [showMediaModal, setShowMediaModal] = useState(false);
+    const [mediaFiles, setMediaFiles] = useState({
+        videos: [],
+        images: [],
+        pdfs: []
+    });
+    const [uploadingFiles, setUploadingFiles] = useState(false);
+
+
     // Form States
     const [chapterForm, setChapterForm] = useState({
         chapterNumber: '',
@@ -42,8 +52,9 @@ function TimeTable() {
     });
 
     const [subTopicForm, setSubTopicForm] = useState({
+        subTopicNumber: '',
         subTopicTitle: '',
-            description: '',
+        description: '',
         duration: '',
         content: ''
     });
@@ -129,36 +140,40 @@ function TimeTable() {
         setLoading(true);
         try {
             const response = await axios.get(`${backendUrl}/college/getCurriculum`, {
-                params: { 
-                    courseId: selectedCourse, 
-                    batchId: selectedBatch 
+                params: {
+                    courseId: selectedCourse,
+                    batchId: selectedBatch
                 },
                 headers: { 'x-auth': token }
             });
-            
+
             if (response.data.status) {
                 const curriculumData = response.data.data;
                 if (curriculumData && curriculumData.chapters) {
-                    const formattedCurriculum = curriculumData.chapters.map(chapter => ({
-                        id: Date.now() + Math.random(), 
+                    const formattedCurriculum = curriculumData.chapters.map((chapter, chapterIndex) => ({
+                        id: chapter._id || `chapter-${chapter.chapterNumber}-${chapterIndex}`,
                         chapterNumber: chapter.chapterNumber,
                         chapterTitle: chapter.chapterTitle,
                         description: chapter.description,
                         duration: chapter.duration,
                         objectives: chapter.objectives,
-                        topics: chapter.topics.map(topic => ({
-                            id: Date.now() + Math.random(),
+                        media: chapter.media || { videos: [], images: [], pdfs: [] },
+                        topics: chapter.topics.map((topic, topicIndex) => ({
+                            id: topic._id || `topic-${chapter.chapterNumber}-${topic.topicNumber}-${topicIndex}`,
                             topicNumber: topic.topicNumber,
                             topicTitle: topic.topicTitle,
                             description: topic.description,
                             duration: topic.duration,
                             resources: topic.resources,
-                            subTopics: topic.subTopics.map(subTopic => ({
-                                id: Date.now() + Math.random(),
+                            media: topic.media || { videos: [], images: [], pdfs: [] },
+                            subTopics: topic.subTopics.map((subTopic, subTopicIndex) => ({
+                                id: subTopic._id || `subtopic-${chapter.chapterNumber}-${topic.topicNumber}-${subTopicIndex}`,
+                                subTopicNumber: subTopic.subTopicNumber,
                                 subTopicTitle: subTopic.subTopicTitle,
                                 description: subTopic.description,
                                 duration: subTopic.duration,
-                                content: subTopic.content
+                                content: subTopic.content,
+                                media: subTopic.media || { videos: [], images: [], pdfs: [] }
                             }))
                         }))
                     }));
@@ -180,7 +195,7 @@ function TimeTable() {
     const handleAddChapter = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
+
         try {
             const chapterData = {
                 courseId: selectedCourse,
@@ -206,7 +221,7 @@ function TimeTable() {
             if (response.data.status) {
                 // Add chapter to local state
                 const newChapter = {
-                    id: Date.now(),
+                    id: response.data.data?._id || `chapter-${chapterForm.chapterNumber}-${Date.now()}`,
                     chapterNumber: parseInt(chapterForm.chapterNumber),
                     chapterTitle: chapterForm.chapterTitle,
                     description: chapterForm.description,
@@ -214,7 +229,7 @@ function TimeTable() {
                     objectives: chapterForm.objectives,
                     topics: []
                 };
-                
+
                 setCurriculum([...curriculum, newChapter]);
                 setShowChapterModal(false);
                 resetChapterForm();
@@ -234,7 +249,7 @@ function TimeTable() {
     const handleAddTopic = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
+
         try {
             const topicData = {
                 courseId: selectedCourse,
@@ -263,7 +278,7 @@ function TimeTable() {
                         return {
                             ...chapter,
                             topics: [...(chapter.topics || []), {
-                                id: Date.now(),
+                                id: response.data.data?._id || `topic-${chapter.chapterNumber}-${topicForm.topicNumber}-${Date.now()}`,
                                 topicNumber: topicForm.topicNumber,
                                 topicTitle: topicForm.topicTitle,
                                 description: topicForm.description,
@@ -275,7 +290,7 @@ function TimeTable() {
                     }
                     return chapter;
                 });
-                
+
                 setCurriculum(updatedCurriculum);
                 setShowTopicModal(false);
                 resetTopicForm();
@@ -295,13 +310,14 @@ function TimeTable() {
     const handleAddSubTopic = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
+
         try {
             const subTopicData = {
                 courseId: selectedCourse,
                 batchId: selectedBatch,
                 chapterNumber: selectedChapter.chapterNumber,
                 topicNumber: selectedTopic.topicNumber,
+                subTopicNumber: subTopicForm.subTopicNumber,
                 subTopicTitle: subTopicForm.subTopicTitle,
                 description: subTopicForm.description,
                 duration: subTopicForm.duration,
@@ -328,7 +344,8 @@ function TimeTable() {
                                     return {
                                         ...topic,
                                         subTopics: [...(topic.subTopics || []), {
-                                            id: Date.now(),
+                                            id: response.data.data?._id || `subtopic-${selectedChapter.chapterNumber}-${selectedTopic.topicNumber}-${Date.now()}`,
+                                            subTopicNumber: subTopicForm.subTopicNumber,
                                             subTopicTitle: subTopicForm.subTopicTitle,
                                             description: subTopicForm.description,
                                             duration: subTopicForm.duration,
@@ -342,18 +359,18 @@ function TimeTable() {
                     }
                     return chapter;
                 });
-                
+
                 setCurriculum(updatedCurriculum);
                 setShowSubTopicModal(false);
                 resetSubTopicForm();
                 alert('Sub-topic added successfully!');
             } else {
-                alert(response.data.message || 'Failed to add sub-topic');
+                alert(response.data.message);
             }
 
         } catch (error) {
             console.error('Error adding sub-topic:', error);
-            alert(error?.response?.data?.message || 'Failed to add sub-topic');
+            alert(error?.response?.data?.message);
         } finally {
             setLoading(false);
         }
@@ -369,7 +386,7 @@ function TimeTable() {
         if (window.confirm('Are you sure you want to delete this topic?')) {
             const updatedCurriculum = curriculum.map(chapter => {
                 if (chapter.id === chapterId) {
-                return {
+                    return {
                         ...chapter,
                         topics: chapter.topics.filter(t => t.id !== topicId)
                     };
@@ -441,6 +458,7 @@ function TimeTable() {
 
     const resetSubTopicForm = () => {
         setSubTopicForm({
+            subTopicNumber: '',
             subTopicTitle: '',
             description: '',
             duration: '',
@@ -448,7 +466,146 @@ function TimeTable() {
         });
     };
 
-        return (
+    // Dynamic numbering functions
+    const getNextChapterNumber = () => {
+        if (curriculum.length === 0) return 1;
+        const maxChapterNumber = Math.max(...curriculum.map(chapter => chapter.chapterNumber));
+        return maxChapterNumber + 1;
+    };
+
+    const getNextTopicNumber = (chapterNumber) => {
+        const chapter = curriculum.find(ch => ch.chapterNumber === chapterNumber);
+        if (!chapter || !chapter.topics || chapter.topics.length === 0) return 1;
+        const maxTopicNumber = Math.max(...chapter.topics.map(topic => parseInt(topic.topicNumber) || 0));
+        return maxTopicNumber + 1;
+    };
+
+    const getNextSubTopicNumber = (chapterNumber, topicNumber) => {
+        const chapter = curriculum.find(ch => ch.chapterNumber === chapterNumber);
+        if (!chapter) return `${topicNumber}.1`;
+
+        const topic = chapter.topics.find(t => t.topicNumber === topicNumber.toString());
+        if (!topic || !topic.subTopics || topic.subTopics.length === 0) return `${topicNumber}.1`;
+
+        const maxSubTopicNumber = Math.max(...topic.subTopics.map(subTopic => {
+            const parts = subTopic.subTopicTitle?.split('.') || ['0'];
+            return parseInt(parts[parts.length - 1]) || 0;
+        }));
+        return `${topicNumber}.${maxSubTopicNumber + 1}`;
+    };
+
+    // Calculate total media count for a chapter (including all topics and subtopics)
+    const getChapterMediaCount = (chapter) => {
+        let totalVideos = 0;
+        let totalImages = 0;
+        let totalPdfs = 0;
+
+        // Count chapter's own media
+        if (chapter.media) {
+            totalVideos += chapter.media.videos?.length || 0;
+            totalImages += chapter.media.images?.length || 0;
+            totalPdfs += chapter.media.pdfs?.length || 0;
+        }
+
+        // Count all topics' media
+        if (chapter.topics && chapter.topics.length > 0) {
+            chapter.topics.forEach(topic => {
+                if (topic.media) {
+                    totalVideos += topic.media.videos?.length || 0;
+                    totalImages += topic.media.images?.length || 0;
+                    totalPdfs += topic.media.pdfs?.length || 0;
+                }
+
+                // Count all subtopics' media
+                if (topic.subTopics && topic.subTopics.length > 0) {
+                    topic.subTopics.forEach(subTopic => {
+                        if (subTopic.media) {
+                            totalVideos += subTopic.media.videos?.length || 0;
+                            totalImages += subTopic.media.images?.length || 0;
+                            totalPdfs += subTopic.media.pdfs?.length || 0;
+                        }
+                    });
+                }
+            });
+        }
+
+        return { videos: totalVideos, images: totalImages, pdfs: totalPdfs };
+    };
+
+    // Media Upload Functions
+    const openMediaModal = (item) => {
+        setSelectedItem(item);
+        setMediaFiles({
+            videos: [],
+            images: [],
+            pdfs: []
+        });
+        setShowMediaModal(true);
+    };
+
+    const handleFileSelect = (e, fileType) => {
+        const files = Array.from(e.target.files);
+        setMediaFiles(prev => ({
+            ...prev,
+            [fileType]: [...prev[fileType], ...files]
+        }));
+    };
+
+    const removeSelectedFile = (fileType, index) => {
+        setMediaFiles(prev => ({
+            ...prev,
+            [fileType]: prev[fileType].filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleUploadMedia = async () => {
+        setUploadingFiles(true);
+        try {
+            const formData = new FormData();
+            formData.append('courseId', selectedCourse);
+            formData.append('batchId', selectedBatch);
+            formData.append('mediaType', selectedItem.type);
+
+            formData.append('chapterNumber', selectedItem.chapterNumber);
+            formData.append('topicNumber', selectedItem.data.topicNumber);
+
+            mediaFiles.videos.forEach(file => {
+                formData.append('videos', file);
+            });
+
+            mediaFiles.images.forEach(file => {
+                formData.append('images', file);
+            });
+
+            mediaFiles.pdfs.forEach(file => {
+                formData.append('pdfs', file);
+            });
+
+            const response = await axios.post(`${backendUrl}/college/uploadmedia`, formData, {
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+
+            if (response.data.status) {
+                alert(`Media uploaded successfully!`);
+                setShowMediaModal(false);
+                await fetchCurriculum();
+            } else {
+                alert(response.data.message);
+            }
+        } catch (error) {
+            console.error('Error uploading media:', error);
+            alert(error?.response?.data?.message);
+        } finally {
+            setUploadingFiles(false);
+        }
+    };
+
+
+    return (
         <div className="curriculum-container">
             {/* Header */}
             <div className="curriculum-header">
@@ -458,8 +615,8 @@ function TimeTable() {
                         Course Curriculum Manager
                     </h2>
                     <p className="page-subtitle">Organize chapters, topics, and sub-topics like a book's table of contents</p>
-                            </div>
-                    </div>
+                </div>
+            </div>
 
             {/* Course & Batch Selection */}
             <div className="selection-bar">
@@ -484,7 +641,7 @@ function TimeTable() {
                             </option>
                         ))}
                     </select>
-                                        </div>
+                </div>
 
                 <div className="selection-group">
                     <label>Select Batch *</label>
@@ -503,66 +660,73 @@ function TimeTable() {
                             </option>
                         ))}
                     </select>
-                    </div>
+                </div>
 
                 {selectedCourse && selectedBatch && (
-                    <button className="btn btn-primary" onClick={() => setShowChapterModal(true)}>
+                    <button className="btn btn-primary" onClick={() => {
+                        const nextChapterNumber = getNextChapterNumber();
+                        setChapterForm({
+                            ...chapterForm,
+                            chapterNumber: nextChapterNumber.toString()
+                        });
+                        setShowChapterModal(true);
+                    }}>
                         <i className="fas fa-plus me-2"></i>
                         Add New Chapter
                     </button>
-                                                )}
-                                            </div>
+                )}
+            </div>
 
             {/* Statistics */}
             {selectedCourse && selectedBatch && (
-            <div className="stats-row">
-                <div className="stat-card stat-primary">
-                    <div className="stat-icon">
+                <div className="stats-row">
+                    <div className="stat-card stat-primary">
+                        <div className="stat-icon">
                             <i className="fas fa-book-open"></i>
-                    </div>
-                    <div className="stat-content">
+                        </div>
+                        <div className="stat-content">
                             <div className="stat-value">{curriculum.length}</div>
                             <div className="stat-label">Total Chapters</div>
-                    </div>
-                </div>
-                <div className="stat-card stat-success">
-                    <div className="stat-icon">
-                            <i className="fas fa-list"></i>
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-value">
-                                {curriculum.reduce((acc, ch) => acc + (ch.topics?.length || 0), 0)}
                         </div>
+                    </div>
+                    <div className="stat-card stat-success">
+                        <div className="stat-icon">
+                            <i className="fas fa-list"></i>
+                        </div>
+                        <div className="stat-content">
+                            <div className="stat-value">
+                                {curriculum.reduce((acc, ch) => acc + (ch.topics?.length || 0), 0)}
+                            </div>
                             <div className="stat-label">Total Topics</div>
+                        </div>
                     </div>
-                </div>
-                <div className="stat-card stat-info">
-                    <div className="stat-icon">
+                    <div className="stat-card stat-info">
+                        <div className="stat-icon">
                             <i className="fas fa-stream"></i>
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-value">
+                        </div>
+                        <div className="stat-content">
+                            <div className="stat-value">
                                 {curriculum.reduce((acc, ch) =>
                                     acc + (ch.topics?.reduce((tacc, t) => tacc + (t.subTopics?.length || 0), 0) || 0), 0
                                 )}
-                        </div>
+                            </div>
                             <div className="stat-label">Total Sub-topics</div>
+                        </div>
                     </div>
-                </div>
-                <div className="stat-card stat-warning">
-                    <div className="stat-icon">
+                    <div className="stat-card stat-warning">
+                        <div className="stat-icon">
                             <i className="fas fa-clock"></i>
-                    </div>
-                    <div className="stat-content">
+                        </div>
+                        <div className="stat-content">
                             <div className="stat-value">
                                 {curriculum.reduce((acc, ch) => {
                                     const weeks = parseInt(ch.duration) || 0;
                                     return acc + weeks;
                                 }, 0)}
-                    </div>
+                            </div>
                             <div className="stat-label">Total Duration (weeks)</div>
-                </div>
-            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -575,14 +739,14 @@ function TimeTable() {
                                 <i className="fas fa-table me-2"></i>
                                 Table of Contents
                             </h3>
-                </div>
+                        </div>
 
                         {curriculum.length === 0 ? (
                             <div className="empty-state">
                                 <i className="fas fa-book-open"></i>
                                 <h4>No Curriculum Added Yet</h4>
                                 <p>Start by adding your first chapter</p>
-                               
+
                             </div>
                         ) : (
                             <div className="chapters-list">
@@ -592,55 +756,45 @@ function TimeTable() {
                                             <div className="chapter-left" onClick={() => toggleChapter(chapter.id)}>
                                                 <button className="expand-btn">
                                                     <i className={`fas fa-chevron-${expandedChapters.includes(chapter.id) ? 'down' : 'right'}`}></i>
-                    </button>
+                                                </button>
                                                 <div className="chapter-number">
                                                     Chapter {chapter.chapterNumber}
-                    </div>
+                                                </div>
                                                 <div className="chapter-title">
                                                     {chapter.chapterTitle}
-                </div>
+                                                </div>
                                             </div>
                                             <div className="chapter-actions">
+                                                <div className="topic-actions">
+                                                    <span className="media-badge small">
+                                                        <i className="fas fa-video"></i> {getChapterMediaCount(chapter).videos}
+                                                        <i className="fas fa-image ml-1"></i> {getChapterMediaCount(chapter).images}
+                                                        <i className="fas fa-file-pdf ml-1"></i> {getChapterMediaCount(chapter).pdfs}
+                                                    </span>
+                                                </div>
                                                 <span className="duration-badge">
                                                     <i className="fas fa-clock"></i> {chapter.duration}
                                                 </span>
-                        <button
+                                                <button
                                                     className="btn-action btn-add"
                                                     onClick={() => {
                                                         setSelectedChapter(chapter);
+                                                        const nextTopicNumber = getNextTopicNumber(chapter.chapterNumber);
+                                                        setTopicForm({
+                                                            ...topicForm,
+                                                            topicNumber: nextTopicNumber.toString()
+                                                        });
                                                         setShowTopicModal(true);
                                                     }}
                                                     title="Add Topic"
                                                 >
                                                     <i className="fas fa-plus"></i>
-                        </button>
-                        <button
-                                                    className="btn-action btn-view"
-                                                    onClick={() => {
-                                                        setSelectedItem({ type: 'chapter', data: chapter });
-                                                        setViewDetailModal(true);
-                                                    }}
-                                                    title="View Details"
-                                                >
-                                                    <i className="fas fa-eye"></i>
-                        </button>
-                        <button
-                                                    className="btn-action btn-delete"
-                                                    onClick={() => handleDeleteChapter(chapter.id)}
-                                                    title="Delete Chapter"
-                        >
-                                                    <i className="fas fa-trash"></i>
-                        </button>
-                </div>
-            </div>
+                                                </button>
+                                            </div>
+                                        </div>
 
                                         {expandedChapters.includes(chapter.id) && (
                                             <div className="chapter-content">
-                                                {chapter.description && (
-                                                    <div className="chapter-description">
-                                                        {chapter.description}
-            </div>
-                                                )}
 
                                                 {chapter.topics && chapter.topics.length > 0 ? (
                                                     <div className="topics-list">
@@ -653,118 +807,128 @@ function TimeTable() {
                                                                         </button>
                                                                         <div className="topic-number">
                                                                             {topic.topicNumber}
-                        </div>
+                                                                        </div>
                                                                         <div className="topic-title">
                                                                             {topic.topicTitle}
-                                    </div>
-                                </div>
+                                                                        </div>
+                                                                    </div>
                                                                     <div className="topic-actions">
-                                                                        <span className="duration-badge small">
-                                                                            <i className="fas fa-clock"></i> {topic.duration}
+                                                                        <span className="media-badge small">
+                                                                            <i className="fas fa-video"></i> {topic.media?.videos?.length || 0}
+                                                                            <i className="fas fa-image ml-1"></i> {topic.media?.images?.length || 0}
+                                                                            <i className="fas fa-file-pdf ml-1"></i> {topic.media?.pdfs?.length || 0}
                                                                         </span>
+                                                                        {/* <span className="duration-badge small">
+                                                                            <i className="fas fa-clock"></i> {topic.duration}
+                                                                        </span> */}
                                                                         <button
-                                                                            className="btn-action btn-add small"
-                                                                            onClick={() => {
-                                                                                setSelectedChapter(chapter);
-                                                                                setSelectedTopic(topic);
-                                                                                setShowSubTopicModal(true);
-                                                                            }}
-                                                                            title="Add Sub-topic"
+                                                                            className="btn-action btn-upload small"
+                                                                            onClick={() => openMediaModal({
+                                                                                type: 'topic',
+                                                                                data: topic,
+                                                                                chapterNumber: chapter.chapterNumber
+                                                                            })}
+                                                                            title="Upload Media"
                                                                         >
-                                                                            <i className="fas fa-plus"></i>
+                                                                            <i className="fas fa-upload"></i>
                                                                         </button>
-                                                                        <button
-                                                                            className="btn-action btn-view small"
-                                                                            onClick={() => {
-                                                                                setSelectedItem({ type: 'topic', data: topic });
-                                                                                setViewDetailModal(true);
-                                                                            }}
-                                                                            title="View Details"
-                                                                        >
-                                                                            <i className="fas fa-eye"></i>
-                                                                        </button>
-                                                                        <button
-                                                                            className="btn-action btn-delete small"
-                                                                            onClick={() => handleDeleteTopic(chapter.id, topic.id)}
-                                                                            title="Delete Topic"
-                                                                        >
-                                                                            <i className="fas fa-trash"></i>
-                                                                        </button>
-                                    </div>
-                                </div>
+
+                                                                    </div>
+                                                                </div>
 
                                                                 {expandedTopics.includes(topic.id) && (
                                                                     <div className="topic-content">
-                                                                        {topic.description && (
+                                                                        {/* {topic.description && (
                                                                             <div className="topic-description">
                                                                                 {topic.description}
-                                    </div>
-                                                                        )}
+                                                                            </div>
+                                                                        )} */}
 
+                                                                        {/* Show Uploaded Media */}
+                                                                        {(topic.media?.videos?.length > 0 || topic.media?.images?.length > 0 || topic.media?.pdfs?.length > 0) && (
+                                                                            <div className="media-preview-section">
+                                                                                <h6>Uploaded Media:</h6>
+                                                                                <div className="media-grid">
+                                                                                    {topic.media.videos?.map((video, idx) => (
+                                                                                        <div key={idx} className="media-item small video-container">
+                                                                                            <video
+                                                                                                controls
+                                                                                                src={video.url}
+                                                                                                className="embedded-video"
+                                                                                                preload="metadata"
+                                                                                            >
+                                                                                                Your browser does not support the video tag.
+                                                                                            </video>
+                                                                                            <span className="video-name">{video.name || `Video ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {topic.media.images?.map((image, idx) => (
+                                                                                        <div key={idx} className="media-item small image-container">
+                                                                                            <img
+                                                                                                src={image.url}
+                                                                                                alt={image.name || `Image ${idx + 1}`}
+                                                                                                className="embedded-image"
+                                                                                                loading="lazy"
+                                                                                            />
+                                                                                            <span className="image-name">{image.name || `Image ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                    {topic.media.pdfs?.map((pdf, idx) => (
+                                                                                        <div key={idx} className="media-item small pdf-container">
+                                                                                            <iframe
+                                                                                                src={pdf.url}
+                                                                                                title={pdf.name || `PDF ${idx + 1}`}
+                                                                                                className="embedded-pdf"
+                                                                                            >
+                                                                                                Your browser does not support PDFs.
+                                                                                            </iframe>
+                                                                                            <span className="pdf-name">{pdf.name || `PDF ${idx + 1}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        {/* 
                                                                         {topic.subTopics && topic.subTopics.length > 0 ? (
                                                                             <div className="subtopics-list">
-                                                                                {topic.subTopics.map((subTopic, subIndex) => (
+                                                                                {topic.subTopics.map((subTopic, subTopicIndex) => (
                                                                                     <div key={subTopic.id} className="subtopic-item">
                                                                                         <div className="subtopic-header">
                                                                                             <div className="subtopic-left">
-                                                                                                <div className="subtopic-bullet">•</div>
+                                                                                                <div className="subtopic-number">
+                                                                                                    {subTopic.subTopicNumber || '•'}
+                                                                                                </div>
                                                                                                 <div className="subtopic-title">
                                                                                                     {subTopic.subTopicTitle}
-                                    </div>
+                                                                                                </div>
                                                                                             </div>
-                                                                                            <div className="subtopic-actions">
-                                                                                                <span className="duration-badge small">
-                                                                                                    <i className="fas fa-clock"></i> {subTopic.duration}
-                                                                                                </span>
-                                                <button
-                                                                                                    className="btn-action btn-view small"
-                                                                                                    onClick={() => {
-                                                                                                        setSelectedItem({ type: 'subtopic', data: subTopic });
-                                                                                                        setViewDetailModal(true);
-                                                                                                    }}
-                                                                                                    title="View Details"
-                                                                                                >
-                                                                                                    <i className="fas fa-eye"></i>
-                                                                                                </button>
-                                                                                                <button
-                                                                                                    className="btn-action btn-delete small"
-                                                                                                    onClick={() => handleDeleteSubTopic(chapter.id, topic.id, subTopic.id)}
-                                                                                                    title="Delete Sub-topic"
-                                                                                                >
-                                                                                                    <i className="fas fa-trash"></i>
-                                                                                                </button>
-                                                                                            </div>
+                                                                                      
                                                                                         </div>
-                                                                                        {subTopic.description && (
-                                                                                            <div className="subtopic-description">
-                                                                                                {subTopic.description}
-                                                                                            </div>
-                                                                                        )}
                                                                                     </div>
-                                            ))}
-                                        </div>
+                                                                                ))}
+                                                                            </div>
                                                                         ) : (
                                                                             <div className="empty-subtopics">
                                                                                 <p>No sub-topics added yet</p>
-                                    </div>
-                                                                        )}
-                                </div>
+                                                                            </div>
+                                                                        )} */}
+                                                                    </div>
                                                                 )}
-                                    </div>
+                                                            </div>
                                                         ))}
-                                    </div>
+                                                    </div>
                                                 ) : (
                                                     <div className="empty-topics">
                                                         <p>No topics added yet</p>
-                                </div>
+                                                    </div>
                                                 )}
-                                    </div>
+                                            </div>
                                         )}
-                                </div>
-                                ))}
                                     </div>
+                                ))}
+                            </div>
                         )}
-                                </div>
+                    </div>
                 </div>
             )}
 
@@ -782,43 +946,43 @@ function TimeTable() {
                         <form onSubmit={handleAddChapter}>
                             <div className="modal-body">
                                 <div className="form-row">
-                                        <div className="form-group">
+                                    <div className="form-group">
                                         <label>Chapter Number *</label>
                                         <input
                                             type="number"
-                                                className="form-control"
+                                            className="form-control"
                                             value={chapterForm.chapterNumber}
-                                            onChange={(e) => setChapterForm({ ...chapterForm, chapterNumber: e.target.value })}
-                                                required
-                                            placeholder="e.g., 1"
+                                            readOnly
+                                            required
+                                            style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                                         />
-                                        </div>
-                                        <div className="form-group">
+                                    </div>
+                                    <div className="form-group">
                                         <label>Duration *</label>
-                                            <input
+                                        <input
                                             type="text"
-                                                className="form-control"
+                                            className="form-control"
                                             value={chapterForm.duration}
                                             onChange={(e) => setChapterForm({ ...chapterForm, duration: e.target.value })}
-                                                required
+                                            required
                                             placeholder="e.g., 2 weeks"
-                                            />
-                                        </div>
+                                        />
                                     </div>
-                                    <div className="form-row">
+                                </div>
+                                <div className="form-row">
                                     <div className="form-group">
                                         <label>Chapter Title *</label>
-                                                        <input
-                                                            type="text"
+                                        <input
+                                            type="text"
                                             className="form-control"
                                             value={chapterForm.chapterTitle}
                                             onChange={(e) => setChapterForm({ ...chapterForm, chapterTitle: e.target.value })}
                                             required
                                             placeholder="e.g., Introduction to Programming"
-                                                        />
-                                                    </div>
-                                            </div>
-                                    <div className="form-row">
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
                                     <div className="form-group">
                                         <label>Description</label>
                                         <textarea
@@ -827,9 +991,9 @@ function TimeTable() {
                                             value={chapterForm.description}
                                             onChange={(e) => setChapterForm({ ...chapterForm, description: e.target.value })}
                                             placeholder="Brief description of the chapter..."
-                                                                    />
-                                                                </div>
-                                                        </div>
+                                        />
+                                    </div>
+                                </div>
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label>Learning Objectives</label>
@@ -877,11 +1041,11 @@ function TimeTable() {
                                             type="text"
                                             className="form-control"
                                             value={topicForm.topicNumber}
-                                            onChange={(e) => setTopicForm({ ...topicForm, topicNumber: e.target.value })}
+                                            readOnly
                                             required
-                                            placeholder="e.g., 1.1"
-                                            />
-                                        </div>
+                                            style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
+                                        />
+                                    </div>
                                     <div className="form-group">
                                         <label>Duration *</label>
                                         <input
@@ -961,49 +1125,37 @@ function TimeTable() {
                             <div className="modal-body">
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label>Sub-topic Title *</label>
+                                        <label>Sub Topic Number *</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={subTopicForm.subTopicNumber}
+                                            readOnly
+                                            required
+                                            style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Duration</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={subTopicForm.duration}
+                                            onChange={(e) => setSubTopicForm({ ...subTopicForm, duration: e.target.value })}
+                                            placeholder="e.g., 30 mins"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Sub Topic Title *</label>
                                         <input
                                             type="text"
                                             className="form-control"
                                             value={subTopicForm.subTopicTitle}
                                             onChange={(e) => setSubTopicForm({ ...subTopicForm, subTopicTitle: e.target.value })}
                                             required
-                                            placeholder="e.g., Integer Data Type"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Duration *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            value={subTopicForm.duration}
-                                            onChange={(e) => setSubTopicForm({ ...subTopicForm, duration: e.target.value })}
-                                            required
-                                            placeholder="e.g., 1 day"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Description</label>
-                                        <textarea
-                                            className="form-control"
-                                            rows="3"
-                                            value={subTopicForm.description}
-                                            onChange={(e) => setSubTopicForm({ ...subTopicForm, description: e.target.value })}
-                                            placeholder="Brief description of the sub-topic..."
-                                        />
-                                        </div>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Content</label>
-                                        <textarea
-                                            className="form-control"
-                                            rows="4"
-                                            value={subTopicForm.content}
-                                            onChange={(e) => setSubTopicForm({ ...subTopicForm, content: e.target.value })}
-                                            placeholder="Detailed content, examples, notes..."
+                                            placeholder="e.g., Introduction to Variables"
                                         />
                                     </div>
                                 </div>
@@ -1040,89 +1192,227 @@ function TimeTable() {
                                         <strong>Chapter Number:</strong>
                                         <span>{selectedItem.data.chapterNumber}</span>
                                     </div>
-                            <div className="detail-row">
-                                <strong>Title:</strong>
+                                    <div className="detail-row">
+                                        <strong>Title:</strong>
                                         <span>{selectedItem.data.chapterTitle}</span>
-                            </div>
-                            <div className="detail-row">
+                                    </div>
+                                    <div className="detail-row">
                                         <strong>Duration:</strong>
                                         <span>{selectedItem.data.duration}</span>
-                            </div>
+                                    </div>
                                     {selectedItem.data.description && (
-                                <div className="detail-row">
+                                        <div className="detail-row">
                                             <strong>Description:</strong>
                                             <span>{selectedItem.data.description}</span>
-                                </div>
-                            )}
+                                        </div>
+                                    )}
                                     {selectedItem.data.objectives && (
-                            <div className="detail-row">
+                                        <div className="detail-row">
                                             <strong>Objectives:</strong>
                                             <span>{selectedItem.data.objectives}</span>
-                            </div>
+                                        </div>
                                     )}
                                 </>
                             )}
                             {selectedItem.type === 'topic' && (
                                 <>
-                            <div className="detail-row">
+                                    <div className="detail-row">
                                         <strong>Topic Number:</strong>
                                         <span>{selectedItem.data.topicNumber}</span>
-                            </div>
-                            <div className="detail-row">
+                                    </div>
+                                    <div className="detail-row">
                                         <strong>Title:</strong>
                                         <span>{selectedItem.data.topicTitle}</span>
-                            </div>
-                                <div className="detail-row">
-                                    <strong>Duration:</strong>
-                                        <span>{selectedItem.data.duration}</span>
-                                </div>
-                                    {selectedItem.data.description && (
-                                <div className="detail-row">
-                                    <strong>Description:</strong>
-                                            <span>{selectedItem.data.description}</span>
-                                </div>
-                            )}
-                                    {selectedItem.data.resources && (
-                                <div className="detail-row">
-                                            <strong>Resources:</strong>
-                                            <span>{selectedItem.data.resources}</span>
-                                </div>
-                            )}
-                                </>
-                            )}
-                            {selectedItem.type === 'subtopic' && (
-                                <>
-                                <div className="detail-row">
-                                        <strong>Title:</strong>
-                                        <span>{selectedItem.data.subTopicTitle}</span>
-                                                        </div>
+                                    </div>
                                     <div className="detail-row">
                                         <strong>Duration:</strong>
                                         <span>{selectedItem.data.duration}</span>
-                                                </div>
+                                    </div>
                                     {selectedItem.data.description && (
                                         <div className="detail-row">
                                             <strong>Description:</strong>
                                             <span>{selectedItem.data.description}</span>
-                                </div>
+                                        </div>
+                                    )}
+                                    {selectedItem.data.resources && (
+                                        <div className="detail-row">
+                                            <strong>Resources:</strong>
+                                            <span>{selectedItem.data.resources}</span>
+                                        </div>
+                                    )}
+                                </>
                             )}
+                            {selectedItem.type === 'subtopic' && (
+                                <>
+                                    <div className="detail-row">
+                                        <strong>Sub Topic Number:</strong>
+                                        <span>{selectedItem.data.subTopicNumber}</span>
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Title:</strong>
+                                        <span>{selectedItem.data.subTopicTitle}</span>
+                                    </div>
+                                    <div className="detail-row">
+                                        <strong>Duration:</strong>
+                                        <span>{selectedItem.data.duration}</span>
+                                    </div>
                                     {selectedItem.data.content && (
                                         <div className="detail-row">
                                             <strong>Content:</strong>
                                             <span>{selectedItem.data.content}</span>
-                </div>
-            )}
+                                        </div>
+                                    )}
                                 </>
-                                )}
-                            </div>
-                            <div className="modal-footer">
+                            )}
+                        </div>
+                        <div className="modal-footer">
                             <button className="btn btn-outline" onClick={() => setViewDetailModal(false)}>
                                 Close
-                                </button>
-                            </div>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
+
+            {/* Media Upload Modal */}
+            {showMediaModal && selectedItem && (
+                <div className="modal-overlay" onClick={() => setShowMediaModal(false)}>
+                    <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>
+                                <i className="fas fa-upload me-2"></i>
+                                Upload Media to {selectedItem.type === 'chapter' ? 'Chapter' : selectedItem.type === 'topic' ? 'Topic' : 'Sub-topic'}
+                            </h3>
+                            <button className="btn-close" onClick={() => setShowMediaModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="upload-info-box">
+                                <strong>Uploading to:</strong> {selectedItem.data.chapterTitle || selectedItem.data.topicTitle || selectedItem.data.subTopicTitle}
+                            </div>
+
+                            {/* Video Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-video me-2"></i>
+                                    Videos
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="video/*"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'videos')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.videos.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.videos.length} video(s) selected:</p>
+                                        {mediaFiles.videos.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-video"></i> {file.name}</span>
+                                                <button
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('videos', idx)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Image Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-image me-2"></i>
+                                    Images
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'images')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.images.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.images.length} image(s) selected:</p>
+                                        {mediaFiles.images.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-image"></i> {file.name}</span>
+                                                <button
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('images', idx)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PDF Upload */}
+                            <div className="upload-section">
+                                <h4>
+                                    <i className="fas fa-file-pdf me-2"></i>
+                                    PDFs
+                                </h4>
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, 'pdfs')}
+                                    className="file-input"
+                                />
+                                {mediaFiles.pdfs.length > 0 && (
+                                    <div className="selected-files">
+                                        <p className="selected-count">{mediaFiles.pdfs.length} PDF(s) selected:</p>
+                                        {mediaFiles.pdfs.map((file, idx) => (
+                                            <div key={idx} className="file-item">
+                                                <span><i className="fas fa-file-pdf"></i> {file.name}</span>
+                                                <button
+                                                    className="btn-remove-file"
+                                                    onClick={() => removeSelectedFile('pdfs', idx)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => setShowMediaModal(false)}
+                                disabled={uploadingFiles}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleUploadMedia}
+                                disabled={uploadingFiles}
+                            >
+                                {uploadingFiles ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin me-2"></i>
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-upload me-2"></i>
+                                        Upload Media
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* Styles */}
             <style jsx>{`
@@ -1286,12 +1576,13 @@ function TimeTable() {
                 }
 
                 .chapter-item:hover {
-                    border-color: #2196f3;
+                    border-color: #fc2b5a;
                     box-shadow: 0 4px 12px rgba(33, 150, 243, 0.1);
                 }
 
                 .chapter-header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    // background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #fc2b5a 0%, #ed3f66cf 100%);
                     color: white;
                     padding: 1.25rem 1.5rem;
                     display: flex;
@@ -1395,6 +1686,285 @@ function TimeTable() {
                     background: #e74c3c;
                 }
 
+                .btn-action.btn-upload:hover {
+                    background: #4caf50;
+                }
+
+                .media-badge {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.5rem 1rem;
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .media-badge.small {
+                    padding: 0.4rem 0.8rem;
+                    font-size: 0.75rem;
+                }
+
+                .media-badge i {
+                    margin-right: 0.25rem;
+                }
+
+                .ml-1 {
+                    margin-left: 0.5rem;
+                }
+
+                .ml-2 {
+                    margin-left: 1rem;
+                }
+
+                .media-preview-section {
+                    background: #f9fafb;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin-bottom: 1rem;
+                }
+
+                .media-preview-section h5, .media-preview-section h6 {
+                    margin: 0 0 0.75rem 0;
+                    color: #2c3e50;
+                    font-weight: 600;
+                }
+
+                .media-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                    gap: 0.75rem;
+                    width: 100%;
+                }
+
+                .media-item {
+                    background: white;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    border: 1px solid #e0e0e0;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .media-item.small {
+                    padding: 0.5rem;
+                    font-size: 0.85rem;
+                }
+
+                .media-item i {
+                    color: #3498db;
+                }
+
+                .media-item span {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .video-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 5px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    background-color: #f9f9f9;
+                    margin-bottom: 5px;
+                }
+
+                .embedded-video {
+                    width: 100%;
+                    max-height: 120px;
+                    object-fit: cover;
+                    border-radius: 3px;
+                    margin-bottom: 5px;
+                }
+
+                .video-name {
+                    font-size: 0.8rem;
+                    color: #555;
+                    text-align: center;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    width: 100%;
+                }
+
+                .image-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 5px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    background-color: #f9f9f9;
+                    margin-bottom: 5px;
+                    overflow: hidden;
+                    max-width: 100%;
+                    min-height: 160px;
+                }
+
+                .embedded-image {
+                    width: 100%;
+                    max-height: 105px;
+                    height: 105px;
+                    object-fit: cover;
+                    border-radius: 3px;
+                    margin-bottom: 5px;
+                    cursor: pointer;
+                    transition: transform 0.3s;
+                    display: block;
+                }
+
+                .image-name {
+                    font-size: 0.75rem;
+                    color: #555;
+                    text-align: center;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    width: 100%;
+                    margin-top: 5px;
+                    padding: 2px;
+                    background: rgba(255, 255, 255, 0.9);
+                    border-radius: 3px;
+                    font-weight: 500;
+                }
+
+                .pdf-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 5px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    background-color: #f9f9f9;
+                    margin-bottom: 5px;
+                    overflow: hidden;
+                    max-width: 100%;
+                    min-height: 160px;
+                }
+
+                .embedded-pdf {
+                    width: 100%;
+                    max-height: 105px;
+                    height: 105px;
+                    border: none;
+                    border-radius: 3px;
+                    margin-bottom: 5px;
+                    display: block;
+                }
+
+                .pdf-name {
+                    font-size: 0.75rem;
+                    color: #555;
+                    text-align: center;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    width: 100%;
+                    margin-top: 5px;
+                    padding: 2px;
+                    background: rgba(255, 255, 255, 0.9);
+                    border-radius: 3px;
+                    font-weight: 500;
+                }
+
+                .modal-large {
+                    max-width: 700px;
+                }
+
+                .upload-info-box {
+                    background: #e3f2fd;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin-bottom: 1.5rem;
+                    color: #1565c0;
+                }
+
+                .upload-section {
+                    margin-bottom: 2rem;
+                }
+
+                .upload-section h4 {
+                    color: #2c3e50;
+                    font-size: 1.1rem;
+                    margin-bottom: 1rem;
+                }
+
+                .file-input {
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 2px dashed #3498db;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+
+                .file-input:hover {
+                    border-color: #2980b9;
+                    background: #f8f9fa;
+                }
+
+                .selected-files {
+                    margin-top: 1rem;
+                    background: #f9fafb;
+                    padding: 1rem;
+                    border-radius: 8px;
+                }
+
+                .selected-count {
+                    font-weight: 600;
+                    color: #2c3e50;
+                    margin-bottom: 0.75rem;
+                }
+
+                .file-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.5rem;
+                    background: white;
+                    border-radius: 6px;
+                    margin-bottom: 0.5rem;
+                    border: 1px solid #e0e0e0;
+                }
+
+                .file-item span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .file-item i {
+                    color: #3498db;
+                }
+
+                .btn-remove-file {
+                    background: #e74c3c;
+                    color: white;
+                    border: none;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 1.2rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s;
+                }
+
+                .btn-remove-file:hover {
+                    background: #c0392b;
+                    transform: scale(1.1);
+                }
+
                 .chapter-content {
                     padding: 1.5rem;
                     background: #fafbfc;
@@ -1423,7 +1993,8 @@ function TimeTable() {
                 }
 
                 .topic-header {
-                    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                    // background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
                     padding: 1rem 1.25rem;
                     display: flex;
@@ -1487,9 +2058,6 @@ function TimeTable() {
                 }
 
                 .subtopic-header {
-                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                    color: white;
-                    padding: 0.75rem 1rem;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -1502,9 +2070,14 @@ function TimeTable() {
                     flex: 1;
                 }
 
-                .subtopic-bullet {
-                    font-size: 1.5rem;
+                .subtopic-number {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.4rem 0.8rem;
+                    border-radius: 6px;
                     font-weight: 700;
+                    font-size: 0.85rem;
+                    min-width: 40px;
+                    text-align: center;
                 }
 
                 .subtopic-title {

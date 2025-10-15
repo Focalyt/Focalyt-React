@@ -1486,27 +1486,42 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Execute aggregation
 		const response = await AppliedCourses.aggregate(aggregationPipeline);
 
-		for (let doc of response) {
-			if (doc._candidate && doc._candidate.personalInfo) {
-				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
-					const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
-					if (state) {
-						doc._candidate.personalInfo.currentAddress.state = state.name;
+	for (let doc of response) {
+		if (doc._candidate && doc._candidate.personalInfo) {
+			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
+				if (typeof doc._candidate.personalInfo.currentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.state)) {
+					try {
+						const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
+						if (state) {
+							doc._candidate.personalInfo.currentAddress.state = state.name;
+						}
+					} catch (err) {
 					}
 				}
-				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
-					const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
-					if (city) {
-						doc._candidate.personalInfo.currentAddress.city = city.name;
+			}
+			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
+				if (typeof doc._candidate.personalInfo.currentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.city)) {
+					try {
+						const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
+						if (city) {
+							doc._candidate.personalInfo.currentAddress.city = city.name;
+						}
+					} catch (err) {
 					}
 				}
-				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
-					const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
-					if (state) {
-						doc._candidate.personalInfo.permanentAddress.state = state.name;
+			}
+			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+				if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
+					try {
+						const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+						if (state) {
+							doc._candidate.personalInfo.permanentAddress.state = state.name;
+						}
+					} catch (err) {
 					}
 				}
-				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+			}
+			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
 					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
 					if (city) {
 						doc._candidate.personalInfo.permanentAddress.city = city.name;
@@ -12804,7 +12819,7 @@ router.post('/addNewSubTopic', isTrainer, async (req, res) => {
 			content
 		} = req.body;
 
-		if (!courseId || !batchId || !chapterNumber || !topicNumber || !subTopicTitle) {
+		if (!courseId || !batchId || !chapterNumber ) {
 			return res.status(400).json({
 				status: false,
 				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, subTopicTitle'
@@ -12983,6 +12998,191 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		});
 	}
 
+})
+
+router.post('/uploadmedia', isTrainer, async (req, res) => {
+		
+	try {
+		const { courseId, batchId, chapterNumber, topicNumber, mediaType } = req.body;
+		// console.log("req.body", req.body)
+		if (!courseId || !batchId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required fields: courseId, batchId'
+			});
+		}
+
+		if (!chapterNumber) {
+			return res.status(400).json({
+				status: false,
+				message: 'Chapter number is required'
+			});
+		}
+
+		if (!req.files || Object.keys(req.files).length === 0) {
+			return res.status(400).json({
+				status: false,
+				message: 'No files uploaded'
+			});
+		}
+		const curriculum = await Curriculum.findOne({ courseId, batchId });
+
+		if (!curriculum) {
+			return res.status(404).json({
+				status: false,
+				message: 'Curriculum not found for this course and batch'
+			});
+		}
+
+		const chapter = curriculum.chapters.find(
+			ch => ch.chapterNumber === parseInt(chapterNumber)
+		);
+
+		if (!chapter) {
+			return res.status(404).json({
+				status: false,
+				message: `Chapter ${chapterNumber} not found`
+			});
+		}
+
+		if (!topicNumber) {
+			return res.status(400).json({
+				status: false,
+				message: 'Topic number is required for media upload'
+			});
+		}
+
+		const topic = chapter.topics.find(t => t.topicNumber === topicNumber);
+		
+		if (!topic) {
+			return res.status(404).json({
+				status: false,
+				message: `Topic ${topicNumber} not found in Chapter ${chapterNumber}`
+			});
+		}
+
+		if (!topic.media) {
+			topic.media = { videos: [], images: [], pdfs: [] };
+		}
+
+		const targetMediaObject = topic.media;
+		const targetLocation = `Chapter ${chapterNumber} - Topic ${topicNumber}`;
+
+		const uploadedFiles = {
+			videos: [],
+			images: [],
+			pdfs: []
+		};
+// console.log("targetMediaObject", targetMediaObject)
+// console.log("targetLocation", targetLocation)
+// console.log("uploadedFiles", uploadedFiles)
+		const uploadPromises = [];
+
+		const uploadToS3 = async (file, fileType) => {
+			const ext = file.name.split('.').pop().toLowerCase();
+			
+			let allowedExtensions = [];
+			if (fileType === 'videos') {
+				allowedExtensions = allowedVideoExtensions;
+			} else if (fileType === 'images') {
+				allowedExtensions = allowedImageExtensions;
+			} else if (fileType === 'pdfs') {
+				allowedExtensions = ['pdf'];
+			}
+
+			if (!allowedExtensions.includes(ext)) {
+				throw new Error(`Invalid file extension .${ext} for ${fileType}`);
+			}
+
+			const key = `Curriculum/${courseId}/${batchId}/Chapter-${chapterNumber}/${topicNumber ? `Topic-${topicNumber}/` : ''}${fileType}/${uuid()}.${ext}`;
+
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: file.data,
+				ContentType: file.mimetype,
+			};
+
+			const uploadResult = await s3.upload(params).promise();
+
+			return {
+				name: file.name,
+				url: uploadResult.Location,
+				size: file.size,
+				uploadedAt: new Date()
+			};
+		};
+
+		if (req.files.videos) {
+			const videoFiles = Array.isArray(req.files.videos) ? req.files.videos : [req.files.videos];
+			
+			for (const video of videoFiles) {
+				uploadPromises.push(
+					uploadToS3(video, 'videos').then(result => {
+						uploadedFiles.videos.push(result);
+					})
+				);
+			}
+		}
+
+		if (req.files.images) {
+			const imageFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+			
+			for (const image of imageFiles) {
+				uploadPromises.push(
+					uploadToS3(image, 'images').then(result => {
+						uploadedFiles.images.push(result);
+					})
+				);
+			}
+		}
+
+		if (req.files.pdfs) {
+			const pdfFiles = Array.isArray(req.files.pdfs) ? req.files.pdfs : [req.files.pdfs];
+			
+			for (const pdf of pdfFiles) {
+				uploadPromises.push(
+					uploadToS3(pdf, 'pdfs').then(result => {
+						uploadedFiles.pdfs.push(result);
+					})
+				);
+			}
+		}
+
+		await Promise.all(uploadPromises);
+
+		if (uploadedFiles.videos.length > 0) {
+			targetMediaObject.videos.push(...uploadedFiles.videos);
+		}
+		if (uploadedFiles.images.length > 0) {
+			targetMediaObject.images.push(...uploadedFiles.images);
+		}
+		if (uploadedFiles.pdfs.length > 0) {
+			targetMediaObject.pdfs.push(...uploadedFiles.pdfs);
+		}
+
+		await curriculum.save();
+
+console.log("uploadedFiles", uploadedFiles)
+console.log("totalFiles", uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length)
+console.log("targetLocation", targetLocation)
+		return res.status(200).json({
+			status: true,
+			message: `Media uploaded successfully to ${targetLocation}`,
+			data: {
+				uploadedFiles,
+				totalFiles: uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length
+			}
+		});
+
+	} catch (err) {
+		console.error('Error uploading media:', err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error uploading media',
+			error: err.message
+		});
+	}
 })
 
 module.exports = router;
