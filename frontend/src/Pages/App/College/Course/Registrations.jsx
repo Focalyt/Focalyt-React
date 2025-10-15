@@ -952,8 +952,6 @@ const CRMDashboard = () => {
         // Handle different message types
         if (data.type === 'message_status_update') {
           handleMessageStatusUpdate(data);
-        } else if (data.type === 'template_status_update') {
-          handleTemplateStatusUpdate(data);
         } else if (data.type === 'registered') {
           console.log('✅ Registered with WebSocket for college:', data.collegeId);
         } else if (data.type === 'pong') {
@@ -1019,45 +1017,6 @@ const CRMDashboard = () => {
     }
   };
 
-  // Handle template status updates from WebSocket
-  const handleTemplateStatusUpdate = (data) => {
-    console.log('📋 Template status update:', data);
-    
-    // Show notification to user
-    if (data.status === 'APPROVED') {
-      // Success notification
-      setNotification({
-        type: 'success',
-        message: `🎉 Template "${data.templateName}" has been approved and is ready to use!`,
-        show: true
-      });
-    } else if (data.status === 'REJECTED') {
-      // Error notification with rejection reason
-      setNotification({
-        type: 'error',
-        message: `❌ Template "${data.templateName}" was rejected: ${data.rejectionReason}`,
-        show: true
-      });
-    } else {
-      // Info notification for other status updates
-      setNotification({
-        type: 'info',
-        message: `ℹ️ Template "${data.templateName}" status updated to ${data.status}`,
-        show: true
-      });
-    }
-
-    // Auto-hide notification after 5 seconds
-    setTimeout(() => {
-      setNotification(prev => ({ ...prev, show: false }));
-    }, 5000);
-
-    // Refresh templates list to show updated status
-    if (selectedTemplate && selectedTemplate.templateName === data.templateName) {
-      // If the current template was updated, refresh the templates
-      fetchTemplates();
-    }
-  };
 
   // Keep WebSocket alive with ping
   useEffect(() => {
