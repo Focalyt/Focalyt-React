@@ -23,6 +23,14 @@ const WhatsAppTemplate = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCloneMode, setIsCloneMode] = useState(false);
 
+  // WebSocket and notification states
+  const [whatsappWs, setWhatsappWs] = useState(null);
+  const [notification, setNotification] = useState({
+    type: 'info',
+    message: '',
+    show: false
+  });
+
   const [editForm, setEditForm] = useState({
 
     name: '',
@@ -1079,6 +1087,105 @@ const WhatsAppTemplate = () => {
 
   }, []);
 
+  // WebSocket connection for template status updates
+  useEffect(() => {
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
+    const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
+    
+    console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
+    
+    const ws = new WebSocket(wsUrl);
+    setWhatsappWs(ws);
+
+    ws.onopen = () => {
+      console.log('✅ WhatsApp WebSocket connected');
+      
+      // Register with college ID
+      const collegeId = localStorage.getItem('collegeId') || sessionStorage.getItem('collegeId');
+      if (collegeId) {
+        ws.send(JSON.stringify({
+          type: 'register',
+          collegeId: collegeId
+        }));
+        console.log('✅ Registered with WebSocket for college:', collegeId);
+      }
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📨 WebSocket message received:', data);
+
+        // Handle different message types
+        if (data.type === 'template_status_update') {
+          handleTemplateStatusUpdate(data);
+        } else if (data.type === 'registered') {
+          console.log('✅ Registered with WebSocket for college:', data.collegeId);
+        } else if (data.type === 'pong') {
+          // Pong response for keep-alive
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('🔌 WhatsApp WebSocket disconnected');
+      // Attempt to reconnect after 3 seconds
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.CLOSED) {
+          console.log('🔄 Attempting to reconnect WebSocket...');
+          // This will trigger the useEffect again
+        }
+      }, 3000);
+    };
+
+    ws.onerror = (error) => {
+      console.error('❌ WhatsApp WebSocket error:', error);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  // Handle template status updates from WebSocket
+  const handleTemplateStatusUpdate = (data) => {
+    console.log('📋 Template status update:', data);
+    
+    // Show notification to user
+    if (data.status === 'APPROVED') {
+      // Success notification
+      setNotification({
+        type: 'success',
+        message: `🎉 Template "${data.templateName}" has been approved and is ready to use!`,
+        show: true
+      });
+    } else if (data.status === 'REJECTED') {
+      // Error notification with rejection reason
+      setNotification({
+        type: 'error',
+        message: `❌ Template "${data.templateName}" was rejected: ${data.rejectionReason}`,
+        show: true
+      });
+    } else {
+      // Info notification for other status updates
+      setNotification({
+        type: 'info',
+        message: `ℹ️ Template "${data.templateName}" status updated to ${data.status}`,
+        show: true
+      });
+    }
+
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, 5000);
+
+    // Refresh templates list to show updated status
+    fetchWhatsappTemplates();
+  };
+
 
 
   // Handle create modal show/hide
@@ -1224,6 +1331,8 @@ const WhatsAppTemplate = () => {
           headers: { 'x-auth': token }
         }
       );
+      console.log('Templates fetched successfully from Facebook:', response.data.data);
+
 
       if (response.data && response.data.data) {
         setTemplates(response.data.data);
@@ -1558,10 +1667,9 @@ const WhatsAppTemplate = () => {
 
   // Function to delete template
   const handleDeleteTemplate = async (template) => {
-    const templateId = template.template?.id || template.id;
     const templateName = template.template?.name || template.name;
 
-    if (!templateId) {
+    if (!templateName) {
       alert('Template ID not found');
       return;
     }
@@ -1585,7 +1693,7 @@ const WhatsAppTemplate = () => {
         return;
       }
 
-      const response = await axios.delete(`${backendUrl}/college/whatsapp/delete-template/${templateId}`, {
+      const response = await axios.delete(`${backendUrl}/college/whatsapp/delete-template/${templateName}`, {
         headers: { 'x-auth': token }
       });
 
@@ -3318,26 +3426,29 @@ const WhatsAppTemplate = () => {
 
                                 <video
 
-                                  src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
-
-                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
-
-                                    selectedTemplate?.template?.headerVideo ||
-
-                                    selectedTemplate?.headerVideo ||
-
-                                    selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
-
-                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url}
+                                  src={(() => {
+                                    const videoUrl = selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                      selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                      selectedTemplate?.template?.headerVideo ||
+                                      selectedTemplate?.headerVideo ||
+                                      selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
+                                      selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url;
+                                    
+                                    // Clean URL by removing spaces and extra characters
+                                    const cleanUrl = videoUrl ? videoUrl.replace(/\s+/g, '') : null;
+                                    
+                                    console.log('Video URL for template:', selectedTemplate?.name, ':', cleanUrl);
+                                    return cleanUrl;
+                                  })()}
 
                                   controls
-
+                                  preload="metadata"
+                                  crossOrigin="anonymous"
                                   className="image-uploaded"
-
                                   style={{ width: '100%', height: 'auto' }}
 
                                   onError={(e) => {
-
+                                    console.error('Video failed to load:', e.target.src);
                                     e.target.style.display = 'none';
 
                                   }}
@@ -8898,7 +9009,52 @@ background-color:#000000a3;
 
 
 
-  return renderTemplateList();
+  return (
+    <>
+      {/* Notification Toast */}
+      {notification.show && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 9999,
+            minWidth: '300px',
+            maxWidth: '500px',
+            backgroundColor: notification.type === 'success' ? '#28a745' : notification.type === 'error' ? '#dc3545' : '#17a2b8',
+            color: 'white',
+            padding: '15px 20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            animation: 'slideIn 0.3s ease-out',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ flex: 1, marginRight: '10px' }}>
+            {notification.message}
+          </div>
+          <button
+            onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '0',
+              lineHeight: '1'
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
+      {renderTemplateList()}
+    </>
+  );
 
 };
 
