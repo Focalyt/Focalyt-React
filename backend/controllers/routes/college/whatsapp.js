@@ -1783,7 +1783,7 @@ async function fetchTemplateFromFacebook(templateName) {
  */
 async function saveMessageToDatabase(messageData) {
   try {
-    const { to, message, templateName, collegeId, messageType = 'text', templateData = null, candidateId = null, candidateName = null } = messageData;
+    const { to, message, templateName, collegeId, messageType = 'text', templateData = null, candidateId = null, candidateName = null, whatsappMessageId = null } = messageData;
     
     // Create message document
     const messageDoc = {
@@ -1796,12 +1796,14 @@ async function saveMessageToDatabase(messageData) {
       status: 'sent',
       sentAt: new Date(),
       candidateId: candidateId,
-      candidateName: candidateName
+      candidateName: candidateName,
+      whatsappMessageId: whatsappMessageId
     };
     
     // Save to database
     const savedMessage = await WhatsAppMessage.create(messageDoc);
     console.log('Message saved to database:', savedMessage._id);
+    console.log('WhatsApp Message ID:', whatsappMessageId);
     
     return savedMessage;
   } catch (error) {
@@ -1907,7 +1909,7 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
  * POST /api/whatsapp/send
  * Send WhatsApp message with template
  */
-router.post('/send-template',isCollege, async (req, res) => {
+router.post('/send-template', async (req, res) => {
   try {
     const { templateName, to, collegeId } = req.body;
 
