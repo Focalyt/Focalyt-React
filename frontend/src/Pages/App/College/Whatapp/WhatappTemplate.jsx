@@ -1224,6 +1224,8 @@ const WhatsAppTemplate = () => {
           headers: { 'x-auth': token }
         }
       );
+      console.log('Templates fetched successfully from Facebook:', response.data.data);
+
 
       if (response.data && response.data.data) {
         setTemplates(response.data.data);
@@ -1558,10 +1560,9 @@ const WhatsAppTemplate = () => {
 
   // Function to delete template
   const handleDeleteTemplate = async (template) => {
-    const templateId = template.template?.id || template.id;
     const templateName = template.template?.name || template.name;
 
-    if (!templateId) {
+    if (!templateName) {
       alert('Template ID not found');
       return;
     }
@@ -1585,7 +1586,7 @@ const WhatsAppTemplate = () => {
         return;
       }
 
-      const response = await axios.delete(`${backendUrl}/college/whatsapp/delete-template/${templateId}`, {
+      const response = await axios.delete(`${backendUrl}/college/whatsapp/delete-template/${templateName}`, {
         headers: { 'x-auth': token }
       });
 
@@ -3318,26 +3319,29 @@ const WhatsAppTemplate = () => {
 
                                 <video
 
-                                  src={selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
-
-                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
-
-                                    selectedTemplate?.template?.headerVideo ||
-
-                                    selectedTemplate?.headerVideo ||
-
-                                    selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
-
-                                    selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url}
+                                  src={(() => {
+                                    const videoUrl = selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                      selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.example?.header_handle?.[0] ||
+                                      selectedTemplate?.template?.headerVideo ||
+                                      selectedTemplate?.headerVideo ||
+                                      selectedTemplate?.template?.components?.find(comp => comp.type === 'HEADER')?.video_url ||
+                                      selectedTemplate?.components?.find(comp => comp.type === 'HEADER')?.video_url;
+                                    
+                                    // Clean URL by removing spaces and extra characters
+                                    const cleanUrl = videoUrl ? videoUrl.replace(/\s+/g, '') : null;
+                                    
+                                    console.log('Video URL for template:', selectedTemplate?.name, ':', cleanUrl);
+                                    return cleanUrl;
+                                  })()}
 
                                   controls
-
+                                  preload="metadata"
+                                  crossOrigin="anonymous"
                                   className="image-uploaded"
-
                                   style={{ width: '100%', height: 'auto' }}
 
                                   onError={(e) => {
-
+                                    console.error('Video failed to load:', e.target.src);
                                     e.target.style.display = 'none';
 
                                   }}

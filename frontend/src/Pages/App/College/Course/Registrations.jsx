@@ -768,6 +768,7 @@ const CRMDashboard = () => {
   const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
   const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false);
   const [whatsAppTemplatesError, setWhatsAppTemplatesError] = useState("");
+  
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templatePreview, setTemplatePreview] = useState("");
 
@@ -893,9 +894,7 @@ const CRMDashboard = () => {
 
   // WhatsApp Panel states
   const [whatsappMessages, setWhatsappMessages] = useState([
-    { id: 1, text: 'Hi, I am interested in your course', sender: 'lead', time: '10:25 AM', type: 'session' },
-    { id: 2, text: 'Hello! Thank you for your interest. I would be happy to help you.', sender: 'agent', time: '10:26 AM', type: 'session' }
-  ]);
+     ]);
   const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
   const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
   const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
@@ -904,7 +903,113 @@ const CRMDashboard = () => {
   const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
   const whatsappMessagesEndRef = useRef(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [whatsappWs, setWhatsappWs] = useState(null);
 
+
+  // Initialize WhatsApp WebSocket connection
+  useEffect(() => {
+    const collegeId = sessionStorage.getItem('collegeId');
+    if (!collegeId) return;
+
+    // WebSocket URL (adjust based on your backend URL)
+    const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
+    
+    console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
+    
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('✅ WhatsApp WebSocket connected');
+      // Register with collegeId
+      ws.send(JSON.stringify({
+        type: 'register',
+        collegeId: collegeId
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📨 WebSocket message received:', data);
+
+        // Handle different message types
+        if (data.type === 'message_status_update') {
+          handleMessageStatusUpdate(data);
+        } else if (data.type === 'registered') {
+          console.log('✅ Registered with WebSocket for college:', data.collegeId);
+        } else if (data.type === 'pong') {
+          // Pong response for keep-alive
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('🔌 WebSocket disconnected');
+    };
+
+    setWhatsappWs(ws);
+
+    // Cleanup on unmount
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [backendUrl]);
+
+  // Handle message status updates from WebSocket
+  const handleMessageStatusUpdate = (data) => {
+    console.log('📊 Message status update:', data);
+    
+    // Update messages in state
+    setWhatsappMessages((prevMessages) => {
+      return prevMessages.map((msg) => {
+        // Match message by checking if it's for the same recipient and has matching text/template
+        const isMatchingMessage = 
+          msg.type === 'template' 
+            ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
+            : msg.text === data.message;
+
+        if (isMatchingMessage && msg.sender === 'agent') {
+          console.log('✅ Updating message status to:', data.status);
+          return {
+            ...msg,
+            status: data.status
+          };
+        }
+        return msg;
+      });
+    });
+
+    // Show notification (optional)
+    if (data.status === 'delivered') {
+      console.log('✅ Message delivered to:', data.to);
+    } else if (data.status === 'read') {
+      console.log('👀 Message read by:', data.to);
+    } else if (data.status === 'failed') {
+      console.error('❌ Message failed:', data.to);
+    }
+  };
+
+  // Keep WebSocket alive with ping
+  useEffect(() => {
+    if (!whatsappWs) return;
+
+    const pingInterval = setInterval(() => {
+      if (whatsappWs.readyState === WebSocket.OPEN) {
+        whatsappWs.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(pingInterval);
+  }, [whatsappWs]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -3072,29 +3177,31 @@ const CRMDashboard = () => {
 
     if (profile) {
       setSelectedProfile(profile);
-
-
     }
 
     setShowPopup(null)
 
     if (panel === 'RefferAllLeads') {
-
       setShowPanel('RefferAllLeads');
-
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
     } else if (panel === 'AddAllLeads') {
       setShowPanel('AddAllLeads');
     } else if (panel === 'whatsapp') {
       setShowPanel('Whatsapp');
+      // Use profile parameter directly instead of selectedProfile state
+      if (profile?._candidate?.mobile) {
+        console.log('📱 Opening WhatsApp panel for:', profile._candidate.name, profile._candidate.mobile);
+        await fetchWhatsappHistory(profile._candidate.mobile);
+      } else {
+        console.error('❌ No mobile number found for WhatsApp chat. Profile:', profile);
+        alert('Mobile number not found for this candidate');
+      }
     }
 
     if (!isMobile) {
       setMainContentClass('col-8');
     }
-
-
   };
   const handleFetchCandidate = async (profile = null) => {
     console.log('handleFetchCandidate called with profile:', profile);
@@ -3162,11 +3269,322 @@ const CRMDashboard = () => {
 
 
 
-  const openWhatsappPanel = () => {
+  const openWhatsappPanel = async () => {
     setShowPanel('whatsapp');
     if (!isMobile) {
       setMainContentClass('col-8');
     }
+    // Fetch chat history when panel opens
+    if (selectedProfile?._candidate?.mobile) {
+      await fetchWhatsappHistory(selectedProfile._candidate.mobile);
+    }
+  };
+
+  // Fetch WhatsApp chat history for selected profile
+  const fetchWhatsappHistory = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('❌ Phone number or token missing:', { phoneNumber, hasToken: !!token });
+        return;
+      }
+
+      setIsLoadingChatHistory(true);
+      console.log('📡 Fetching chat history for:', phoneNumber);
+      
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        console.log('✅ Chat history fetched successfully. Messages count:', response.data.data.length);
+        
+        // Convert database messages to chat format
+        const formattedMessages = response.data.data.map((msg, index) => ({
+          id: index + 1,
+          text: msg.message,
+          sender: 'agent', // All sent messages are from agent
+          time: new Date(msg.sentAt).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          type: msg.messageType, // 'text' or 'template'
+          templateData: msg.templateData, // Will contain components for template messages
+          status: msg.status || 'sent'
+        }));
+
+        setWhatsappMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching chat history:', error.response?.data || error.message);
+      
+      // Show error to user
+      if (error.response?.status === 401) {
+        alert('Session expired. Please login again.');
+      } else if (error.response?.status === 400) {
+        alert('Invalid phone number or missing information');
+      } else {
+        console.warn('⚠️ Could not fetch chat history. Starting with empty chat.');
+      }
+      
+      // Start with empty messages on error
+      setWhatsappMessages([]);
+    } finally {
+      setIsLoadingChatHistory(false);
+    }
+  };
+
+  // Render message status icon (WhatsApp style)
+  const renderMessageStatus = (status) => {
+    switch (status) {
+      case 'sending':
+        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }}></i>;
+      case 'sent':
+        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }}></i>;
+      case 'delivered':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }}>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'read':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }}>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'failed':
+        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px' }}></i>;
+      default:
+        return null;
+    }
+  };
+
+  // Render WhatsApp Template Message
+  const renderTemplateMessage = (templateData) => {
+    if (!templateData || !templateData.components) {
+      return null;
+    }
+
+    const components = templateData.components;
+    const headerComponent = components.find(c => c.type === 'HEADER');
+    const bodyComponent = components.find(c => c.type === 'BODY');
+    const footerComponent = components.find(c => c.type === 'FOOTER');
+    const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+    const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+
+    return (
+      <div style={{ width: '100%' }}>
+        {/* Carousel Template */}
+        {carouselComponent && carouselComponent.cards && carouselComponent.cards.length > 0 && (
+          <div style={{ marginBottom: '8px' }}>
+            <div 
+              className="d-flex overflow-auto pb-2" 
+              style={{ 
+                gap: '8px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#888 #f0f0f0'
+              }}
+            >
+              {carouselComponent.cards.map((card, cardIndex) => {
+                const cardHeader = card.components?.find(c => c.type === 'HEADER');
+                const cardBody = card.components?.find(c => c.type === 'BODY');
+                const cardButtons = card.components?.find(c => c.type === 'BUTTONS');
+                const cardMedia = templateData.carouselMedia?.[cardIndex];
+
+                return (
+                  <div 
+                    key={cardIndex}
+                    style={{ 
+                      minWidth: '220px',
+                      maxWidth: '220px',
+                      backgroundColor: '#fff',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1px solid #e0e0e0'
+                    }}
+                  >
+                    {/* Card Media */}
+                    {cardHeader && cardMedia?.s3Url && (
+                      <div style={{ position: 'relative', width: '100%', height: '140px' }}>
+                        {cardMedia.mediaType === 'IMAGE' ? (
+                          <img 
+                            src={cardMedia.s3Url} 
+                            alt={`Card ${cardIndex + 1}`}
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover' 
+                            }} 
+                          />
+                        ) : (
+                          <video 
+                            controls 
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover' 
+                            }}
+                          >
+                            <source src={cardMedia.s3Url} type="video/mp4" />
+                          </video>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Card Body */}
+                    {cardBody && (
+                      <div style={{ padding: '10px', fontSize: '13px', lineHeight: '1.3' }}>
+                        {cardBody.text}
+                      </div>
+                    )}
+
+                    {/* Card Buttons */}
+                    {cardButtons && cardButtons.buttons && cardButtons.buttons.length > 0 && (
+                      <div style={{ borderTop: '1px solid #e0e0e0' }}>
+                        {cardButtons.buttons.map((btn, btnIndex) => (
+                          <div 
+                            key={btnIndex}
+                            style={{ 
+                              padding: '8px',
+                              textAlign: 'center',
+                              color: '#00A5F4',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              borderBottom: btnIndex < cardButtons.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                            }}
+                          >
+                            {btn.type === 'URL' && <i className="fas fa-external-link-alt me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#667781', marginTop: '4px', fontStyle: 'italic' }}>
+              <i className="fas fa-images me-1"></i>Carousel Template ({carouselComponent.cards.length} cards)
+            </div>
+          </div>
+        )}
+
+        {/* Regular Template (Non-Carousel) */}
+        {!carouselComponent && (
+          <>
+            {/* Header */}
+            {headerComponent && (
+              <div className="mb-2">
+                {headerComponent.format === 'TEXT' && (
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#000' }}>
+                    {headerComponent.text}
+                  </div>
+                )}
+                {headerComponent.format === 'IMAGE' && templateData.headerMedia?.s3Url && (
+                  <img 
+                    src={templateData.headerMedia.s3Url} 
+                    alt="Header" 
+                    style={{ 
+                      width: '100%', 
+                      maxHeight: '200px', 
+                      objectFit: 'cover', 
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }} 
+                  />
+                )}
+                {headerComponent.format === 'VIDEO' && templateData.headerMedia?.s3Url && (
+                  <video 
+                    controls 
+                    style={{ 
+                      width: '100%', 
+                      maxHeight: '200px', 
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }}
+                  >
+                    <source src={templateData.headerMedia.s3Url} type="video/mp4" />
+                  </video>
+                )}
+                {headerComponent.format === 'DOCUMENT' && templateData.headerMedia?.s3Url && (
+                  <a 
+                    href={templateData.headerMedia.s3Url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="d-flex align-items-center p-2 mb-2"
+                    style={{ 
+                      backgroundColor: '#f0f0f0', 
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      color: '#000'
+                    }}
+                  >
+                    <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#d32f2f' }}></i>
+                    <span style={{ fontSize: '13px' }}>{templateData.headerMedia.fileName || 'Document'}</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Body */}
+            {bodyComponent && (
+              <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#000', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
+                {bodyComponent.text}
+              </div>
+            )}
+
+            {/* Footer */}
+            {footerComponent && (
+              <div style={{ fontSize: '12px', color: '#667781', marginTop: '6px', marginBottom: '8px' }}>
+                {footerComponent.text}
+              </div>
+            )}
+
+            {/* Buttons */}
+            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+              <div style={{ marginTop: '8px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+                {buttonsComponent.buttons.map((button, index) => (
+                  <div 
+                    key={index}
+                    style={{ 
+                      padding: '8px 12px',
+                      textAlign: 'center',
+                      color: '#00A5F4',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      borderBottom: index < buttonsComponent.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                    }}
+                  >
+                    {button.type === 'URL' && <i className="fas fa-external-link-alt me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'QUICK_REPLY' && <i className="fas fa-reply me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   // Fetch WhatsApp Templates from backend
@@ -3508,7 +3926,7 @@ const CRMDashboard = () => {
 
     setEditForm({
 
-      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+      name: formatTemplateName(`${templateData.name || 'template'}`),
 
       category: templateData.category || 'UTILITY',
 
@@ -3569,7 +3987,7 @@ const CRMDashboard = () => {
     });
 
     console.log('EditForm set with:', {
-      name: formatTemplateName(`${templateData.name || 'template'}_copy`),
+      name: formatTemplateName(`${templateData.name || 'template'}`),
       headerType,
       headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
       headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
@@ -4030,10 +4448,16 @@ const CRMDashboard = () => {
       }
 
 
+      const sendindData = {
+        ...templateData,
+        templateName: templateData.name, // Add templateName for backend
+        to: selectedProfile?._candidate?.mobile
+      }
+
+    
 
       // Make API call to create template
-
-      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, templateData, {
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
 
         headers: { 'x-auth': token }
 
@@ -4047,7 +4471,19 @@ const CRMDashboard = () => {
 
         await fetchWhatsappTemplates();
 
-
+        // Add sent template to existing WhatsApp chat with backend response data
+        const templateMessage = {
+          id: whatsappMessages.length + 1,
+          text: `Template: ${response.data.data.templateName}`,
+          sender: 'agent',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          type: 'template',
+          templateData: response.data.data.templateData || templateData,
+          status: 'sent'
+        };
+        
+        setWhatsappMessages([...whatsappMessages, templateMessage]);
+        console.log('Template sent successfully to:', selectedProfile?._candidate?.mobile);
 
         // Close the modal
 
@@ -5150,11 +5586,24 @@ const CRMDashboard = () => {
             minHeight: '300px'
           }}
         >
-          {whatsappMessages.map(message => (
+          {/* Loading State */}
+          {isLoadingChatHistory && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          {!isLoadingChatHistory && whatsappMessages.map(message => (
             <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
-              <div style={{ maxWidth: '75%' }}>
+              <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
                 <div 
-                  className={`p-2 ${
+                  className={`${
                     message.sender === 'agent' 
                       ? 'text-white' 
                       : 'bg-white text-dark'
@@ -5166,22 +5615,45 @@ const CRMDashboard = () => {
                     borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
                     borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
                     boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
-                    padding: '6px 10px 8px'
+                    padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+                    overflow: 'hidden'
                   }}
                 >
-                  <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
-                    {message.text}
-                  </p>
-                  <p 
-                    className="mb-0 text-end" 
-                    style={{ 
-                      fontSize: '11px', 
-                      color: '#667781',
-                      marginTop: '4px'
-                    }}
-                  >
-                    {message.time}
-                  </p>
+                  {/* Render template message with components */}
+                  {message.type === 'template' && message.templateData ? (
+                    <>
+                      {renderTemplateMessage(message.templateData)}
+                      <div 
+                        className="d-flex align-items-center justify-content-end" 
+                        style={{ 
+                          fontSize: '11px', 
+                          color: '#667781',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <span>{message.time}</span>
+                        {message.sender === 'agent' && renderMessageStatus(message.status)}
+                      </div>
+                    </>
+                  ) : (
+                    /* Regular text message */
+                    <>
+                      <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                        {message.text}
+                      </p>
+                      <div 
+                        className="d-flex align-items-center justify-content-end" 
+                        style={{ 
+                          fontSize: '11px', 
+                          color: '#667781',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <span>{message.time}</span>
+                        {message.sender === 'agent' && renderMessageStatus(message.status)}
+                      </div>
+                    </>
+                  )}
                 </div>
                 {message.sender === 'agent' && message.type === 'template' && (
                   <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
@@ -6285,6 +6757,7 @@ const CRMDashboard = () => {
       </div>
     ) : null;
   };
+
 
   return (
     <div className="container-fluid">
@@ -16541,6 +17014,7 @@ max-width: 600px;
           `
         }
       </style>
+      
     </div>
   );
 };
