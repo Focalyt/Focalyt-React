@@ -999,7 +999,10 @@ const CRMDashboard = () => {
           console.log('✅ Updating message status to:', data.status);
           return {
             ...msg,
-            status: data.status
+            status: data.status,
+            errorMessage: data.status === 'failed' ? data.errorMessage : msg.errorMessage,
+            deliveredAt: data.status === 'delivered' ? data.timestamp : msg.deliveredAt,
+            readAt: data.status === 'read' ? data.timestamp : msg.readAt
           };
         }
         return msg;
@@ -3397,28 +3400,28 @@ const CRMDashboard = () => {
   };
 
   // Render message status icon (WhatsApp style)
-  const renderMessageStatus = (status) => {
+  const renderMessageStatus = (status, errorMessage = null) => {
     switch (status) {
       case 'sending':
-        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }}></i>;
+        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sending..."></i>;
       case 'sent':
-        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }}></i>;
+        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sent"></i>;
       case 'delivered':
         return (
-          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }}>
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Delivered">
             <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '0' }}></i>
             <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '3px' }}></i>
           </span>
         );
       case 'read':
         return (
-          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }}>
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Read">
             <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '0' }}></i>
             <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '3px' }}></i>
           </span>
         );
       case 'failed':
-        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px' }}></i>;
+        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px', cursor: 'pointer' }} title={errorMessage || 'Message failed to send'}></i>;
       default:
         return null;
     }
