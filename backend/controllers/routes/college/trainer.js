@@ -283,7 +283,7 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			remarks = '' 
 		} = req.body;
 
-		console.log("req.body", req.body);
+		// console.log("req.body", req.body);
 
 		// Validate required fields
 		if (!appliedCourseId || !date || !status) {

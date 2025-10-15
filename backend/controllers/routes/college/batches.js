@@ -60,9 +60,9 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 
 	const promises = filesArray.map((file) => {
 		const ext = file.name.split('.').pop().trim().toLowerCase();
-		console.log('file name', file.name)
-		console.log('allowedExtensions', allowedExtensions)
-		console.log('folder', folder)
+		// console.log('file name', file.name)
+		// console.log('allowedExtensions', allowedExtensions)
+		// console.log('folder', folder)
 		if (!allowedExtensions.includes(ext)) {
 			throw new Error(`Unsupported file format: ${ext}`);
 		}

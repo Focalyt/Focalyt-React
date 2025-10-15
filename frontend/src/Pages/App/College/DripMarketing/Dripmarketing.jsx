@@ -705,6 +705,11 @@ const DripMarketing = () => {
             // console.log(response.data.data, 'response.data.data')
             if (response.data.success) {
                 setRules(response.data.data);
+                response.data.data.forEach(rule => {
+                    if (rule.communication.occurrenceCount) {
+                        rule.communication.occurrenceCount = rule.communication.occurrenceCount.toString();
+                    }
+                });
             }
         }
         catch (error) {
@@ -2061,8 +2066,11 @@ const DripMarketing = () => {
                                     <td width={100}>
                                         Active
                                     </td>
+                                    {/* <td width='20'>Count</td> */}
+
                                     <td width={50}>
                                     </td>
+
                                 </tr>
                             </thead>
                             <tbody>
@@ -2071,7 +2079,7 @@ const DripMarketing = () => {
                                     <tr className='driprule' key={rule.id || index}>
                                         <td>
                                             {rule.name}
-                                        </td>
+                                        </td>                                        
                                         <td>
                                             {rule.createdBy.name}
                                         </td>
@@ -2099,6 +2107,8 @@ const DripMarketing = () => {
                                                 />
                                             </div>
                                         </td>
+                                        {/* <td>{rule.communication?.communications?.length || 0}</td> */}
+
                                         <td className='ellipsis' onClick={() => handleDropdown(index)}>
                                             <i className="fas fa-ellipsis-v"></i>
 
@@ -2141,6 +2151,7 @@ const DripMarketing = () => {
                                                 </div>
                                             )}
                                         </td>
+
                                     </tr>
                                 ))
                             )}

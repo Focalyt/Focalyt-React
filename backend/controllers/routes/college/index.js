@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -8252,12 +8252,12 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 	}
 });
-router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) => {
+router.route("/traineradmissionlists/:batchId").get(isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
 		const college = req.college;
 		let { batchId } = req.params;
-		
+
 		if (!batchId) {
 			return res.status(400).json({ success: false, message: 'Batch ID is required' });
 		}
@@ -10738,11 +10738,11 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 		const user = req.user;
 		const college = req.college;
 		let { batchId } = req.params;
-		
-		console.log('Trainer admission-list called for batchId:', batchId);
-		console.log('Trainer user:', user.name, user._id);
-		console.log('College:', college?.name, college?._id);
-		
+
+		// console.log('Trainer admission-list called for batchId:', batchId);
+		// console.log('Trainer user:', user.name, user._id);
+		// console.log('College:', college?.name, college?._id);
+
 		if (!batchId) {
 			return res.status(400).json({ success: false, message: 'Batch ID is required' });
 		}
@@ -10758,8 +10758,8 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 			return res.status(404).json({ success: false, message: 'Batch not found' });
 		}
 
-		console.log('Batch found:', batch.name);
-		console.log('Batch trainers:', batch.trainers);
+		// console.log('Batch found:', batch.name);
+		// console.log('Batch trainers:', batch.trainers);
 
 		// Check if trainer is assigned to this batch
 		const isTrainerAssigned = batch.trainers.some(trainerId => trainerId.toString() === user._id.toString());
@@ -10767,7 +10767,7 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 			return res.status(403).json({ success: false, message: 'You are not assigned to this batch' });
 		}
 
-		console.log('Trainer is assigned to batch');
+		// console.log('Trainer is assigned to batch');
 
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 50;
@@ -10785,7 +10785,7 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 			batch: batchId
 		};
 
-		console.log('Base match stage:', JSON.stringify(baseMatchStage));
+		// console.log('Base match stage:', JSON.stringify(baseMatchStage));
 
 		// Status filters
 		if (req.query.status && req.query.status !== 'all') {
@@ -10940,7 +10940,7 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 		const totalCount = totalResults.length;
 		const totalPages = Math.ceil(totalCount / limit);
 
-		console.log('Total count:', totalCount);
+		// console.log('Total count:', totalCount);
 
 		// Add pagination
 		aggregationPipeline.push(
@@ -10951,7 +10951,7 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 		// Execute aggregation with pagination
 		const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
 
-		console.log('Applied courses count:', appliedCourses.length);
+		// console.log('Applied courses count:', appliedCourses.length);
 
 		// Calculate filter counts
 		const calculateFilterCounts = async () => {
@@ -10993,7 +10993,7 @@ router.route("/traineradmission-list/:batchId").get(isTrainer, async (req, res) 
 
 		const filterCounts = await calculateFilterCounts();
 
-		console.log('Filter counts:', filterCounts);
+		// console.log('Filter counts:', filterCounts);
 
 		return res.json({
 			success: true,
@@ -12163,7 +12163,7 @@ router.post('/trainee/login', async (req, res) => {
 	try {
 		const { userInput, password } = req.body;
 
-		console.log("req.body", req.body)
+		// console.log("req.body", req.body)
 		const isMobile = /^\d{10}$/.test(userInput);
 		const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
 
@@ -12239,7 +12239,8 @@ router.post('/assigntrainerstocourse', isCollege, async (req, res) => {
 
 		// console.log("trainee", trainee);
 
-		course.trainers.push(...trainers);
+		// course.trainers.push(...trainers);
+		course.trainers = trainers;
 		await course.save();
 
 		return res.status(200).json({
@@ -12285,7 +12286,8 @@ router.post('/assigntrainerstobatch', isCollege, async (req, res) => {
 			_id: { $in: trainers },
 			role: 4
 		})
-		batch.trainers.push(...trainers);
+
+		batch.trainers = trainers;
 		await batch.save()
 
 		return res.status(200).json({
@@ -12311,7 +12313,7 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		const trainerId = user._id;
 
 		if (courseId) {
-			const course = await Courses.findOne({ 
+			const course = await Courses.findOne({
 				_id: courseId,
 				trainers: trainerId
 			}).populate('trainers');
@@ -12401,14 +12403,14 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 // 			});
 // 		}
 // 		const assignedCourses = await Courses.find({
-		// 	college: collegeId,
-		// 	trainers: trainerId
-		// });
-		// return res.status(200).json({
-		// 	status: true,
-		// 	message: 'Assigned courses fetched successfully',
-		// 	data: assignedCourses
-		// });
+// 	college: collegeId,
+// 	trainers: trainerId
+// });
+// return res.status(200).json({
+// 	status: true,
+// 	message: 'Assigned courses fetched successfully',
+// 	data: assignedCourses
+// });
 // 	}
 // 	catch(err){
 // 		console.log(err)
@@ -12499,26 +12501,26 @@ router.get('/trainers', isTrainer, async (req, res) => {
 })
 router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 	try {
-		const { 
+		const {
 			batchId,
-			batchName, 
+			batchName,
 			courseId,
-			courseName, 
-			subject, 
-			date, 
-			startTime, 
-			endTime, 
-			scheduleType, 
-			weekTopics, 
-			monthTopics, 
-			title, 
+			courseName,
+			subject,
+			date,
+			startTime,
+			endTime,
+			scheduleType,
+			weekTopics,
+			monthTopics,
+			title,
 			description,
 			color,
 			isRecurring,
 			recurringType,
 			recurringEndDate
 		} = req.body;
-		
+
 		const trainerId = req.user._id;
 		const collegeId = req.user.collegeId;
 
@@ -12586,7 +12588,7 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			data: trainerTimeTable
 		});
 
-		
+
 	}
 	catch (err) {
 		console.log('Error in POST /trainerTimeTable:', err.message);
@@ -12628,16 +12630,16 @@ router.get('/trainerTimeTable', isTrainer, async (req, res) => {
 
 router.post('/addNewChapter', isTrainer, async (req, res) => {
 	try {
-		const { 
-			courseId, 
-			batchId, 
-			courseName, 
+		const {
+			courseId,
+			batchId,
+			courseName,
 			batchName,
-			chapterNumber, 
-			chapterTitle, 
-			description, 
-			duration, 
-			objectives 
+			chapterNumber,
+			chapterTitle,
+			description,
+			duration,
+			objectives
 		} = req.body;
 		if (!courseId || !batchId || !chapterNumber || !chapterTitle) {
 			return res.status(400).json({
@@ -12646,9 +12648,9 @@ router.post('/addNewChapter', isTrainer, async (req, res) => {
 			});
 		}
 		const userId = req.user.id;
-		let curriculum = await Curriculum.findOne({ 
-			courseId, 
-			batchId 
+		let curriculum = await Curriculum.findOne({
+			courseId,
+			batchId
 		});
 
 		if (!curriculum) {
@@ -12706,15 +12708,15 @@ router.post('/addNewChapter', isTrainer, async (req, res) => {
 
 router.post('/addNewTopic', isTrainer, async (req, res) => {
 	try {
-		const { 
-			courseId, 
-			batchId, 
+		const {
+			courseId,
+			batchId,
 			chapterNumber,
-			topicNumber, 
-			topicTitle, 
-			description, 
-			duration, 
-			resources 
+			topicNumber,
+			topicTitle,
+			description,
+			duration,
+			resources
 		} = req.body;
 
 		if (!courseId || !batchId || !chapterNumber || !topicNumber || !topicTitle) {
@@ -12724,9 +12726,9 @@ router.post('/addNewTopic', isTrainer, async (req, res) => {
 			});
 		}
 
-		const curriculum = await Curriculum.findOne({ 
-			courseId, 
-			batchId 
+		const curriculum = await Curriculum.findOne({
+			courseId,
+			batchId
 		});
 
 		if (!curriculum) {
@@ -12791,15 +12793,15 @@ router.post('/addNewTopic', isTrainer, async (req, res) => {
 
 router.post('/addNewSubTopic', isTrainer, async (req, res) => {
 	try {
-		const { 
-			courseId, 
-			batchId, 
+		const {
+			courseId,
+			batchId,
 			chapterNumber,
 			topicNumber,
-			subTopicTitle, 
-			description, 
-			duration, 
-			content 
+			subTopicTitle,
+			description,
+			duration,
+			content
 		} = req.body;
 
 		if (!courseId || !batchId || !chapterNumber || !topicNumber || !subTopicTitle) {
@@ -12808,9 +12810,9 @@ router.post('/addNewSubTopic', isTrainer, async (req, res) => {
 				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, subTopicTitle'
 			});
 		}
-		const curriculum = await Curriculum.findOne({ 
-			courseId, 
-			batchId 
+		const curriculum = await Curriculum.findOne({
+			courseId,
+			batchId
 		});
 
 		if (!curriculum) {
@@ -12895,9 +12897,9 @@ router.get('/getCurriculum', isTrainer, async (req, res) => {
 			});
 		}
 
-		const curriculum = await Curriculum.findOne({ 
-			courseId, 
-			batchId 
+		const curriculum = await Curriculum.findOne({
+			courseId,
+			batchId
 		}).populate('courseId', 'name').populate('batchId', 'name').populate('createdBy', 'name');
 
 		if (!curriculum) {
@@ -12915,7 +12917,7 @@ router.get('/getCurriculum', isTrainer, async (req, res) => {
 				const bNum = parseFloat(b.topicNumber);
 				return aNum - bNum;
 			});
-			
+
 			chapter.topics.forEach(topic => {
 				if (topic.subTopics && topic.subTopics.length > 0) {
 					topic.subTopics.sort((a, b) => {
@@ -12940,5 +12942,47 @@ router.get('/getCurriculum', isTrainer, async (req, res) => {
 		});
 	}
 });
+
+router.post('/addDailyDiary', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const { batch, course, sendTo, selectedStudents, assignmentDetail, studyMaterials, projectVideos } = req.body;
+		console.log("req.body", req.body)
+
+		if (!batch || !course || !assignmentDetail) {
+			return res.status(400).json({
+				status: false,
+				message: 'Missing required parameters: batch, course, assignmentDetail'
+			});
+		}
+
+		const dailyDiary = new DailyDiary({
+			batch: batch,
+			course: course,
+			sendTo,
+			selectedStudents,
+			assignmentDetail,
+			studyMaterials,
+			projectVideos,
+			createdBy: user._id
+		})
+		console.log(dailyDiary, 'dailyDiary')
+		// await dailyDiary.save();
+		// return res.status(200).json({
+		// 	status: true,
+		// 	message: 'Daily diary added successfully',
+		// 	data: dailyDiary
+		// });
+		
+	} catch (error) {
+		console.error('Error adding daily diary:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error adding daily diary',
+			error: error.message
+		});
+	}
+
+})
 
 module.exports = router;

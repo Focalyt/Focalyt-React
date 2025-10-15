@@ -111,7 +111,6 @@ function BatchMangement() {
                 </div>
             </div>
 
-            {/* Course Info Card */}
             {courseInfo && (
                 <div className="row mb-4">
                     <div className="col-12">
@@ -195,7 +194,6 @@ function BatchMangement() {
                 </div>
             </div>
 
-            {/* Search and Filters */}
             <div className="row mb-4">
                 <div className="col-md-8">
                     <div className="input-group">
@@ -221,7 +219,6 @@ function BatchMangement() {
                 </div>
             </div>
 
-            {/* Batches List */}
             <div className="row">
                 {filteredBatches.length === 0 ? (
                     <div className="col-12">
@@ -413,7 +410,7 @@ function BatchMangement() {
             </div>
 
             {/* Summary */}
-            {filteredBatches.length > 0 && (
+            {/* {filteredBatches.length > 0 && (
                 <div className="row mt-4">
                     <div className="col-12">
                         <div className="alert alert-info mb-0">
@@ -423,7 +420,7 @@ function BatchMangement() {
                         </div>
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* Custom CSS */}
             <style jsx>{`

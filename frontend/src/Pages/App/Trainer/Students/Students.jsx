@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-
+import { X, Upload, FileText, Image, Video, Calendar, Users, User, Send, Plus, Trash2 } from 'lucide-react';
 
 function Students() {
     const [loading, setLoadingData] = useState(true);
     const [allProfiles, setAllProfiles] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const [activeTab] = useState('batchFreeze'); 
+    const [activeTab] = useState('batchFreeze');
     const [searchQuery, setSearchQuery] = useState('');
     const [batchFreezeCount, setBatchFreezeCount] = useState(0);
     const [selectedBatch, setSelectedBatch] = useState(null);
     const [batchName, setBatchName] = useState('');
     const [courseId, setCourseId] = useState('');
     const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [showDailyDiaryModal, setShowDailyDiaryModal] = useState(false);
     const [attendanceData, setAttendanceData] = useState({});
     const [loadingAttendance, setLoadingAttendance] = useState(false);
 
@@ -26,6 +27,44 @@ function Students() {
     const batchId = searchParams.get('batchId');
     const batchNameParam = searchParams.get('batchName');
     const courseIdParam = searchParams.get('courseId');
+
+    //  Daily Diary State
+    const [sendTo, setSendTo] = useState("all");
+    const [selectedStudents, setSelectedStudents] = useState([]);
+    const [assignmentDetail, setAssignmentDetail] = useState("");
+    const [studyMaterials, setStudyMaterials] = useState([]);
+    const [projectVideos, setProjectVideos] = useState([]);
+
+  
+
+    const handleFileUpload = (type, e) => {
+        const files = Array.from(e.target.files);
+        if (type === 'study') {
+            setStudyMaterials([...studyMaterials, ...files.map(f => ({ name: f.name, type: f.type }))]);
+        } else if (type === 'video') {
+            setProjectVideos([...projectVideos, ...files.map(f => ({ name: f.name }))]);
+        }
+    };
+
+    const removeFile = (type, index) => {
+        if (type === 'study') {
+            setStudyMaterials(studyMaterials.filter((_, i) => i !== index));
+        } else if (type === 'video') {
+            setProjectVideos(projectVideos.filter((_, i) => i !== index));
+        }
+    };
+
+    const handleStudentToggle = (studentId) => {
+        setSelectedStudents(prev =>
+            prev.includes(studentId)
+                ? prev.filter(id => id !== studentId)
+                : [...prev, studentId]
+        );
+    };
+
+    const handleSend = () => {
+        handleDailyDiary();
+    };
 
     useEffect(() => {
         if (batchId) {
@@ -92,12 +131,57 @@ function Students() {
         }
     };
 
+    const handleDailyDiary = async () => {
+        try {
+            if (sendTo === 'individual' && selectedStudents.length === 0) {
+                alert('Please select at least one student');
+                return;
+            }
+
+            const response = await axios.post(
+                `${backendUrl}/college/addDailyDiary`, 
+                {
+                    batch: batchId,
+                    course: courseId,
+                    sendTo,
+                    selectedStudents: sendTo === 'individual' ? selectedStudents : [],
+                    assignmentDetail,
+                    studyMaterials,
+                    projectVideos
+                },
+                {
+                    headers: {
+                        "x-auth": token,
+                    },
+                }
+            );
+            
+            if (response.data.status) {
+                alert(response.data.message);
+                setAssignmentDetail('');
+                setStudyMaterials([]);
+                setProjectVideos([]);
+                setSelectedStudents([]);
+                setSendTo('all');
+                setShowDailyDiaryModal(false);
+            } else {
+                alert(response.data.message);
+            }
+        } catch (error) {
+            console.error("Error adding daily diary:", error);
+            alert(error.response?.data?.message );
+        }
+    }
+
     const handleSearch = (e) => {
         setSearchQuery(e.target.value);
         setCurrentPage(1);
     };
 
-    // Attendance Management Functions
+    const handleDailyDiaryManagement = () => {
+        setShowDailyDiaryModal(true);
+    };
+
     const handleAttendanceManagement = () => {
         setShowAttendanceModal(true);
         fetchAttendanceData();
@@ -148,8 +232,8 @@ function Students() {
 
             if (response.data.status) {
                 alert(response.data.message || 'Attendance marked successfully!');
-                fetchProfileData(); 
-                fetchAttendanceData(); 
+                fetchProfileData();
+                fetchAttendanceData();
             } else {
                 alert(response.data.message || 'Failed to mark attendance');
             }
@@ -163,16 +247,16 @@ function Students() {
         const today = new Date().toISOString().split('T')[0];
         const studentAttendance = attendanceData[studentId];
         if (!studentAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
-        
+
         const dayAttendance = studentAttendance[today];
         if (!dayAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
-        
+
         const status = dayAttendance.status?.toLowerCase();
         const statusMap = {
             'present': { symbol: 'P', class: 'present' },
             'absent': { symbol: 'A', class: 'absent' },
         };
-        
+
         return statusMap[status] || { status: 'not-marked', symbol: '-', class: 'not-marked' };
     };
 
@@ -219,7 +303,7 @@ function Students() {
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
                             <div className="d-flex align-items-center mb-2">
-                                <button 
+                                <button
                                     onClick={() => navigate(-1)}
                                     className="btn btn-sm btn-outline-secondary me-3"
                                 >
@@ -233,11 +317,14 @@ function Students() {
                             </p>
                         </div>
                         <div className="d-flex gap-2">
-                            <button
+                            {/* <button
                                 className="btn btn-outline-primary"
                                 onClick={fetchProfileData}
                             >
                                 <i className="fas fa-sync-alt me-1"></i> Refresh
+                            </button> */}
+                            <button className="btn btn-primary" onClick={handleDailyDiaryManagement}>
+                                Daily Diary
                             </button>
                             <button
                                 className="btn btn-success"
@@ -287,7 +374,7 @@ function Students() {
                             className="form-control"
                             placeholder="Search students by name, email, phone..."
                             value={searchQuery}
-                            onChange={handleSearch}
+                        // onChange={handleSearch}
                         />
                         {searchQuery && (
                             <button
@@ -312,7 +399,7 @@ function Students() {
                             <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
                             <h4 className="text-muted">No students found</h4>
                             <p className="text-muted">
-                                {searchQuery 
+                                {searchQuery
                                     ? 'Try adjusting your search criteria'
                                     : 'No students have been enrolled in this batch yet'
                                 }
@@ -375,16 +462,16 @@ function Students() {
                                             </td>
                                             <td className="align-middle">
                                                 <div className="d-flex gap-1 mb-1">
-                                                    <button 
+                                                    <button
                                                         className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-secondary'}`}
-                                                        onClick={() => markAttendance(profile._id, 'Present')}
+                                                        // onClick={() => markAttendance(profile._id, 'Present')}
                                                         title="Mark Present"
                                                     >
                                                         P
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
-                                                        onClick={() => markAttendance(profile._id, 'Absent')}
+                                                        //  onClick={() => markAttendance(profile._id, 'Absent')}
                                                         title="Mark Absent"
                                                     >
                                                         A
@@ -418,7 +505,7 @@ function Students() {
                                         <i className="fas fa-chevron-left"></i> Previous
                                     </button>
                                 </li>
-                                
+
                                 {[...Array(totalPages)].map((_, i) => {
                                     const pageNum = i + 1;
                                     // Show first page, last page, current page, and pages around current
@@ -643,9 +730,9 @@ function Students() {
                                     <i className="fas fa-calendar-check me-2"></i>
                                     Attendance Management - {batchName}
                                 </h5>
-                                <button 
-                                    type="button" 
-                                    className="btn-close" 
+                                <button
+                                    type="button"
+                                    className="btn-close"
                                     onClick={() => setShowAttendanceModal(false)}
                                 ></button>
                             </div>
@@ -699,13 +786,13 @@ function Students() {
                                                         </td>
                                                         <td>
                                                             <div className="d-flex gap-2">
-                                                                <button 
+                                                                <button
                                                                     className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : 'btn-outline-success'}`}
                                                                     onClick={() => markAttendance(profile._id, 'Present')}
                                                                 >
                                                                     <i className="fas fa-check me-1"></i>Present
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
                                                                     onClick={() => markAttendance(profile._id, 'Absent')}
                                                                 >
@@ -721,19 +808,184 @@ function Students() {
                                 )}
                             </div>
                             <div className="modal-footer">
-                                <button 
-                                    type="button" 
-                                    className="btn btn-secondary" 
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
                                     onClick={() => setShowAttendanceModal(false)}
                                 >
                                     Close
                                 </button>
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     className="btn btn-primary"
                                     onClick={fetchAttendanceData}
                                 >
                                     <i className="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showDailyDiaryModal && (
+          
+                <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div className="modal-content">
+                            <div className="modal-header bg-primary text-white">
+                                <h5 className="modal-title">
+                                    Daily Diary - {batchName}
+                                </h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowDailyDiaryModal(false)}></button>
+                            </div>
+
+                            <div className="modal-body p-4">
+                                {/* Send To Section */}
+                                <div className="mb-4 p-3 border rounded bg-light">
+                                    <label className="form-label fw-bold d-flex align-items-center">
+                                        Send To
+                                    </label>
+                                    <div className="d-flex gap-3 mb-3">
+                                        <div className="form-check">
+                                            <input
+                                                className="form-check-input"
+                                                type="radio"
+                                                name="sendTo"
+                                                id="sendAll"
+                                                checked={sendTo === "all"}
+                                                onChange={() => setSendTo("all")}
+                                            />
+                                            <label className="form-check-label" htmlFor="sendAll">
+                                                All Students
+                                            </label>
+                                        </div>
+                                        <div className="form-check">
+                                            <input
+                                                className="form-check-input"
+                                                type="radio"
+                                                name="sendTo"
+                                                id="sendIndividual"
+                                                checked={sendTo === "individual"}
+                                                onChange={() => setSendTo("individual")}
+                                            />
+                                            <label className="form-check-label" htmlFor="sendIndividual">
+                                                Individual Students
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {sendTo === "individual" && (
+                                        <div className="mt-3">
+                                            <label className="form-label small text-muted">Select Students:</label>
+                                            <div className="d-flex flex-wrap gap-2">
+                                                {allProfiles.map(profile => (
+                                                    <div
+                                                        key={profile._id}
+                                                        className={`badge p-2 cursor-pointer ${selectedStudents.includes(profile._id) ? 'bg-primary' : 'bg-secondary'}`}
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => handleStudentToggle(profile._id)}
+                                                    >
+                                                        {profile._candidate?.name || 'N/A'}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mb-4">
+                                    <label className="form-label fw-bold d-flex align-items-center">
+                                        Assignment Detail
+                                    </label>
+                                    <textarea
+                                        className="form-control"
+                                        rows="3"
+                                        placeholder="Enter assignment details here..."
+                                        value={assignmentDetail}
+                                        onChange={(e) => setAssignmentDetail(e.target.value)}
+                                    ></textarea>
+                                </div>
+                                <div className="mb-4">
+                                    <label className="form-label fw-bold d-flex align-items-center">
+                                        Study Material (PDF/Images/Videos) (Optional)
+                                    </label>
+                                    <div className="border rounded p-3 bg-light">
+                                        <input
+                                            type="file"
+                                            className="form-control mb-3"
+                                            multiple
+                                            accept=".pdf,image/*,video/*"
+                                            onChange={(e) => handleFileUpload('study', e)}
+                                        />
+                                        {studyMaterials.length > 0 && (
+                                            <div className="mt-2">
+                                                {studyMaterials.map((file, index) => (
+                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
+                                                        <span className="small">
+                                                            {file.type?.includes('pdf') ? <FileText size={16} className="text-danger me-2" /> : <Image size={16} className="text-primary me-2" />}
+                                                            {file.name}
+                                                        </span>
+                                                        <button
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            onClick={() => removeFile('study', index)}
+                                                        >
+                                                            <Trash2 size={16} className="text-danger" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Project Videos Section */}
+                                <div className="mb-4">
+                                    <label className="form-label fw-bold d-flex align-items-center">
+                                        <Video size={18} className="me-2" />
+                                        Project Videos (Optional)
+                                    </label>
+                                    <div className="border rounded p-3 bg-light">
+                                        <input
+                                            type="file"
+                                            className="form-control mb-3"
+                                            multiple
+                                            accept="video/*"
+                                            onChange={(e) => handleFileUpload('video', e)}
+                                        />
+                                        {projectVideos.length > 0 && (
+                                            <div className="mt-2">
+                                                {projectVideos.map((file, index) => (
+                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
+                                                        <span className="small">
+                                                            <Video size={16} className="text-success me-2" />
+                                                            {file.name}
+                                                        </span>
+                                                        <button
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            onClick={() => removeFile('video', index)}
+                                                        >
+                                                            <Trash2 size={16} className="text-danger" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="alert alert-info small">
+                                    <i className="fas fa-info-circle me-2"></i>
+                                    All fields are optional. Fill only what you want to share with students.
+                                </div>
+                            </div>
+
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowDailyDiaryModal(false)}>
+                                    <X size={18} className="me-1" />
+                                    Cancel
+                                </button>
+                                <button type="button" className="btn btn-primary" onClick={handleSend}>
+                                    <Send size={18} className="me-1" />
+                                    Send Daily Diary
                                 </button>
                             </div>
                         </div>
