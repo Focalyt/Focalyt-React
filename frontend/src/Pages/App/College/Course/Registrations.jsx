@@ -929,6 +929,7 @@ const CRMDashboard = () => {
     if (!collegeId) return;
 
     // WebSocket URL (adjust based on your backend URL)
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
     const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
     
     console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
