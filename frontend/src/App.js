@@ -123,8 +123,6 @@ import TrainerProfile from './Pages/App/Trainer/TrainerProfile/TrainerProfile';
 import MyCourses from './Pages/App/Trainer/CourseManagement/MyCourses';
 import AddCourseContent from './Pages/App/Trainer/CourseManagement/AddCourseContent';
 import StudyMaterial from './Pages/App/Trainer/CourseManagement/StudyMaterial';
-import AllStudent from './Pages/App/Trainer/StudentManagement/AllStudents';
-import StudentProgress from './Pages/App/Trainer/StudentManagement/StudentProgress';
 import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourses';
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
 import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
@@ -299,12 +297,11 @@ const Layout = () => {
         <Route path='profile' element={<TrainerProfile/>}/>
         <Route path='mycourses' element={<MyCourses/>}/>
         <Route path='viewcourses' element={<ViewTrainerCourses/>}/>
-        <Route path='addcoursecontent' element={<AddCourseContent/>}/>
+        {/* <Route path='addcoursecontent' element={<AddCourseContent/>}/> */}
+        <Route path='addcoursecontent' element={<TimeTable/>}/>
         <Route path='studymaterial' element={<StudyMaterial/>}/>
-        <Route path='allstudents' element={<AllStudent/>}/>
-        <Route path='studentprogress' element={<StudentProgress/>}/>
         <Route path='batchmanagement' element={<BatchMangement/>}/>
-        <Route path='timetable' element={<TimeTable/>}/>
+        {/* <Route path='timetable' element={<TimeTable/>}/> */}
         <Route path='students' element={<Students/>}/>
         <Route path='dailydiary' element={<DailyDiary/>}/>
         </Route>

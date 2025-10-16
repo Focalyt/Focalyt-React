@@ -64,3 +64,4 @@ frontend/.env
 # /frontend/src/Pages/App/College
 /frontend/src/Pages/App/College/Course/AdmissionList copy.jsx
 /frontend/src/Pages/App/College/Whatapp/WhatappWithWebSocket copy.jsx
+/frontend/src/Pages/App/Trainer/CourseManagement/AddCourseContent copy.jsx
