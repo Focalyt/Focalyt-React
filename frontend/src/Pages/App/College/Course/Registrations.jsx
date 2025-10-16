@@ -942,7 +942,15 @@ const CRMDashboard = () => {
       query: { 
         userId: userData._id,
         collegeId: collegeId 
-      } 
+      },
+      transports: ['websocket', 'polling'], // Enable both transports for production
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: false,
+      upgrade: true
     });
 
     console.log('🔌 Connecting to WhatsApp Socket.io');
@@ -953,6 +961,30 @@ const CRMDashboard = () => {
 
     socket.on("connect", () => {
       console.log("✅ WhatsApp Socket.io connected:", socket.id);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("❌ WhatsApp Socket.io connection error:", error);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("⚠️ WhatsApp Socket.io disconnected:", reason);
+    });
+
+    socket.on("reconnect", (attemptNumber) => {
+      console.log("🔄 WhatsApp Socket.io reconnected after", attemptNumber, "attempts");
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber) => {
+      console.log("🔄 WhatsApp Socket.io reconnection attempt:", attemptNumber);
+    });
+
+    socket.on("reconnect_error", (error) => {
+      console.error("❌ WhatsApp Socket.io reconnection error:", error);
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("❌ WhatsApp Socket.io reconnection failed after all attempts");
     });
 
     // Listen for WhatsApp status updates

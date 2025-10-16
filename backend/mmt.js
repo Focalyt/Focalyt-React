@@ -44,8 +44,13 @@ const server = http.createServer(app);
 const io = new Server(server, {
 	cors: {
 	  origin: "*", // sab frontends allow
-	  methods: ["GET", "POST"]
-	}
+	  methods: ["GET", "POST"],
+	  credentials: true
+	},
+	transports: ['websocket', 'polling'],
+	pingTimeout: 60000,
+	pingInterval: 25000,
+	upgradeTimeout: 30000
   });
   
   const userSockets = {}; // { userId: [socketId1, socketId2] }
