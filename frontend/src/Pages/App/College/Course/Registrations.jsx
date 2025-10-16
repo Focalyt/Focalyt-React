@@ -317,16 +317,13 @@ const DocumentModal = memo(({
                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                 <>
                   {(() => {
-                    console.log('selectedDocument:', selectedDocument);
-                    console.log('latestUpload:', latestUpload);
+                   
 
                     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
                     const hasDocument = fileUrl ||
                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
-                    console.log('fileUrl:', fileUrl);
-                    console.log('hasDocument:', hasDocument);
-
+                  
                     if (hasDocument) {
                       // If we have a file URL, show the appropriate viewer
                       if (fileUrl) {
@@ -719,10 +716,8 @@ const CRMDashboard = () => {
 
 
   const fetchProfile = (id) => {
-    console.log('fetchProfile called with id:', id);
-    console.log('candidateRef.current:', candidateRef.current);
+
     if (candidateRef.current) {
-      console.log('candidateRef.current exists, calling fetchProfile');
       candidateRef.current.fetchProfile(id);
     } else {
       console.log('candidateRef.current is null - this is the problem!');
@@ -756,7 +751,6 @@ const CRMDashboard = () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
 
-      console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
         setAllProfiles(prevProfiles =>
@@ -927,7 +921,6 @@ const CRMDashboard = () => {
   useEffect(() => {
     const collegeId = userData.collegeId;
     if (!collegeId) {
-      console.log('⚠️ No collegeId found in sessionStorage');
       return;
     }
     
@@ -1106,12 +1099,7 @@ const CRMDashboard = () => {
               }
             }));
 
-            console.log("Selected Location:", {
-              latitude,
-              longitude,
-              state,
-              city, address
-            });
+            
 
             addressInputRef.current.value = place.formatted_address || place.name || "";
           });
@@ -1132,18 +1120,9 @@ const CRMDashboard = () => {
     }
   }, [showPanel]);
 
-  useEffect(() => {
-    console.log('CandidateRef initialized:', candidateRef.current);
-  }, []);
-
-  useEffect(() => {
-    console.log('CandidateRef current changed:', candidateRef.current);
-  }, [candidateRef.current]);
 
 
-  useEffect(() => {
-    console.log(counselorOptions, 'counselorOptions')
-  }, [counselorOptions])
+
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
@@ -1208,7 +1187,6 @@ const CRMDashboard = () => {
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -1223,7 +1201,6 @@ const CRMDashboard = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('doc', selectedDocumentForUpload._id);
-      console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
         headers: {
@@ -1232,7 +1209,6 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log('response', response)
 
       if (response.data.status) {
         fetchLeadDetails()
@@ -1314,7 +1290,6 @@ const CRMDashboard = () => {
   };
 
   const updateDocumentStatus = useCallback((uploadId, status, reason) => {
-    console.log(`Updating document ${uploadId} to ${status}`);
     if (status === 'Rejected' && !reason?.trim()) {
       alert('Please provide a rejection reason');
       return;
@@ -1552,7 +1527,6 @@ const CRMDashboard = () => {
   const fetchFormData = async () => {
     try {
       setLoadingData(true);
-      console.log("testing.......")
       // Fetch courses
       const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
         headers: {
@@ -1560,7 +1534,6 @@ const CRMDashboard = () => {
           'Content-Type': 'application/json',
         }
       });
-      console.log("coursesResponse", coursesResponse)
 
       // Fetch qualifications
       const qualificationsResponse = await axios.get(`${backendUrl}/candidate/api/highestQualifications`, {
@@ -1601,7 +1574,6 @@ const CRMDashboard = () => {
         return;
       }
 
-      console.log("courseId", courseId)
 
 
       const response = await axios.get(`${backendUrl}/college/courses/course_centers?courseId=${courseId}`, {
@@ -1611,7 +1583,6 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log("centersResponse", response);
 
       if (response.data.status) {
         setCenters(response.data.data);
@@ -1661,7 +1632,6 @@ const CRMDashboard = () => {
         registeredBy,
       };
 
-      console.log('Submitting data:', requestData);
 
       // Make API call
 
@@ -1672,7 +1642,6 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log('API Response:', response);
       if (response.data.status) {
         alert("Lead added successfully");
 
@@ -1830,7 +1799,6 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     fetchCourseHistory();
-    console.log("courseHistory", courseHistory)
   }, [selectedProfile]);
 
   useEffect(() => {
@@ -1866,7 +1834,6 @@ const CRMDashboard = () => {
       const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
         headers: { 'x-auth': token }
       });
-      console.log("response", response);
       if (response.data && response.data.jobs) {
         setJobHistory(response.data.jobs);
       }
@@ -2260,7 +2227,6 @@ const CRMDashboard = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -2288,10 +2254,8 @@ const CRMDashboard = () => {
   };
 
   const handleMoveToKyc = async (profile) => {
-    console.log('Function called');
     try {
 
-      console.log('Function in try');
 
       if (profile?._course?.center || profile?._course?.center?.length > 0) {
         if (!profile._center || !profile._center._id) {
@@ -2314,7 +2278,6 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log('API response:', response.data);
 
       if (response.data.success) {
         alert('Lead moved to KYC Section successfully!');
@@ -2341,7 +2304,6 @@ const CRMDashboard = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -2577,8 +2539,7 @@ const CRMDashboard = () => {
         let followupDateTime = '';
         if (followupDate && followupTime) {
 
-          console.log('followupDate', followupDate)
-          console.log('followupTime', followupTime)
+          
           // Create proper datetime string
           const year = followupDate.getFullYear();
           const month = String(followupDate.getMonth() + 1).padStart(2, "0");
@@ -2586,10 +2547,8 @@ const CRMDashboard = () => {
 
           const dateStr = `${year}-${month}-${day}`;
 
-          console.log('dateStr', dateStr)
 
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
-          console.log('followupDateTime', followupDateTime)
 
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
@@ -2639,7 +2598,6 @@ const CRMDashboard = () => {
           }
         );
 
-        console.log('API response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -2698,7 +2656,6 @@ const CRMDashboard = () => {
         'Content-Type': 'multipart/form-data',
       }
     });
-    console.log('res..', response)
     if (response.data.status) {
       setBranches(response.data);
       setSelectedBranch('');
@@ -2708,16 +2665,12 @@ const CRMDashboard = () => {
   }
 
   const updateBranch = async (profile, selectedBranchId) => {
-    console.log("updateBranch")
     if (!selectedBranchId) {
       alert('Please select a branch first');
       return;
     }
 
     const profileId = profile._id;
-    console.log("profile", profileId)
-    console.log("profileId", profileId)
-    console.log("selectedBranchId", selectedBranchId)
 
     try {
       const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
@@ -2728,7 +2681,6 @@ const CRMDashboard = () => {
           'Content-Type': 'application/json',
         }
       });
-      console.log('response', response)
       if (response.data.success) {
         alert('Branch updated successfully!');
         // Optionally refresh the data or close modal
@@ -2777,7 +2729,6 @@ const CRMDashboard = () => {
 
   // Add this function in your component:
   const updateCrmFiltersFromBackend = (backendCounts) => {
-    console.log('Backend counts received:', backendCounts);
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
@@ -2844,7 +2795,6 @@ const CRMDashboard = () => {
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        console.log('data', data);
         // Sirf ek state me data set karo - paginated data
         setAllProfiles(data.data);
         setTotalPages(data.totalPages);
@@ -2956,7 +2906,6 @@ const CRMDashboard = () => {
 
     try {
 
-      console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/registrationCrmFilterCounts?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -2964,7 +2913,6 @@ const CRMDashboard = () => {
 
       if (response.data.success && response.data) {
         const data = response.data;
-        console.log('crm filter count', data);
         updateCrmFiltersFromBackend(data.crmFilterCount)
 
       } else {
@@ -2988,15 +2936,12 @@ const CRMDashboard = () => {
     try {
       setIsLoadingProfilesData(true);
       const leadId = allProfiles[leadDetailsVisible]._id;
-      console.log('leadId', leadId)
       const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
         headers: { 'x-auth': token }
       });
-      console.log("leadDetailsVisible", response)
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        console.log('data', data)
 
 
         // Sirf ek state me data set karo - paginated data
@@ -3020,7 +2965,6 @@ const CRMDashboard = () => {
     const response = await axios.get(`${backendUrl}/college/appliedJobs`, {
       headers: { 'x-auth': token }
     });
-    console.log('jobs', response)
   }
 
   const [experiences, setExperiences] = useState([{
@@ -3067,15 +3011,6 @@ const CRMDashboard = () => {
     fetchJobs(1);
   }, []);
 
-  // यह logs add करें अपने code में
-  useEffect(() => {
-    console.log('Current State:', {
-      totalProfiles: allProfiles.length,
-      totalPages: totalPages,
-      currentPage: currentPage,
-      pageSize: pageSize
-    });
-  }, [allProfiles, totalPages, currentPage, pageSize]);
 
 
 
@@ -3115,8 +3050,6 @@ const CRMDashboard = () => {
         values: values
       }
     }));
-    console.log(`Selected ${criteria}:`, values);
-    // Reset to first page and fetch with new filters
   };
 
 
@@ -3143,7 +3076,6 @@ const CRMDashboard = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
     setSelectedProfile(null)
     setShowPanel('')
     setSelectedStatus(null)
@@ -3206,7 +3138,6 @@ const CRMDashboard = () => {
 
 
   const openPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
 
     if (profile) {
       setSelectedProfile(profile);
@@ -3224,10 +3155,8 @@ const CRMDashboard = () => {
       setShowPanel('Whatsapp');
       // Use profile parameter directly instead of selectedProfile state
       if (profile?._candidate?.mobile) {
-        console.log('📱 Opening WhatsApp panel for:', profile._candidate.name, profile._candidate.mobile);
         await fetchWhatsappHistory(profile._candidate.mobile);
       } else {
-        console.error('❌ No mobile number found for WhatsApp chat. Profile:', profile);
         alert('Mobile number not found for this candidate');
       }
     }
@@ -3237,36 +3166,24 @@ const CRMDashboard = () => {
     }
   };
   const handleFetchCandidate = async (profile = null) => {
-    console.log('handleFetchCandidate called with profile:', profile);
     setShowPopup(null)
     setSelectedProfile(profile)
     setOpenModalId(profile._id);
-    console.log('openModalId set to:', profile._id);
   }
 
   useEffect(() => {
-    console.log('useEffect triggered with selectedProfile:', selectedProfile);
     if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
-      console.log('About to call fetchProfile with candidate ID:', selectedProfile._candidate._id);
       fetchProfile(selectedProfile._candidate._id);
-    } else {
-      console.log('selectedProfile condition failed:', {
-        selectedProfile: !!selectedProfile,
-        hasCandidate: !!(selectedProfile && selectedProfile._candidate),
-        hasCandidateId: !!(selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id)
-      });
-    }
+    } 
   }, [selectedProfile]);
 
 
 
   const handleConcernPersonChange = (e) => {
-    console.log(e.target.value, 'e.target.value');
     setSelectedConcernPerson(e.target.value);
   }
 
   const handleReferLead = async (type) => {
-    console.log(selectedConcernPerson, 'selectedConcernPerson');
     try {
       const response = await axios.post(`${backendUrl}/college/refer-leads`, {
         counselorId: selectedConcernPerson,
@@ -3322,7 +3239,6 @@ const CRMDashboard = () => {
       }
 
       setIsLoadingChatHistory(true);
-      console.log('📡 Fetching chat history for:', phoneNumber);
       
       const response = await axios.get(
         `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
@@ -3334,7 +3250,6 @@ const CRMDashboard = () => {
       );
 
       if (response.data.success) {
-        console.log('✅ Chat history fetched successfully. Messages count:', response.data.data.length);
         
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
@@ -3660,7 +3575,6 @@ const CRMDashboard = () => {
       
       if (response.data && response.data.data) {
         // downloadTemplatesJSON(response.data.data);
-        console.log('templates', response.data.data);
         
         const formattedTemplates = response.data.data
           .filter(template => template.status === 'APPROVED') // Only show approved templates
@@ -3710,7 +3624,6 @@ const CRMDashboard = () => {
           });
         
         setWhatsappTemplates(formattedTemplates);
-        console.log('Formatted templates:', formattedTemplates);
       }
 
     } catch (error) {
@@ -3888,8 +3801,6 @@ const CRMDashboard = () => {
       // Then find carousel component
       const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
 
-      console.log('Carousel Component Found:', carouselComponent);
-      console.log('Carousel Cards:', carouselComponent?.cards);
 
       if (carouselComponent && carouselComponent.cards) {
         carouselCards = carouselComponent.cards.map((card, index) => {
@@ -4019,15 +3930,7 @@ const CRMDashboard = () => {
 
     });
 
-    console.log('EditForm set with:', {
-      name: formatTemplateName(`${templateData.name || 'template'}`),
-      headerType,
-      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
-      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
-      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
-      bodyText: bodyText,
-      footerText: footerComponent?.text || ''
-    });
+   
 
     // Reset carousel index
 
@@ -4037,14 +3940,7 @@ const CRMDashboard = () => {
     setIsCloneMode(true);
     setShowCreateModal(true);
 
-    console.log('Template cloned:', templateData.name, 'Type:', templateType);
-    console.log('Header component:', headerComponent);
-    console.log('Extracted header data:', {
-      headerType,
-      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
-      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
-      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null
-    });
+   
 
   };
   // const handleWhatsappSendTemplate = async () => {
@@ -4505,7 +4401,6 @@ const CRMDashboard = () => {
         };
         
         setWhatsappMessages([...whatsappMessages, templateMessage]);
-        console.log('Template sent successfully to:', selectedProfile?._candidate?.mobile);
 
         // Close the modal
 
@@ -4572,9 +4467,7 @@ const CRMDashboard = () => {
 
     } catch (error) {
 
-      console.error('Error creating template:', error);
-
-      console.log('Full error response:', error.response?.data);
+    
 
 
 
@@ -4690,9 +4583,6 @@ const CRMDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    console.log('selectedProfile', selectedProfile);
-  }, [selectedProfile]);
 
   const openProfileEditPanel = async (profile = null) => {
     if (profile) {
@@ -6379,7 +6269,6 @@ const CRMDashboard = () => {
         }
       });
       if (response.data.success) {
-        console.log("response", response)
         setLeadHistory(response.data.data);
       } else {
         alert('Field to history load')
@@ -6477,7 +6366,6 @@ const CRMDashboard = () => {
                     };
                     
                     setTemplatePreview(JSON.stringify(templateData));
-                    console.log('Selected template:', tpl);
                   }}
                 >
                   <div className="fw-semibold text-dark">{tpl.name}</div>
@@ -7450,7 +7338,6 @@ const CRMDashboard = () => {
                         }}
                         onClick={() => {
                           openPanel(null, 'RefferAllLeads');
-                          console.log('selectedProfile', null);
                         }}
                       >
                         <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
@@ -7531,7 +7418,6 @@ const CRMDashboard = () => {
                             }}
                             onClick={() => {
                               openPanel(null, 'RefferAllLeads');
-                              console.log('selectedProfile', null);
                             }}
                           >
                             <i className="fas fa-share-alt" style={{ fontSize: "9px" }}></i>
@@ -7656,7 +7542,6 @@ const CRMDashboard = () => {
                                           readOnly
                                           onClick={() => {
                                             openEditPanel(profile, 'StatusChange');
-                                            console.log('selectedProfile', profile);
                                           }}
 
                                         />
@@ -7760,7 +7645,6 @@ const CRMDashboard = () => {
                                                 }}
                                                 onClick={() => {
                                                   openPanel(profile, 'SetFollowup');
-                                                  console.log('selectedProfile', profile);
                                                 }}
                                               >
                                                 Set Followup
@@ -7799,7 +7683,6 @@ const CRMDashboard = () => {
                                                 onClick={() => {
                                                   getBranches(profile);
                                                   setShowBranchModal(true);
-                                                  console.log('change Branch')
 
                                                 }}
                                               >
@@ -7823,7 +7706,6 @@ const CRMDashboard = () => {
                                               }}
                                               onClick={() => {
                                                 openPanel(profile, 'Reffer');
-                                                console.log('selectedProfile', profile);
                                               }}
                                             >
                                               Reffer
@@ -7845,7 +7727,6 @@ const CRMDashboard = () => {
 
                                             onClick={() => {
                                               openleadHistoryPanel(profile);
-                                              console.log('selectedProfile', profile);
                                             }}
                                           >
                                             History List
@@ -7947,7 +7828,6 @@ const CRMDashboard = () => {
                                                 }}
                                                 onClick={() => {
                                                   openEditPanel(profile, 'SetFollowup');
-                                                  console.log('selectedProfile', profile);
                                                 }}
                                               >
                                                 Set Followup
@@ -7985,7 +7865,6 @@ const CRMDashboard = () => {
                                                 }}
                                                 onClick={() => {
                                                   getBranches(profile);
-                                                  console.log('change Branch')
                                                   setShowBranchModal(true);
                                                 }}
                                               >
@@ -8009,7 +7888,6 @@ const CRMDashboard = () => {
                                               }}
                                               onClick={() => {
                                                 openPanel(profile, 'Reffer');
-                                                console.log('selectedProfile', profile);
                                               }}
                                             >
                                               Reffer
@@ -9287,7 +9165,6 @@ const CRMDashboard = () => {
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">
-                                      {console.log('Modal body rendering, candidateRef:', candidateRef)}
                                       <CandidateProfile ref={candidateRef} />
                                     </div>
                                     <div className="modal-footer">
