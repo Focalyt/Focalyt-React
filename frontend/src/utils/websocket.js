@@ -6,14 +6,7 @@ function useWebsocket(userId) {
   const [updates, setUpdates] = useState([]);
 
   useEffect(() => {
-    // Get backend URL from environment or use default
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000';
-    const socketUrl = backendUrl.replace('http://', '').replace('https://', '').split(':')[0] + ':8080';
-    const protocol = backendUrl.startsWith('https') ? 'https' : 'http';
-    
-    const socket = io(`${protocol}://${socketUrl}`, { query: { userId } });
-    
-    console.log('🔌 useWebsocket connecting to:', `${protocol}://${socketUrl}`);
+    const socket = io("http://localhost:8080", { query: { userId } });
 
     socket.on("connect", () => console.log("✅ Connected:", socket.id));
 

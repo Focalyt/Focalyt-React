@@ -930,11 +930,22 @@ const CRMDashboard = () => {
       console.log('⚠️ No collegeId found in sessionStorage');
       return;
     }
+    
+    // Handle both absolute URLs (https://focalyt.com/api) and relative URLs (/api)
+    let socketUrl;
+    let protocol;
+    
+    if (backendUrl.startsWith('http://') || backendUrl.startsWith('https://')) {
+      // Absolute URL - extract hostname and path
+      socketUrl = backendUrl
+      
+    } else {
+      // Relative URL like /api - use current browser's domain
+      socketUrl = `${process.env.REACT_APP_FOCALYT_BASE_URL}${backendUrl}`
+    }
 
-    // Socket.io connection - using backendUrl for production support
-    const socketUrl = backendUrl.replace('http://', '').replace('https://', '').split(':')[0] + ':8080';
-    const protocol = backendUrl.startsWith('https') ? 'https' : 'http';
-    const socket = io(`${protocol}://${socketUrl}`, { 
+    // Socket.io connection (no port needed - uses same port as backend)
+    const socket = io(`${socketUrl}`, { 
       query: { 
         userId: userData._id,
         collegeId: collegeId 
