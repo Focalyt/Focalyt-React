@@ -925,7 +925,7 @@ const CRMDashboard = () => {
 
   // Initialize WhatsApp WebSocket connection
   useEffect(() => {
-    const collegeId = sessionStorage.getItem('collegeId');
+    const collegeId = userData.collegeId;
     if (!collegeId) {
       console.log('⚠️ No collegeId found in sessionStorage');
       return;
