@@ -8,8 +8,17 @@ function useWebsocket(userId) {
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
 
   useEffect(() => {
-    // Use environment variable for backend URL
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+    // Get backend URL - handle both relative and absolute URLs
+    let backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+    
+    // If backendUrl is a relative path like '/api', convert it to full URL
+    if (backendUrl.startsWith('/')) {
+      // Use window.location to construct full URL
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      backendUrl = `${protocol}//${host}${backendUrl}`;
+    }
+    
     console.log('🔌 [WebSocket Hook] Initializing connection...');
     console.log('🔌 [WebSocket Hook] UserId:', userId);
     console.log('🔌 [WebSocket Hook] Backend URL:', backendUrl);
