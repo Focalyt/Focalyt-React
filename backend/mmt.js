@@ -49,33 +49,46 @@ const io = new Server(server, {
   });
   
   const userSockets = {}; // { userId: [socketId1, socketId2] }
+  global.userSockets = userSockets; // Make it globally accessible for Socket.io notifications
 
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
 
-	console.log('🔌 New Socket.io connection - Socket ID:', socket.id);
-	console.log('🔌 User ID from query:', userId);
+	console.log('🔌 [Socket.io] New connection attempt - Socket ID:', socket.id);
+	console.log('🔌 [Socket.io] Query params:', socket.handshake.query);
+	console.log('🔌 [Socket.io] User ID from query:', userId);
+	console.log('🔌 [Socket.io] Headers:', socket.handshake.headers);
 
 	if(!userId){
 		userId = 'guestUser'
-		console.log('⚠️ No userId provided, using guestUser');
+		console.log('⚠️ [Socket.io] No userId provided, using guestUser');
 	}
   
 	if (!userSockets[userId]) userSockets[userId] = [];
 	userSockets[userId].push(socket.id);
   
-	console.log(`✅ User ${userId} connected with socket ${socket.id}`);
-	console.log(`📊 Total sockets for user ${userId}:`, userSockets[userId].length);
-	console.log('📊 All registered users:', Object.keys(userSockets));
+	console.log(`✅ [Socket.io] User ${userId} connected with socket ${socket.id}`);
+	console.log(`📊 [Socket.io] Total sockets for user ${userId}:`, userSockets[userId].length);
+	console.log('📊 [Socket.io] All registered users:', Object.keys(userSockets));
+	console.log('📊 [Socket.io] Total active connections:', Object.keys(userSockets).reduce((sum, key) => sum + userSockets[key].length, 0));
   
-	socket.on("disconnect", () => {
-	  console.log(`❌ User ${userId} disconnected - Socket ID: ${socket.id}`);
+	// Send welcome message to client
+	socket.emit('connected', {
+		message: 'Connected to server',
+		userId: userId,
+		socketId: socket.id,
+		timestamp: new Date().toISOString()
+	});
+  
+	socket.on("disconnect", (reason) => {
+	  console.log(`❌ [Socket.io] User ${userId} disconnected - Socket ID: ${socket.id}`);
+	  console.log(`❌ [Socket.io] Reason:`, reason);
 	  userSockets[userId] = userSockets[userId].filter(id => id !== socket.id);
 	  if (userSockets[userId].length === 0) {
 		delete userSockets[userId];
-		console.log(`🗑️ Removed user ${userId} from active sockets`);
+		console.log(`🗑️ [Socket.io] Removed user ${userId} from active sockets`);
 	  }
-	  console.log('📊 Remaining active users:', Object.keys(userSockets));
+	  console.log('📊 [Socket.io] Remaining active users:', Object.keys(userSockets));
 	});
   });
   
@@ -242,4 +255,3 @@ app.get("*", (req, res) =>
 
 
 global.io = io;
-global.userSockets = userSockets;

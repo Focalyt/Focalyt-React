@@ -10,18 +10,43 @@ function useWebsocket(userId) {
   useEffect(() => {
     // Use environment variable for backend URL
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
-    console.log('🔌 Connecting to Socket.io with userId:', userId);
-    console.log('🔌 Backend URL:', backendUrl);
+    console.log('🔌 [WebSocket Hook] Initializing connection...');
+    console.log('🔌 [WebSocket Hook] UserId:', userId);
+    console.log('🔌 [WebSocket Hook] Backend URL:', backendUrl);
     
-    const socket = io(backendUrl, { query: { userId } });
-
-    socket.on("connect", () => {
-      console.log("✅ Socket.io Connected - Socket ID:", socket.id);
-      console.log("✅ User ID:", userId);
+    if (!userId) {
+      console.warn('⚠️ [WebSocket Hook] No userId provided, connection will use guestUser');
+    }
+    
+    const socket = io(backendUrl, { 
+      query: { userId },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
 
-    socket.on("disconnect", () => {
-      console.log("❌ Socket.io Disconnected - Socket ID:", socket.id);
+    socket.on("connect", () => {
+      console.log("✅ [WebSocket Hook] Socket.io Connected!");
+      console.log("✅ [WebSocket Hook] Socket ID:", socket.id);
+      console.log("✅ [WebSocket Hook] User ID:", userId);
+      console.log("✅ [WebSocket Hook] Connected to:", backendUrl);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("❌ [WebSocket Hook] Connection error:", error.message);
+      console.error("❌ [WebSocket Hook] Backend URL:", backendUrl);
+      console.error("❌ [WebSocket Hook] User ID:", userId);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("❌ [WebSocket Hook] Disconnected - Socket ID:", socket.id);
+      console.log("❌ [WebSocket Hook] Reason:", reason);
+    });
+
+    // Server welcome message
+    socket.on("connected", (data) => {
+      console.log("🎉 [WebSocket Hook] Server welcome message:", data);
     });
 
     // Chat messages

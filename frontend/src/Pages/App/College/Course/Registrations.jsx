@@ -932,7 +932,11 @@ const CRMDashboard = () => {
 
   // Use Socket.io for WebSocket connection (same as MyFollowupB2C)
   // Use collegeId instead of _id for WhatsApp message updates
-  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userData.collegeId || userData._id);
+  const userIdForSocket = userData.collegeId || userData._id;
+  console.log('🔌 [Registrations] Initializing WebSocket connection...');
+  console.log('🔌 [Registrations] userData:', userData);
+  console.log('🔌 [Registrations] userId for socket:', userIdForSocket);
+  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userIdForSocket);
 
   // Handle WhatsApp message updates from Socket.io
   useEffect(() => {
@@ -973,7 +977,7 @@ const CRMDashboard = () => {
           msg.messageId === data.messageId || 
           (msg.recipient === data.to && 
            (msg.type === 'template' 
-             ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
+            ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
              : msg.text === data.message));
 
         if (isMatchingMessage && msg.sender === 'agent') {

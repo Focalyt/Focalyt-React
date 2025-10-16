@@ -2318,21 +2318,29 @@ async function handleStatusUpdates(statuses) {
 					message: updatedMessage.message
 				};
 
-				// Broadcast Socket.io notification to ALL active clients
-				if (global.io) {
-					try {
-						const totalClients = global.io.sockets.sockets.size;
-						global.io.emit('whatsapp_message_update', {
-							collegeId: updatedMessage.collegeId,
-							...notificationData
-						});
-						console.log(`🔔 Broadcasted WhatsApp message update to ${totalClients} active client(s)`);
-					} catch (ioError) {
-						console.error('Socket.io notification failed:', ioError.message);
-					}
-				} else {
-					console.log('⚠️ Socket.io not available');
+			// Broadcast Socket.io notification to ALL active clients
+			if (global.io) {
+				try {
+					const totalClients = global.io.sockets.sockets.size;
+					const broadcastData = {
+						collegeId: updatedMessage.collegeId,
+						...notificationData
+					};
+					
+					console.log(`🔔 [WhatsApp Broadcast] Attempting to broadcast to ${totalClients} active client(s)`);
+					console.log(`🔔 [WhatsApp Broadcast] College ID: ${updatedMessage.collegeId}`);
+					console.log(`🔔 [WhatsApp Broadcast] Broadcast data:`, JSON.stringify(broadcastData, null, 2));
+					
+					global.io.emit('whatsapp_message_update', broadcastData);
+					
+					console.log(`✅ [WhatsApp Broadcast] Successfully broadcasted to all ${totalClients} client(s)`);
+				} catch (ioError) {
+					console.error('❌ [WhatsApp Broadcast] Socket.io notification failed:', ioError.message);
+					console.error('❌ [WhatsApp Broadcast] Error stack:', ioError.stack);
 				}
+			} else {
+				console.log('⚠️ [WhatsApp Broadcast] Socket.io not available - global.io is undefined');
+			}
 			} else {
 				console.warn(`⚠️ Message not found in database: ${messageId}`);
 			}
