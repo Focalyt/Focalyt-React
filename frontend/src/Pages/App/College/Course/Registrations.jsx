@@ -4453,7 +4453,7 @@ const CRMDashboard = () => {
         // Add sent template to existing WhatsApp chat with backend response data
         const templateMessage = {
           id: whatsappMessages.length + 1,
-          messageId: response.data.data.messages?.[0]?.id, // WhatsApp message ID for status updates
+          messageId: response.data.data.messageId, // WhatsApp message ID for status updates
           text: `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           recipient: selectedProfile?._candidate?.mobile,
