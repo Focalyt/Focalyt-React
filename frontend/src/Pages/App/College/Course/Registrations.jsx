@@ -953,7 +953,7 @@ const CRMDashboard = () => {
     });
 
     console.log('🔌 Connecting to WhatsApp Socket.io');
-    console.log('📋 Socket URL:', `${protocol}://${socketUrl}`);
+    console.log('📋 Socket URL:', `${socketUrl}`);
     console.log('📋 Backend URL:', backendUrl);
     console.log('📋 CollegeId:', collegeId);
     console.log('📋 UserId:', userData._id);
