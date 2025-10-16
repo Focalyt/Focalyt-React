@@ -2329,13 +2329,22 @@ async function handleStatusUpdates(statuses) {
 				}
 
 				// Send Socket.io notification to frontend
-				if (global.io) {
+				if (global.io && global.userSockets) {
 					try {
-						global.io.emit('whatsapp_message_update', {
-							collegeId: updatedMessage.collegeId,
-							...notificationData
-						});
-						console.log('🔔 Socket.io notification sent for WhatsApp message update');
+						const collegeIdStr = String(updatedMessage.collegeId);
+						const socketIds = global.userSockets[collegeIdStr] || [];
+						
+						if (socketIds.length > 0) {
+							socketIds.forEach(socketId => {
+								global.io.to(socketId).emit('whatsapp_message_update', {
+									collegeId: updatedMessage.collegeId,
+									...notificationData
+								});
+							});
+							console.log(`🔔 Socket.io notification sent to ${socketIds.length} client(s) for college: ${collegeIdStr}`);
+						} else {
+							console.log(`⚠️ No active Socket.io clients for college: ${collegeIdStr}`);
+						}
 					} catch (ioError) {
 						console.error('Socket.io notification failed:', ioError.message);
 					}
@@ -2448,13 +2457,22 @@ async function handleTemplateStatusUpdate(templateStatusUpdates) {
 				}
 
 				// Send Socket.io notification to frontend
-				if (global.io) {
+				if (global.io && global.userSockets) {
 					try {
-						global.io.emit('whatsapp_template_update', {
-							collegeId: updatedTemplate.collegeId,
-							...templateNotificationData
-						});
-						console.log('🔔 Socket.io notification sent for template status update');
+						const collegeIdStr = String(updatedTemplate.collegeId);
+						const socketIds = global.userSockets[collegeIdStr] || [];
+						
+						if (socketIds.length > 0) {
+							socketIds.forEach(socketId => {
+								global.io.to(socketId).emit('whatsapp_template_update', {
+									collegeId: updatedTemplate.collegeId,
+									...templateNotificationData
+								});
+							});
+							console.log(`🔔 Socket.io notification sent to ${socketIds.length} client(s) for template status update`);
+						} else {
+							console.log(`⚠️ No active Socket.io clients for college: ${collegeIdStr}`);
+						}
 					} catch (ioError) {
 						console.error('Template status Socket.io notification failed:', ioError.message);
 					}

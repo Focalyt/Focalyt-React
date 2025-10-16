@@ -924,7 +924,8 @@ const CRMDashboard = () => {
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
 
   // Use Socket.io for WebSocket connection (same as MyFollowupB2C)
-  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userData._id);
+  // Use collegeId instead of _id for WhatsApp message updates
+  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userData.collegeId || userData._id);
 
   // Handle WhatsApp message updates from Socket.io
   useEffect(() => {
