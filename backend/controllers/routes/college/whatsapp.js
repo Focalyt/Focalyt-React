@@ -2318,42 +2318,20 @@ async function handleStatusUpdates(statuses) {
 					message: updatedMessage.message
 				};
 
-				// Send WebSocket notification to frontend (if WebSocket server is available)
-				if (global.wsServer) {
+				// Broadcast Socket.io notification to ALL active clients
+				if (global.io) {
 					try {
-						global.wsServer.sendWhatsAppNotification(updatedMessage.collegeId, notificationData);
-						console.log('🔔 WebSocket notification sent to college:', updatedMessage.collegeId);
-					} catch (wsError) {
-						console.error('WebSocket notification failed:', wsError.message);
-					}
-				}
-
-				// Send Socket.io notification to frontend
-				if (global.io && global.userSockets) {
-					try {
-						const collegeIdStr = String(updatedMessage.collegeId);
-						console.log('🔍 Looking for socket IDs for college:', collegeIdStr);
-						console.log('📊 All registered users:', Object.keys(global.userSockets));
-						
-						const socketIds = global.userSockets[collegeIdStr] || [];
-						console.log('📊 Found socket IDs:', socketIds);
-						
-						if (socketIds.length > 0) {
-							socketIds.forEach(socketId => {
-								global.io.to(socketId).emit('whatsapp_message_update', {
-									collegeId: updatedMessage.collegeId,
-									...notificationData
-								});
-							});
-							console.log(`🔔 Socket.io notification sent to ${socketIds.length} client(s) for college: ${collegeIdStr}`);
-						} else {
-							console.log(`⚠️ No active Socket.io clients for college: ${collegeIdStr}`);
-						}
+						const totalClients = global.io.sockets.sockets.size;
+						global.io.emit('whatsapp_message_update', {
+							collegeId: updatedMessage.collegeId,
+							...notificationData
+						});
+						console.log(`🔔 Broadcasted WhatsApp message update to ${totalClients} active client(s)`);
 					} catch (ioError) {
 						console.error('Socket.io notification failed:', ioError.message);
 					}
 				} else {
-					console.log('⚠️ Socket.io or userSockets not available');
+					console.log('⚠️ Socket.io not available');
 				}
 			} else {
 				console.warn(`⚠️ Message not found in database: ${messageId}`);
@@ -2452,33 +2430,15 @@ async function handleTemplateStatusUpdate(templateStatusUpdates) {
 						: `Template "${templateName}" status updated to ${status}`
 				};
 
-				// Send WebSocket notification to frontend
-				if (global.wsServer) {
+				// Broadcast Socket.io notification to ALL active clients
+				if (global.io) {
 					try {
-						global.wsServer.sendWhatsAppNotification(updatedTemplate.collegeId, templateNotificationData);
-						console.log('🔔 Template status WebSocket notification sent to college:', updatedTemplate.collegeId);
-					} catch (wsError) {
-						console.error('Template status WebSocket notification failed:', wsError.message);
-					}
-				}
-
-				// Send Socket.io notification to frontend
-				if (global.io && global.userSockets) {
-					try {
-						const collegeIdStr = String(updatedTemplate.collegeId);
-						const socketIds = global.userSockets[collegeIdStr] || [];
-						
-						if (socketIds.length > 0) {
-							socketIds.forEach(socketId => {
-								global.io.to(socketId).emit('whatsapp_template_update', {
-									collegeId: updatedTemplate.collegeId,
-									...templateNotificationData
-								});
-							});
-							console.log(`🔔 Socket.io notification sent to ${socketIds.length} client(s) for template status update`);
-						} else {
-							console.log(`⚠️ No active Socket.io clients for college: ${collegeIdStr}`);
-						}
+						const totalClients = global.io.sockets.sockets.size;
+						global.io.emit('whatsapp_template_update', {
+							collegeId: updatedTemplate.collegeId,
+							...templateNotificationData
+						});
+						console.log(`🔔 Broadcasted WhatsApp template update to ${totalClients} active client(s)`);
 					} catch (ioError) {
 						console.error('Template status Socket.io notification failed:', ioError.message);
 					}

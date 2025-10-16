@@ -50,12 +50,6 @@ const io = new Server(server, {
   
   const userSockets = {}; // { userId: [socketId1, socketId2] }
 
-// WhatsApp WebSocket Server
-const wsServer = require('./websocket');
-wsServer.initialize(server);
-global.wsServer = wsServer; // Make it globally accessible
-console.log('✅ WhatsApp WebSocket server initialized');
-
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
 
