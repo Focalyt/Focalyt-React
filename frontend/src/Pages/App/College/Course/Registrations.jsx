@@ -5,7 +5,8 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import useWebsocket from '../../../utils/websocket';
+import useWebsocket from '../../../../utils/websocket'
+
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
