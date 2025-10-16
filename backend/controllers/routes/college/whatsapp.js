@@ -158,13 +158,16 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 			}
 		});
 
-		// Send WebSocket notification
-		if (global.wsServer) {
-			global.wsServer.sendWhatsAppNotification(req.collegeId, {
+		// Send Socket.io notification
+		if (global.io) {
+			global.io.emit('whatsapp_template_sync', {
+				collegeId: req.collegeId,
 				type: 'templates_synced',
 				message: 'Templates synced successfully from Meta',
 				timestamp: new Date().toISOString()
 			});
+			console.log('📤 Socket.io event emitted: whatsapp_template_sync');
+			console.log('   - College ID:', req.collegeId);
 		}
 
 		res.json({
@@ -184,13 +187,17 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 			errorMessage = error.response.data.error;
 		}
 
-		// Send WebSocket error notification
-		if (global.wsServer) {
-			global.wsServer.sendWhatsAppNotification(req.collegeId, {
+		// Send Socket.io error notification
+		if (global.io) {
+			global.io.emit('whatsapp_template_sync_error', {
+				collegeId: req.collegeId,
 				type: 'templates_sync_error',
 				error: errorMessage,
 				timestamp: new Date().toISOString()
 			});
+			console.log('📤 Socket.io event emitted: whatsapp_template_sync_error');
+			console.log('   - College ID:', req.collegeId);
+			console.log('   - Error:', errorMessage);
 		}
 
 		res.status(500).json({ 
@@ -2308,39 +2315,28 @@ async function handleStatusUpdates(statuses) {
 			if (updatedMessage) {
 				console.log(`✅ Updated message ${messageId} status to ${statusValue}`);
 
-				const notificationData = {
-					type: 'message_status_update',
-					messageId: messageId,
-					status: statusValue,
-					to: recipientId,
-					candidateId: updatedMessage.candidateId,
-					timestamp: new Date(parseInt(timestamp) * 1000),
-					message: updatedMessage.message
-				};
-
-			// Broadcast Socket.io notification to ALL active clients
-			if (global.io) {
-				try {
-					const totalClients = global.io.sockets.sockets.size;
-					const broadcastData = {
-						collegeId: updatedMessage.collegeId,
-						...notificationData
-					};
-					
-					console.log(`🔔 [WhatsApp Broadcast] Attempting to broadcast to ${totalClients} active client(s)`);
-					console.log(`🔔 [WhatsApp Broadcast] College ID: ${updatedMessage.collegeId}`);
-					console.log(`🔔 [WhatsApp Broadcast] Broadcast data:`, JSON.stringify(broadcastData, null, 2));
-					
-					global.io.emit('whatsapp_message_update', broadcastData);
-					
-					console.log(`✅ [WhatsApp Broadcast] Successfully broadcasted to all ${totalClients} client(s)`);
-				} catch (ioError) {
-					console.error('❌ [WhatsApp Broadcast] Socket.io notification failed:', ioError.message);
-					console.error('❌ [WhatsApp Broadcast] Error stack:', ioError.stack);
+				// Send Socket.io notification for WhatsApp status updates
+				if (global.io) {
+					try {
+						global.io.emit('whatsapp_status_update', {
+							collegeId: updatedMessage.collegeId,
+							type: 'message_status_update',
+							messageId: messageId,
+							status: statusValue,
+							to: recipientId,
+							candidateId: updatedMessage.candidateId,
+							timestamp: new Date(parseInt(timestamp) * 1000),
+							message: updatedMessage.message
+						});
+						console.log('🔔 Socket.io event emitted: whatsapp_status_update');
+						console.log('   - College ID:', updatedMessage.collegeId);
+						console.log('   - Message ID:', messageId);
+						console.log('   - Status:', statusValue);
+						console.log('   - To:', recipientId);
+					} catch (ioError) {
+						console.error('❌ Socket.io notification failed:', ioError.message);
+					}
 				}
-			} else {
-				console.log('⚠️ [WhatsApp Broadcast] Socket.io not available - global.io is undefined');
-			}
 			} else {
 				console.warn(`⚠️ Message not found in database: ${messageId}`);
 			}
@@ -2424,31 +2420,29 @@ async function handleTemplateStatusUpdate(templateStatusUpdates) {
 			if (updatedTemplate) {
 				console.log(`✅ Template status updated in database: ${templateName} - ${status}`);
 
-				const templateNotificationData = {
-					type: 'template_status_update',
-					templateId: templateId,
-					templateName: templateName,
-					status: status,
-					rejectionReason: rejectionReason,
-					timestamp: new Date(parseInt(timestamp) * 1000),
-					message: status === 'APPROVED' 
-						? `Template "${templateName}" has been approved and is ready to use!`
-						: status === 'REJECTED'
-						? `Template "${templateName}" was rejected: ${rejectionReason}`
-						: `Template "${templateName}" status updated to ${status}`
-				};
-
-				// Broadcast Socket.io notification to ALL active clients
+				// Send Socket.io notification to frontend
 				if (global.io) {
 					try {
-						const totalClients = global.io.sockets.sockets.size;
-						global.io.emit('whatsapp_template_update', {
+						global.io.emit('whatsapp_template_status_update', {
 							collegeId: updatedTemplate.collegeId,
-							...templateNotificationData
+							type: 'template_status_update',
+							templateId: templateId,
+							templateName: templateName,
+							status: status,
+							rejectionReason: rejectionReason,
+							timestamp: new Date(parseInt(timestamp) * 1000),
+							message: status === 'APPROVED' 
+								? `Template "${templateName}" has been approved and is ready to use!`
+								: status === 'REJECTED'
+								? `Template "${templateName}" was rejected: ${rejectionReason}`
+								: `Template "${templateName}" status updated to ${status}`
 						});
-						console.log(`🔔 Broadcasted WhatsApp template update to ${totalClients} active client(s)`);
+						console.log('🔔 Socket.io event emitted: whatsapp_template_status_update');
+						console.log('   - College ID:', updatedTemplate.collegeId);
+						console.log('   - Template:', templateName);
+						console.log('   - Status:', status);
 					} catch (ioError) {
-						console.error('Template status Socket.io notification failed:', ioError.message);
+						console.error('❌ Socket.io notification failed:', ioError.message);
 					}
 				}
 			} else {

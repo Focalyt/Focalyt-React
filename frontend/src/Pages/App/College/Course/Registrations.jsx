@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
+import { io } from 'socket.io-client';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import useWebsocket from '../../../../utils/websocket'
-
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -781,13 +780,6 @@ const CRMDashboard = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
-  // Debug: Log userData for Socket.io connection
-  console.log('👤 User Data:', {
-    _id: userData._id,
-    collegeId: userData.collegeId,
-    email: userData.email
-  });
-
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
   const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
@@ -930,59 +922,91 @@ const CRMDashboard = () => {
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
 
-  // Use Socket.io for WebSocket connection (same as MyFollowupB2C)
-  // Use collegeId instead of _id for WhatsApp message updates
-  const userIdForSocket = userData.collegeId || userData._id;
-  console.log('🔌 [Registrations] Initializing WebSocket connection...');
-  console.log('🔌 [Registrations] userData:', userData);
-  console.log('🔌 [Registrations] userId for socket:', userIdForSocket);
-  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userIdForSocket);
 
-  // Handle WhatsApp message updates from Socket.io
+  // Initialize WhatsApp Socket.io connection
   useEffect(() => {
-    if (wsMessages && wsMessages.length > 0) {
-      const latestMessage = wsMessages[wsMessages.length - 1];
-      console.log('📱 Processing WhatsApp message update:', latestMessage);
-      
-      if (latestMessage.type === 'message_status_update') {
-        handleMessageStatusUpdate(latestMessage);
-      }
+    const collegeId = userData.collegeId;
+    if (!collegeId) {
+      console.log('⚠️ No collegeId found in sessionStorage');
+      return;
     }
-  }, [wsMessages]);
 
-  // Handle WhatsApp template updates from Socket.io
-  useEffect(() => {
-    if (wsTemplates && wsTemplates.length > 0) {
-      const latestTemplate = wsTemplates[wsTemplates.length - 1];
-      console.log('📋 Processing WhatsApp template update:', latestTemplate);
+    // Socket.io connection - same as MyFollowupB2C.jsx implementation
+    const socket = io("http://localhost:8080", { 
+      query: { 
+        userId: userData._id,
+        collegeId: collegeId 
+      } 
+    });
+
+    console.log('🔌 Connecting to WhatsApp Socket.io');
+    console.log('📋 CollegeId:', collegeId);
+    console.log('📋 UserId:', userData._id);
+
+    socket.on("connect", () => {
+      console.log("✅ WhatsApp Socket.io connected:", socket.id);
+    });
+
+    // Listen for WhatsApp status updates
+    socket.on("whatsapp_status_update", (data) => {
+      console.log("📨 WhatsApp status update received:", data);
       
-      if (latestTemplate.type === 'template_status_update') {
-        // Handle template status updates
-        console.log('✅ Template status updated:', latestTemplate);
+      // Only process if this update is for the current college
+      if (data.collegeId === collegeId) {
+        handleMessageStatusUpdate(data);
       }
-    }
-  }, [wsTemplates]);
+    });
 
-  // Handle message status updates from WebSocket
+    // Listen for template sync notifications
+    socket.on("whatsapp_template_sync", (data) => {
+      console.log("📨 WhatsApp template sync received:", data);
+      
+      // Only process if this update is for the current college
+      if (data.collegeId === collegeId) {
+        // Optionally refresh templates or show notification
+        console.log("✅ Templates synced for college:", collegeId);
+      }
+    });
+
+    // Listen for template sync errors
+    socket.on("whatsapp_template_sync_error", (data) => {
+      console.log("❌ WhatsApp template sync error received:", data);
+      
+      // Only process if this update is for the current college
+      if (data.collegeId === collegeId) {
+        console.error("❌ Template sync error:", data.error);
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log("🔌 WhatsApp Socket.io disconnected");
+    });
+
+    socket.on("error", (error) => {
+      console.error("❌ Socket.io error:", error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      socket.disconnect();
+    };
+  }, [backendUrl, userData._id, userData.collegeId]);
+
+  // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = (data) => {
-    console.log('📊 Message status update received:', data);
+    console.log('📊 Message status update:', data);
     
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
-      let updated = false;
-      const updatedMessages = prevMessages.map((msg) => {
-        // Match message by messageId (most reliable)
-        // Fallback to recipient + text matching if messageId not available
+      return prevMessages.map((msg) => {
+        // Match message by checking if it's for the same recipient and has matching text/template
         const isMatchingMessage = 
-          msg.messageId === data.messageId || 
-          (msg.recipient === data.to && 
-           (msg.type === 'template' 
+          msg.type === 'template' 
             ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
-             : msg.text === data.message));
+            : msg.text === data.message;
 
         if (isMatchingMessage && msg.sender === 'agent') {
-          console.log('✅ Updating message status from', msg.status, 'to', data.status);
-          updated = true;
+          console.log('✅ Updating message status to:', data.status);
           return {
             ...msg,
             status: data.status,
@@ -993,12 +1017,6 @@ const CRMDashboard = () => {
         }
         return msg;
       });
-
-      if (!updated) {
-        console.warn('⚠️ No matching message found for update:', data);
-      }
-
-      return updatedMessages;
     });
 
     // Show notification (optional)
@@ -3306,10 +3324,8 @@ const CRMDashboard = () => {
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
           id: index + 1,
-          messageId: msg.whatsappMessageId, // WhatsApp message ID for status updates
           text: msg.message,
           sender: 'agent', // All sent messages are from agent
-          recipient: msg.recipientPhone,
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit' 
@@ -4465,10 +4481,8 @@ const CRMDashboard = () => {
         // Add sent template to existing WhatsApp chat with backend response data
         const templateMessage = {
           id: whatsappMessages.length + 1,
-          messageId: response.data.data.messageId, // WhatsApp message ID for status updates
           text: `Template: ${response.data.data.templateName}`,
           sender: 'agent',
-          recipient: selectedProfile?._candidate?.mobile,
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
           templateData: response.data.data.templateData || templateData,
@@ -4477,7 +4491,6 @@ const CRMDashboard = () => {
         
         setWhatsappMessages([...whatsappMessages, templateMessage]);
         console.log('Template sent successfully to:', selectedProfile?._candidate?.mobile);
-        console.log('Message ID:', templateMessage.messageId);
 
         // Close the modal
 
