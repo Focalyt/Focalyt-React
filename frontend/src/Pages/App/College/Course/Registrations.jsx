@@ -703,6 +703,8 @@ const CRMDashboard = () => {
   const candidateRef = useRef();
   // Refs
   const addressInputRef = useRef(null);
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000';
+
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -731,7 +733,6 @@ const CRMDashboard = () => {
       try {
         const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
         const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
         const res = await axios.get(`${backendUrl}/college/filters-data`, {
           headers: { 'x-auth': token }
         });
@@ -775,7 +776,6 @@ const CRMDashboard = () => {
     }
   };
 
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
@@ -926,13 +926,16 @@ const CRMDashboard = () => {
   // Initialize WhatsApp WebSocket connection
   useEffect(() => {
     const collegeId = sessionStorage.getItem('collegeId');
-    if (!collegeId) return;
+    if (!collegeId) {
+      console.log('⚠️ No collegeId found in sessionStorage');
+      return;
+    }
 
-    // WebSocket URL (adjust based on your backend URL)
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
+    // WebSocket URL - using the same backendUrl as the rest of the component
     const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
     
     console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
+    console.log('📋 CollegeId:', collegeId);
     
     const ws = new WebSocket(wsUrl);
 
