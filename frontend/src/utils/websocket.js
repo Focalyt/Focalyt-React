@@ -1,38 +1,70 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 
 function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
+  const [whatsappMessages, setWhatsappMessages] = useState([]);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
 
   useEffect(() => {
-    const socket = io("http://localhost:8080", { query: { userId } });
+    // Use environment variable for backend URL
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+    const socket = io(backendUrl, { query: { userId } });
 
-    socket.on("connect", () => console.log("✅ Connected:", socket.id));
+    socket.on("connect", () => {
+      console.log("✅ Socket.io Connected:", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("❌ Socket.io Disconnected");
+    });
 
     // Chat messages
     socket.on("message", (data) => {
       console.log("📩 Message received:", data);
-      setMessages(prev => [...prev, data]); // update messages state
+      setMessages(prev => [...prev, data]);
     });
 
     // Product updates
     socket.on("productUpdate", (data) => {
       console.log("🆕 Product update received:", data);
-      setUpdates(prev => [...prev, data]); // update product updates state
+      setUpdates(prev => [...prev, data]);
     });
 
     // Missed followup notifications
     socket.on("missedFollowup", (data) => {
       console.log("⚠️ Missed followup received:", data);
-      setUpdates(prev => [...prev, data]); // ya alag state maintain kar sakte ho
+      setUpdates(prev => [...prev, data]);
     });
 
-    return () => socket.disconnect();
+    // WhatsApp message status updates
+    socket.on("whatsapp_message_update", (data) => {
+      console.log("📱 WhatsApp message update received:", data);
+      setWhatsappMessages(prev => [...prev, data]);
+    });
+
+    // WhatsApp template status updates
+    socket.on("whatsapp_template_update", (data) => {
+      console.log("📋 WhatsApp template update received:", data);
+      setWhatsappTemplates(prev => [...prev, data]);
+    });
+
+    return () => {
+      console.log("🔌 Disconnecting socket...");
+      socket.disconnect();
+    };
   }, [userId]);
 
-  // Return data so component can use it
-  return { messages, updates };
+  // Return data and helper functions
+  return { 
+    messages, 
+    updates, 
+    whatsappMessages,
+    whatsappTemplates,
+    clearWhatsappMessages: () => setWhatsappMessages([]),
+    clearWhatsappTemplates: () => setWhatsappTemplates([])
+  };
 }
 
 export default useWebsocket;

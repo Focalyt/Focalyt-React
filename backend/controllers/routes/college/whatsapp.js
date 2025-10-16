@@ -2308,21 +2308,36 @@ async function handleStatusUpdates(statuses) {
 			if (updatedMessage) {
 				console.log(`✅ Updated message ${messageId} status to ${statusValue}`);
 
+				const notificationData = {
+					type: 'message_status_update',
+					messageId: messageId,
+					status: statusValue,
+					to: recipientId,
+					candidateId: updatedMessage.candidateId,
+					timestamp: new Date(parseInt(timestamp) * 1000),
+					message: updatedMessage.message
+				};
+
 				// Send WebSocket notification to frontend (if WebSocket server is available)
 				if (global.wsServer) {
 					try {
-						global.wsServer.sendWhatsAppNotification(updatedMessage.collegeId, {
-							type: 'message_status_update',
-							messageId: messageId,
-							status: statusValue,
-							to: recipientId,
-							candidateId: updatedMessage.candidateId,
-							timestamp: new Date(parseInt(timestamp) * 1000),
-							message: updatedMessage.message
-						});
+						global.wsServer.sendWhatsAppNotification(updatedMessage.collegeId, notificationData);
 						console.log('🔔 WebSocket notification sent to college:', updatedMessage.collegeId);
 					} catch (wsError) {
 						console.error('WebSocket notification failed:', wsError.message);
+					}
+				}
+
+				// Send Socket.io notification to frontend
+				if (global.io) {
+					try {
+						global.io.emit('whatsapp_message_update', {
+							collegeId: updatedMessage.collegeId,
+							...notificationData
+						});
+						console.log('🔔 Socket.io notification sent for WhatsApp message update');
+					} catch (ioError) {
+						console.error('Socket.io notification failed:', ioError.message);
 					}
 				}
 			} else {
@@ -2408,25 +2423,40 @@ async function handleTemplateStatusUpdate(templateStatusUpdates) {
 			if (updatedTemplate) {
 				console.log(`✅ Template status updated in database: ${templateName} - ${status}`);
 
+				const templateNotificationData = {
+					type: 'template_status_update',
+					templateId: templateId,
+					templateName: templateName,
+					status: status,
+					rejectionReason: rejectionReason,
+					timestamp: new Date(parseInt(timestamp) * 1000),
+					message: status === 'APPROVED' 
+						? `Template "${templateName}" has been approved and is ready to use!`
+						: status === 'REJECTED'
+						? `Template "${templateName}" was rejected: ${rejectionReason}`
+						: `Template "${templateName}" status updated to ${status}`
+				};
+
 				// Send WebSocket notification to frontend
 				if (global.wsServer) {
 					try {
-						global.wsServer.sendWhatsAppNotification(updatedTemplate.collegeId, {
-							type: 'template_status_update',
-							templateId: templateId,
-							templateName: templateName,
-							status: status,
-							rejectionReason: rejectionReason,
-							timestamp: new Date(parseInt(timestamp) * 1000),
-							message: status === 'APPROVED' 
-								? `Template "${templateName}" has been approved and is ready to use!`
-								: status === 'REJECTED'
-								? `Template "${templateName}" was rejected: ${rejectionReason}`
-								: `Template "${templateName}" status updated to ${status}`
-						});
+						global.wsServer.sendWhatsAppNotification(updatedTemplate.collegeId, templateNotificationData);
 						console.log('🔔 Template status WebSocket notification sent to college:', updatedTemplate.collegeId);
 					} catch (wsError) {
 						console.error('Template status WebSocket notification failed:', wsError.message);
+					}
+				}
+
+				// Send Socket.io notification to frontend
+				if (global.io) {
+					try {
+						global.io.emit('whatsapp_template_update', {
+							collegeId: updatedTemplate.collegeId,
+							...templateNotificationData
+						});
+						console.log('🔔 Socket.io notification sent for template status update');
+					} catch (ioError) {
+						console.error('Template status Socket.io notification failed:', ioError.message);
 					}
 				}
 			} else {

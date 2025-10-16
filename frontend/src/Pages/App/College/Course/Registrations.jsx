@@ -5,6 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import useWebsocket from '../../../utils/websocket';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -920,78 +921,34 @@ const CRMDashboard = () => {
   const whatsappMessagesEndRef = useRef(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
-  const [whatsappWs, setWhatsappWs] = useState(null);
 
+  // Use Socket.io for WebSocket connection (same as MyFollowupB2C)
+  const { whatsappMessages: wsMessages, whatsappTemplates: wsTemplates } = useWebsocket(userData._id);
 
-  // Initialize WhatsApp WebSocket connection
+  // Handle WhatsApp message updates from Socket.io
   useEffect(() => {
-    const collegeId = userData.collegeId;
-    if (!collegeId) {
-      console.log('⚠️ No collegeId found in sessionStorage');
-      return;
-    }
-
-    // WebSocket URL - remove /api from backendUrl if present, then convert to ws
-    let baseUrl = backendUrl;
-    if (baseUrl.includes('/api')) {
-      baseUrl = baseUrl.replace('/api', '');
-    }
-    const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/whatsapp`;
-    
-    console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
-    console.log('📋 CollegeId:', collegeId);
-    console.log('📋 Base URL:', baseUrl);
-    
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log('✅ WhatsApp WebSocket connected');
-      console.log('📝 Registering with collegeId:', collegeId);
-      // Register with collegeId
-      ws.send(JSON.stringify({
-        type: 'register',
-        collegeId: collegeId
-      }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('📨 WebSocket message received:', data);
-
-        // Handle different message types
-        if (data.type === 'message_status_update') {
-          handleMessageStatusUpdate(data);
-        } else if (data.type === 'registered') {
-          console.log('✅ Registered with WebSocket for college:', data.collegeId);
-        } else if (data.type === 'pong') {
-          // Pong response for keep-alive
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+    if (wsMessages && wsMessages.length > 0) {
+      const latestMessage = wsMessages[wsMessages.length - 1];
+      console.log('📱 Processing WhatsApp message update:', latestMessage);
+      
+      if (latestMessage.type === 'message_status_update') {
+        handleMessageStatusUpdate(latestMessage);
       }
-    };
+    }
+  }, [wsMessages]);
 
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
-      console.error('❌ WebSocket URL:', wsUrl);
-    };
-
-    ws.onclose = (event) => {
-      console.log('🔌 WebSocket disconnected');
-      console.log('🔌 Close code:', event.code);
-      console.log('🔌 Close reason:', event.reason);
-    };
-
-    setWhatsappWs(ws);
-
-    // Cleanup on unmount
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+  // Handle WhatsApp template updates from Socket.io
+  useEffect(() => {
+    if (wsTemplates && wsTemplates.length > 0) {
+      const latestTemplate = wsTemplates[wsTemplates.length - 1];
+      console.log('📋 Processing WhatsApp template update:', latestTemplate);
+      
+      if (latestTemplate.type === 'template_status_update') {
+        // Handle template status updates
+        console.log('✅ Template status updated:', latestTemplate);
       }
-    };
-  }, [backendUrl]);
+    }
+  }, [wsTemplates]);
 
   // Handle message status updates from WebSocket
   const handleMessageStatusUpdate = (data) => {
@@ -1029,20 +986,6 @@ const CRMDashboard = () => {
       console.error('❌ Message failed:', data.to);
     }
   };
-
-
-  // Keep WebSocket alive with ping
-  useEffect(() => {
-    if (!whatsappWs) return;
-
-    const pingInterval = setInterval(() => {
-      if (whatsappWs.readyState === WebSocket.OPEN) {
-        whatsappWs.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 30000); // Every 30 seconds
-
-    return () => clearInterval(pingInterval);
-  }, [whatsappWs]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
