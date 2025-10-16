@@ -931,11 +931,16 @@ const CRMDashboard = () => {
       return;
     }
 
-    // WebSocket URL - using the same backendUrl as the rest of the component
-    const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
+    // WebSocket URL - remove /api from backendUrl if present, then convert to ws
+    let baseUrl = backendUrl;
+    if (baseUrl.includes('/api')) {
+      baseUrl = baseUrl.replace('/api', '');
+    }
+    const wsUrl = `${baseUrl.replace('http', 'ws')}/ws/whatsapp`;
     
     console.log('🔌 Connecting to WhatsApp WebSocket:', wsUrl);
     console.log('📋 CollegeId:', collegeId);
+    console.log('📋 Base URL:', baseUrl);
     
     const ws = new WebSocket(wsUrl);
 
