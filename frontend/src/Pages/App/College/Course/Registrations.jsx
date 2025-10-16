@@ -931,8 +931,10 @@ const CRMDashboard = () => {
       return;
     }
 
-    // Socket.io connection - same as MyFollowupB2C.jsx implementation
-    const socket = io("http://localhost:8080", { 
+    // Socket.io connection - using backendUrl for production support
+    const socketUrl = backendUrl.replace('http://', '').replace('https://', '').split(':')[0] + ':8080';
+    const protocol = backendUrl.startsWith('https') ? 'https' : 'http';
+    const socket = io(`${protocol}://${socketUrl}`, { 
       query: { 
         userId: userData._id,
         collegeId: collegeId 
@@ -940,6 +942,8 @@ const CRMDashboard = () => {
     });
 
     console.log('🔌 Connecting to WhatsApp Socket.io');
+    console.log('📋 Socket URL:', `${protocol}://${socketUrl}`);
+    console.log('📋 Backend URL:', backendUrl);
     console.log('📋 CollegeId:', collegeId);
     console.log('📋 UserId:', userData._id);
 
@@ -953,7 +957,7 @@ const CRMDashboard = () => {
       
       // Only process if this update is for the current college
       if (data.collegeId === collegeId) {
-        handleMessageStatusUpdate(data);
+          handleMessageStatusUpdate(data);
       }
     });
 
