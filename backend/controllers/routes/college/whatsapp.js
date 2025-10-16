@@ -2332,7 +2332,11 @@ async function handleStatusUpdates(statuses) {
 				if (global.io && global.userSockets) {
 					try {
 						const collegeIdStr = String(updatedMessage.collegeId);
+						console.log('🔍 Looking for socket IDs for college:', collegeIdStr);
+						console.log('📊 All registered users:', Object.keys(global.userSockets));
+						
 						const socketIds = global.userSockets[collegeIdStr] || [];
+						console.log('📊 Found socket IDs:', socketIds);
 						
 						if (socketIds.length > 0) {
 							socketIds.forEach(socketId => {
@@ -2348,6 +2352,8 @@ async function handleStatusUpdates(statuses) {
 					} catch (ioError) {
 						console.error('Socket.io notification failed:', ioError.message);
 					}
+				} else {
+					console.log('⚠️ Socket.io or userSockets not available');
 				}
 			} else {
 				console.warn(`⚠️ Message not found in database: ${messageId}`);

@@ -59,19 +59,29 @@ console.log('✅ WhatsApp WebSocket server initialized');
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
 
+	console.log('🔌 New Socket.io connection - Socket ID:', socket.id);
+	console.log('🔌 User ID from query:', userId);
+
 	if(!userId){
 		userId = 'guestUser'
+		console.log('⚠️ No userId provided, using guestUser');
 	}
   
 	if (!userSockets[userId]) userSockets[userId] = [];
 	userSockets[userId].push(socket.id);
   
-	// console.log(`✅ User ${userId} connected with socket ${socket.id}`);
+	console.log(`✅ User ${userId} connected with socket ${socket.id}`);
+	console.log(`📊 Total sockets for user ${userId}:`, userSockets[userId].length);
+	console.log('📊 All registered users:', Object.keys(userSockets));
   
 	socket.on("disconnect", () => {
+	  console.log(`❌ User ${userId} disconnected - Socket ID: ${socket.id}`);
 	  userSockets[userId] = userSockets[userId].filter(id => id !== socket.id);
-	  if (userSockets[userId].length === 0) delete userSockets[userId];
-	//   console.log(`❌ User ${userId} disconnected`);
+	  if (userSockets[userId].length === 0) {
+		delete userSockets[userId];
+		console.log(`🗑️ Removed user ${userId} from active sockets`);
+	  }
+	  console.log('📊 Remaining active users:', Object.keys(userSockets));
 	});
   });
   

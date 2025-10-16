@@ -781,6 +781,13 @@ const CRMDashboard = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
+  // Debug: Log userData for Socket.io connection
+  console.log('👤 User Data:', {
+    _id: userData._id,
+    collegeId: userData.collegeId,
+    email: userData.email
+  });
+
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
   const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);

@@ -10,14 +10,18 @@ function useWebsocket(userId) {
   useEffect(() => {
     // Use environment variable for backend URL
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+    console.log('🔌 Connecting to Socket.io with userId:', userId);
+    console.log('🔌 Backend URL:', backendUrl);
+    
     const socket = io(backendUrl, { query: { userId } });
 
     socket.on("connect", () => {
-      console.log("✅ Socket.io Connected:", socket.id);
+      console.log("✅ Socket.io Connected - Socket ID:", socket.id);
+      console.log("✅ User ID:", userId);
     });
 
     socket.on("disconnect", () => {
-      console.log("❌ Socket.io Disconnected");
+      console.log("❌ Socket.io Disconnected - Socket ID:", socket.id);
     });
 
     // Chat messages
