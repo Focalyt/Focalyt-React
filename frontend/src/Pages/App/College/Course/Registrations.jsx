@@ -953,19 +953,24 @@ const CRMDashboard = () => {
 
   // Handle message status updates from WebSocket
   const handleMessageStatusUpdate = (data) => {
-    console.log('📊 Message status update:', data);
+    console.log('📊 Message status update received:', data);
     
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
-      return prevMessages.map((msg) => {
-        // Match message by checking if it's for the same recipient and has matching text/template
+      let updated = false;
+      const updatedMessages = prevMessages.map((msg) => {
+        // Match message by messageId (most reliable)
+        // Fallback to recipient + text matching if messageId not available
         const isMatchingMessage = 
-          msg.type === 'template' 
-            ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
-            : msg.text === data.message;
+          msg.messageId === data.messageId || 
+          (msg.recipient === data.to && 
+           (msg.type === 'template' 
+             ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
+             : msg.text === data.message));
 
         if (isMatchingMessage && msg.sender === 'agent') {
-          console.log('✅ Updating message status to:', data.status);
+          console.log('✅ Updating message status from', msg.status, 'to', data.status);
+          updated = true;
           return {
             ...msg,
             status: data.status,
@@ -976,6 +981,12 @@ const CRMDashboard = () => {
         }
         return msg;
       });
+
+      if (!updated) {
+        console.warn('⚠️ No matching message found for update:', data);
+      }
+
+      return updatedMessages;
     });
 
     // Show notification (optional)
@@ -3283,8 +3294,10 @@ const CRMDashboard = () => {
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
           id: index + 1,
+          messageId: msg.whatsappMessageId, // WhatsApp message ID for status updates
           text: msg.message,
           sender: 'agent', // All sent messages are from agent
+          recipient: msg.recipientPhone,
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit' 
@@ -4440,8 +4453,10 @@ const CRMDashboard = () => {
         // Add sent template to existing WhatsApp chat with backend response data
         const templateMessage = {
           id: whatsappMessages.length + 1,
+          messageId: response.data.data.messages?.[0]?.id, // WhatsApp message ID for status updates
           text: `Template: ${response.data.data.templateName}`,
           sender: 'agent',
+          recipient: selectedProfile?._candidate?.mobile,
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
           templateData: response.data.data.templateData || templateData,
@@ -4450,6 +4465,7 @@ const CRMDashboard = () => {
         
         setWhatsappMessages([...whatsappMessages, templateMessage]);
         console.log('Template sent successfully to:', selectedProfile?._candidate?.mobile);
+        console.log('Message ID:', templateMessage.messageId);
 
         // Close the modal
 
