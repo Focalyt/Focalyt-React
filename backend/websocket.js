@@ -11,17 +11,22 @@ class WhatsAppWebSocketServer {
 
     this.wss.on('connection', (ws, req) => {
       console.log('🔌 New WebSocket connection established');
+      console.log('📡 Client IP:', req.socket.remoteAddress);
+      console.log('📡 Request URL:', req.url);
 
       // Handle authentication
       ws.on('message', (message) => {
+        console.log('📨 Received message from client:', message.toString());
         try {
           const data = JSON.parse(message);
 
           // Register client with collegeId
           if (data.type === 'register' && data.collegeId) {
+            console.log(`📝 Registration request for college: ${data.collegeId}`);
             this.registerClient(data.collegeId, ws);
             console.log(`✅ Client registered for college: ${data.collegeId}`);
             console.log(`📊 Total clients for college ${data.collegeId}: ${this.clients.get(data.collegeId)?.size || 0}`);
+            console.log(`📊 All registered colleges:`, Array.from(this.clients.keys()));
             
             // Send confirmation
             ws.send(JSON.stringify({
