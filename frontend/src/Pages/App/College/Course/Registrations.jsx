@@ -938,6 +938,7 @@ const CRMDashboard = () => {
 
     ws.onopen = () => {
       console.log('✅ WhatsApp WebSocket connected');
+      console.log('📝 Registering with collegeId:', collegeId);
       // Register with collegeId
       ws.send(JSON.stringify({
         type: 'register',
@@ -965,10 +966,13 @@ const CRMDashboard = () => {
 
     ws.onerror = (error) => {
       console.error('❌ WebSocket error:', error);
+      console.error('❌ WebSocket URL:', wsUrl);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       console.log('🔌 WebSocket disconnected');
+      console.log('🔌 Close code:', event.code);
+      console.log('🔌 Close reason:', event.reason);
     };
 
     setWhatsappWs(ws);

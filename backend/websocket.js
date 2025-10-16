@@ -21,6 +21,7 @@ class WhatsAppWebSocketServer {
           if (data.type === 'register' && data.collegeId) {
             this.registerClient(data.collegeId, ws);
             console.log(`✅ Client registered for college: ${data.collegeId}`);
+            console.log(`📊 Total clients for college ${data.collegeId}: ${this.clients.get(data.collegeId)?.size || 0}`);
             
             // Send confirmation
             ws.send(JSON.stringify({
