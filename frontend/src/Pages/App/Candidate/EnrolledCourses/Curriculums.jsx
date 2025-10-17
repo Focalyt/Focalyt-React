@@ -20,6 +20,11 @@ function Enrolled() {
     const [curriculum, setCurriculum] = useState([]);
     const [expandedChapters, setExpandedChapters] = useState([]);
     const [expandedTopics, setExpandedTopics] = useState([]);
+    
+    // Media Viewer Modal States
+    const [showMediaViewer, setShowMediaViewer] = useState(false);
+    const [viewerMedia, setViewerMedia] = useState(null);
+    
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
@@ -118,6 +123,17 @@ const fetchCurriculum = async () => {
                 ? prev.filter(id => id !== topicId)
                 : [...prev, topicId]
         );
+    };
+
+    // Media Viewer Functions
+    const openMediaViewer = (media, type) => {
+        setViewerMedia({ ...media, type });
+        setShowMediaViewer(true);
+    };
+
+    const closeMediaViewer = () => {
+        setShowMediaViewer(false);
+        setViewerMedia(null);
     };
 
     const getChapterMediaCount = (chapter) => {
@@ -386,7 +402,13 @@ const fetchCurriculum = async () => {
                                                                                                     </div>
                                                                                                 ))}
                                                                                                 {topic.media.images?.map((image, idx) => (
-                                                                                                    <div key={idx} className="media-item small image-container">
+                                                                                                    <div 
+                                                                                                        key={idx} 
+                                                                                                        className="media-item small image-container"
+                                                                                                        onClick={() => openMediaViewer(image, 'image')}
+                                                                                                        style={{ cursor: 'pointer' }}
+                                                                                                        title="Click to view full image"
+                                                                                                    >
                                                                                                         <img
                                                                                                             src={image.url}
                                                                                                             alt={image.name || `Image ${idx + 1}`}
@@ -397,11 +419,18 @@ const fetchCurriculum = async () => {
                                                                                                     </div>
                                                                                                 ))}
                                                                                                 {topic.media.pdfs?.map((pdf, idx) => (
-                                                                                                    <div key={idx} className="media-item small pdf-container">
+                                                                                                    <div 
+                                                                                                        key={idx} 
+                                                                                                        className="media-item small pdf-container"
+                                                                                                        onClick={() => openMediaViewer(pdf, 'pdf')}
+                                                                                                        style={{ cursor: 'pointer' }}
+                                                                                                        title="Click to view full PDF"
+                                                                                                    >
                                                                                                         <iframe
                                                                                                             src={pdf.url}
                                                                                                             title={pdf.name || `PDF ${idx + 1}`}
                                                                                                             className="embedded-pdf"
+                                                                                                            style={{ pointerEvents: 'none' }}
                                                                                                         >
                                                                                                             Your browser does not support PDFs.
                                                                                                         </iframe>
@@ -1283,6 +1312,120 @@ const fetchCurriculum = async () => {
         }
     }
 
+    /* Media Viewer Modal Styles */
+    .media-viewer-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 1rem;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .media-viewer-content {
+        background: white;
+        border-radius: 12px;
+        width: 50%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .media-viewer-header {
+        padding: 1.5rem;
+        border-bottom: 2px solid #f5f7fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .media-viewer-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .media-viewer-body {
+        flex: 1;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        background: #f5f7fa;
+    }
+
+    .viewer-image {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .viewer-pdf {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 8px;
+    }
+
+    .media-viewer-footer {
+        padding: 1.5rem;
+        border-top: 2px solid #f5f7fa;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        background: white;
+        border-radius: 0 0 12px 12px;
+    }
+
+    .embedded-image:hover {
+        transform: scale(1.05);
+    }
+
+    .pdf-container:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .image-container:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
     /* Hover Effects */
     .hover-shadow {
         transition: all 0.3s ease;
@@ -1404,6 +1547,52 @@ const fetchCurriculum = async () => {
     }
 `}
 </style>
+
+            {/* Media Viewer Modal */}
+            {showMediaViewer && viewerMedia && (
+                <div className="media-viewer-overlay" onClick={closeMediaViewer}>
+                    <div className="media-viewer-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="media-viewer-header">
+                            <h3>
+                                <i className={`fas fa-${viewerMedia.type === 'image' ? 'image' : 'file-pdf'} me-2`}></i>
+                                {viewerMedia.name || `${viewerMedia.type === 'image' ? 'Image' : 'PDF'} Viewer`}
+                            </h3>
+                            <button className="btn-close" onClick={closeMediaViewer}></button>
+                        </div>
+                        <div className="media-viewer-body">
+                            {viewerMedia.type === 'image' ? (
+                                <img
+                                    src={viewerMedia.url}
+                                    alt={viewerMedia.name || 'Image'}
+                                    className="viewer-image"
+                                />
+                            ) : (
+                                <iframe
+                                    src={`${viewerMedia.url}#toolbar=0&navpanes=0&scrollbar=1`}
+                                    title={viewerMedia.name || 'PDF'}
+                                    className="viewer-pdf"
+                                >
+                                    Your browser does not support PDFs.
+                                </iframe>
+                            )}
+                        </div>
+                        <div className="media-viewer-footer">
+                            <a
+                                href={viewerMedia.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary"
+                            >
+                                <i className="fas fa-external-link-alt me-2"></i>
+                                Open in New Tab
+                            </a>
+                            <button className="btn btn-outline" onClick={closeMediaViewer}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

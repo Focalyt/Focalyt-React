@@ -12961,33 +12961,105 @@ router.get('/getCurriculum', isTrainer, async (req, res) => {
 router.post('/addDailyDiary', isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
-		const { batch, course, sendTo, selectedStudents, assignmentDetail, studyMaterials, projectVideos } = req.body;
-		console.log("req.body", req.body)
+		const { batch, course, sendTo, assignmentDetail } = req.body;
+		
+		let selectedStudents = [];
+		if (req.body.selectedStudents) {
+			try {
+				selectedStudents = JSON.parse(req.body.selectedStudents);
+			} catch (e) {
+				selectedStudents = [];
+			}
+		}
 
-		if (!batch || !course || !assignmentDetail) {
+		if (!batch || !course) {
 			return res.status(400).json({
 				status: false,
-				message: 'Missing required parameters: batch, course, assignmentDetail'
+				message: 'Missing required parameters: batch, course'
 			});
+		}
+
+		const uploadFileToS3 = async (file, folder) => {
+			const ext = file.name.split('.').pop().toLowerCase();
+			const key = `DailyDiary/${batch}/${folder}/${uuid()}.${ext}`;
+			
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: file.data,
+				ContentType: file.mimetype
+			};
+
+			await s3.upload(params).promise();
+			
+			return {
+				fileName: file.name,
+				fileType: file.mimetype,
+				fileUrl: `https://${bucketName}.s3.${region}.amazonaws.com/${key}`,
+				fileSize: file.size
+			};
+		};
+		const studyMaterials = [];
+		const projectVideos = [];
+
+		if (req.files && req.files.studyMaterials) {
+			const studyFiles = Array.isArray(req.files.studyMaterials) 
+				? req.files.studyMaterials 
+				: [req.files.studyMaterials];
+			
+			for (const file of studyFiles) {
+				const ext = file.name.split('.').pop().toLowerCase();
+				
+				if (!allowedExtensions.includes(ext)) {
+					return res.status(400).json({
+						status: false,
+						message: `Invalid file extension .${ext} for study material`
+					});
+				}
+
+				const uploadedFile = await uploadFileToS3(file, 'study-materials');
+				studyMaterials.push(uploadedFile);
+			}
+		}
+
+		if (req.files && req.files.projectVideos) {
+			const videoFiles = Array.isArray(req.files.projectVideos) 
+				? req.files.projectVideos 
+				: [req.files.projectVideos];
+			
+			for (const file of videoFiles) {
+				const ext = file.name.split('.').pop().toLowerCase();
+				
+				if (!allowedVideoExtensions.includes(ext)) {
+					return res.status(400).json({
+						status: false,
+						message: `Invalid video extension .${ext}. Only ${allowedVideoExtensions.join(', ')} are allowed`
+					});
+				}
+
+				const uploadedFile = await uploadFileToS3(file, 'project-videos');
+				projectVideos.push(uploadedFile);
+			}
 		}
 
 		const dailyDiary = new DailyDiary({
 			batch: batch,
 			course: course,
-			sendTo,
-			selectedStudents,
-			assignmentDetail,
+			sendTo: sendTo || 'all',
+			selectedStudents: sendTo === 'individual' ? selectedStudents : [],
+			assignmentDetail: assignmentDetail || '',
 			studyMaterials,
 			projectVideos,
 			createdBy: user._id
-		})
-		console.log(dailyDiary, 'dailyDiary')
-		// await dailyDiary.save();
-		// return res.status(200).json({
-		// 	status: true,
-		// 	message: 'Daily diary added successfully',
-		// 	data: dailyDiary
-		// });
+		});
+
+		await dailyDiary.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Daily diary added successfully',
+			data: dailyDiary
+		});
 		
 	} catch (error) {
 		console.error('Error adding daily diary:', error);
@@ -12997,7 +13069,6 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			error: error.message
 		});
 	}
-
 })
 
 router.post('/uploadmedia', isTrainer, async (req, res) => {

@@ -18,6 +18,7 @@ function Students() {
     const [showDailyDiaryModal, setShowDailyDiaryModal] = useState(false);
     const [attendanceData, setAttendanceData] = useState({});
     const [loadingAttendance, setLoadingAttendance] = useState(false);
+    const [loadingDailyDiary, setLoadingDailyDiary] = useState(false);
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const token = JSON.parse(sessionStorage.getItem('token'));
@@ -40,9 +41,11 @@ function Students() {
     const handleFileUpload = (type, e) => {
         const files = Array.from(e.target.files);
         if (type === 'study') {
-            setStudyMaterials([...studyMaterials, ...files.map(f => ({ name: f.name, type: f.type }))]);
+            // Store actual file objects, not just metadata
+            setStudyMaterials([...studyMaterials, ...files]);
         } else if (type === 'video') {
-            setProjectVideos([...projectVideos, ...files.map(f => ({ name: f.name }))]);
+            // Store actual file objects, not just metadata
+            setProjectVideos([...projectVideos, ...files]);
         }
     };
 
@@ -138,20 +141,37 @@ function Students() {
                 return;
             }
 
+            setLoadingDailyDiary(true);
+
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('batch', batchId);
+            formData.append('course', courseId);
+            formData.append('sendTo', sendTo);
+            formData.append('assignmentDetail', assignmentDetail);
+            
+            // Add selected students as JSON string
+            if (sendTo === 'individual' && selectedStudents.length > 0) {
+                formData.append('selectedStudents', JSON.stringify(selectedStudents));
+            }
+
+            // Add study materials files
+            studyMaterials.forEach((file) => {
+                formData.append('studyMaterials', file);
+            });
+
+            // Add project video files
+            projectVideos.forEach((file) => {
+                formData.append('projectVideos', file);
+            });
+
             const response = await axios.post(
                 `${backendUrl}/college/addDailyDiary`, 
-                {
-                    batch: batchId,
-                    course: courseId,
-                    sendTo,
-                    selectedStudents: sendTo === 'individual' ? selectedStudents : [],
-                    assignmentDetail,
-                    studyMaterials,
-                    projectVideos
-                },
+                formData,
                 {
                     headers: {
                         "x-auth": token,
+                        "Content-Type": "multipart/form-data",
                     },
                 }
             );
@@ -169,7 +189,9 @@ function Students() {
             }
         } catch (error) {
             console.error("Error adding daily diary:", error);
-            alert(error.response?.data?.message );
+            alert(error.response?.data?.message || 'Error adding daily diary');
+        } finally {
+            setLoadingDailyDiary(false);
         }
     }
 
@@ -918,20 +940,29 @@ function Students() {
                                         />
                                         {studyMaterials.length > 0 && (
                                             <div className="mt-2">
-                                                {studyMaterials.map((file, index) => (
-                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
-                                                        <span className="small">
-                                                            {file.type?.includes('pdf') ? <FileText size={16} className="text-danger me-2" /> : <Image size={16} className="text-primary me-2" />}
-                                                            {file.name}
-                                                        </span>
-                                                        <button
-                                                            className="btn btn-sm btn-outline-danger"
-                                                            onClick={() => removeFile('study', index)}
-                                                        >
-                                                            <Trash2 size={16} className="text-danger" />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                {studyMaterials.map((file, index) => {
+                                                    const isPdf = file.type?.includes('pdf');
+                                                    const isImage = file.type?.includes('image');
+                                                    const isVideo = file.type?.includes('video');
+                                                    const fileSize = file.size ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : '';
+                                                    
+                                                    return (
+                                                        <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
+                                                            <span className="small">
+                                                                {isPdf && <FileText size={16} className="text-danger me-2" />}
+                                                                {isImage && <Image size={16} className="text-primary me-2" />}
+                                                                {isVideo && <Video size={16} className="text-success me-2" />}
+                                                                {file.name} {fileSize}
+                                                            </span>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-danger"
+                                                                onClick={() => removeFile('study', index)}
+                                                            >
+                                                                <Trash2 size={16} className="text-danger" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -953,20 +984,24 @@ function Students() {
                                         />
                                         {projectVideos.length > 0 && (
                                             <div className="mt-2">
-                                                {projectVideos.map((file, index) => (
-                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
-                                                        <span className="small">
-                                                            <Video size={16} className="text-success me-2" />
-                                                            {file.name}
-                                                        </span>
-                                                        <button
-                                                            className="btn btn-sm btn-outline-danger"
-                                                            onClick={() => removeFile('video', index)}
-                                                        >
-                                                            <Trash2 size={16} className="text-danger" />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                {projectVideos.map((file, index) => {
+                                                    const fileSize = file.size ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : '';
+                                                    
+                                                    return (
+                                                        <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
+                                                            <span className="small">
+                                                                <Video size={16} className="text-success me-2" />
+                                                                {file.name} {fileSize}
+                                                            </span>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-danger"
+                                                                onClick={() => removeFile('video', index)}
+                                                            >
+                                                                <Trash2 size={16} className="text-danger" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -979,13 +1014,32 @@ function Students() {
                             </div>
 
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowDailyDiaryModal(false)}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowDailyDiaryModal(false)}
+                                    disabled={loadingDailyDiary}
+                                >
                                     <X size={18} className="me-1" />
                                     Cancel
                                 </button>
-                                <button type="button" className="btn btn-primary" onClick={handleSend}>
-                                    <Send size={18} className="me-1" />
-                                    Send Daily Diary
+                                <button 
+                                    type="button" 
+                                    className="btn btn-primary" 
+                                    onClick={handleSend}
+                                    disabled={loadingDailyDiary}
+                                >
+                                    {loadingDailyDiary ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send size={18} className="me-1" />
+                                            Send Daily Diary
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>

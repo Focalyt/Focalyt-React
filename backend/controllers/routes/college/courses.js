@@ -263,18 +263,44 @@ router
 				});
 				body.brochure = brochureUrl;
 			}
-			if (typeof body.createdBy.id === 'string') {
-				// Convert the string ID to an ObjectId
-				body.createdBy = new mongoose.Types.ObjectId(body.createdBy.id); // Directly assign the ObjectId
-			}
-
-
-
+		if (typeof body.createdBy.id === 'string') {
 			// Convert the string ID to an ObjectId
-			body.createdByType = 'college'
+			body.createdBy = new mongoose.Types.ObjectId(body.createdBy.id); // Directly assign the ObjectId
+		}
 
-			// Save course
-			const newCourse = await Courses.create(body);
+		// Convert the string ID to an ObjectId
+		body.createdByType = 'college'
+
+		// Parse sectors field - handle if it comes as array from FormData
+		if (body.sectors) {
+			if (typeof body.sectors === 'string') {
+				try {
+					body.sectors = JSON.parse(body.sectors);
+				} catch (e) {
+					body.sectors = body.sectors.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+				}
+			}
+			if (Array.isArray(body.sectors)) {
+				body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
+			}
+		}
+
+		// Parse center field - handle if it comes as array from FormData  
+		if (body.center) {
+			if (typeof body.center === 'string') {
+				try {
+					body.center = JSON.parse(body.center);
+				} catch (e) {
+					body.center = body.center.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+				}
+			}
+			if (Array.isArray(body.center)) {
+				body.center = body.center.map(id => new mongoose.Types.ObjectId(id));
+			}
+		}
+
+		// Save course
+		const newCourse = await Courses.create(body);
 			res.json({ status: true, message: "Record added!", data: newCourse });
 
 		} catch (err) {
@@ -390,13 +416,25 @@ router
 	})
 	.put(async (req, res) => {
 		try {
-			const courseId = req.params.id;
-			const { files } = req;
-			let body = req.body;
-			if (Array.isArray(body.sectors)) {
-				// If the first element is a string (ObjectId in string format), convert each element in the array to an ObjectId
-				body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
+		const courseId = req.params.id;
+		const { files } = req;
+		let body = req.body;
+		if (Array.isArray(body.sectors)) {
+			body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
+		}
+		
+		if (body.center) {
+			if (typeof body.center === 'string') {
+				try {
+					body.center = JSON.parse(body.center);
+				} catch (e) {
+					body.center = body.center.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+				}
 			}
+			if (Array.isArray(body.center)) {
+				body.center = body.center.map(id => new mongoose.Types.ObjectId(id));
+			}
+		}
 
 
 
