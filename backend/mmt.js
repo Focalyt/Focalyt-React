@@ -44,20 +44,29 @@ const server = http.createServer(app);
 const io = new Server(server, {
 	cors: {
 	  origin: "*", // sab frontends allow
-	  methods: ["GET", "POST"]
-	}
+	  methods: ["GET", "POST"],
+	  credentials: true
+	},
+	transports: ['websocket', 'polling'],
+	pingTimeout: 60000,
+	pingInterval: 25000,
+	upgradeTimeout: 30000
   });
   
   const userSockets = {}; // { userId: [socketId1, socketId2] }
 
-// WhatsApp WebSocket Server
-const wsServer = require('./websocket');
-wsServer.initialize(server);
-global.wsServer = wsServer; // Make it globally accessible
-console.log('✅ WhatsApp WebSocket server initialized');
+  // Helper function to count total connected sockets
+  const getTotalSockets = () => {
+	let total = 0;
+	for (let userId in userSockets) {
+	  total += userSockets[userId].length;
+	}
+	return total;
+  };
 
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
+	let collegeId = socket.handshake.query.collegeId; // college ID from frontend
 
 	if(!userId){
 		userId = 'guestUser'
@@ -66,12 +75,24 @@ console.log('✅ WhatsApp WebSocket server initialized');
 	if (!userSockets[userId]) userSockets[userId] = [];
 	userSockets[userId].push(socket.id);
   
-	// console.log(`✅ User ${userId} connected with socket ${socket.id}`);
+	const totalSockets = getTotalSockets();
+	console.log(`✅ Socket.io connected:`);
+	console.log(`   - User ID: ${userId}`);
+	console.log(`   - College ID: ${collegeId || 'N/A'}`);
+	console.log(`   - Socket ID: ${socket.id}`);
+	console.log(`   - Total Sockets: ${totalSockets}`);
+	console.log(`   - Total Users: ${Object.keys(userSockets).length}`);
   
 	socket.on("disconnect", () => {
 	  userSockets[userId] = userSockets[userId].filter(id => id !== socket.id);
 	  if (userSockets[userId].length === 0) delete userSockets[userId];
-	//   console.log(`❌ User ${userId} disconnected`);
+	  
+	  const totalSockets = getTotalSockets();
+	  console.log(`❌ Socket.io disconnected:`);
+	  console.log(`   - User ID: ${userId}`);
+	  console.log(`   - Socket ID: ${socket.id}`);
+	  console.log(`   - Total Sockets: ${totalSockets}`);
+	  console.log(`   - Total Users: ${Object.keys(userSockets).length}`);
 	});
   });
   
