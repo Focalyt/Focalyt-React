@@ -51,6 +51,9 @@ import CandidateViewJobs from './Pages/App/Candidate/Jobs/CandidateViewJobs';
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
+import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCourses';
+import Curriculums from './Pages/App/Candidate/EnrolledCourses/Curriculums';
+
 import Registration from './Pages/Front/StudentRegistration/Registration';
 import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
@@ -71,7 +74,7 @@ import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
-import AdmissionPost from './Pages/App/College/Course/AdmissionPost';
+import AdmissionPost from './Pages/App/College/Course/AdmissionPost'; 
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 import ClgCourse from './Pages/App/College/Settings/Course';
 import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
@@ -211,6 +214,8 @@ const Layout = () => {
           <Route path="pendingFee" element={<PaymentDetails />} />
           <Route path='candidateevent' element={<CandidatesEvents />} />
           <Route path='appliedevents' element={<AppliedEvents/>}/>
+          <Route path='enrolledCourses' element={<EnrolledCourses/>}/>
+          <Route path='enrolledCourses/:courseId' element={<Curriculums/>}/>
         </Route>
       
 

@@ -4855,8 +4855,8 @@ th.fix-company {
 }
 .single-footer .contact-info li img {
   position: absolute;
-  left: 0;
-  top: 3px;
+  left: -14px;
+  top: 5px;
   height: auto;
   width: 12px;
 }

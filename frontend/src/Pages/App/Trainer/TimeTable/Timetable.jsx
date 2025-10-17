@@ -818,9 +818,7 @@ function TimeTable() {
                                                                             <i className="fas fa-image ml-1"></i> {topic.media?.images?.length || 0}
                                                                             <i className="fas fa-file-pdf ml-1"></i> {topic.media?.pdfs?.length || 0}
                                                                         </span>
-                                                                        {/* <span className="duration-badge small">
-                                                                            <i className="fas fa-clock"></i> {topic.duration}
-                                                                        </span> */}
+                                                                        
                                                                         <button
                                                                             className="btn-action btn-upload small"
                                                                             onClick={() => openMediaModal({
@@ -838,12 +836,7 @@ function TimeTable() {
 
                                                                 {expandedTopics.includes(topic.id) && (
                                                                     <div className="topic-content">
-                                                                        {/* {topic.description && (
-                                                                            <div className="topic-description">
-                                                                                {topic.description}
-                                                                            </div>
-                                                                        )} */}
-
+                                                                        
                                                                         {/* Show Uploaded Media */}
                                                                         {(topic.media?.videos?.length > 0 || topic.media?.images?.length > 0 || topic.media?.pdfs?.length > 0) && (
                                                                             <div className="media-preview-section">
@@ -888,30 +881,7 @@ function TimeTable() {
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        {/* 
-                                                                        {topic.subTopics && topic.subTopics.length > 0 ? (
-                                                                            <div className="subtopics-list">
-                                                                                {topic.subTopics.map((subTopic, subTopicIndex) => (
-                                                                                    <div key={subTopic.id} className="subtopic-item">
-                                                                                        <div className="subtopic-header">
-                                                                                            <div className="subtopic-left">
-                                                                                                <div className="subtopic-number">
-                                                                                                    {subTopic.subTopicNumber || '•'}
-                                                                                                </div>
-                                                                                                <div className="subtopic-title">
-                                                                                                    {subTopic.subTopicTitle}
-                                                                                                </div>
-                                                                                            </div>
-                                                                                      
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="empty-subtopics">
-                                                                                <p>No sub-topics added yet</p>
-                                                                            </div>
-                                                                        )} */}
+                                                                    
                                                                     </div>
                                                                 )}
                                                             </div>
