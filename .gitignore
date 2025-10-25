@@ -56,6 +56,9 @@ frontend/.env
 /frontend/package-lock.json
 # /frontend/src/Component/Layouts/Front
 # /frontend/src/Pages/Front
+/frontend/src/Pages/App/Trainer/Center/Center.jsx
+/frontend/src/Pages/App/Trainer/Vertical/Vertical.jsx
+/frontend/src/Pages/App/Trainer/Project/Project.jsx
 
 
 /frontend/src/Pages/App/College/Course/text.jsx

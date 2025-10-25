@@ -132,6 +132,7 @@ import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
 import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
 import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
+import Center from './Pages/App/Trainer/Center/Center';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -309,6 +310,7 @@ const Layout = () => {
         {/* <Route path='timetable' element={<TimeTable/>}/> */}
         <Route path='students' element={<Students/>}/>
         <Route path='dailydiary' element={<DailyDiary/>}/>
+        <Route path='center' element={<Center/>}/>
         </Route>
 
 

@@ -12320,6 +12320,30 @@ router.post('/assigntrainerstobatch', isCollege, async (req, res) => {
 
 })
 
+router.get('/centers', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const collegeId = req.college._id;
+		const trainerId = user._id;
+		const centers = await Center.find({
+			college: collegeId,
+			trainers: trainerId
+		});
+		return res.status(200).json({
+			status: true,
+			message: 'Centers fetched successfully',
+			data: centers
+		});
+	}
+	catch (err) {
+		console.log(err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching centers'
+		});
+	}
+})
+
 router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 	try {
 		const { courseId } = req.query;
