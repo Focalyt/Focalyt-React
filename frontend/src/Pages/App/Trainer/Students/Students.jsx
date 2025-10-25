@@ -10,6 +10,7 @@ function Students() {
     const [totalPages, setTotalPages] = useState(1);
     const [activeTab] = useState('batchFreeze');
     const [searchQuery, setSearchQuery] = useState('');
+    const [appliedSearchQuery, setAppliedSearchQuery] = useState(''); 
     const [batchFreezeCount, setBatchFreezeCount] = useState(0);
     const [selectedBatch, setSelectedBatch] = useState(null);
     const [batchName, setBatchName] = useState('');
@@ -83,7 +84,7 @@ function Students() {
         if (batchId) {
             fetchProfileData();
         }
-    }, [batchId, currentPage, activeTab, searchQuery]);
+    }, [batchId, currentPage, activeTab, appliedSearchQuery]);
 
     const fetchProfileData = async () => {
         try {
@@ -102,8 +103,8 @@ function Students() {
             });
 
             // Add search query
-            if (searchQuery.trim()) {
-                queryParams.append('search', searchQuery.trim());
+            if (appliedSearchQuery.trim()) {
+                queryParams.append('search', appliedSearchQuery.trim());
             }
 
             const response = await axios.get(
@@ -141,6 +142,12 @@ function Students() {
                 return;
             }
 
+            // Add validation for assignment detail
+            if (!assignmentDetail.trim()) {
+                alert('Please enter assignment details');
+                return;
+            }
+
             setLoadingDailyDiary(true);
 
             // Create FormData for file upload
@@ -171,7 +178,6 @@ function Students() {
                 {
                     headers: {
                         "x-auth": token,
-                        "Content-Type": "multipart/form-data",
                     },
                 }
             );
@@ -200,13 +206,23 @@ function Students() {
         setCurrentPage(1);
     };
 
+    const handleSearchButtonClick = () => {
+        setAppliedSearchQuery(searchQuery);
+        setCurrentPage(1);
+    };
+
+    const handleClearSearch = () => {
+        setSearchQuery('');
+        setAppliedSearchQuery('');
+        setCurrentPage(1);
+    };
+
     const handleDailyDiaryManagement = () => {
         setShowDailyDiaryModal(true);
     };
 
     const handleAttendanceManagement = () => {
         setShowAttendanceModal(true);
-        fetchAttendanceData();
     };
 
     const fetchAttendanceData = async () => {
@@ -242,7 +258,7 @@ function Students() {
                     appliedCourseId: studentId,
                     date: today,
                     status: status,
-                    period: 'regularPeriod', // Since we're dealing with batch freeze students
+                    period: 'regularPeriod',
                     remarks: ''
                 },
                 {
@@ -253,15 +269,14 @@ function Students() {
             );
 
             if (response.data.status) {
-                alert(response.data.message || 'Attendance marked successfully!');
+                alert(response.data.message );
                 fetchProfileData();
-                fetchAttendanceData();
             } else {
-                alert(response.data.message || 'Failed to mark attendance');
+                alert(response.data.message);
             }
         } catch (error) {
             console.error("Error marking attendance:", error);
-            alert(error.response?.data?.message || "Failed to mark attendance");
+            alert(error.response?.data?.message);
         }
     };
 
@@ -394,21 +409,24 @@ function Students() {
                         <input
                             type="text"
                             className="form-control"
-                            placeholder="Search students by name, email, phone..."
+                            placeholder="Search students by name, email"
                             value={searchQuery}
-                        // onChange={handleSearch}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                         {searchQuery && (
                             <button
                                 className="btn btn-outline-secondary"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setCurrentPage(1);
-                                }}
+                                onClick={handleClearSearch}
                             >
                                 <i className="fas fa-times"></i>
                             </button>
                         )}
+                        <button
+                            className="btn btn-outline-primary"
+                            onClick={handleSearchButtonClick}
+                        >
+                            <i className="fas fa-search"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -421,8 +439,8 @@ function Students() {
                             <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
                             <h4 className="text-muted">No students found</h4>
                             <p className="text-muted">
-                                {searchQuery
-                                    ? 'Try adjusting your search criteria'
+                                {appliedSearchQuery
+                                    ? `No results for "${appliedSearchQuery}". Try adjusting your search`
                                     : 'No students have been enrolled in this batch yet'
                                 }
                             </p>
@@ -493,7 +511,7 @@ function Students() {
                                                     </button>
                                                     <button
                                                         className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
-                                                        //  onClick={() => markAttendance(profile._id, 'Absent')}
+                                                        // onClick={() => markAttendance(profile._id, 'Absent')}
                                                         title="Mark Absent"
                                                     >
                                                         A
@@ -840,7 +858,6 @@ function Students() {
                                 <button
                                     type="button"
                                     className="btn btn-primary"
-                                    onClick={fetchAttendanceData}
                                 >
                                     <i className="fas fa-sync-alt me-1"></i>Refresh
                                 </button>
@@ -1037,7 +1054,7 @@ function Students() {
                                     ) : (
                                         <>
                                             <Send size={18} className="me-1" />
-                                            Send Daily Diary
+                                            Send
                                         </>
                                     )}
                                 </button>
