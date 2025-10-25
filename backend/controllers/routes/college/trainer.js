@@ -251,8 +251,7 @@ router.get('/trainers', isCollege ,async (req, res) => {
         // console.log("user" , user)
        
         const trainers = await User.find({
-            role: 4,
-            isDeleted: false
+            role: 4
         })
         
         res.status(200).json({
@@ -264,6 +263,47 @@ router.get('/trainers', isCollege ,async (req, res) => {
         
     } catch (err) {
         console.log('Error in GET /trainers:', err.message);
+        return res.status(500).json({
+            status: false,
+            message: "Internal server error",
+            error: err.message
+        });
+    }
+})
+
+router.put('/toggle-status/:id', isCollege, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isDeleted } = req.body;
+        const trainer = await User.findOne({
+            _id: id,
+            role: 4
+        });
+
+        if (!trainer) {
+            return res.status(404).json({
+                status: false,
+                message: 'Trainer not found'
+            });
+        }
+
+        trainer.isDeleted = isDeleted;
+        trainer.updatedAt = new Date();
+        await trainer.save();
+
+        res.status(200).json({
+            status: true,
+            message: `Trainer status updated to ${isDeleted ? 'Inactive' : 'Active'}`,
+            data: {
+                id: trainer._id,
+                name: trainer.name,
+                email: trainer.email,
+                isDeleted: trainer.isDeleted
+            }
+        });
+
+    } catch (err) {
+        console.log('Error in PUT /toggle-status:', err.message);
         return res.status(500).json({
             status: false,
             message: "Internal server error",

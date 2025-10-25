@@ -133,6 +133,7 @@ import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
 import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
+import Assignment from './Pages/App/Trainer/Assignment/Assignment';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -311,6 +312,7 @@ const Layout = () => {
         <Route path='students' element={<Students/>}/>
         <Route path='dailydiary' element={<DailyDiary/>}/>
         <Route path='center' element={<Center/>}/>
+        <Route path='assignment' element={<Assignment/>}/>
         </Route>
 
 

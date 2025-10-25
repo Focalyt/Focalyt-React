@@ -12325,14 +12325,16 @@ router.get('/centers', isTrainer, async (req, res) => {
 		const user = req.user;
 		const collegeId = req.college._id;
 		const trainerId = user._id;
-		const centers = await Center.find({
+		const courses = await Courses.find({
 			college: collegeId,
 			trainers: trainerId
-		});
+		}).populate('center', 'name address')
+		.populate('centerId', 'name address');
+		
 		return res.status(200).json({
 			status: true,
 			message: 'Centers fetched successfully',
-			data: centers
+			data: courses
 		});
 	}
 	catch (err) {
@@ -12381,29 +12383,38 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		}
 
 
-		const courses = await Courses.find({
-			college: collegeId,
-			trainers: trainerId
-		}).select('name description image trainers');
+	const courses = await Courses.find({
+		college: collegeId,
+		trainers: trainerId
+	})
+	.select('name description image trainers center centerId')
+	.populate('center', 'name address')
+	.populate('centerId', 'name address');
 
-		const trainer = await User.findOne({
-			_id: trainerId,
-			role: 4
-		}).select('name email mobile _id');
+	const trainer = await User.findOne({
+		_id: trainerId,
+		role: 4
+	}).select('name email mobile _id');
 
-		if (!trainer) {
-			return res.status(404).json({
-				status: false,
-				message: 'Trainer not found'
-			});
-		}
+	if (!trainer) {
+		return res.status(404).json({
+			status: false,
+			message: 'Trainer not found'
+		});
+	}
 
-		const assignedCourses = courses.map(course => ({
+	const assignedCourses = courses.map(course => {
+		// Get center info - prefer centerId, fallback to first center in array
+		const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+		
+		return {
 			_id: course._id,
 			name: course.name,
 			image: course.image,
-			description: course.description
-		}));
+			description: course.description,
+			center: centerInfo
+		};
+	});
 
 		const trainerWithCourses = {
 			_id: trainer._id,

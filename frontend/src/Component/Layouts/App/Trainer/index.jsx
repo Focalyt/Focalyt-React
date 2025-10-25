@@ -183,8 +183,8 @@ function TrainerLayout({ children }){
                   transition: 'max-height 0.3s ease-in-out'
                 }}
               >
-                <li className={`nav-item ${location.pathname === '/trainer/mycourses' ? 'active' : ''}`}>
-                  <Link to="/trainer/mycourses" onClick={() => handleSidebarClose()}>
+                <li className={`nav-item ${location.pathname === '/trainer/center' ? 'active' : ''}`}>
+                  <Link to="/trainer/center" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faBookOpen} />
                     <span className="menu-title">My Courses</span>
                   </Link>

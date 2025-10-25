@@ -1,5 +1,5 @@
 import React, { useState , useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios'
 function MyCourses() {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
@@ -8,6 +8,11 @@ function MyCourses() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = JSON.parse(sessionStorage.getItem('token'))
+    const location = useLocation();
+    const navigate = useNavigate();
+    const searchParams = new URLSearchParams(location.search);
+    const centerId = searchParams.get('centerId');
+    const centerName = searchParams.get('centerName');
 
 
     useEffect(()=>{
@@ -45,7 +50,8 @@ function MyCourses() {
                         title: course.name,
                         image: course.image || "/Assets/images/logo/logo.png",
                         trainerName: trainer.name,
-                        trainerId: trainer._id
+                        trainerId: trainer._id,
+                        center: course.center // Add center information
                     });
                 });
             }
@@ -68,28 +74,31 @@ function MyCourses() {
         <>
             <div className="my-courses-container">
                 {/* Header Section */}
-                <div className="content-header row mb-4">
-                    <div className="content-header-left col-md-9 col-12 mb-2">
-                        <div className="row breadcrumbs-top">
-                            <div className="col-12">
-                                <h2 className="content-header-title float-left mb-0">
-                                    <i className="feather icon-book-open mr-2"></i>
-                                    My Courses
-                                </h2>
-                                <div className="breadcrumb-wrapper col-12">
-                                    <ol className="breadcrumb">
-                                        <li className="breadcrumb-item">
-                                            <a href="/trainer/dashboard">Home</a>
-                                        </li>
-                                        <li className="breadcrumb-item active">My Courses</li>
-                                    </ol>
-                                </div>
+                <div className="row mb-4">
+                <div className="col-12">
+                    <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div className="d-flex align-items-center mb-2">
+                                
+                                <button
+                                    onClick={() => navigate(-1)}
+                                    className="btn btn-sm btn-outline-secondary me-3"
+                                    style={{borderRadius: 'inherit'}}
+                                >
+                                    <i className="feather icon-arrow-left me-1"></i> Back to Centers
+                                </button>
+                                <h2 className="mb-0">Course Management</h2>
                             </div>
+                            {/* {courseInfo && (
+                                <p className="text-muted mb-0">
+                                    <i className="feather icon-book me-1"></i>
+                                    Course: <strong>{courseInfo.name}</strong>
+                                </p>
+                            )} */}
                         </div>
                     </div>
-
                 </div>
-
+            </div>
                 {/* Stats Cards */}
                 <div className="row match-height mb-4">
                     <div className="col-xl-3 col-md-6 col-12">
@@ -261,6 +270,15 @@ function MyCourses() {
                                             {course.description}
                                         </p>
 
+                                        {course.center && (
+                                            <div className="mb-2">
+                                                <small className="text-muted">
+                                                    <i className="fas fa-building me-1 text-primary"></i>
+                                                    <strong>Center:</strong> {course.center.name}
+                                                </small>
+                                            </div>
+                                        )}
+
                                         <div className="d-flex justify-content-between">
                                             <Link to={`/trainer/batchmanagement?courseId=${course.id}`} className="btn btn-sm btn-outline-primary">
                                                 <i className="feather icon-eye mr-1"></i>
@@ -311,7 +329,13 @@ function MyCourses() {
                                                                 />
                                                                 <div>
                                                                     <h6 className="mb-0">{course.title}</h6>
-                                                                    <small className="text-muted">{course.description}</small>
+                                                                    <small className="text-muted d-block">{course.description}</small>
+                                                                    {course.center && (
+                                                                        <small className="text-primary d-block mt-1">
+                                                                            <i className="fas fa-building me-1"></i>
+                                                                            {course.center.name}
+                                                                        </small>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </td>

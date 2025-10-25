@@ -183,29 +183,29 @@ function TrainerManagement() {
     
 
     // Handle status toggle
-    const handleStatusToggle = async (typeId, currentStatus) => {
+    const handleStatusToggle = async (trainerId, currentStatus) => {
         try {
             const newStatus = !currentStatus;
 
-            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
-                method: 'PUT',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    isActive: newStatus
-                })
-            });
+            const response = await axios.put(
+                `${backendUrl}/college/trainer/toggle-status/${trainerId}`,
+                { isDeleted: newStatus },
+                {
+                    headers: {
+                        'x-auth': token,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
-            const data = await response.json();
+            const data = response.data;
 
             if (data.status) {
                 // Update local state
-                setB2bTypes(prev => prev.map(type =>
-                    type._id === typeId
-                        ? { ...type, isActive: newStatus }
-                        : type
+                setTrainers(prev => prev.map(trainer =>
+                    trainer._id === trainerId
+                        ? { ...trainer, isDeleted: newStatus }
+                        : trainer
                 ));
                 showAlert('Status updated successfully!', 'success');
             } else {
@@ -213,7 +213,7 @@ function TrainerManagement() {
             }
         } catch (error) {
             console.error('Error updating status:', error);
-            showAlert('Failed to update status', 'error');
+            showAlert(error?.response?.data?.message || 'Failed to update status', 'error');
         }
     };
 
@@ -422,7 +422,7 @@ function TrainerManagement() {
                                             <table className="table table-hover-animation mb-0 table-hover">
                                                 <thead>
                                                     <tr>
-                                                        <th>Trainer Name</th>
+                                                        <th style={{whiteSpace: 'nowrap'}}>Trainer Name</th>
                                                         <th>Trainer Email</th>
                                                         <th>Designation</th>
                                                         <th>Status</th>
@@ -433,13 +433,18 @@ function TrainerManagement() {
                                                     {trainers.length > 0 ? (
                                                         trainers.map((trainer) => (
                                                             <tr key={trainer._id}>
-                                                                <td>{trainer.name || 'N/A'}</td>
+                                                                <td style={{whiteSpace: 'nowrap'}}>{trainer.name || 'N/A'}</td>
                                                                 <td>{trainer.email || 'N/A'}</td>
                                                                 <td>{trainer.designation || 'N/A'}</td>
                                                                 <td>
-                                                                    <span className={`badge ${trainer.isDeleted ? 'badge-danger' : 'badge-success'}`}>
-                                                                        {trainer.isDeleted ? 'Inactive' : 'Active'}
-                                                                    </span>
+                                                                    <div className="form-check form-switch">
+                                                                        <input
+                                                                            className="form-check-input"
+                                                                            type="checkbox"
+                                                                            checked={!trainer.isDeleted}
+                                                                            onChange={() => handleStatusToggle(trainer._id, trainer.isDeleted)}
+                                                                        />
+                                                                    </div>
                                                                 </td>
                                                                 <td>
                                                                     <button
@@ -476,6 +481,9 @@ function TrainerManagement() {
             </div>
 
             <style jsx>{`
+            .trainer-main-row .table-responsive tbody tr td{
+            font-size: 1rem;
+            }
         .asterisk {
           color: red;
         }
