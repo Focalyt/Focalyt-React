@@ -1,20 +1,25 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Plus, Trash2, Save, AlertTriangle, Database, Search, Filter, CheckSquare, Square } from 'lucide-react';
-import { AssignmentBuilder } from './Assignment';
+import { Plus, Trash2, Database, Search, Filter, CheckSquare, Square } from 'lucide-react';
+import axios from 'axios';
+
 
 function CreateAssignment() {
-  const [activeTab, setActiveTab] = useState('assignment'); // 'assignment' or 'bank'
+
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = JSON.parse(sessionStorage.getItem('token'));
+
   const [meta, setMeta] = useState({
     title: '',
     durationMins: 30,
     passPercent: 40,
     totalMarks: 100,
-    negativeMarkPerWrong: 0, // optional
+    negativeMarkPerWrong: 0,
   });
 
   const [questions, setQuestions] = useState([]);
 
-  // Question Bank State
+
   const [questionBank, setQuestionBank] = useState([]);
   const [bankSearchTerm, setBankSearchTerm] = useState('');
   const [bankFilterMarks, setBankFilterMarks] = useState('');
@@ -35,13 +40,6 @@ function CreateAssignment() {
     negativeMarkPerWrong: 0
   });
 
-  // Load question bank on component mount
-  useEffect(() => {
-    const savedBank = localStorage.getItem('questionBank:v1');
-    if (savedBank) {
-      setQuestionBank(JSON.parse(savedBank));
-    }
-  }, []);
 
   const totalAllocated = useMemo(
     () => questions.reduce((sum, q) => sum + Number(q.marks || 0), 0),
@@ -65,9 +63,9 @@ function CreateAssignment() {
   // Filtered question bank
   const filteredQuestionBank = useMemo(() => {
     return questionBank.filter(q => {
-      const matchesSearch = !bankSearchTerm || 
+      const matchesSearch = !bankSearchTerm ||
         q.question.toLowerCase().includes(bankSearchTerm.toLowerCase());
-      const matchesMarks = !bankFilterMarks || 
+      const matchesMarks = !bankFilterMarks ||
         Number(q.marks) === Number(bankFilterMarks);
       return matchesSearch && matchesMarks;
     });
@@ -129,40 +127,101 @@ function CreateAssignment() {
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   };
 
-  // Question Bank Functions
-  const addToQuestionBank = () => {
-    if (!newBankQuestion.question.trim() || newBankQuestion.correctIndex === null) {
-      alert('Please fill question and select correct answer');
-      return;
+  const addToQuestionBank = async () => {
+    try {
+      const { question, options, correctIndex, marks } = newBankQuestion;
+
+      if (!question || !question.trim()) {
+        return alert('Please enter the question text.');
+      }
+      if (!Array.isArray(options) || options.length !== 4 || options.some(o => !o || !o.trim())) {
+        return alert('Please provide 4 non-empty options.');
+      }
+      if (correctIndex === null || correctIndex === undefined || typeof correctIndex !== 'number') {
+        return alert('Please select the correct option.');
+      }
+      const parsedMarks = Number(marks);
+      if (isNaN(parsedMarks) || parsedMarks <= 0) {
+        return alert('Please provide a valid positive marks value.');
+      }
+
+      const payload = {
+        question: question.trim(),
+        options: options.map(o => o.trim()),
+        correctIndex,
+        marks: parsedMarks,
+
+      };
+
+      const headers = {
+        'x-auth': token
+      };
+
+      const response = await axios.post(`${backendUrl}/college/questionBank`, payload, { headers });
+
+      if (response && response.data) {
+        if (response.data.status) {
+          const bankDoc = response.data.data;
+          const returnedQuestions = Array.isArray(bankDoc.questions) ? bankDoc.questions : [];
+
+          const normalized = returnedQuestions.map((q, i) => ({
+            // prefer the stable server _id when present
+            id: q._id ? String(q._id) : (q.id ? String(q.id) : `bank-${Date.now()}-${i}`),
+            question: q.question || '',
+            options: Array.isArray(q.options) ? q.options : [],
+            correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+            marks: Number(q.marks) || 0,
+          }));
+
+          setQuestionBank(normalized);
+
+          setNewBankQuestion({
+            question: '',
+            options: ['', '', '', ''],
+            correctIndex: null,
+            marks: 1
+          });
+
+          alert(response.data.message || 'Question added to bank.');
+        } else {
+          alert(response.data.message || 'Failed to add question to bank.');
+        }
+      } else {
+        alert('Unexpected server response.');
+      }
+    } catch (err) {
+      console.error('Add to question bank error:', err);
+      alert(err.response?.data?.message || err.message || 'Failed to add question.');
     }
-    
-    const newQuestion = {
-      id: questionBank.length ? Math.max(...questionBank.map(q => q.id)) + 1 : 1,
-      ...newBankQuestion,
-      question: newBankQuestion.question.trim(),
-      options: newBankQuestion.options.map(opt => opt.trim()),
-      createdAt: new Date().toISOString()
-    };
-    
-    const updatedBank = [...questionBank, newQuestion];
-    setQuestionBank(updatedBank);
-    localStorage.setItem('questionBank:v1', JSON.stringify(updatedBank));
-    
-    // Reset form
-    setNewBankQuestion({
-      question: '',
-      options: ['', '', '', ''],
-      correctIndex: null,
-      marks: 1
-    });
-    
-    alert('Question added to bank successfully!');
   };
 
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/allquestionandanswers`, {
+          headers: { 'x-auth': token }
+        });
+        // console.log('Bank fetch response:', res);
+        if (res?.data?.status) {
+          const returned = Array.isArray(res.data.data?.questions) ? res.data.data.questions : [];
+          const normalized = returned.map((q, i) => ({
+            id: q._id ? String(q._id) : (q.id ? String(q.id) : `bank-${Date.now()}-${i}`),
+            question: q.question || '',
+            options: Array.isArray(q.options) ? q.options : [],
+            correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+            marks: Number(q.marks) || 0,
+          }));
+          setQuestionBank(normalized);
+        }
+      } catch (e) {
+        console.error('Bank fetch failed:', e?.message);
+      }
+    };
+    run();
+  }, []);
   const removeFromQuestionBank = (id) => {
     const updatedBank = questionBank.filter(q => q.id !== id);
     setQuestionBank(updatedBank);
-    localStorage.setItem('questionBank:v1', JSON.stringify(updatedBank));
     setSelectedBankQuestions(prev => {
       const newSet = new Set(prev);
       newSet.delete(id);
@@ -183,31 +242,10 @@ function CreateAssignment() {
   };
 
   const addSelectedQuestionsToAssignment = () => {
-    const selectedQuestions = questionBank.filter(q => selectedBankQuestions.has(q.id));
-    if (selectedQuestions.length === 0) {
-      alert('Please select at least one question');
-      return;
-    }
-
-    // Require assignment title in assignment settings before adding
-    if (!bankAssignmentSettings.title || !bankAssignmentSettings.title.trim()) {
-      alert('Please provide an Assignment Title in Assignment Settings before adding questions');
-      return;
-    }
-
-    const newQuestions = selectedQuestions.map((q, index) => ({
-      ...q,
-      id: Date.now() + index + Math.random(), // Generate unique IDs using timestamp + index + random
-      correctIndex: null  // Reset correct answer so you can select it manually in Assignment Builder
-    }));
-
-    // Use assignment settings from Question Bank
-    setMeta(bankAssignmentSettings);
-
-    setQuestions(prev => [...prev, ...newQuestions]);
-    setSelectedBankQuestions(new Set());
-    setActiveTab('assignment');
-    alert(`${selectedQuestions.length} questions added to assignment!`);
+   try{}
+   catch(err){
+    console.error('Add selected questions error:', err);
+   }
   };
 
   const handleSave = () => {
@@ -227,7 +265,6 @@ function CreateAssignment() {
       },
       questions,
     };
-    localStorage.setItem('assignment:v1', JSON.stringify(payload));
     alert('Assignment saved successfully!');
   };
 
@@ -235,246 +272,210 @@ function CreateAssignment() {
     <div className="create-assignment-container">
       <div className="create-assignment-card">
         <h1 className="create-title">Create Assignment</h1>
-        
-        {/* Tab Navigation */}
-        <div className="tab-navigation">
-          <button 
-            className={`tab-btn ${activeTab === 'assignment' ? 'active' : ''}`}
-            onClick={() => setActiveTab('assignment')}
-          >
-            Assignment Builder
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'bank' ? 'active' : ''}`}
-            onClick={() => setActiveTab('bank')}
-          >
-            <Database size={18} />
-            Question Bank
-          </button>
-        </div>
 
-        {/* Assignment Tab */}
-        {activeTab === 'assignment' && (
-          <AssignmentBuilder
-            meta={meta}
-            questions={questions}
-            totalAllocated={totalAllocated}
-            handleQuestionChange={handleQuestionChange}
-            handleOptionChange={handleOptionChange}
-            handleCorrectIndexChange={handleCorrectIndexChange}
-            handleMarksChange={handleMarksChange}
-            handleSave={handleSave}
-            canSave={canSave}
-          />
-        )}
+        <>
+          <div className="bank-add-section">
+            <h3>Add New Question to Bank</h3>
+            <div className="bank-form">
+              <div className="form-group">
+                <input
+                  type="text"
+                  placeholder="Enter question"
+                  value={newBankQuestion.question}
+                  onChange={(e) => setNewBankQuestion({ ...newBankQuestion, question: e.target.value })}
+                  className="question-input"
+                />
+              </div>
 
-        {/* Question Bank Tab */}
-        {activeTab === 'bank' && (
-          <>
-            {/* Add New Question to Bank */}
-            <div className="bank-add-section">
-              <h3>Add New Question to Bank</h3>
-              <div className="bank-form">
-                <div className="form-group">
+              <div className="options-group">
+                {newBankQuestion.options.map((option, optionIndex) => (
+                  <div key={optionIndex} className="option-input-group">
+                    <input
+                      type="text"
+                      placeholder={`Option ${optionIndex + 1}`}
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newBankQuestion.options];
+                        newOptions[optionIndex] = e.target.value;
+                        setNewBankQuestion({ ...newBankQuestion, options: newOptions });
+                      }}
+                      className="option-input"
+                    />
+                    <label className="correct-flag">
+                      <input
+                        type="radio"
+                        name="bank-correct"
+                        checked={newBankQuestion.correctIndex === optionIndex}
+                        onChange={() => setNewBankQuestion({ ...newBankQuestion, correctIndex: optionIndex })}
+                        className="correct-radio"
+                      />
+                      Correct
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bank-meta">
+                <div className="meta-field">
+                  <label>Marks</label>
                   <input
-                    type="text"
-                    placeholder="Enter question"
-                    value={newBankQuestion.question}
-                    onChange={(e) => setNewBankQuestion({...newBankQuestion, question: e.target.value})}
-                    className="question-input"
+                    type="number"
+                    min={1}
+                    value={newBankQuestion.marks}
+                    onChange={(e) => setNewBankQuestion({ ...newBankQuestion, marks: Number(e.target.value) })}
                   />
                 </div>
-                
-                <div className="options-group">
-                  {newBankQuestion.options.map((option, optionIndex) => (
-                    <div key={optionIndex} className="option-input-group">
-                      <input
-                        type="text"
-                        placeholder={`Option ${optionIndex + 1}`}
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...newBankQuestion.options];
-                          newOptions[optionIndex] = e.target.value;
-                          setNewBankQuestion({...newBankQuestion, options: newOptions});
-                        }}
-                        className="option-input"
-                      />
-                      <label className="correct-flag">
-                        <input
-                          type="radio"
-                          name="bank-correct"
-                          checked={newBankQuestion.correctIndex === optionIndex}
-                          onChange={() => setNewBankQuestion({...newBankQuestion, correctIndex: optionIndex})}
-                          className="correct-radio"
-                        />
-                        Correct
-                      </label>
-                    </div>
-                  ))}
+              </div>
+
+              <button className="add-to-bank-btn" onClick={addToQuestionBank}>
+                <Plus size={18} />
+                Add to Question Bank
+              </button>
+            </div>
+          </div>
+
+          {/* Assignment Settings */}
+          {selectedBankQuestions.size > 0 && (
+            <div className="assignment-settings-section">
+              <h3>Assignment Settings</h3>
+              <div className="assignment-settings-grid">
+                <div className="meta-field">
+                  <label>Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Week 1 Quiz"
+                    value={bankAssignmentSettings.title}
+                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, title: e.target.value })}
+                  />
                 </div>
-                
-                <div className="bank-meta">
-                  <div className="meta-field">
-                    <label>Marks</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={newBankQuestion.marks}
-                      onChange={(e) => setNewBankQuestion({...newBankQuestion, marks: Number(e.target.value)})}
-                    />
-                  </div>
+                <div className="meta-field">
+                  <label>Duration (mins)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={bankAssignmentSettings.durationMins}
+                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, durationMins: Number(e.target.value) })}
+                  />
                 </div>
-                
-                <button className="add-to-bank-btn" onClick={addToQuestionBank}>
-                  <Plus size={18} />
-                  Add to Question Bank
-                </button>
+                <div className="meta-field">
+                  <label>Pass %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={bankAssignmentSettings.passPercent}
+                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, passPercent: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="meta-field">
+                  <label>Total Marks</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={bankAssignmentSettings.totalMarks}
+                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, totalMarks: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="meta-field">
+                  <label>Negative Mark per wrong (optional)</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min={0}
+                    value={bankAssignmentSettings.negativeMarkPerWrong}
+                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, negativeMarkPerWrong: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Question Bank Management */}
+          <div className="bank-management-section">
+            <div className="bank-header">
+              <h3>Question Bank ({questionBank.length} questions)</h3>
+              <div className="bank-filters">
+                <div className="search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search questions..."
+                    value={bankSearchTerm}
+                    onChange={(e) => setBankSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="filter-box">
+                  <Filter size={16} />
+                  <input
+                    type="number"
+                    placeholder="Filter by marks"
+                    value={bankFilterMarks}
+                    onChange={(e) => setBankFilterMarks(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Assignment Settings */}
+            {/* Selected Questions Actions */}
             {selectedBankQuestions.size > 0 && (
-              <div className="assignment-settings-section">
-                <h3>Assignment Settings</h3>
-                <div className="assignment-settings-grid">
-                  <div className="meta-field">
-                    <label>Title</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Week 1 Quiz"
-                      value={bankAssignmentSettings.title}
-                      onChange={(e) => setBankAssignmentSettings({...bankAssignmentSettings, title: e.target.value})}
-                    />
-                  </div>
-                  <div className="meta-field">
-                    <label>Duration (mins)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={bankAssignmentSettings.durationMins}
-                      onChange={(e) => setBankAssignmentSettings({...bankAssignmentSettings, durationMins: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="meta-field">
-                    <label>Pass %</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={bankAssignmentSettings.passPercent}
-                      onChange={(e) => setBankAssignmentSettings({...bankAssignmentSettings, passPercent: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="meta-field">
-                    <label>Total Marks</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={bankAssignmentSettings.totalMarks}
-                      onChange={(e) => setBankAssignmentSettings({...bankAssignmentSettings, totalMarks: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="meta-field">
-                    <label>Negative Mark per wrong (optional)</label>
-                    <input
-                      type="number"
-                      step="0.25"
-                      min={0}
-                      value={bankAssignmentSettings.negativeMarkPerWrong}
-                      onChange={(e) => setBankAssignmentSettings({...bankAssignmentSettings, negativeMarkPerWrong: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
+              <div className="selected-actions">
+                <span>{selectedBankQuestions.size} questions selected</span>
+                <button
+                  className="add-selected-btn"
+                  onClick={addSelectedQuestionsToAssignment}
+                  disabled={!bankAssignmentSettings.title || !bankAssignmentSettings.title.trim()}
+                >
+                  <Plus size={16} />
+                  Add to Assignment
+                </button>
               </div>
             )}
 
-            {/* Question Bank Management */}
-            <div className="bank-management-section">
-              <div className="bank-header">
-                <h3>Question Bank ({questionBank.length} questions)</h3>
-                <div className="bank-filters">
-                  <div className="search-box">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search questions..."
-                      value={bankSearchTerm}
-                      onChange={(e) => setBankSearchTerm(e.target.value)}
-                    />
+            {/* Question Bank List */}
+            <div className="bank-questions-list">
+              {filteredQuestionBank.map((q) => (
+                <div key={q.id} className="bank-question-card">
+                  <div className="question-select">
+                    <button
+                      className="select-btn"
+                      onClick={() => toggleBankQuestionSelection(q.id)}
+                    >
+                      {selectedBankQuestions.has(q.id) ?
+                        <CheckSquare size={18} /> :
+                        <Square size={18} />
+                      }
+                    </button>
                   </div>
-                  <div className="filter-box">
-                    <Filter size={16} />
-                    <input
-                      type="number"
-                      placeholder="Filter by marks"
-                      value={bankFilterMarks}
-                      onChange={(e) => setBankFilterMarks(e.target.value)}
-                    />
+
+                  <div className="question-content">
+                    <div className="question-text">{q.question}</div>
+                    <div className="question-meta">
+                      <span className="meta-tag">{q.marks} marks</span>
+                      <span className="meta-tag">Correct: {q.options[q.correctIndex]}</span>
+                    </div>
+                  </div>
+
+                  <div className="question-actions">
+                    <button
+                      className="remove-bank-btn"
+                      onClick={() => removeFromQuestionBank(q.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-              </div>
+              ))}
 
-              {/* Selected Questions Actions */}
-              {selectedBankQuestions.size > 0 && (
-                <div className="selected-actions">
-                  <span>{selectedBankQuestions.size} questions selected</span>
-                   <button
-                    className="add-selected-btn"
-                    onClick={addSelectedQuestionsToAssignment}
-                    disabled={!bankAssignmentSettings.title || !bankAssignmentSettings.title.trim()}
-                  >
-                    <Plus size={16} />
-                    Add to Assignment
-                  </button>
+              {filteredQuestionBank.length === 0 && (
+                <div className="empty-bank">
+                  <Database size={48} />
+                  <p>No questions found in bank</p>
+                  <small>Add questions using the form above</small>
                 </div>
               )}
-
-              {/* Question Bank List */}
-              <div className="bank-questions-list">
-                {filteredQuestionBank.map((q) => (
-                  <div key={q.id} className="bank-question-card">
-                    <div className="question-select">
-                      <button
-                        className="select-btn"
-                        onClick={() => toggleBankQuestionSelection(q.id)}
-                      >
-                        {selectedBankQuestions.has(q.id) ? 
-                          <CheckSquare size={18} /> : 
-                          <Square size={18} />
-                        }
-                      </button>
-                    </div>
-                    
-                    <div className="question-content">
-                      <div className="question-text">{q.question}</div>
-                      <div className="question-meta">
-                        <span className="meta-tag">{q.marks} marks</span>
-                        <span className="meta-tag">Correct: {q.options[q.correctIndex]}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="question-actions">
-                      <button 
-                        className="remove-bank-btn"
-                        onClick={() => removeFromQuestionBank(q.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                
-                {filteredQuestionBank.length === 0 && (
-                  <div className="empty-bank">
-                    <Database size={48} />
-                    <p>No questions found in bank</p>
-                    <small>Add questions using the form above</small>
-                  </div>
-                )}
-              </div>
             </div>
-          </>
-        )}
+          </div>
+        </>
       </div>
 
       <style>{`

@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -1496,42 +1496,42 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Execute aggregation
 		const response = await AppliedCourses.aggregate(aggregationPipeline);
 
-	for (let doc of response) {
-		if (doc._candidate && doc._candidate.personalInfo) {
-			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
-				if (typeof doc._candidate.personalInfo.currentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.state)) {
-					try {
-						const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
-						if (state) {
-							doc._candidate.personalInfo.currentAddress.state = state.name;
+		for (let doc of response) {
+			if (doc._candidate && doc._candidate.personalInfo) {
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
+					if (typeof doc._candidate.personalInfo.currentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.state)) {
+						try {
+							const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
+							if (state) {
+								doc._candidate.personalInfo.currentAddress.state = state.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
-			}
-			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
-				if (typeof doc._candidate.personalInfo.currentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.city)) {
-					try {
-						const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
-						if (city) {
-							doc._candidate.personalInfo.currentAddress.city = city.name;
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
+					if (typeof doc._candidate.personalInfo.currentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.city)) {
+						try {
+							const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
+							if (city) {
+								doc._candidate.personalInfo.currentAddress.city = city.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
-			}
-			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
-				if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
-					try {
-						const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
-						if (state) {
-							doc._candidate.personalInfo.permanentAddress.state = state.name;
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+					if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
+						try {
+							const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+							if (state) {
+								doc._candidate.personalInfo.permanentAddress.state = state.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
-			}
-			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
 					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
 					if (city) {
 						doc._candidate.personalInfo.permanentAddress.city = city.name;
@@ -12339,8 +12339,8 @@ router.get('/centers', isTrainer, async (req, res) => {
 			college: collegeId,
 			trainers: trainerId
 		}).populate('center', 'name address')
-		.populate('centerId', 'name address');
-		
+			.populate('centerId', 'name address');
+
 		return res.status(200).json({
 			status: true,
 			message: 'Centers fetched successfully',
@@ -12393,38 +12393,38 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		}
 
 
-	const courses = await Courses.find({
-		college: collegeId,
-		trainers: trainerId
-	})
-	.select('name description image trainers center centerId')
-	.populate('center', 'name address')
-	.populate('centerId', 'name address');
+		const courses = await Courses.find({
+			college: collegeId,
+			trainers: trainerId
+		})
+			.select('name description image trainers center centerId')
+			.populate('center', 'name address')
+			.populate('centerId', 'name address');
 
-	const trainer = await User.findOne({
-		_id: trainerId,
-		role: 4
-	}).select('name email mobile _id');
+		const trainer = await User.findOne({
+			_id: trainerId,
+			role: 4
+		}).select('name email mobile _id');
 
-	if (!trainer) {
-		return res.status(404).json({
-			status: false,
-			message: 'Trainer not found'
+		if (!trainer) {
+			return res.status(404).json({
+				status: false,
+				message: 'Trainer not found'
+			});
+		}
+
+		const assignedCourses = courses.map(course => {
+			// Get center info - prefer centerId, fallback to first center in array
+			const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+
+			return {
+				_id: course._id,
+				name: course.name,
+				image: course.image,
+				description: course.description,
+				center: centerInfo
+			};
 		});
-	}
-
-	const assignedCourses = courses.map(course => {
-		// Get center info - prefer centerId, fallback to first center in array
-		const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
-		
-		return {
-			_id: course._id,
-			name: course.name,
-			image: course.image,
-			description: course.description,
-			center: centerInfo
-		};
-	});
 
 		const trainerWithCourses = {
 			_id: trainer._id,
@@ -12864,7 +12864,7 @@ router.post('/addNewSubTopic', isTrainer, async (req, res) => {
 			content
 		} = req.body;
 
-		if (!courseId || !batchId || !chapterNumber ) {
+		if (!courseId || !batchId || !chapterNumber) {
 			return res.status(400).json({
 				status: false,
 				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, subTopicTitle'
@@ -13007,7 +13007,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
 		const { batch, course, sendTo, assignmentDetail } = req.body;
-		
+
 		let selectedStudents = [];
 		if (req.body.selectedStudents) {
 			try {
@@ -13027,7 +13027,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		const uploadFileToS3 = async (file, folder) => {
 			const ext = file.name.split('.').pop().toLowerCase();
 			const key = `DailyDiary/${batch}/${folder}/${uuid()}.${ext}`;
-			
+
 			const params = {
 				Bucket: bucketName,
 				Key: key,
@@ -13036,7 +13036,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			};
 
 			await s3.upload(params).promise();
-			
+
 			return {
 				fileName: file.name,
 				fileType: file.mimetype,
@@ -13048,13 +13048,13 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		const projectVideos = [];
 
 		if (req.files && req.files.studyMaterials) {
-			const studyFiles = Array.isArray(req.files.studyMaterials) 
-				? req.files.studyMaterials 
+			const studyFiles = Array.isArray(req.files.studyMaterials)
+				? req.files.studyMaterials
 				: [req.files.studyMaterials];
-			
+
 			for (const file of studyFiles) {
 				const ext = file.name.split('.').pop().toLowerCase();
-				
+
 				if (!allowedExtensions.includes(ext)) {
 					return res.status(400).json({
 						status: false,
@@ -13068,13 +13068,13 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		}
 
 		if (req.files && req.files.projectVideos) {
-			const videoFiles = Array.isArray(req.files.projectVideos) 
-				? req.files.projectVideos 
+			const videoFiles = Array.isArray(req.files.projectVideos)
+				? req.files.projectVideos
 				: [req.files.projectVideos];
-			
+
 			for (const file of videoFiles) {
 				const ext = file.name.split('.').pop().toLowerCase();
-				
+
 				if (!allowedVideoExtensions.includes(ext)) {
 					return res.status(400).json({
 						status: false,
@@ -13105,7 +13105,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			message: 'Daily diary added successfully',
 			data: dailyDiary
 		});
-		
+
 	} catch (error) {
 		console.error('Error adding daily diary:', error);
 		return res.status(500).json({
@@ -13117,7 +13117,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 })
 
 router.post('/uploadmedia', isTrainer, async (req, res) => {
-		
+
 	try {
 		const { courseId, batchId, chapterNumber, topicNumber, mediaType } = req.body;
 		// console.log("req.body", req.body)
@@ -13169,7 +13169,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 		}
 
 		const topic = chapter.topics.find(t => t.topicNumber === topicNumber);
-		
+
 		if (!topic) {
 			return res.status(404).json({
 				status: false,
@@ -13189,14 +13189,14 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 			images: [],
 			pdfs: []
 		};
-// console.log("targetMediaObject", targetMediaObject)
-// console.log("targetLocation", targetLocation)
-// console.log("uploadedFiles", uploadedFiles)
+		// console.log("targetMediaObject", targetMediaObject)
+		// console.log("targetLocation", targetLocation)
+		// console.log("uploadedFiles", uploadedFiles)
 		const uploadPromises = [];
 
 		const uploadToS3 = async (file, fileType) => {
 			const ext = file.name.split('.').pop().toLowerCase();
-			
+
 			let allowedExtensions = [];
 			if (fileType === 'videos') {
 				allowedExtensions = allowedVideoExtensions;
@@ -13231,7 +13231,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.videos) {
 			const videoFiles = Array.isArray(req.files.videos) ? req.files.videos : [req.files.videos];
-			
+
 			for (const video of videoFiles) {
 				uploadPromises.push(
 					uploadToS3(video, 'videos').then(result => {
@@ -13243,7 +13243,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.images) {
 			const imageFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
-			
+
 			for (const image of imageFiles) {
 				uploadPromises.push(
 					uploadToS3(image, 'images').then(result => {
@@ -13255,7 +13255,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.pdfs) {
 			const pdfFiles = Array.isArray(req.files.pdfs) ? req.files.pdfs : [req.files.pdfs];
-			
+
 			for (const pdf of pdfFiles) {
 				uploadPromises.push(
 					uploadToS3(pdf, 'pdfs').then(result => {
@@ -13279,9 +13279,9 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		await curriculum.save();
 
-console.log("uploadedFiles", uploadedFiles)
-console.log("totalFiles", uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length)
-console.log("targetLocation", targetLocation)
+		console.log("uploadedFiles", uploadedFiles)
+		console.log("totalFiles", uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length)
+		console.log("targetLocation", targetLocation)
 		return res.status(200).json({
 			status: true,
 			message: `Media uploaded successfully to ${targetLocation}`,
@@ -13300,5 +13300,88 @@ console.log("targetLocation", targetLocation)
 		});
 	}
 })
+router.post('/questionBank', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const { question, options, correctIndex, marks, shuffleOptions = false, negativeMarkPerWrong = 0 } = req.body;
+
+		console.log("req.body", req.body);
+		if (!question || typeof question !== 'string' || !question.trim()) {
+			return res.status(400).json({ status: false, message: 'Question text is required' });
+		}
+
+		if (!Array.isArray(options) || options.length !== 4 || options.some(o => !o || typeof o !== 'string' || !o.trim())) {
+			return res.status(400).json({ status: false, message: 'Options must be an array of 4 non-empty strings' });
+		}
+
+		if (typeof correctIndex !== 'number' || correctIndex < 0 || correctIndex > 3) {
+			return res.status(400).json({ status: false, message: 'correctIndex must be a number between 0 and 3' });
+		}
+
+		const parsedMarks = Number(marks);
+		if (isNaN(parsedMarks) || parsedMarks <= 0) {
+			return res.status(400).json({ status: false, message: 'marks must be a positive number' });
+		}
+
+		const snap = {
+			question: question.trim(),
+			options: options.map(o => o.trim()),
+			correctIndex,
+			correctAnswer: options[correctIndex].trim(),
+			marks: parsedMarks,
+			shuffleOptions: !!shuffleOptions,
+			negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0
+		};
+
+		let bank = await AssignmentQuestions.findOne({ owner: user._id, title: 'Question Bank' });
+
+		if (bank) {
+			const allocated = (bank.questions || []).reduce((s, q) => s + (Number(q.marks) || 0), 0) + snap.marks;
+			if (allocated > bank.totalMarks) {
+				return res.status(400).json({ status: false, message: `Allocated ${allocated} > totalMarks ${bank.totalMarks}` });
+			}
+
+			bank.questions.push(snap);
+			await bank.save();
+			return res.status(200).json({ status: true, message: 'Question added to bank', data: bank });
+		}
+
+
+		const newBank = new AssignmentQuestions({
+			title: 'Question Bank',
+			durationMins: 30,
+			passPercent: 33,
+			// totalMarks: ,
+			negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0,
+			questions: [snap],
+			owner: user._id,
+			isPublished: false
+		});
+
+		await newBank.save();
+		return res.status(200).json({ status: true, message: 'Question bank created and question added', data: newBank });
+	} catch (err) {
+		console.log('====================>!err ', err.message);
+		return res.status(500).send({ status: false, error: err.message });
+	}
+
+});
+
+router.get('/allquestionandanswers', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+    const bank = await AssignmentQuestions
+      .findOne({ owner: user._id, title: 'Question Bank' })
+      .lean();
+
+    if (!bank) {
+      return res.status(200).json({ status: true, message: 'No bank yet', data: { questions: [] } });
+    }
+    return res.status(200).json({ status: true, message: 'Question bank retrieved', data: bank });
+  } catch (err) {
+    console.log('GET /allquestionandanswers error:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
 
 module.exports = router;

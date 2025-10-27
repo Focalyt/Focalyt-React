@@ -39,7 +39,7 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC typ
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions  } = require("../../models");
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -408,5 +408,75 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			message: err.message || "Server Error"
 		});
 	}
+});
+
+
+router.post('/questionBank', isTrainer, async (req, res) => {
+    try {
+        const user = req.user;
+        const { question, options, correctIndex, marks, shuffleOptions = false, negativeMarkPerWrong = 0 } = req.body;
+
+        console.log("req.body", req.body);
+        if (!question || typeof question !== 'string' || !question.trim()) {
+            return res.status(400).json({ status: false, message: 'Question text is required' });
+        }
+
+        if (!Array.isArray(options) || options.length !== 4 || options.some(o => !o || typeof o !== 'string' || !o.trim())) {
+            return res.status(400).json({ status: false, message: 'Options must be an array of 4 non-empty strings' });
+        }
+
+        if (typeof correctIndex !== 'number' || correctIndex < 0 || correctIndex > 3) {
+            return res.status(400).json({ status: false, message: 'correctIndex must be a number between 0 and 3' });
+        }
+
+        const parsedMarks = Number(marks);
+        if (isNaN(parsedMarks) || parsedMarks <= 0) {
+            return res.status(400).json({ status: false, message: 'marks must be a positive number' });
+        }
+
+
+        const snap = {
+            question: question.trim(),
+            options: options.map(o => o.trim()),
+            correctIndex,
+            correctAnswer: options[correctIndex].trim(),
+            marks: parsedMarks,
+            shuffleOptions: !!shuffleOptions,
+            negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0
+        };
+
+        let bank = await AssignmentQuestions.findOne({ owner: user._id, title: 'Question Bank' });
+
+        if (bank) {
+            const allocated = (bank.questions || []).reduce((s, q) => s + (Number(q.marks) || 0), 0) + snap.marks;
+            if (allocated > bank.totalMarks) {
+                return res.status(400).json({ status: false, message: `Allocated ${allocated} > totalMarks ${bank.totalMarks}` });
+            }
+
+            bank.questions.push(snap);
+            await bank.save();
+            return res.status(200).json({ status: true, message: 'Question added to bank', data: bank });
+        }
+
+        const bankTotal = providedTotalMarks !== undefined ? providedTotalMarks : Math.max(1, parsedMarks);
+
+        const newBank = new AssignmentQuestions({
+            title: 'Question Bank',
+            durationMins: 30,
+            passPercent: 33,
+            totalMarks: bankTotal,
+            negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0,
+            questions: [snap],
+            owner: user._id,
+            isPublished: false
+        });
+
+        await newBank.save();
+        return res.status(200).json({ status: true, message: 'Question bank created and question added', data: newBank });
+    } catch (err) {
+        console.log('====================>!err ', err.message);
+        return res.status(500).send({ status: false, error: err.message });
+    }
+
 });
 module.exports = router;

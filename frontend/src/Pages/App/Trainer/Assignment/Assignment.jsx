@@ -3,7 +3,7 @@ import { CheckCircle2, Eye, EyeOff, Save, AlertTriangle, Database } from 'lucide
 
 function Assignment() {
   const [assignment, setAssignment] = useState(null);
-  const [selected, setSelected] = useState({}); // { [q.id]: optionIndex }
+  const [selected, setSelected] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [showReview, setShowReview] = useState(false);
 
@@ -39,7 +39,7 @@ function Assignment() {
       }
     }
 
-    // clamp score min 0 (optional business rule)
+    
     if (score < 0) score = 0;
 
     const total = Number(meta?.totalMarks || 100);
@@ -75,7 +75,7 @@ function Assignment() {
       return;
     }
     setSubmitted(true);
-    setShowReview(true); // submit ke baad default: review open
+    setShowReview(true); 
   };
 
   if (!assignment) {
@@ -106,7 +106,7 @@ function Assignment() {
           </div>
         </div>
 
-        {/* Questions */}
+      
         <div className="questions-container">
           {questions.map((q, index) => {
             const chosenIndex = selected[q.id];
@@ -161,7 +161,7 @@ function Assignment() {
           })}
         </div>
 
-        {/* Submit / Result */}
+      
         {!submitted ? (
           <div className="submit-container">
             <button
@@ -176,7 +176,7 @@ function Assignment() {
           </div>
         ) : (
           <>
-            {/* Summary Result Card */}
+            
             <div className="result-card">
               <div className="score-line">
                 Score:&nbsp;
@@ -295,7 +295,6 @@ function Assignment() {
 
 export default Assignment;
 
-// Assignment Builder (trainer) — extracted so CreateAssignment can import it
 export function AssignmentBuilder({
   meta,
   questions,
@@ -354,7 +353,6 @@ export function AssignmentBuilder({
         </div>
       </div>
 
-      {/* Total allocated status */}
       {questions.length > 0 && (
         <div
           className={`total-allocated ${totalAllocated === meta.totalMarks ? 'ok' : 'bad'}`}
@@ -368,7 +366,7 @@ export function AssignmentBuilder({
         </div>
       )}
 
-      {/* No questions message */}
+   
       {questions.length === 0 && (
         <div className="no-questions-message">
           <Database size={48} />
