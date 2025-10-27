@@ -317,13 +317,13 @@ const DocumentModal = memo(({
                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                 <>
                   {(() => {
-                   
+
 
                     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
                     const hasDocument = fileUrl ||
                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
-                  
+
                     if (hasDocument) {
                       // If we have a file URL, show the appropriate viewer
                       if (fileUrl) {
@@ -779,7 +779,7 @@ const CRMDashboard = () => {
   const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
   const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false);
   const [whatsAppTemplatesError, setWhatsAppTemplatesError] = useState("");
-  
+
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templatePreview, setTemplatePreview] = useState("");
 
@@ -905,7 +905,7 @@ const CRMDashboard = () => {
 
   // WhatsApp Panel states
   const [whatsappMessages, setWhatsappMessages] = useState([
-     ]);
+  ]);
   const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
   const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
   const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
@@ -923,25 +923,25 @@ const CRMDashboard = () => {
     if (!collegeId) {
       return;
     }
-    
+
     // Handle both absolute URLs (https://focalyt.com/api) and relative URLs (/api)
     let socketUrl;
     let protocol;
-    
+
     if (backendUrl.startsWith('http://') || backendUrl.startsWith('https://')) {
       // Absolute URL - extract hostname and path
       socketUrl = backendUrl
-      
+
     } else {
       // Relative URL like /api - use current browser's domain
       socketUrl = `${process.env.REACT_APP_FOCALYT_BASE_URL}${backendUrl}`
     }
 
     // Socket.io connection (no port needed - uses same port as backend)
-    const socket = io(`${socketUrl}`, { 
-      query: { 
+    const socket = io(`${socketUrl}`, {
+      query: {
         userId: userData._id,
-        collegeId: collegeId 
+        collegeId: collegeId
       },
       transports: ['websocket', 'polling'], // Enable both transports for production
       reconnection: true,
@@ -990,17 +990,17 @@ const CRMDashboard = () => {
     // Listen for WhatsApp status updates
     socket.on("whatsapp_status_update", (data) => {
       console.log("📨 WhatsApp status update received:", data);
-      
+
       // Only process if this update is for the current college
       if (data.collegeId === collegeId) {
-          handleMessageStatusUpdate(data);
+        handleMessageStatusUpdate(data);
       }
     });
 
     // Listen for template sync notifications
     socket.on("whatsapp_template_sync", (data) => {
       console.log("📨 WhatsApp template sync received:", data);
-      
+
       // Only process if this update is for the current college
       if (data.collegeId === collegeId) {
         // Optionally refresh templates or show notification
@@ -1011,7 +1011,7 @@ const CRMDashboard = () => {
     // Listen for template sync errors
     socket.on("whatsapp_template_sync_error", (data) => {
       console.log("❌ WhatsApp template sync error received:", data);
-      
+
       // Only process if this update is for the current college
       if (data.collegeId === collegeId) {
         console.error("❌ Template sync error:", data.error);
@@ -1035,13 +1035,13 @@ const CRMDashboard = () => {
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = (data) => {
     console.log('📊 Message status update:', data);
-    
+
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
       return prevMessages.map((msg) => {
         // Match message by checking if it's for the same recipient and has matching text/template
-        const isMatchingMessage = 
-          msg.type === 'template' 
+        const isMatchingMessage =
+          msg.type === 'template'
             ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
             : msg.text === data.message;
 
@@ -1131,7 +1131,7 @@ const CRMDashboard = () => {
               }
             }));
 
-            
+
 
             addressInputRef.current.value = place.formatted_address || place.name || "";
           });
@@ -2571,7 +2571,7 @@ const CRMDashboard = () => {
         let followupDateTime = '';
         if (followupDate && followupTime) {
 
-          
+
           // Create proper datetime string
           const year = followupDate.getFullYear();
           const month = String(followupDate.getMonth() + 1).padStart(2, "0");
@@ -2957,30 +2957,59 @@ const CRMDashboard = () => {
   };
 
   useEffect(() => {
-
-    fetchLeadDetails();
-  }, [leadDetailsVisible]);
-
-  const fetchLeadDetails = async () => {
-    if (leadDetailsVisible === null || leadDetailsVisible === undefined) {
+    // Fetch candidate details for both leadDetailsVisible and WhatsApp panel
+    if (showPanel === 'Whatsapp' && selectedProfile) {
+      // WhatsApp panel open hai aur selectedProfile hai - fetch full candidate details
+      fetchLeadDetails();
+    } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
+      // Lead details panel open hai - fetch full candidate details
+      fetchLeadDetails();
+    } else if (selectedProfile === null || selectedProfile === undefined) {
+      // No selected profile - don't fetch
       return;
     }
+  }, [leadDetailsVisible, showPanel]); // ✅ Removed selectedProfile to prevent infinite loop
+  const fetchLeadDetails = async () => {
     try {
       setIsLoadingProfilesData(true);
-      const leadId = allProfiles[leadDetailsVisible]._id;
+      console.log('selectedProfile',selectedProfile);
+      
+      let leadId;
+      let updateTarget;
+      
+      if (showPanel === 'Whatsapp' && selectedProfile) {
+        // WhatsApp panel ke liye selectedProfile ki full detail fetch karo
+        leadId = selectedProfile._id;
+        updateTarget = 'whatsapp';
+        console.log('📱 Fetching candidate details for WhatsApp panel:', leadId);
+      } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
+        // Lead details panel ke liye
+        leadId = allProfiles[leadDetailsVisible]._id || selectedProfile?._id;
+        updateTarget = 'leadDetails';
+        console.log('📋 Fetching candidate details for lead details panel:', leadId);
+      } else {
+        console.log('❌ No valid target for fetching candidate details');
+        return;
+      }
+      
+      console.log('leadId',leadId);
       const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
         headers: { 'x-auth': token }
       });
 
       if (response.data.success && response.data.data) {
         const data = response.data;
+        console.log('✅ Candidate details fetched successfully:', data.data);
 
-
-        // Sirf ek state me data set karo - paginated data
-        if (!isLoadingProfiles) {
+        if (updateTarget === 'whatsapp' && selectedProfile) {
+          // WhatsApp panel ke liye selectedProfile ko update karo with full candidate details
+          setSelectedProfile(data.data)
+          console.log('📱 Updated selectedProfile with full candidate details for WhatsApp');
+        } else if (updateTarget === 'leadDetails' && !isLoadingProfiles) {
+          // Lead details panel ke liye
           allProfiles[leadDetailsVisible] = data.data;
+          console.log('📋 Updated lead details for lead details panel');
         }
-
 
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -3184,7 +3213,9 @@ const CRMDashboard = () => {
     } else if (panel === 'AddAllLeads') {
       setShowPanel('AddAllLeads');
     } else if (panel === 'whatsapp') {
+      setSelectedProfile(profile);
       setShowPanel('Whatsapp');
+
       // Use profile parameter directly instead of selectedProfile state
       if (profile?._candidate?.mobile) {
         await fetchWhatsappHistory(profile._candidate.mobile);
@@ -3206,7 +3237,7 @@ const CRMDashboard = () => {
   useEffect(() => {
     if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
       fetchProfile(selectedProfile._candidate._id);
-    } 
+    }
   }, [selectedProfile]);
 
 
@@ -3271,7 +3302,7 @@ const CRMDashboard = () => {
       }
 
       setIsLoadingChatHistory(true);
-      
+
       const response = await axios.get(
         `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
         {
@@ -3282,15 +3313,15 @@ const CRMDashboard = () => {
       );
 
       if (response.data.success) {
-        
+
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
           id: index + 1,
           text: msg.message,
           sender: 'agent', // All sent messages are from agent
-          time: new Date(msg.sentAt).toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
           }),
           type: msg.messageType, // 'text' or 'template'
           templateData: msg.templateData, // Will contain components for template messages
@@ -3301,7 +3332,7 @@ const CRMDashboard = () => {
       }
     } catch (error) {
       console.error('❌ Error fetching chat history:', error.response?.data || error.message);
-      
+
       // Show error to user
       if (error.response?.status === 401) {
         alert('Session expired. Please login again.');
@@ -3310,7 +3341,7 @@ const CRMDashboard = () => {
       } else {
         console.warn('⚠️ Could not fetch chat history. Starting with empty chat.');
       }
-      
+
       // Start with empty messages on error
       setWhatsappMessages([]);
     } finally {
@@ -3364,9 +3395,9 @@ const CRMDashboard = () => {
         {/* Carousel Template */}
         {carouselComponent && carouselComponent.cards && carouselComponent.cards.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div 
-              className="d-flex overflow-auto pb-2" 
-              style={{ 
+            <div
+              className="d-flex overflow-auto pb-2"
+              style={{
                 gap: '8px',
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#888 #f0f0f0'
@@ -3379,9 +3410,9 @@ const CRMDashboard = () => {
                 const cardMedia = templateData.carouselMedia?.[cardIndex];
 
                 return (
-                  <div 
+                  <div
                     key={cardIndex}
-                    style={{ 
+                    style={{
                       minWidth: '220px',
                       maxWidth: '220px',
                       backgroundColor: '#fff',
@@ -3394,22 +3425,22 @@ const CRMDashboard = () => {
                     {cardHeader && cardMedia?.s3Url && (
                       <div style={{ position: 'relative', width: '100%', height: '140px' }}>
                         {cardMedia.mediaType === 'IMAGE' ? (
-                          <img 
-                            src={cardMedia.s3Url} 
+                          <img
+                            src={cardMedia.s3Url}
                             alt={`Card ${cardIndex + 1}`}
-                            style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              objectFit: 'cover' 
-                            }} 
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
                           />
                         ) : (
-                          <video 
-                            controls 
-                            style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              objectFit: 'cover' 
+                          <video
+                            controls
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
                             }}
                           >
                             <source src={cardMedia.s3Url} type="video/mp4" />
@@ -3417,11 +3448,112 @@ const CRMDashboard = () => {
                         )}
                       </div>
                     )}
-                    
+
                     {/* Card Body */}
                     {cardBody && (
                       <div style={{ padding: '10px', fontSize: '13px', lineHeight: '1.3' }}>
-                        {cardBody.text}
+                        {(() => {
+
+
+                          // Get candidate data for variable replacement
+                          const candidate = selectedProfile?._candidate;
+                          const registration = selectedProfile;
+
+                          // Get template variable mappings from selectedWhatsappTemplate
+                          const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                          // Replace variables with actual candidate data using stored mappings
+                          let text = cardBody.text || '';
+
+                          if (variableMappings && variableMappings.length > 0) {
+                            // Use stored variable mappings from database
+                            console.log('🗺️ Frontend Carousel using stored variable mappings:', variableMappings);
+
+                            variableMappings.forEach(mapping => {
+                              const position = mapping.position;
+                              const variableName = mapping.variableName;
+
+                              // Get value based on actual variable name from mapping
+                              let value = '';
+
+                              switch (variableName) {
+                                case 'name':
+                                  value = candidate?.name || registration?.name || 'User';
+                                  break;
+                                case 'gender':
+                                  value = candidate?.gender || 'Male';
+                                  break;
+                                case 'mobile':
+                                  value = candidate?.mobile || registration?.mobile || 'Mobile';
+                                  break;
+                                case 'email':
+                                  value = candidate?.email || registration?.email || 'Email';
+                                  break;
+                                case 'course_name':
+                                  value = selectedProfile?._course?.name || 'Course Name';
+                                  break;
+                                case 'counselor_name':
+                                  value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                                  break;
+                                case 'job_name':
+                                  value = candidate?.appliedJobs?.[0]?.title || 'Job Title';
+                                  break;
+                                case 'project_name':
+                                  value = selectedProfile?.project?.name || 'Project Name';
+                                  break;
+                                case 'batch_name':
+                                  value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                                  break;
+                                case 'lead_owner_name':
+                                  value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                                  break;
+                                default:
+                                  // Try direct property access
+                                  value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                  break;
+                              }
+
+                              // Replace the numbered variable with actual value
+                              text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                              console.log(`   Frontend Carousel {{${position}}} (${variableName}) → ${value}`);
+                            });
+                          } else {
+                            // Fallback: Use default mapping if no stored mappings
+                            console.log('⚠️ Frontend Carousel: No variable mappings found, using fallback replacement');
+
+                            // Replace {{1}} with name
+                            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                            // Replace {{2}} with gender
+                            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                            // Replace {{3}} with mobile
+                            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                            // Replace {{4}} with email
+                            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                            // Replace {{5}} with course name
+                            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                            // Replace {{6}} with counselor name
+                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+
+                            // Replace {{7}} with job name
+                            text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                            // Replace {{8}} with project name (college name)
+                            text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                            // Replace {{9}} with batch name
+                            text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                            // Replace {{10}} with lead owner name
+                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+                          }
+
+                          return text;
+                        })()}
                       </div>
                     )}
 
@@ -3429,9 +3561,9 @@ const CRMDashboard = () => {
                     {cardButtons && cardButtons.buttons && cardButtons.buttons.length > 0 && (
                       <div style={{ borderTop: '1px solid #e0e0e0' }}>
                         {cardButtons.buttons.map((btn, btnIndex) => (
-                          <div 
+                          <div
                             key={btnIndex}
-                            style={{ 
+                            style={{
                               padding: '8px',
                               textAlign: 'center',
                               color: '#00A5F4',
@@ -3470,28 +3602,28 @@ const CRMDashboard = () => {
                   </div>
                 )}
                 {headerComponent.format === 'IMAGE' && templateData.headerMedia?.s3Url && (
-                  <img 
-                    src={templateData.headerMedia.s3Url} 
-                    alt="Header" 
-                    style={{ 
-                      width: '100%', 
-                      maxHeight: '200px', 
-                      objectFit: 'cover', 
+                  <img
+                    src={templateData.headerMedia.s3Url}
+                    alt="Header"
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
+                      objectFit: 'cover',
                       borderRadius: '8px 8px 0 0',
                       marginLeft: '-10px',
                       marginTop: '-6px',
                       marginRight: '-10px',
                       marginBottom: '8px',
                       width: 'calc(100% + 20px)'
-                    }} 
+                    }}
                   />
                 )}
                 {headerComponent.format === 'VIDEO' && templateData.headerMedia?.s3Url && (
-                  <video 
-                    controls 
-                    style={{ 
-                      width: '100%', 
-                      maxHeight: '200px', 
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
                       borderRadius: '8px 8px 0 0',
                       marginLeft: '-10px',
                       marginTop: '-6px',
@@ -3504,13 +3636,13 @@ const CRMDashboard = () => {
                   </video>
                 )}
                 {headerComponent.format === 'DOCUMENT' && templateData.headerMedia?.s3Url && (
-                  <a 
-                    href={templateData.headerMedia.s3Url} 
-                    target="_blank" 
+                  <a
+                    href={templateData.headerMedia.s3Url}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="d-flex align-items-center p-2 mb-2"
-                    style={{ 
-                      backgroundColor: '#f0f0f0', 
+                    style={{
+                      backgroundColor: '#f0f0f0',
                       borderRadius: '6px',
                       textDecoration: 'none',
                       color: '#000'
@@ -3526,7 +3658,106 @@ const CRMDashboard = () => {
             {/* Body */}
             {bodyComponent && (
               <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#000', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
-                {bodyComponent.text}
+                {(() => {
+                  // Get candidate data for variable replacement
+                  const candidate = selectedProfile?._candidate;
+                  const registration = selectedProfile;
+
+                  // Get template variable mappings from selectedWhatsappTemplate
+                  const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                  // Replace variables with actual candidate data using stored mappings
+                  let text = bodyComponent.text || '';
+
+                  if (variableMappings && variableMappings.length > 0) {
+                    // Use stored variable mappings from database
+                    console.log('🗺️ Frontend Body using stored variable mappings:', variableMappings);
+
+                    variableMappings.forEach(mapping => {
+                      const position = mapping.position;
+                      const variableName = mapping.variableName;
+
+                      // Get value based on actual variable name from mapping
+                      let value = '';
+
+                      switch (variableName) {
+                        case 'name':
+                          value = candidate?.name || registration?.name || 'User';
+                          break;
+                        case 'gender':
+                          value = candidate?.gender || 'Male';
+                          break;
+                        case 'mobile':
+                          value = candidate?.mobile || registration?.mobile || 'Mobile';
+                          break;
+                        case 'email':
+                          value = candidate?.email || registration?.email || 'Email';
+                          break;
+                        case 'course_name':
+                          value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
+                          break;
+                        case 'counselor_name':
+                          value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                          break;
+                        case 'job_name':
+                          value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+                          break;
+                        case 'project_name':
+                          value = selectedProfile?.project?.name || 'Project Name';
+                          break;
+                        case 'batch_name':
+                          value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                          break;
+                        case 'lead_owner_name':
+                          value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                          break;
+                        default:
+                          // Try direct property access
+                          value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                          break;
+                      }
+
+                      // Replace the numbered variable with actual value
+                      text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                      console.log(`   Frontend Body {{${position}}} (${variableName}) → ${value}`);
+                    });
+                  } else {
+                    // Fallback: Use default mapping if no stored mappings
+                    console.log('⚠️ Frontend Body: No variable mappings found, using fallback replacement');
+
+                    // Replace {{1}} with name
+                    text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                    // Replace {{2}} with gender
+                    text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                    // Replace {{3}} with mobile
+                    text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                    // Replace {{4}} with email
+                    text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                    // Replace {{5}} with course name
+                    text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
+
+                    // Replace {{6}} with counselor name
+                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+
+                    // Replace {{7}} with job name
+                    text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                    // Replace {{8}} with project name (college name)
+                    text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                    // Replace {{9}} with batch name
+                    text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                    // Replace {{10}} with lead owner name
+                    text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+                  }
+
+                  return text;
+                })()}
               </div>
             )}
 
@@ -3541,9 +3772,9 @@ const CRMDashboard = () => {
             {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
               <div style={{ marginTop: '8px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
                 {buttonsComponent.buttons.map((button, index) => (
-                  <div 
+                  <div
                     key={index}
-                    style={{ 
+                    style={{
                       padding: '8px 12px',
                       textAlign: 'center',
                       color: '#00A5F4',
@@ -3569,102 +3800,29 @@ const CRMDashboard = () => {
 
   // Fetch WhatsApp Templates from backend
   const fetchWhatsappTemplates = async () => {
-
     try {
-
       if (!token) {
-
         alert('No token found in session storage.');
-
-        return;
-
-      }
-
-
-
-      // Get environment variables for Facebook API
-      const businessAccountId = process.env.REACT_APP_WHATSAPP_BUSINESS_ACCOUNT_ID;
-      const accessToken = process.env.REACT_APP_WHATSAPP_ACCESS_TOKEN;
-
-      if (!businessAccountId || !accessToken) {
-        alert('WhatsApp Business Account ID or Access Token not configured in environment variables.');
         return;
       }
 
-      // Fetch templates directly from Facebook Graph API
-      const response = await axios.get(
-        `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          params: {
-            fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
-          }
-        }
-      );
-      
-      if (response.data && response.data.data) {
-        // downloadTemplatesJSON(response.data.data);
-        
-        const formattedTemplates = response.data.data
-          .filter(template => template.status === 'APPROVED') // Only show approved templates
-          .map((template) => {
-            // Extract BODY text from components
-            let bodyText = '';
-            let headerText = '';
-            let footerText = '';
-            let hasButtons = false;
-            
-            if (template.components && Array.isArray(template.components)) {
-              template.components.forEach(component => {
-                if (component.type === 'BODY') {
-                  bodyText = component.text || '';
-                } else if (component.type === 'HEADER') {
-                  if (component.format === 'TEXT') {
-                    headerText = component.text || '';
-                  } else {
-                    headerText = `[${component.format}]`;
-                  }
-                } else if (component.type === 'FOOTER') {
-                  footerText = component.text || '';
-                } else if (component.type === 'BUTTONS') {
-                  hasButtons = true;
-                } else if (component.type === 'CAROUSEL') {
-                  bodyText = '[Carousel Template]';
-                }
-              });
-            }
-            
-            // Combine all text parts
-            let fullContent = '';
-            if (headerText) fullContent += headerText + '\n\n';
-            fullContent += bodyText;
-            if (footerText) fullContent += '\n\n' + footerText;
-            if (hasButtons) fullContent += '\n[Interactive Buttons]';
-            
-            return {
-              id: template.id,
-              name: template.name,
-              content: fullContent || 'No preview available',
-              category: template.category || 'General',
-              language: template.language || 'en',
-              status: template.status,
-              components: template.components // Keep original for sending
-            };
-          });
-        
-        setWhatsappTemplates(formattedTemplates);
-      }
+      // ✅ Use our backend API instead of direct Meta API
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
 
+      if (response.data.success) {
+        const templates = response.data.data || [];
+        setWhatsappTemplates(Array.isArray(templates) ? templates : []);
+        console.log('✅ WhatsApp templates fetched from backend:', templates.length);
+      } else {
+        console.error('❌ Backend API error:', response.data.message);
+        setWhatsappTemplates([]);
+      }
     } catch (error) {
-
-      console.error('Error fetching WhatsApp templates from Facebook:', error);
-      alert('Error fetching templates from Facebook. Please check your configuration.');
-
+      console.error('❌ Error fetching WhatsApp templates:', error);
+      setWhatsappTemplates([]);
     }
-
   };
 
   const downloadTemplatesJSON = (data) => {
@@ -3676,7 +3834,7 @@ const CRMDashboard = () => {
     a.download = `whatsapp-templates-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-};
+  };
 
 
   const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
@@ -3700,11 +3858,11 @@ const CRMDashboard = () => {
     setShowWhatsappEmojiPicker(false);
   };
 
-  const handleWhatsappSelectTemplate =  (template) => {
-   setSelectedWhatsappTemplate(template);
-     handlePreparingSendingTemplate(template);
-     setShowWhatsappTemplateMenu(false);
-   
+  const handleWhatsappSelectTemplate = (template) => {
+    setSelectedWhatsappTemplate(template);
+    handlePreparingSendingTemplate(template);
+    setShowWhatsappTemplateMenu(false);
+
   };
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
@@ -3962,7 +4120,7 @@ const CRMDashboard = () => {
 
     });
 
-   
+
 
     // Reset carousel index
 
@@ -3972,18 +4130,18 @@ const CRMDashboard = () => {
     setIsCloneMode(true);
     setShowCreateModal(true);
 
-   
+
 
   };
   // const handleWhatsappSendTemplate = async () => {
   //   if (!selectedWhatsappTemplate) return;
-    
+
   //   setIsSendingWhatsapp(true);
-    
+
   //   let content = selectedWhatsappTemplate.content
   //     .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
   //     .replace('{{2}}', 'Course Name');
-    
+
   //   setWhatsappMessages([...whatsappMessages, {
   //     id: whatsappMessages.length + 1,
   //     text: content,
@@ -3991,32 +4149,32 @@ const CRMDashboard = () => {
   //     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
   //     type: 'template'
   //   }]);
-    
+
   //   // Template bhejne ke baad session activate ho jata hai
   //   setHasActiveSession(true);
   //   setSelectedWhatsappTemplate(null);
-    
+
   //   setTimeout(() => {
   //     setIsSendingWhatsapp(false);
   //   }, 1000);
   // };
   const handleWhatsappSendTemplate = async () => {
     if (!selectedWhatsappTemplate) return;
-    
+
     // Validate required data
     if (!selectedProfile?._candidate?.mobile) {
       alert('Phone number not found for this candidate');
       return;
     }
-    
+
     if (!selectedWhatsappTemplate.name) {
       alert('Template name is missing');
       return;
     }
-    
+
 
     setIsSendingWhatsapp(true);
-    
+
     try {
 
       if (!token) {
@@ -4398,15 +4556,24 @@ const CRMDashboard = () => {
       }
 
 
+      // Prepare clean payload - only send required fields for template sending
       const sendindData = {
-        ...templateData,
-        templateName: templateData.name, // Add templateName for backend
-        to: selectedProfile?._candidate?.mobile
+        templateName: selectedWhatsappTemplate.name,  // Template name
+        to: selectedProfile?._candidate?.mobile,       // Phone number
+        candidateId: selectedProfile?._candidate?._id, // ✅ For automatic variable filling
+        registrationId: selectedProfile?._id,          // ✅ Fallback if no candidateId
+        collegeId: userData.college || userData.collegeId  // ✅ College ID
       }
 
-    
+      console.log('🚀 Sending WhatsApp template with data:', {
+        templateName: sendindData.templateName,
+        to: sendindData.to,
+        candidateId: sendindData.candidateId,
+        registrationId: sendindData.registrationId,
+        hasCandidate: !!selectedProfile?._candidate
+      });
 
-      // Make API call to create template
+      // Make API call to send template
       const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
 
         headers: { 'x-auth': token }
@@ -4421,21 +4588,51 @@ const CRMDashboard = () => {
 
         await fetchWhatsappTemplates();
 
-        // Add sent template to existing WhatsApp chat with backend response data
+        // Generate actual message text with variables filled
+        const generateFilledMessage = (templateText) => {
+          if (!templateText) return '';
+
+          const candidate = selectedProfile?._candidate;
+          const registration = selectedProfile;
+
+          let text = templateText;
+
+          // Replace variables with actual candidate data
+          text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+          text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+          text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+          text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+          text = text.replace(/\{\{5\}\}/g, selectedProfile?._course?.name || 'Course Name');
+          text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+          text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+          text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+          text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+          text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+
+          return text;
+        };
+
+        // Get template body text and fill variables
+        const templateBodyText = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+        const filledMessage = generateFilledMessage(templateBodyText);
+
+        // Add sent template to existing WhatsApp chat with FILLED variables
         const templateMessage = {
           id: whatsappMessages.length + 1,
-          text: `Template: ${response.data.data.templateName}`,
+          text: filledMessage || `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
           templateData: response.data.data.templateData || templateData,
           status: 'sent'
         };
-        
+
         setWhatsappMessages([...whatsappMessages, templateMessage]);
 
-        // Close the modal
+        // ✅ Close the template preview
+        setSelectedWhatsappTemplate(null);
 
+        // Close the modal
         setEditingTemplate(null);
 
         setEditForm({
@@ -4499,7 +4696,7 @@ const CRMDashboard = () => {
 
     } catch (error) {
 
-    
+
 
 
 
@@ -4533,8 +4730,8 @@ const CRMDashboard = () => {
 
     } finally {
 
-    setIsSendingWhatsapp(false);
-      
+      setIsSendingWhatsapp(false);
+
 
     }
   };
@@ -5430,14 +5627,14 @@ const CRMDashboard = () => {
       <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
         {/* WhatsApp Header */}
         <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
-          
+
           <div className="d-flex align-items-center mb-2">
-            <div 
+            <div
               className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
-              style={{ 
-                width: '48px', 
-                height: '48px', 
-                fontSize: '20px', 
+              style={{
+                width: '48px',
+                height: '48px',
+                fontSize: '20px',
                 fontWeight: '600',
                 background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
                 flexShrink: 0
@@ -5453,8 +5650,8 @@ const CRMDashboard = () => {
                 {selectedProfile?._candidate?.mobile || '8957066852'}
               </p>
             </div>
-            <button 
-              className="btn-close" 
+            <button
+              className="btn-close"
               onClick={closePanel}
               style={{ marginLeft: '8px' }}
             ></button>
@@ -5463,21 +5660,21 @@ const CRMDashboard = () => {
           {/* Session Status Badge - Below name */}
           <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
             {hasActiveSession ? (
-              <div 
+              <div
                 className="d-flex align-items-center px-2 py-1 rounded"
-                style={{ 
+                style={{
                   backgroundColor: '#D1F4E0',
                   border: '1px solid #25D366',
                   fontSize: '11px',
                   whiteSpace: 'nowrap'
                 }}
               >
-                <div 
+                <div
                   className="rounded-circle me-1"
-                  style={{ 
-                    width: '6px', 
-                    height: '6px', 
-                    backgroundColor: '#25D366' 
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#25D366'
                   }}
                 ></div>
                 <span className="fw-semibold" style={{ color: '#0A6E44' }}>
@@ -5485,9 +5682,9 @@ const CRMDashboard = () => {
                 </span>
               </div>
             ) : (
-              <div 
+              <div
                 className="d-flex align-items-center px-2 py-1 rounded"
-                style={{ 
+                style={{
                   backgroundColor: '#FFF3CD',
                   border: '1px solid #FFA500',
                   fontSize: '11px',
@@ -5504,9 +5701,9 @@ const CRMDashboard = () => {
 
           {/* Info Banner */}
           {!hasActiveSession && (
-            <div 
+            <div
               className="d-flex align-items-start mt-3 p-2 rounded"
-              style={{ 
+              style={{
                 backgroundColor: '#E3F2FD',
                 border: '1px solid #2196F3'
               }}
@@ -5521,9 +5718,9 @@ const CRMDashboard = () => {
         </div>
 
         {/* Messages Area */}
-        <div 
-          className="flex-grow-1 overflow-auto p-3" 
-          style={{ 
+        <div
+          className="flex-grow-1 overflow-auto p-3"
+          style={{
             backgroundColor: '#ECE5DD',
             backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
             maxHeight: '55vh',
@@ -5546,13 +5743,12 @@ const CRMDashboard = () => {
           {!isLoadingChatHistory && whatsappMessages.map(message => (
             <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
               <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
-                <div 
-                  className={`${
-                    message.sender === 'agent' 
-                      ? 'text-white' 
+                <div
+                  className={`${message.sender === 'agent'
+                      ? 'text-white'
                       : 'bg-white text-dark'
-                  }`}
-                  style={{ 
+                    }`}
+                  style={{
                     backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
                     color: message.sender === 'agent' ? '#000' : '#000',
                     borderRadius: '8px',
@@ -5567,10 +5763,10 @@ const CRMDashboard = () => {
                   {message.type === 'template' && message.templateData ? (
                     <>
                       {renderTemplateMessage(message.templateData)}
-                      <div 
-                        className="d-flex align-items-center justify-content-end" 
-                        style={{ 
-                          fontSize: '11px', 
+                      <div
+                        className="d-flex align-items-center justify-content-end"
+                        style={{
+                          fontSize: '11px',
                           color: '#667781',
                           marginTop: '4px'
                         }}
@@ -5585,10 +5781,10 @@ const CRMDashboard = () => {
                       <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
                         {message.text}
                       </p>
-                      <div 
-                        className="d-flex align-items-center justify-content-end" 
-                        style={{ 
-                          fontSize: '11px', 
+                      <div
+                        className="d-flex align-items-center justify-content-end"
+                        style={{
+                          fontSize: '11px',
                           color: '#667781',
                           marginTop: '4px'
                         }}
@@ -5612,9 +5808,9 @@ const CRMDashboard = () => {
           {selectedWhatsappTemplate && (
             <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
               <div style={{ maxWidth: '85%', minWidth: '300px' }}>
-                <div 
-                  className="rounded-3 overflow-hidden" 
-                  style={{ 
+                <div
+                  className="rounded-3 overflow-hidden"
+                  style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
                     border: '2px solid rgba(255,255,255,0.3)',
@@ -5631,19 +5827,19 @@ const CRMDashboard = () => {
                     background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
                     pointerEvents: 'none'
                   }}></div>
-                  
+
                   {/* Header */}
-                  <div className="d-flex align-items-center justify-content-between p-3" style={{ 
-                    backgroundColor: 'rgba(255,255,255,0.15)', 
+                  <div className="d-flex align-items-center justify-content-between p-3" style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(10px)',
                     borderBottom: '1px solid rgba(255,255,255,0.2)'
                   }}>
                     <div className="d-flex align-items-center">
-                      <div 
-                        className="rounded-circle d-flex align-items-center justify-content-center me-2" 
-                        style={{ 
-                          width: '32px', 
-                          height: '32px', 
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2"
+                        style={{
+                          width: '32px',
+                          height: '32px',
                           backgroundColor: 'rgba(255,255,255,0.95)',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
                         }}
@@ -5659,10 +5855,10 @@ const CRMDashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <button 
+                    <button
                       className="btn btn-sm p-0"
                       onClick={() => setSelectedWhatsappTemplate(null)}
-                      style={{ 
+                      style={{
                         width: '28px',
                         height: '28px',
                         backgroundColor: 'rgba(255,255,255,0.2)',
@@ -5693,7 +5889,7 @@ const CRMDashboard = () => {
                   <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
                     {/* Category Badge */}
                     <div className="mb-2">
-                      <span className="badge" style={{ 
+                      <span className="badge" style={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: '#fff',
                         fontSize: '10px',
@@ -5706,11 +5902,11 @@ const CRMDashboard = () => {
                         {selectedWhatsappTemplate.category}
                       </span>
                     </div>
-                    
+
                     {/* Template Content */}
-                    <div 
+                    <div
                       className="rounded-3 p-3 mb-2"
-                      style={{ 
+                      style={{
                         backgroundColor: '#f8f9fa',
                         border: '2px solid #e9ecef',
                         borderLeft: '4px solid #667eea',
@@ -5719,7 +5915,7 @@ const CRMDashboard = () => {
                     >
                       {(() => {
                         const components = selectedWhatsappTemplate.components || [];
-                        
+
                         // Check if it's a carousel template
                         const carouselComponent = components.find(c => c.type === 'CAROUSEL');
                         if (carouselComponent && carouselComponent.cards) {
@@ -5730,9 +5926,9 @@ const CRMDashboard = () => {
                                 const bodyComp = components.find(c => c.type === 'BODY');
                                 if (bodyComp && bodyComp.text) {
                                   return (
-                                    <p className="mb-3" style={{ 
-                                      fontSize: '13px', 
-                                      color: '#2c3e50', 
+                                    <p className="mb-3" style={{
+                                      fontSize: '13px',
+                                      color: '#2c3e50',
                                       fontWeight: '500'
                                     }}>
                                       {bodyComp.text}
@@ -5740,16 +5936,16 @@ const CRMDashboard = () => {
                                   );
                                 }
                               })()}
-                              
+
                               <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
                                 <i className="fas fa-images me-1"></i>
                                 Carousel ({carouselComponent.cards.length} cards)
                               </p>
-                              
-                              <div style={{ 
-                                display: 'flex', 
-                                gap: '12px', 
-                                overflowX: 'auto', 
+
+                              <div style={{
+                                display: 'flex',
+                                gap: '12px',
+                                overflowX: 'auto',
                                 paddingBottom: '10px',
                                 scrollbarWidth: 'thin'
                               }}>
@@ -5758,12 +5954,12 @@ const CRMDashboard = () => {
                                   const cardBody = card.components.find(c => c.type === 'BODY');
                                   const cardButtons = card.components.find(c => c.type === 'BUTTONS');
                                   const imageUrl = cardHeader?.example?.header_handle?.[0];
-                                  
+
                                   return (
-                                    <div key={idx} style={{ 
+                                    <div key={idx} style={{
                                       minWidth: '200px',
                                       maxWidth: '200px',
-                                      border: '2px solid #dee2e6', 
+                                      border: '2px solid #dee2e6',
                                       borderRadius: '12px',
                                       overflow: 'hidden',
                                       backgroundColor: '#fff',
@@ -5771,12 +5967,12 @@ const CRMDashboard = () => {
                                     }}>
                                       {imageUrl && (
                                         <>
-                                          <img 
-                                            src={imageUrl} 
+                                          <img
+                                            src={imageUrl}
                                             alt={`Card ${idx + 1}`}
-                                            style={{ 
-                                              width: '100%', 
-                                              height: '150px', 
+                                            style={{
+                                              width: '100%',
+                                              height: '150px',
                                               objectFit: 'cover'
                                             }}
                                             onError={(e) => {
@@ -5784,10 +5980,10 @@ const CRMDashboard = () => {
                                               e.target.nextElementSibling.style.display = 'flex';
                                             }}
                                           />
-                                          <div style={{ 
-                                            display: 'none', 
-                                            height: '150px', 
-                                            alignItems: 'center', 
+                                          <div style={{
+                                            display: 'none',
+                                            height: '150px',
+                                            alignItems: 'center',
                                             justifyContent: 'center',
                                             backgroundColor: '#e9ecef',
                                             fontSize: '48px'
@@ -5797,21 +5993,60 @@ const CRMDashboard = () => {
                                         </>
                                       )}
                                       <div style={{ padding: '12px' }}>
-                                        <p className="mb-2" style={{ 
-                                          fontSize: '12px', 
+                                        <p className="mb-2" style={{
+                                          fontSize: '12px',
                                           lineHeight: '1.4',
                                           color: '#2c3e50'
                                         }}>
-                                          {cardBody?.text || ''}
+                                          {(() => {
+                                            // Get candidate data for variable replacement
+                                            const candidate = selectedProfile?._candidate;
+                                            const registration = selectedProfile;
+
+                                            // Replace variables with actual candidate data
+                                            let text = cardBody?.text || '';
+
+                                            // Replace {{1}} with name
+                                            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                                            // Replace {{2}} with gender
+                                            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                                            // Replace {{3}} with mobile
+                                            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                                            // Replace {{4}} with email
+                                            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                            // Replace {{5}} with course name
+                                            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                                            // Replace {{6}} with counselor name
+                                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+
+                                            // Replace {{7}} with job name
+                                            text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+                                            // Replace {{8}} with project name (college name)
+                                            text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+                                            // Replace {{9}} with batch name
+                                            text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+                                            // Replace {{10}} with lead owner name
+                                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+
+                                            return text;
+                                          })()}
                                         </p>
                                         {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
-                                          <div style={{ 
+                                          <div style={{
                                             borderTop: '1px solid #dee2e6',
                                             paddingTop: '8px',
                                             marginTop: '8px'
                                           }}>
                                             {cardButtons.buttons.map((btn, bidx) => (
-                                              <div 
+                                              <div
                                                 key={bidx}
                                                 style={{
                                                   padding: '6px',
@@ -5836,24 +6071,24 @@ const CRMDashboard = () => {
                             </div>
                           );
                         }
-                        
+
                         // Regular template with header (image/video), body, footer, buttons
                         const headerComponent = components.find(c => c.type === 'HEADER');
                         const bodyComponent = components.find(c => c.type === 'BODY');
                         const footerComponent = components.find(c => c.type === 'FOOTER');
                         const buttonsComponent = components.find(c => c.type === 'BUTTONS');
-                        
+
                         return (
                           <div>
                             {/* Header - Image or Video */}
                             {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
                               <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
-                                <img 
-                                  src={headerComponent.example.header_handle[0]} 
+                                <img
+                                  src={headerComponent.example.header_handle[0]}
                                   alt="Template header"
-                                  style={{ 
-                                    width: '100%', 
-                                    maxHeight: '200px', 
+                                  style={{
+                                    width: '100%',
+                                    maxHeight: '200px',
                                     objectFit: 'cover',
                                     borderRadius: '12px 12px 0 0'
                                   }}
@@ -5862,10 +6097,10 @@ const CRMDashboard = () => {
                                     e.target.nextElementSibling.style.display = 'flex';
                                   }}
                                 />
-                                <div style={{ 
+                                <div style={{
                                   display: 'none',
                                   height: '200px',
-                                  alignItems: 'center', 
+                                  alignItems: 'center',
                                   justifyContent: 'center',
                                   backgroundColor: '#e9ecef',
                                   fontSize: '64px'
@@ -5874,14 +6109,14 @@ const CRMDashboard = () => {
                                 </div>
                               </div>
                             )}
-                            
+
                             {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
                               <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
-                                <video 
-                                  src={headerComponent.example.header_handle[0]} 
+                                <video
+                                  src={headerComponent.example.header_handle[0]}
                                   controls
-                                  style={{ 
-                                    width: '100%', 
+                                  style={{
+                                    width: '100%',
                                     maxHeight: '200px',
                                     borderRadius: '12px 12px 0 0',
                                     backgroundColor: '#000'
@@ -5893,10 +6128,10 @@ const CRMDashboard = () => {
                                 >
                                   Your browser does not support the video tag.
                                 </video>
-                                <div style={{ 
+                                <div style={{
                                   display: 'none',
                                   height: '200px',
-                                  alignItems: 'center', 
+                                  alignItems: 'center',
                                   justifyContent: 'center',
                                   backgroundColor: '#000',
                                   color: '#fff',
@@ -5906,47 +6141,145 @@ const CRMDashboard = () => {
                                 </div>
                               </div>
                             )}
-                            
+
                             {headerComponent && headerComponent.format === 'TEXT' && (
                               <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
                                 {headerComponent.text}
                               </p>
                             )}
-                            
+
                             {/* Body */}
                             {bodyComponent && (
-                              <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{ 
-                                fontSize: '13px', 
-                                color: '#2c3e50', 
+                              <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+                                fontSize: '13px',
+                                color: '#2c3e50',
                                 lineHeight: '1.6',
                                 whiteSpace: 'pre-wrap'
                               }}>
-                                {bodyComponent.text
-                                  ?.replace('{{1}}', selectedProfile?._candidate?.name || 'User')
-                                  .replace('{{2}}', 'Course Name') || ''}
+                                {(() => {
+                                  // Get candidate data for variable replacement
+                                  const candidate = selectedProfile?._candidate;
+                                  const registration = selectedProfile;
+
+                                  // Get template variable mappings from selectedWhatsappTemplate
+                                  const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                                  // Replace variables with actual candidate data using stored mappings
+                                  let text = bodyComponent.text || '';
+
+                                  if (variableMappings && variableMappings.length > 0) {
+                                    // Use stored variable mappings from database
+                                    console.log('🗺️ Frontend using stored variable mappings:', variableMappings);
+
+                                    variableMappings.forEach(mapping => {
+                                      const position = mapping.position;
+                                      const variableName = mapping.variableName;
+
+                                      // Get value based on actual variable name from mapping
+                                      let value = '';
+
+                                      switch (variableName) {
+                                        case 'name':
+                                          value = candidate?.name || registration?.name || 'User';
+                                          break;
+                                        case 'gender':
+                                          value = candidate?.gender || 'Male';
+                                          break;
+                                        case 'mobile':
+                                          value = candidate?.mobile || registration?.mobile || 'Mobile';
+                                          break;
+                                        case 'email':
+                                          value = candidate?.email || registration?.email || 'Email';
+                                          break;
+                                        case 'course_name':
+                                          value = selectedProfile?._course?.name || 'Course Name';
+                                          break;
+                                        case 'counselor_name':
+                                          value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                                          break;
+                                        case 'job_name':
+                                          value = selectedProfile?._job?.title || 'Job Title';
+                                          break;
+                                        case 'project_name':
+                                          value = selectedProfile?._project?.name || 'Project Name';
+                                          break;
+                                        case 'batch_name':
+                                          value = selectedProfile?._batch?.name || 'Batch Not Assigned';
+                                          break;
+                                        case 'lead_owner_name':
+                                          value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                                          break;
+                                        default:
+                                          // Try direct property access
+                                          value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                          break;
+                                      }
+
+                                      // Replace the numbered variable with actual value
+                                      text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                                      console.log(`   Frontend {{${position}}} (${variableName}) → ${value}`);
+                                      console.log('selected profile in body', selectedProfile);
+                                    });
+                                  } else {
+                                    // Fallback: Use default mapping if no stored mappings
+                                    console.log('⚠️ Frontend: No variable mappings found, using fallback replacement');
+
+                                    // Replace {{1}} with name
+                                    text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                                    // Replace {{2}} with gender
+                                    text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                                    // Replace {{3}} with mobile
+                                    text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                                    // Replace {{4}} with email
+                                    text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                    // Replace {{5}} with course name
+                                    text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                                    // Replace {{6}} with counselor name
+                                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+
+                                    // Replace {{7}} with job name
+                                    text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+                                    // Replace {{8}} with project name (college name)
+                                    text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+
+                                    // Replace {{9}} with batch name
+                                    text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+                                    // Replace {{10}} with lead owner name
+                                    text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Lead Owner not Defined');
+                                  }
+
+                                  return text;
+                                })()}
                               </p>
                             )}
-                            
+
                             {/* Footer */}
                             {footerComponent && (
-                              <p className="mb-2" style={{ 
-                                fontSize: '11px', 
+                              <p className="mb-2" style={{
+                                fontSize: '11px',
                                 color: '#6b7280',
                                 fontStyle: 'italic'
                               }}>
                                 {footerComponent.text}
                               </p>
                             )}
-                            
+
                             {/* Buttons */}
                             {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
-                              <div style={{ 
+                              <div style={{
                                 marginTop: '12px',
                                 paddingTop: '12px',
                                 borderTop: '1px solid #dee2e6'
                               }}>
                                 {buttonsComponent.buttons.map((button, idx) => (
-                                  <div 
+                                  <div
                                     key={idx}
                                     style={{
                                       padding: '8px 12px',
@@ -5977,11 +6310,11 @@ const CRMDashboard = () => {
                     {/* Footer Info */}
                     <div className="d-flex align-items-center justify-content-between">
                       <div className="d-flex align-items-center">
-                        <div 
+                        <div
                           className="rounded-circle me-2"
-                          style={{ 
-                            width: '8px', 
-                            height: '8px', 
+                          style={{
+                            width: '8px',
+                            height: '8px',
                             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                             boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
                             animation: 'pulse 2s ease-in-out infinite'
@@ -6012,11 +6345,11 @@ const CRMDashboard = () => {
         <div className="bg-white border-top p-3">
           <div className="d-flex align-items-center gap-2">
             {/* File Upload Button */}
-            <button 
+            <button
               className="btn"
               title="Attach File"
-              style={{ 
-                width: '42px', 
+              style={{
+                width: '42px',
                 height: '42px',
                 backgroundColor: 'transparent',
                 color: '#54656F',
@@ -6033,15 +6366,15 @@ const CRMDashboard = () => {
 
             {/* Template Button */}
             <div className="position-relative">
-              <button 
+              <button
                 className="btn whatsapp-template-trigger"
                 onClick={() => {
                   setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
                   setShowWhatsappEmojiPicker(false);
                 }}
                 title="Templates"
-                style={{ 
-                  width: '42px', 
+                style={{
+                  width: '42px',
                   height: '42px',
                   backgroundColor: '#0B66E4',
                   color: '#fff',
@@ -6063,7 +6396,7 @@ const CRMDashboard = () => {
                     <h6 className="mb-0 fw-bold">Select Template to Send</h6>
                     <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
                   </div>
-                  
+
                   {whatsappTemplates.length === 0 ? (
                     <div className="p-4 text-center">
                       <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
@@ -6073,7 +6406,7 @@ const CRMDashboard = () => {
                     </div>
                   ) : (
                     whatsappTemplates.map(template => (
-                      <div 
+                      <div
                         key={template.id}
                         className="p-3 border-bottom"
                         style={{ cursor: 'pointer' }}
@@ -6100,11 +6433,11 @@ const CRMDashboard = () => {
             {/* Message Input or Template Send Button */}
             {selectedWhatsappTemplate ? (
               // Template Selected - Show Send Button
-              <button 
+              <button
                 className="btn flex-grow-1"
                 onClick={handleWhatsappSendTemplate}
                 disabled={isSendingWhatsapp}
-                style={{ 
+                style={{
                   height: '42px',
                   backgroundColor: '#25D366',
                   color: '#fff',
@@ -6130,15 +6463,15 @@ const CRMDashboard = () => {
               // Active Session - Show Input
               <>
                 <div className="position-relative flex-grow-1">
-                  <input 
+                  <input
                     type="text"
                     className="form-control"
                     value={whatsappNewMessage}
                     onChange={(e) => setWhatsappNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
                     placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] || 'Ravi Prakash'}...`}
-                    style={{ 
-                      height: '42px', 
+                    style={{
+                      height: '42px',
                       paddingRight: '50px',
                       borderRadius: '24px',
                       border: '1px solid #E9EDEF',
@@ -6146,14 +6479,14 @@ const CRMDashboard = () => {
                       backgroundColor: '#F0F2F5'
                     }}
                   />
-                  <button 
+                  <button
                     className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
                     onClick={() => {
                       setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
                       setShowWhatsappTemplateMenu(false);
                     }}
-                    style={{ 
-                      height: '42px', 
+                    style={{
+                      height: '42px',
                       width: '42px',
                       border: 'none',
                       background: 'transparent',
@@ -6184,10 +6517,10 @@ const CRMDashboard = () => {
 
                 {/* Send/Voice Button */}
                 {whatsappNewMessage.trim() ? (
-                  <button 
+                  <button
                     onClick={handleWhatsappSendMessage}
-                    style={{ 
-                      width: '42px', 
+                    style={{
+                      width: '42px',
                       height: '42px',
                       minWidth: '42px',
                       minHeight: '42px',
@@ -6206,7 +6539,7 @@ const CRMDashboard = () => {
                     <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
                   </button>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => {
                       setWhatsappMessages([...whatsappMessages, {
                         id: whatsappMessages.length + 1,
@@ -6216,8 +6549,8 @@ const CRMDashboard = () => {
                         type: 'voice'
                       }]);
                     }}
-                    style={{ 
-                      width: '42px', 
+                    style={{
+                      width: '42px',
                       height: '42px',
                       minWidth: '42px',
                       minHeight: '42px',
@@ -6319,9 +6652,9 @@ const CRMDashboard = () => {
   const renderWhatsAppTemplatesDropdown = () => {
     if (!showWhatsAppTemplates) return null;
     return (
-      <div className="position-absolute" style={{ 
-        bottom: '100%', 
-        left: '0', 
+      <div className="position-absolute" style={{
+        bottom: '100%',
+        left: '0',
         width: '300px',
         zIndex: 1000,
         backgroundColor: 'white',
@@ -6347,20 +6680,20 @@ const CRMDashboard = () => {
               <div className="p-3 text-center text-muted">No templates found.</div>
             ) : (
               whatsAppTemplates.map((tpl) => (
-                <div 
-                  key={tpl.id || tpl.name} 
+                <div
+                  key={tpl.id || tpl.name}
                   className="list-group-item list-group-item-action"
                   style={{ cursor: 'pointer', border: 'none', padding: '12px 16px' }}
                   onClick={() => {
                     setSelectedTemplate(tpl);
                     setShowWhatsAppTemplates(false);
-                    
+
                     // Generate template preview from components
                     let previewText = "";
                     let hasMedia = false;
                     let mediaType = "";
                     let mediaUrl = "";
-                    
+
                     if (tpl.components && Array.isArray(tpl.components)) {
                       tpl.components.forEach(component => {
                         if (component.type === 'HEADER') {
@@ -6380,12 +6713,12 @@ const CRMDashboard = () => {
                         }
                       });
                     }
-                    
+
                     // If no components, use template name as preview
                     if (!previewText.trim()) {
                       previewText = `Template: ${tpl.name}`;
                     }
-                    
+
                     // Store template data for enhanced preview
                     const templateData = {
                       text: previewText.trim(),
@@ -6396,7 +6729,7 @@ const CRMDashboard = () => {
                       status: tpl.status,
                       category: tpl.category
                     };
-                    
+
                     setTemplatePreview(JSON.stringify(templateData));
                   }}
                 >
@@ -16945,7 +17278,7 @@ max-width: 600px;
           `
         }
       </style>
-      
+
     </div>
   );
 };

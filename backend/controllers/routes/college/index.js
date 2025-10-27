@@ -1293,6 +1293,16 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 				}
 			},
 			{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+			// Counsellor lookup
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'counsellor',
+					foreignField: '_id',
+					as: 'counsellor'
+				}
+			},
+			{ $unwind: { path: '$counsellor', preserveNullAndEmptyArrays: true } },
 
 			// Center lookup
 			{

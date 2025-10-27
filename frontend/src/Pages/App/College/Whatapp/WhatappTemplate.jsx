@@ -99,6 +99,27 @@ const WhatsAppTemplate = () => {
 
   const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
 
+  // Variable dropdown state
+  const [showVariableDropdown, setShowVariableDropdown] = useState(false);
+  const [showCarouselVariableDropdown, setShowCarouselVariableDropdown] = useState(false);
+  const [showCardVariableDropdown, setShowCardVariableDropdown] = useState(null); // for card-specific dropdown
+  const variableDropdownRef = useRef(null);
+  const carouselVariableDropdownRef = useRef(null);
+
+  // Predefined variables list
+  const predefinedVariables = [
+    { name: 'Name', placeholder: 'name' },
+    { name: 'Gender', placeholder: 'gender' },
+    { name: 'Mobile', placeholder: 'mobile' },
+    { name: 'Email', placeholder: 'email' },
+    { name: 'Course Name', placeholder: 'course_name' },
+    { name: 'Job Name', placeholder: 'job_name' },
+    { name: 'Counselor Name', placeholder: 'counselor_name' },
+    { name: 'Lead Owner Name', placeholder: 'lead_owner_name' },
+    { name: 'Project Name', placeholder: 'project_name' },
+    { name: 'Batch Name', placeholder: 'batch_name' }
+  ];
+
 
 
   // Carousel navigation functions
@@ -1309,6 +1330,40 @@ const WhatsAppTemplate = () => {
     setSelectedTemplate(null);
   };
 
+  // Handle clicking outside variable dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (variableDropdownRef.current && !variableDropdownRef.current.contains(event.target)) {
+        setShowVariableDropdown(false);
+      }
+    };
+
+    if (showVariableDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showVariableDropdown]);
+
+  // Handle clicking outside carousel variable dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (carouselVariableDropdownRef.current && !carouselVariableDropdownRef.current.contains(event.target)) {
+        setShowCarouselVariableDropdown(false);
+      }
+    };
+
+    if (showCarouselVariableDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCarouselVariableDropdown]);
+
   const fetchWhatsappTemplates = async () => {
 
     try {
@@ -1941,7 +1996,10 @@ const WhatsAppTemplate = () => {
 
                 body_text: [
 
-                  ["User"]
+                  // Use actual variable values from form instead of hardcoded ["User"]
+                  editForm.variables && editForm.variables.length > 0 
+                    ? editForm.variables.map(v => v.value || 'Sample Value')
+                    : ["Sample Value"]
 
                 ]
 
@@ -4624,47 +4682,72 @@ const WhatsAppTemplate = () => {
 
                             <div className="d-flex justify-content-between align-items-center mt-2">
 
-                              <button
+                              <div className="position-relative" ref={variableDropdownRef}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-primary btn-sm"
+                                  style={{ fontSize: '12px' }}
+                                  onClick={() => setShowVariableDropdown(!showVariableDropdown)}
+                                >
+                                  + Add Variable
+                                </button>
+                                
+                                {showVariableDropdown && (
+                                  <div 
+                                    className="dropdown-menu show" 
+                                    style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      zIndex: 1000,
+                                      maxHeight: '300px',
+                                      overflowY: 'auto',
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                      border: '1px solid #dee2e6',
+                                      borderRadius: '8px',
+                                      marginTop: '4px',
+                                      minWidth: '200px'
+                                    }}
+                                  >
+                                    <div className="px-3 py-2 border-bottom">
+                                      <small className="text-muted fw-bold">Select Variable</small>
+                                    </div>
+                                    {predefinedVariables.map((variable, index) => (
+                                      <button
+                                        key={index}
+                                        type="button"
+                                        className="dropdown-item"
+                                        style={{
+                                          fontSize: '13px',
+                                          padding: '8px 16px',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={() => {
+                                          const variables = editForm.variables || [];
+                                          const newVariableNumber = variables.length + 1;
+                                          
+                                          const newVariable = {
+                                            id: newVariableNumber,
+                                            placeholder: `{{${variable.placeholder}}}`,
+                                            value: '',
+                                            displayName: variable.name
+                                          };
 
-                                type="button"
-
-                                className="btn btn-outline-primary btn-sm"
-
-                                style={{ fontSize: '12px' }}
-
-                                onClick={() => {
-
-                                  const variables = editForm.variables || [];
-
-                                  const newVariableNumber = variables.length + 1;
-
-                                  const newVariable = {
-
-                                    id: newVariableNumber,
-
-                                    placeholder: `{{${newVariableNumber}}}`,
-
-                                    value: ''
-
-                                  };
-
-                                  setEditForm({
-
-                                    ...editForm,
-
-                                    variables: [...variables, newVariable],
-
-                                    bodyText: editForm.bodyText + `{{${newVariableNumber}}}`
-
-                                  });
-
-                                }}
-
-                              >
-
-                                + Add Variable
-
-                              </button>
+                                          setEditForm({
+                                            ...editForm,
+                                            variables: [...variables, newVariable],
+                                            bodyText: editForm.bodyText + `{{${variable.placeholder}}}`
+                                          });
+                                          
+                                          setShowVariableDropdown(false);
+                                        }}
+                                      >
+                                        {variable.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
 
                               <small className="text-muted" style={{ fontSize: '12px' }}>
 
@@ -4726,7 +4809,7 @@ const WhatsAppTemplate = () => {
 
                                       <span className="fw-medium" style={{ fontSize: '12px' }}>
 
-                                        Variable {variable.id} Value:
+                                        {variable.displayName || `Variable ${variable.id}`} Value:
 
                                       </span>
 
@@ -5556,21 +5639,70 @@ const WhatsAppTemplate = () => {
 
                                 </small>
 
-                                <button
+                                <div className="position-relative" ref={carouselVariableDropdownRef}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-secondary btn-sm"
+                                    onClick={() => setShowCarouselVariableDropdown(!showCarouselVariableDropdown)}
+                                    style={{ fontSize: '12px' }}
+                                  >
+                                    + Add Variable
+                                  </button>
+                                  
+                                  {showCarouselVariableDropdown && (
+                                    <div 
+                                      className="dropdown-menu show" 
+                                      style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        right: 0,
+                                        zIndex: 1000,
+                                        maxHeight: '300px',
+                                        overflowY: 'auto',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                        border: '1px solid #dee2e6',
+                                        borderRadius: '8px',
+                                        marginTop: '4px',
+                                        minWidth: '200px'
+                                      }}
+                                    >
+                                      <div className="px-3 py-2 border-bottom">
+                                        <small className="text-muted fw-bold">Select Variable</small>
+                                      </div>
+                                      {predefinedVariables.map((variable, index) => (
+                                        <button
+                                          key={index}
+                                          type="button"
+                                          className="dropdown-item"
+                                          style={{
+                                            fontSize: '13px',
+                                            padding: '8px 16px',
+                                            cursor: 'pointer'
+                                          }}
+                                          onClick={() => {
+                                            const existingVariables = editForm.carouselVariables || [];
+                                            const newVariable = {
+                                              id: Date.now(),
+                                              placeholder: `{{${variable.placeholder}}}`,
+                                              value: '',
+                                              displayName: variable.name
+                                            };
 
-                                  type="button"
-
-                                  className="btn btn-outline-secondary btn-sm"
-
-                                  onClick={addCarouselVariable}
-
-                                  style={{ fontSize: '12px' }}
-
-                                >
-
-                                  + Add Variable
-
-                                </button>
+                                            setEditForm({
+                                              ...editForm,
+                                              carouselMessage: editForm.carouselMessage + `{{${variable.placeholder}}}`,
+                                              carouselVariables: [...existingVariables, newVariable]
+                                            });
+                                            
+                                            setShowCarouselVariableDropdown(false);
+                                          }}
+                                        >
+                                          {variable.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
 
                               </div>
 
@@ -5606,9 +5738,22 @@ const WhatsAppTemplate = () => {
 
                                 <div className="d-flex align-items-center mb-2">
 
+                                  <span
+                                    className="badge me-2"
+                                    style={{
+                                      backgroundColor: '#e3f2fd',
+                                      color: '#1976d2',
+                                      fontSize: '12px',
+                                      padding: '4px 8px',
+                                      borderRadius: '12px'
+                                    }}
+                                  >
+                                    {variable.placeholder}
+                                  </span>
+
                                   <label className="form-label fw-medium me-2" style={{ fontSize: '14px', minWidth: '120px' }}>
 
-                                    {variable.placeholder} Variable {index + 1} Value:
+                                    {variable.displayName || `Variable ${index + 1}`} Value:
 
                                   </label>
 
@@ -6070,53 +6215,74 @@ const WhatsAppTemplate = () => {
 
                                                 <div className="d-flex justify-content-between align-items-center mt-2">
 
-                                                  <button
+                                                  <div className="position-relative">
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-outline-secondary btn-sm"
+                                                      onClick={() => setShowCardVariableDropdown(showCardVariableDropdown === card.id ? null : card.id)}
+                                                      style={{ fontSize: '12px' }}
+                                                    >
+                                                      + Add Variable
+                                                    </button>
+                                                    
+                                                    {showCardVariableDropdown === card.id && (
+                                                      <div 
+                                                        className="dropdown-menu show" 
+                                                        style={{
+                                                          position: 'absolute',
+                                                          top: '100%',
+                                                          left: 0,
+                                                          zIndex: 1000,
+                                                          maxHeight: '300px',
+                                                          overflowY: 'auto',
+                                                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                          border: '1px solid #dee2e6',
+                                                          borderRadius: '8px',
+                                                          marginTop: '4px',
+                                                          minWidth: '200px'
+                                                        }}
+                                                      >
+                                                        <div className="px-3 py-2 border-bottom">
+                                                          <small className="text-muted fw-bold">Select Variable</small>
+                                                        </div>
+                                                        {predefinedVariables.map((variable, index) => (
+                                                          <button
+                                                            key={index}
+                                                            type="button"
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              fontSize: '13px',
+                                                              padding: '8px 16px',
+                                                              cursor: 'pointer'
+                                                            }}
+                                                            onClick={() => {
+                                                              const variables = card.variables || [];
+                                                              
+                                                              const newVariable = {
+                                                                id: Date.now(),
+                                                                placeholder: `{{${variable.placeholder}}}`,
+                                                                value: '',
+                                                                displayName: variable.name
+                                                              };
 
-                                                    type="button"
+                                                              const updatedCards = editForm.carouselCards.map(c =>
+                                                                c.id === card.id ? {
+                                                                  ...c,
+                                                                  variables: [...variables, newVariable],
+                                                                  bodyText: c.bodyText + `{{${variable.placeholder}}}`
+                                                                } : c
+                                                              );
 
-                                                    className="btn btn-outline-secondary btn-sm"
-
-                                                    onClick={() => {
-
-                                                      const variables = card.variables || [];
-
-                                                      const variableNumber = variables.length + 1;
-
-                                                      const newVariable = {
-
-                                                        id: Date.now(),
-
-                                                        placeholder: `{{${variableNumber}}}`,
-
-                                                        value: ''
-
-                                                      };
-
-                                                      const updatedCards = editForm.carouselCards.map(c =>
-
-                                                        c.id === card.id ? {
-
-                                                          ...c,
-
-                                                          variables: [...variables, newVariable],
-
-                                                          bodyText: c.bodyText + `{{${variableNumber}}}`
-
-                                                        } : c
-
-                                                      );
-
-                                                      setEditForm({ ...editForm, carouselCards: updatedCards });
-
-                                                    }}
-
-                                                    style={{ fontSize: '12px' }}
-
-                                                  >
-
-                                                    + Add Variable
-
-                                                  </button>
+                                                              setEditForm({ ...editForm, carouselCards: updatedCards });
+                                                              setShowCardVariableDropdown(null);
+                                                            }}
+                                                          >
+                                                            {variable.name}
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
 
                                                   <small className="text-muted" style={{ fontSize: '11px' }}>
 
@@ -6146,11 +6312,23 @@ const WhatsAppTemplate = () => {
 
                                                     <div key={variable.id} className="mb-2">
 
-                                                      <label className="form-label fw-medium" style={{ fontSize: '11px' }}>
-
-                                                        {variable.placeholder} Variable {varIndex + 1} Value:
-
-                                                      </label>
+                                                      <div className="d-flex align-items-center mb-1">
+                                                        <span
+                                                          className="badge me-2"
+                                                          style={{
+                                                            backgroundColor: '#e3f2fd',
+                                                            color: '#1976d2',
+                                                            fontSize: '11px',
+                                                            padding: '3px 6px',
+                                                            borderRadius: '10px'
+                                                          }}
+                                                        >
+                                                          {variable.placeholder}
+                                                        </span>
+                                                        <label className="form-label fw-medium mb-0" style={{ fontSize: '11px' }}>
+                                                          {variable.displayName || `Variable ${varIndex + 1}`} Value:
+                                                        </label>
+                                                      </div>
 
                                                       <input
 

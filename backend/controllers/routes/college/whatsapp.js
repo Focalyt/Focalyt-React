@@ -87,6 +87,12 @@ router.get('/templates', [isCollege], async (req, res) => {
 					if (dbTemplate) {
 						console.log(`Found database media for template: ${template.name}`);
 						
+						// Add variable mappings to template
+						if (dbTemplate.variableMappings && dbTemplate.variableMappings.length > 0) {
+							template.variableMappings = dbTemplate.variableMappings;
+							console.log(`  - Added variable mappings:`, dbTemplate.variableMappings);
+						}
+						
 						// Replace Facebook handles with S3 URLs in components
 						if (template.components) {
 							template.components = template.components.map(component => {
@@ -462,6 +468,9 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			category,
 			components: []
 		};
+		
+		// Track variable mappings for database storage
+		let variableMappings = [];
 
 		// Process components and add file URLs if files were uploaded
 		let fileIndex = 0;
@@ -515,6 +524,102 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 				};
 			}
 			
+			// Handle BODY component - convert named variables to numbered and add examples
+			if (component.type === 'BODY' && component.text) {
+				// Find all variables in format {{variable_name}} or {{1}}, {{2}}, etc.
+				const variableRegex = /\{\{[^}]+\}\}/g;
+				const variables = component.text.match(variableRegex);
+				
+				if (variables && variables.length > 0) {
+					// Convert named variables to numbered format for WhatsApp API
+					let numberedText = component.text;
+					const bodyVariableMappings = [];
+					
+					variables.forEach((variable, index) => {
+						// Extract variable name/number from {{...}}
+						const varName = variable.replace(/\{\{|\}\}/g, '').trim();
+						
+						// Check if it's already a number
+						const isNumber = /^\d+$/.test(varName);
+						
+						if (!isNumber) {
+							// Convert named variable to numbered: {{name}} -> {{1}}
+							numberedText = numberedText.replace(variable, `{{${index + 1}}}`);
+							// Store mapping: position -> variable name
+							bodyVariableMappings.push({
+								position: index + 1,
+								variableName: varName
+							});
+						}
+					});
+					
+					// Store variable mappings for this template
+					if (bodyVariableMappings.length > 0) {
+						variableMappings = bodyVariableMappings;
+					}
+					
+					// Update component text with numbered variables
+					processedComponent.text = numberedText;
+					
+					// Use example from frontend if provided, otherwise generate defaults
+					let exampleValues = [];
+					
+					if (component.example && component.example.body_text && Array.isArray(component.example.body_text[0])) {
+						// Frontend ne example values bheje hain - use those
+						exampleValues = component.example.body_text[0];
+						console.log(`✅ Using examples from frontend:`, exampleValues);
+					} else {
+						// Generate default examples as fallback
+						console.log(`⚠️  No examples from frontend, generating defaults...`);
+						exampleValues = variables.map((variable, index) => {
+							const varName = variable.replace(/\{\{|\}\}/g, '').trim();
+							
+							// Create appropriate example value based on variable name
+							if (varName === 'name' || varName.includes('name')) {
+								return 'John Doe';
+							} else if (varName === 'gender') {
+								return 'Male';
+							} else if (varName === 'mobile' || varName.includes('mobile') || varName.includes('phone')) {
+								return '9876543210';
+							} else if (varName === 'email') {
+								return 'user@example.com';
+							} else if (varName.includes('course')) {
+								return 'Sample Course';
+							} else if (varName.includes('job')) {
+								return 'Sample Job';
+							} else if (varName.includes('batch')) {
+								return 'Batch 2025';
+							} else if (varName.includes('date')) {
+								return '2025-01-01';
+							} else {
+								return 'Sample Value';
+							}
+						});
+					}
+					
+					// Ensure we have enough examples for all variables
+					if (exampleValues.length < variables.length) {
+						console.warn(`⚠️  Example count (${exampleValues.length}) < Variable count (${variables.length})`);
+						// Pad with 'Sample Value'
+						while (exampleValues.length < variables.length) {
+							exampleValues.push('Sample Value');
+						}
+					}
+					
+					// Add example to component
+					// WhatsApp API expects: { "body_text": [["value1", "value2", ...]] }
+					processedComponent.example = {
+						body_text: [exampleValues]
+					};
+					
+					console.log(`✅ Converted ${variables.length} variables to numbered format`);
+					console.log(`   Original: ${component.text.substring(0, 100)}...`);
+					console.log(`   Numbered: ${numberedText.substring(0, 100)}...`);
+					console.log(`   Examples:`, exampleValues);
+					console.log(`   Mappings:`, bodyVariableMappings);
+				}
+			}
+			
 			// Handle BUTTONS component - ensure proper structure
 			if (component.type === 'BUTTONS' && component.buttons) {
 				processedComponent.buttons = component.buttons.map(button => ({
@@ -524,14 +629,20 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 				}));
 			}
 			
-			// Remove example property if it's empty or undefined
+			// Remove example property if it's empty or undefined (but keep valid examples)
 			if (!processedComponent.example || Object.keys(processedComponent.example).length === 0) {
 				delete processedComponent.example;
+			} else {
+				// Log the example being kept for debugging
+				console.log(`Keeping example for ${component.type}:`, JSON.stringify(processedComponent.example, null, 2));
 			}
 			
 			templateData.components.push(processedComponent);
 		});
 
+		// Debug: Log final template data being sent to Facebook
+		console.log('=== Final Template Data Being Sent to Facebook ===');
+		console.log(JSON.stringify(templateData, null, 2));
 
 		// Create template directly via Facebook Graph API
 		const response = await axios.post(
@@ -686,7 +797,8 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					category: category,
 					status: response.data?.status || 'PENDING',
 					carouselMedia: savedCarouselMedia,
-					headerMedia: savedHeaderMedia // Save header media
+					headerMedia: savedHeaderMedia, // Save header media
+					variableMappings: variableMappings // Save variable mappings
 				});
 				
 				console.log(`✓ Template metadata saved to database: ${templateDoc._id}`);
@@ -1822,8 +1934,9 @@ async function saveMessageToDatabase(messageData) {
 /**
  * Send WhatsApp message with template
  */
-async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
+async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData = null) {
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  const { getVariablesInText, replaceVariables } = require('../../../helpers/whatsappVariableMapper');
   
   // Fetch template from Facebook to verify language and status
   const fbTemplate = await fetchTemplateFromFacebook(template.templateName);
@@ -1850,8 +1963,68 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
     }
   };
 
-  // Add components for templates with media
+  // Add components for templates with media and variables
   const components = [];
+  
+  // Extract variables from template and prepare parameters
+  let bodyParameters = [];
+  if (candidateData && fbTemplate && fbTemplate.components) {
+    const bodyComponent = fbTemplate.components.find(c => c.type === 'BODY');
+    if (bodyComponent && bodyComponent.text) {
+      const variables = getVariablesInText(bodyComponent.text);
+      console.log('📝 Variables found in template:', variables);
+      
+      // Get variable mappings from database template
+      const variableMappings = template.variableMappings || [];
+      console.log('🗺️  Variable mappings from DB:', variableMappings);
+      
+      // Create parameters array with actual values
+      bodyParameters = variables.map(varName => {
+        // varName will be like "1", "2", "3" (numbered)
+        const isNumbered = /^\d+$/.test(varName);
+        
+        let actualValue = '';
+        
+        if (isNumbered && variableMappings.length > 0) {
+          // Find the mapping for this numbered variable
+          const mapping = variableMappings.find(m => m.position === parseInt(varName));
+          
+          if (mapping) {
+            // Get the actual variable name (e.g., "name", "email")
+            const actualVarName = mapping.variableName;
+            console.log(`   {{${varName}}} → ${actualVarName}`);
+            
+            // Get value from candidate data using the actual variable name
+            actualValue = replaceVariables(`{{${actualVarName}}}`, candidateData);
+            // Remove brackets if variable wasn't found
+            actualValue = actualValue.replace(/^\[|\]$/g, '');
+            console.log(`      Value: ${actualValue}`);
+          } else {
+            console.warn(`   ⚠️  No mapping found for {{${varName}}}`);
+            actualValue = `[Variable ${varName}]`;
+          }
+        } else {
+          // If not numbered or no mappings, use direct replacement
+          actualValue = replaceVariables(`{{${varName}}}`, candidateData);
+          actualValue = actualValue.replace(/^\[|\]$/g, '');
+          console.log(`   ${varName} = ${actualValue}`);
+        }
+        
+        return {
+          type: 'text',
+          text: actualValue
+        };
+      });
+    }
+  }
+  
+  // Add BODY component with variable parameters if exists
+  if (bodyParameters.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: bodyParameters
+    });
+  }
 
   // Handle regular header media (IMAGE/VIDEO/DOCUMENT)
   if (template.headerMedia && template.headerMedia.mediaType && mediaUrls.headerUrl) {
@@ -1916,9 +2089,169 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}) {
  * POST /api/whatsapp/send
  * Send WhatsApp message with template
  */
+/**
+ * POST /api/whatsapp/validate-template-variables
+ * Validate if candidate has all required variable data
+ */
+router.post('/validate-template-variables', isCollege, async (req, res) => {
+  try {
+    const { templateName, candidateId, registrationId, collegeId, mobile } = req.body;
+    
+    if (!templateName) {
+      return res.status(400).json({
+        success: false,
+        message: 'templateName is required'
+      });
+    }
+    
+    // Fetch candidate data
+    const { Candidate, CandidateRegister, College } = require('../../models');
+    const { validateCandidateData } = require('../../../helpers/whatsappVariableMapper');
+    
+    let candidateData = null;
+    
+    // Try by candidateId first
+    if (candidateId) {
+      candidateData = await Candidate.findById(candidateId)
+        .populate('_concernPerson', 'name email mobile')
+        .populate({
+          path: 'appliedCourses',
+          select: 'courseName fees duration courseType',
+          model: 'courses'
+        })
+        .populate({
+          path: 'appliedJobs',
+          select: 'title company location salary',
+          model: 'Vacancy'
+        })
+        .lean();
+        
+      if (candidateData) {
+        candidateData._appliedCourse = candidateData.appliedCourses?.[0] || null;
+        candidateData._appliedJob = candidateData.appliedJobs?.[0] || null;
+      }
+    }
+    
+    // Try by registrationId
+    if (!candidateData && registrationId) {
+      candidateData = await CandidateRegister.findById(registrationId)
+        .populate('_concernPerson', 'name email mobile')
+        .lean();
+    }
+    
+    // Try by mobile number as fallback
+    if (!candidateData && mobile) {
+      // Convert to string first if it's a number
+      const mobileStr = String(mobile);
+      let cleanMobile = mobileStr.replace(/^\+91/, '').replace(/^\+/, '').replace(/\s/g, '');
+      
+      candidateData = await Candidate.findOne({ 
+        $or: [
+          { mobile: cleanMobile },
+          { mobile: parseInt(cleanMobile) },
+          { mobile: mobile },
+          { mobile: mobileStr },
+          { mobile: `+${cleanMobile}` },
+          { mobile: `91${cleanMobile}` },
+          { mobile: parseInt(`91${cleanMobile}`) }
+        ]
+      })
+        .populate('_concernPerson', 'name email mobile')
+        .populate({
+          path: 'appliedCourses',
+          select: 'courseName fees duration courseType',
+          model: 'courses'
+        })
+        .populate({
+          path: 'appliedJobs',
+          select: 'title company location salary',
+          model: 'Vacancy'
+        })
+        .lean();
+      
+      if (candidateData) {
+        candidateData._appliedCourse = candidateData.appliedCourses?.[0] || null;
+        candidateData._appliedJob = candidateData.appliedJobs?.[0] || null;
+      } else {
+        // Try CandidateRegister model by mobile
+        candidateData = await CandidateRegister.findOne({ 
+          $or: [
+            { mobile: cleanMobile },
+            { mobile: parseInt(cleanMobile) },
+            { mobile: mobile },
+            { mobile: mobileStr },
+            { mobile: `+${cleanMobile}` },
+            { mobile: `91${cleanMobile}` }
+          ]
+        })
+          .populate('_concernPerson', 'name email mobile')
+          .lean();
+      }
+    }
+    
+    if (collegeId && candidateData) {
+      const collegeInfo = await College.findById(collegeId)
+        .select('name email phone address')
+        .lean();
+      candidateData._college = collegeInfo;
+    }
+    
+    if (!candidateData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found by ID or mobile number'
+      });
+    }
+    
+    // Fetch template
+    const template = await WhatsAppTemplate.findOne({ templateName });
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template not found'
+      });
+    }
+    
+    // Get template from Facebook to get actual body text
+    const fbTemplate = await fetchTemplateFromFacebook(templateName);
+    if (!fbTemplate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template not found on WhatsApp'
+      });
+    }
+    
+    const bodyComponent = fbTemplate.components?.find(c => c.type === 'BODY');
+    if (!bodyComponent || !bodyComponent.text) {
+      return res.status(200).json({
+        success: true,
+        valid: true,
+        message: 'No variables in template',
+        missingVariables: []
+      });
+    }
+    
+    // Validate candidate data
+    const validation = validateCandidateData(bodyComponent.text, candidateData);
+    
+    return res.status(200).json({
+      success: true,
+      ...validation,
+      message: validation.valid ? 'All variables are available' : 'Some variables are missing'
+    });
+    
+  } catch (error) {
+    console.error('Validation Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to validate template variables'
+    });
+  }
+});
+
 router.post('/send-template', isCollege, async (req, res) => {
   try {
-    const { templateName, to, collegeId } = req.body;
+    const { templateName, to, collegeId, candidateId, registrationId } = req.body;
 
     // Validation
     if (!templateName || !to) {
@@ -1937,6 +2270,137 @@ router.post('/send-template', isCollege, async (req, res) => {
         success: false,
         message: error.message
       });
+    }
+
+    // Fetch candidate/registration data
+    // Priority: candidateId > registrationId > mobile number
+    let candidateData = null;
+    const { Candidate, CandidateRegister, Course, User, College, Vacancy } = require('../../models');
+    const { replaceVariablesInComponents } = require('../../../helpers/whatsappVariableMapper');
+    
+    console.log('🔍 Request params:', { templateName, to, candidateId, registrationId, collegeId });
+    
+    // Try to fetch candidate data by ID first
+    if (candidateId) {
+      console.log('📥 Fetching candidate data by ID:', candidateId);
+      candidateData = await Candidate.findById(candidateId)
+        .populate('_concernPerson', 'name email mobile')
+        .populate({
+          path: 'appliedCourses',
+          select: 'courseName fees duration courseType',
+          model: 'courses'
+        })
+        .populate({
+          path: 'appliedJobs',
+          select: 'title company location salary',
+          model: 'Vacancy'
+        })
+        .lean();
+        
+      if (candidateData) {
+        console.log('✅ Candidate data found by ID');
+      }
+    } 
+    
+    // If not found by ID, try registration ID
+    if (!candidateData && registrationId) {
+      console.log('📥 Fetching registration data by ID:', registrationId);
+      candidateData = await CandidateRegister.findById(registrationId)
+        .populate('_concernPerson', 'name email mobile')
+        .lean();
+      
+      if (candidateData) {
+        console.log('✅ Registration data found by ID');
+      }
+    }
+    
+    // If still not found, try to find by mobile number
+    if (!candidateData && to) {
+      console.log('📥 Fetching candidate data by mobile number:', to);
+      
+      // Convert to string first if it's a number
+      const mobileStr = String(to);
+      
+      // Clean mobile number (remove + and country code if present)
+      let cleanMobile = mobileStr.replace(/^\+91/, '').replace(/^\+/, '').replace(/\s/g, '');
+      
+      // Try to find candidate by mobile (check both string and number formats)
+      candidateData = await Candidate.findOne({ 
+        $or: [
+          { mobile: cleanMobile },
+          { mobile: parseInt(cleanMobile) },
+          { mobile: to },
+          { mobile: mobileStr },
+          { mobile: `+${cleanMobile}` },
+          { mobile: `91${cleanMobile}` },
+          { mobile: parseInt(`91${cleanMobile}`) }
+        ]
+      })
+        .populate('_concernPerson', 'name email mobile')
+        .populate({
+          path: 'appliedCourses',
+          select: 'courseName fees duration courseType',
+          model: 'courses'
+        })
+        .populate({
+          path: 'appliedJobs',
+          select: 'title company location salary',
+          model: 'Vacancy'
+        })
+        .lean();
+      
+      if (candidateData) {
+        console.log('✅ Candidate data found by mobile number:', {
+          name: candidateData.name,
+          mobile: candidateData.mobile,
+          email: candidateData.email,
+          coursesCount: candidateData.appliedCourses?.length || 0
+        });
+      } else {
+        // Try registration model with same mobile variations
+        candidateData = await CandidateRegister.findOne({ 
+          $or: [
+            { mobile: cleanMobile },
+            { mobile: parseInt(cleanMobile) },
+            { mobile: to },
+            { mobile: mobileStr },
+            { mobile: `+${cleanMobile}` },
+            { mobile: `91${cleanMobile}` },
+            { mobile: parseInt(`91${cleanMobile}`) }
+          ]
+        })
+          .populate('_concernPerson', 'name email mobile')
+          .lean();
+        
+        if (candidateData) {
+          console.log('✅ Registration data found by mobile number');
+        }
+      }
+    }
+    
+    // Set course/job if found
+    if (candidateData) {
+      candidateData._appliedCourse = candidateData.appliedCourses?.[0] || null;
+      candidateData._appliedJob = candidateData.appliedJobs?.[0] || null;
+      
+      console.log('📊 Final candidate data:', {
+        name: candidateData.name,
+        mobile: candidateData.mobile,
+        email: candidateData.email,
+        counselor: candidateData._concernPerson?.name || 'N/A',
+        course: candidateData._appliedCourse?.courseName || 'N/A'
+      });
+    } else {
+      console.warn('⚠️  No candidate data found - variables will use default values');
+    }
+    
+    // Fetch college info if collegeId exists
+    if (collegeId && candidateData) {
+      const collegeInfo = await College.findById(collegeId)
+        .select('name email phone address')
+        .lean();
+      candidateData._college = collegeInfo;
+      console.log('✅ College info added:', collegeInfo?.name);
     }
 
     // Fetch template from database
@@ -1977,15 +2441,102 @@ router.post('/send-template', isCollege, async (req, res) => {
       );
     }
 
-    // Send WhatsApp message
+    // Send WhatsApp message with candidate data for variable replacement
     const whatsappResponse = await sendWhatsAppMessage(
       formattedPhone,
       template,
-      mediaUrls
+      mediaUrls,
+      candidateData
     );
+    
+    console.log('✅ WhatsApp message sent with variables:', candidateData ? 'YES' : 'NO');
 
     // Fetch full template details from Facebook to get all components
     const fbTemplate = await fetchTemplateFromFacebook(template.templateName);
+    
+    // Generate filled message text for database storage using stored variable mappings
+    const generateFilledMessageForDB = (templateText, candidateData, variableMappings) => {
+      if (!templateText || !candidateData) return `Template: ${template.templateName}`;
+      
+      let text = templateText;
+      
+      // Use stored variable mappings from database to replace variables correctly
+      if (variableMappings && variableMappings.length > 0) {
+        console.log('🗺️  Using stored variable mappings for DB message:', variableMappings);
+        
+        variableMappings.forEach(mapping => {
+          const position = mapping.position;
+          const variableName = mapping.variableName;
+          
+          // Get value based on actual variable name from mapping
+          let value = '';
+		  console.log('candidateData',candidateData)
+          
+          switch (variableName) {
+            case 'name':
+              value = candidateData.name || candidateData.candidate_name || 'User';
+              break;
+            case 'gender':
+              value = candidateData.gender || 'Male';
+              break;
+            case 'mobile':
+              value = candidateData.mobile || candidateData.phone || 'Mobile';
+              break;
+            case 'email':
+              value = candidateData.email || 'Email';
+              break;
+            case 'course_name':
+              value = candidateData._appliedCourse?.courseName || candidateData.courseName || 'Course Name';
+              break;
+            case 'counselor_name':
+              value = candidateData._concernPerson?.name || 'Counselor';
+              break;
+            case 'job_name':
+              value = candidateData._appliedJob?.title || candidateData.jobTitle || 'Job Title';
+              break;
+            case 'project_name':
+              value = candidateData._college?.name || 'Project Name';
+              break;
+            case 'batch_name':
+              value = candidateData.batchName || 'Batch Name';
+              break;
+            case 'lead_owner_name':
+              value = candidateData._concernPerson?.name || 'Lead Owner';
+              break;
+            default:
+              // Try direct property access
+              value = candidateData[variableName] || `[${variableName}]`;
+              break;
+          }
+          
+          // Replace the numbered variable with actual value
+          text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+          console.log(`   {{${position}}} (${variableName}) → ${value}`);
+        });
+      } else {
+        console.log('⚠️  No variable mappings found, using fallback replacement');
+        
+        // Fallback: Use default mapping if no stored mappings
+        text = text.replace(/\{\{1\}\}/g, candidateData.name || candidateData.candidate_name || 'User');
+        text = text.replace(/\{\{2\}\}/g, candidateData.gender || 'Male');
+        text = text.replace(/\{\{3\}\}/g, candidateData.mobile || candidateData.phone || 'Mobile');
+        text = text.replace(/\{\{4\}\}/g, candidateData.email || 'Email');
+        text = text.replace(/\{\{5\}\}/g, candidateData._appliedCourse?.courseName || candidateData.courseName || 'Course Name');
+        text = text.replace(/\{\{6\}\}/g, candidateData._concernPerson?.name || 'Counselor');
+        text = text.replace(/\{\{7\}\}/g, candidateData._appliedJob?.title || candidateData.jobTitle || 'Job Title');
+        text = text.replace(/\{\{8\}\}/g, candidateData._college?.name || 'Project Name');
+        text = text.replace(/\{\{9\}\}/g, candidateData.batchName || 'Batch Name');
+        text = text.replace(/\{\{10\}\}/g, candidateData._concernPerson?.name || 'Lead Owner');
+      }
+      
+      return text;
+    };
+    
+    // Get filled message text using stored variable mappings
+    const bodyComponent = fbTemplate?.components?.find(c => c.type === 'BODY');
+    const filledMessage = generateFilledMessageForDB(bodyComponent?.text, candidateData, template.variableMappings);
+    
+    console.log('📝 Generated filled message for DB:', filledMessage);
     
     // Prepare template data with components for saving
     const templateDataToSave = {
@@ -1997,18 +2548,20 @@ router.post('/send-template', isCollege, async (req, res) => {
       carouselMedia: template.carouselMedia
     };
 
-    // Save message to database
+    // Save message to database with FILLED message
     try {
       await saveMessageToDatabase({
         collegeId: collegeId || req.college?._id,
         to: formattedPhone,
-        message: `Template: ${template.templateName}`,
+        message: filledMessage, // ✅ Use filled message instead of generic
         templateName: template.templateName,
         messageType: 'template',
         templateData: templateDataToSave,
+        candidateId: candidateData?._id,
+        candidateName: candidateData?.name,
         whatsappMessageId: whatsappResponse.messages[0].id
       });
-      console.log('✓ Template message saved to database with components');
+      console.log('✓ Template message saved to database with FILLED variables');
     } catch (dbError) {
       console.error('⚠ DB save error (non-critical):', dbError.message);
       // Continue - DB save is optional

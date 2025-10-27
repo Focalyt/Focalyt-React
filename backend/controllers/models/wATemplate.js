@@ -60,6 +60,19 @@ const WhatsAppTemplateSchema = new mongoose.Schema({
 		},
 		fileName: String
 	}],
+	// Variable mappings: stores which numbered variable maps to which named variable
+	// Example: [{ position: 1, variableName: 'name' }, { position: 2, variableName: 'email' }]
+	// This means {{1}} = name, {{2}} = email
+	variableMappings: [{
+		position: {
+			type: Number,
+			required: true
+		},
+		variableName: {
+			type: String,
+			required: true
+		}
+	}],
 	createdAt: {
 		type: Date,
 		default: Date.now
