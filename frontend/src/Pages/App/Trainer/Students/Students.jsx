@@ -1,999 +1,346 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { X, Upload, FileText, Image, Video, Calendar, Users, User, Send, Plus, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, Trash2, Save, AlertTriangle } from 'lucide-react';
 
-function Students() {
-    const [loading, setLoadingData] = useState(true);
-    const [allProfiles, setAllProfiles] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [activeTab] = useState('batchFreeze');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [batchFreezeCount, setBatchFreezeCount] = useState(0);
-    const [selectedBatch, setSelectedBatch] = useState(null);
-    const [batchName, setBatchName] = useState('');
-    const [courseId, setCourseId] = useState('');
-    const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-    const [showDailyDiaryModal, setShowDailyDiaryModal] = useState(false);
-    const [attendanceData, setAttendanceData] = useState({});
-    const [loadingAttendance, setLoadingAttendance] = useState(false);
+function CreateAssignment() {
+  const [meta, setMeta] = useState({
+    title: '',
+    durationMins: 30,
+    passPercent: 40,
+    totalMarks: 100,
+    negativeMarkPerWrong: 0, // optional
+  });
 
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-    const token = JSON.parse(sessionStorage.getItem('token'));
-    const location = useLocation();
-    const navigate = useNavigate();
-    const searchParams = new URLSearchParams(location.search);
-    const batchId = searchParams.get('batchId');
-    const batchNameParam = searchParams.get('batchName');
-    const courseIdParam = searchParams.get('courseId');
+  const [questions, setQuestions] = useState([
+    {
+      id: 1,
+      question: '',
+      options: ['', '', '', ''],
+      correctIndex: null,   // 0..3
+      marks: 5,             // per-question marks
+    },
+  ]);
 
-    //  Daily Diary State
-    const [sendTo, setSendTo] = useState("all");
-    const [selectedStudents, setSelectedStudents] = useState([]);
-    const [assignmentDetail, setAssignmentDetail] = useState("");
-    const [studyMaterials, setStudyMaterials] = useState([]);
-    const [projectVideos, setProjectVideos] = useState([]);
+  const totalAllocated = useMemo(
+    () => questions.reduce((sum, q) => sum + Number(q.marks || 0), 0),
+    [questions]
+  );
 
-  
-
-    const handleFileUpload = (type, e) => {
-        const files = Array.from(e.target.files);
-        if (type === 'study') {
-            setStudyMaterials([...studyMaterials, ...files.map(f => ({ name: f.name, type: f.type }))]);
-        } else if (type === 'video') {
-            setProjectVideos([...projectVideos, ...files.map(f => ({ name: f.name }))]);
-        }
-    };
-
-    const removeFile = (type, index) => {
-        if (type === 'study') {
-            setStudyMaterials(studyMaterials.filter((_, i) => i !== index));
-        } else if (type === 'video') {
-            setProjectVideos(projectVideos.filter((_, i) => i !== index));
-        }
-    };
-
-    const handleStudentToggle = (studentId) => {
-        setSelectedStudents(prev =>
-            prev.includes(studentId)
-                ? prev.filter(id => id !== studentId)
-                : [...prev, studentId]
-        );
-    };
-
-    const handleSend = () => {
-        handleDailyDiary();
-    };
-
-    useEffect(() => {
-        if (batchId) {
-            setSelectedBatch({ _id: batchId });
-            setBatchName(decodeURIComponent(batchNameParam || 'Batch'));
-            if (courseIdParam) {
-                setCourseId(courseIdParam);
-            }
-        }
-    }, [batchId, batchNameParam, courseIdParam]);
-
-    useEffect(() => {
-        if (batchId) {
-            fetchProfileData();
-        }
-    }, [batchId, currentPage, activeTab, searchQuery]);
-
-    const fetchProfileData = async () => {
-        try {
-            setLoadingData(true);
-            if (!token) {
-                console.warn("No token found in session storage.");
-                setLoadingData(false);
-                return;
-            }
-
-            // Build query parameters
-            const queryParams = new URLSearchParams({
-                page: currentPage.toString(),
-                limit: '50',
-                status: activeTab,
-            });
-
-            // Add search query
-            if (searchQuery.trim()) {
-                queryParams.append('search', searchQuery.trim());
-            }
-
-            const response = await axios.get(
-                `${backendUrl}/college/traineradmission-list/${batchId}?${queryParams.toString()}`,
-                {
-                    headers: {
-                        "x-auth": token,
-                    },
-                }
-            );
-
-            if (response.data.success && response.data.data) {
-                console.log('response.data.data', response.data.data);
-                setAllProfiles(response.data.data);
-                setTotalPages(response.data.totalPages);
-
-                // Update batch freeze count if available
-                if (response.data.filterCounts) {
-                    setBatchFreezeCount(response.data.filterCounts.batchFreeze || 0);
-                }
-            } else {
-                console.error("Failed to fetch profile data", response.data.message);
-            }
-        } catch (error) {
-            console.error("Error fetching profile data:", error);
-        } finally {
-            setLoadingData(false);
-        }
-    };
-
-    const handleDailyDiary = async () => {
-        try {
-            if (sendTo === 'individual' && selectedStudents.length === 0) {
-                alert('Please select at least one student');
-                return;
-            }
-
-            const response = await axios.post(
-                `${backendUrl}/college/addDailyDiary`, 
-                {
-                    batch: batchId,
-                    course: courseId,
-                    sendTo,
-                    selectedStudents: sendTo === 'individual' ? selectedStudents : [],
-                    assignmentDetail,
-                    studyMaterials,
-                    projectVideos
-                },
-                {
-                    headers: {
-                        "x-auth": token,
-                    },
-                }
-            );
-            
-            if (response.data.status) {
-                alert(response.data.message);
-                setAssignmentDetail('');
-                setStudyMaterials([]);
-                setProjectVideos([]);
-                setSelectedStudents([]);
-                setSendTo('all');
-                setShowDailyDiaryModal(false);
-            } else {
-                alert(response.data.message);
-            }
-        } catch (error) {
-            console.error("Error adding daily diary:", error);
-            alert(error.response?.data?.message );
-        }
+  const isQuestionsValid = useMemo(() => {
+    if (!questions.length) return false;
+    for (const q of questions) {
+      if (!q.question?.trim()) return false;
+      if (q.correctIndex === null || q.correctIndex === undefined) return false;
+      if (!q.options || q.options.length !== 4) return false;
+      for (const op of q.options) {
+        if (!op?.trim()) return false;
+      }
+      if (!q.marks || Number(q.marks) <= 0) return false;
     }
+    return true;
+  }, [questions]);
 
-    const handleSearch = (e) => {
-        setSearchQuery(e.target.value);
-        setCurrentPage(1);
-    };
+  const canSave =
+    meta.title.trim() &&
+    Number(meta.durationMins) > 0 &&
+    Number(meta.passPercent) >= 0 &&
+    Number(meta.passPercent) <= 100 &&
+    isQuestionsValid &&
+    Number(totalAllocated) === Number(meta.totalMarks);
 
-    const handleDailyDiaryManagement = () => {
-        setShowDailyDiaryModal(true);
-    };
-
-    const handleAttendanceManagement = () => {
-        setShowAttendanceModal(true);
-        fetchAttendanceData();
-    };
-
-    const fetchAttendanceData = async () => {
-        try {
-            setLoadingAttendance(true);
-            if (!batchId) return;
-
-            const response = await axios.get(
-                `${backendUrl}/college/getattendancebybatch/${batchId}`,
-                {
-                    headers: {
-                        "x-auth": token,
-                    },
-                }
-            );
-
-            if (response.data.success) {
-                setAttendanceData(response.data.data || {});
-            }
-        } catch (error) {
-            console.error("Error fetching attendance data:", error);
-        } finally {
-            setLoadingAttendance(false);
-        }
-    };
-
-    const markAttendance = async (studentId, status) => {
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const response = await axios.post(
-                `${backendUrl}/college/trainer/mark-attendance`,
-                {
-                    appliedCourseId: studentId,
-                    date: today,
-                    status: status,
-                    period: 'regularPeriod', // Since we're dealing with batch freeze students
-                    remarks: ''
-                },
-                {
-                    headers: {
-                        "x-auth": token,
-                    },
-                }
-            );
-
-            if (response.data.status) {
-                alert(response.data.message || 'Attendance marked successfully!');
-                fetchProfileData();
-                fetchAttendanceData();
-            } else {
-                alert(response.data.message || 'Failed to mark attendance');
-            }
-        } catch (error) {
-            console.error("Error marking attendance:", error);
-            alert(error.response?.data?.message || "Failed to mark attendance");
-        }
-    };
-
-    const getAttendanceStatus = (studentId, date) => {
-        const today = new Date().toISOString().split('T')[0];
-        const studentAttendance = attendanceData[studentId];
-        if (!studentAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
-
-        const dayAttendance = studentAttendance[today];
-        if (!dayAttendance) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
-
-        const status = dayAttendance.status?.toLowerCase();
-        const statusMap = {
-            'present': { symbol: 'P', class: 'present' },
-            'absent': { symbol: 'A', class: 'absent' },
-        };
-
-        return statusMap[status] || { status: 'not-marked', symbol: '-', class: 'not-marked' };
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
-
-    const getStatusBadge = (profile) => {
-        if (profile.dropout) {
-            return <span className="badge bg-danger">Dropout</span>;
-        }
-        if (profile.isBatchFreeze) {
-            return <span className="badge bg-warning">Batch Freeze</span>;
-        }
-        if (profile.isZeroPeriodAssigned) {
-            return <span className="badge bg-info">Zero Period</span>;
-        }
-        if (profile.admissionDone) {
-            return <span className="badge bg-success">Admitted</span>;
-        }
-        return <span className="badge bg-secondary">Unknown</span>;
-    };
-
-    if (loading) {
-        return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-                <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="container-fluid p-4">
-            {/* Header */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div className="d-flex align-items-center mb-2">
-                                <button
-                                    onClick={() => navigate(-1)}
-                                    className="btn btn-sm btn-outline-secondary me-3"
-                                >
-                                    <i className="feather icon-arrow-left me-1"></i> Back to Batches
-                                </button>
-                                <h2 className="mb-0">Student Management</h2>
-                            </div>
-                            <p className="text-muted mb-0">
-                                <i className="fas fa-layer-group me-1"></i>
-                                Batch: <strong>{batchName}</strong>
-                            </p>
-                        </div>
-                        <div className="d-flex gap-2">
-                            {/* <button
-                                className="btn btn-outline-primary"
-                                onClick={fetchProfileData}
-                            >
-                                <i className="fas fa-sync-alt me-1"></i> Refresh
-                            </button> */}
-                            <button className="btn btn-primary" onClick={handleDailyDiaryManagement}>
-                                Daily Diary
-                            </button>
-                            <button
-                                className="btn btn-success"
-                                onClick={handleAttendanceManagement}
-                            >
-                                <i className="fas fa-calendar-check me-1"></i> Attendance
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Statistics Card - Batch Freeze Only */}
-            <div className="row mb-4">
-                <div className="col-md-12">
-                    <div className="card bg-warning text-white border-0 shadow-sm">
-                        <div className="card-body">
-                            <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h2 className="card-title mb-1">
-                                        <i className="fas fa-snowflake me-2"></i>
-                                        Batch Freeze Students
-                                    </h2>
-                                    <p className="card-text mb-0 opacity-75">
-                                        Students with frozen batch status in {batchName}
-                                    </p>
-                                </div>
-                                <div className="text-end">
-                                    <h1 className="display-3 mb-0 fw-bold">{batchFreezeCount}</h1>
-                                    <p className="mb-0 small">Total Students</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="input-group">
-                        <span className="input-group-text">
-                            <i className="fas fa-search"></i>
-                        </span>
-                        <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Search students by name, email, phone..."
-                            value={searchQuery}
-                        // onChange={handleSearch}
-                        />
-                        {searchQuery && (
-                            <button
-                                className="btn btn-outline-secondary"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setCurrentPage(1);
-                                }}
-                            >
-                                <i className="fas fa-times"></i>
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Students Table */}
-            <div className="card border-0 shadow-sm">
-                <div className="card-body p-0">
-                    {allProfiles.length === 0 ? (
-                        <div className="text-center py-5">
-                            <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
-                            <h4 className="text-muted">No students found</h4>
-                            <p className="text-muted">
-                                {searchQuery
-                                    ? 'Try adjusting your search criteria'
-                                    : 'No students have been enrolled in this batch yet'
-                                }
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="table-responsive">
-                            <table className="table table-hover mb-0">
-                                <thead className="bg-light">
-                                    <tr>
-                                        <th>S.No</th>
-                                        <th>Student Name</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Course</th>
-                                        <th>Center</th>
-                                        <th>Registered Date</th>
-                                        <th>Today's Attendance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {allProfiles.map((profile, index) => (
-                                        <tr key={profile._id}>
-                                            <td className="align-middle">
-                                                {(currentPage - 1) * 50 + index + 1}
-                                            </td>
-                                            <td className="align-middle">
-                                                <div className="d-flex align-items-center">
-                                                    <div className="avatar-circle me-2">
-                                                        {profile._candidate?.name ? (
-                                                            profile._candidate.name.charAt(0).toUpperCase()
-                                                        ) : 'N'}
-                                                    </div>
-                                                    <div>
-                                                        <div className="fw-bold">
-                                                            {profile._candidate?.name || 'N/A'}
-                                                        </div>
-                                                        {profile._candidate?.fatherName && (
-                                                            <small className="text-muted">
-                                                                S/O: {profile._candidate.fatherName}
-                                                            </small>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="align-middle">
-                                                {profile._candidate?.email || 'N/A'}
-                                            </td>
-                                            <td className="align-middle">
-                                                {profile._candidate?.mobile || 'N/A'}
-                                            </td>
-                                            <td className="align-middle">
-                                                {profile._course?.name || 'N/A'}
-                                            </td>
-                                            <td className="align-middle">
-                                                {profile._center?.name || 'N/A'}
-                                            </td>
-                                            <td className="align-middle">
-                                                {formatDate(profile.createdAt)}
-                                            </td>
-                                            <td className="align-middle">
-                                                <div className="d-flex gap-1 mb-1">
-                                                    <button
-                                                        className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-secondary'}`}
-                                                        // onClick={() => markAttendance(profile._id, 'Present')}
-                                                        title="Mark Present"
-                                                    >
-                                                        P
-                                                    </button>
-                                                    <button
-                                                        className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
-                                                        //  onClick={() => markAttendance(profile._id, 'Absent')}
-                                                        title="Mark Absent"
-                                                    >
-                                                        A
-                                                    </button>
-                                                </div>
-                                                <small className="text-muted">
-                                                    Status: {getAttendanceStatus(profile._id).symbol}
-                                                </small>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="row mt-4">
-                    <div className="col-12">
-                        <nav>
-                            <ul className="pagination justify-content-center">
-                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button
-                                        className="page-link"
-                                        onClick={() => setCurrentPage(currentPage - 1)}
-                                        disabled={currentPage === 1}
-                                    >
-                                        <i className="fas fa-chevron-left"></i> Previous
-                                    </button>
-                                </li>
-
-                                {[...Array(totalPages)].map((_, i) => {
-                                    const pageNum = i + 1;
-                                    // Show first page, last page, current page, and pages around current
-                                    if (
-                                        pageNum === 1 ||
-                                        pageNum === totalPages ||
-                                        (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
-                                    ) {
-                                        return (
-                                            <li
-                                                key={pageNum}
-                                                className={`page-item ${currentPage === pageNum ? 'active' : ''}`}
-                                            >
-                                                <button
-                                                    className="page-link"
-                                                    onClick={() => setCurrentPage(pageNum)}
-                                                >
-                                                    {pageNum}
-                                                </button>
-                                            </li>
-                                        );
-                                    } else if (
-                                        pageNum === currentPage - 3 ||
-                                        pageNum === currentPage + 3
-                                    ) {
-                                        return (
-                                            <li key={pageNum} className="page-item disabled">
-                                                <span className="page-link">...</span>
-                                            </li>
-                                        );
-                                    }
-                                    return null;
-                                })}
-
-                                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                                    <button
-                                        className="page-link"
-                                        onClick={() => setCurrentPage(currentPage + 1)}
-                                        disabled={currentPage === totalPages}
-                                    >
-                                        Next <i className="fas fa-chevron-right"></i>
-                                    </button>
-                                </li>
-                            </ul>
-                        </nav>
-                        <p className="text-center text-muted">
-                            Page {currentPage} of {totalPages} | Showing {allProfiles.length} students
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            <style>
-                {
-                    `
-
-.nav-tabs {
-    border-bottom: 2px solid #dee2e6;
-}
-
-.nav-tabs .nav-link {
-    color: #6c757d;
-    border: none;
-    border-bottom: 3px solid transparent;
-    padding: 0.75rem 1.5rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.nav-tabs .nav-link:hover {
-    color: #0d6efd;
-    border-color: transparent;
-    background-color: rgba(13, 110, 253, 0.1);
-}
-
-.nav-tabs .nav-link.active {
-    color: #0d6efd;
-    background-color: transparent;
-    border-color: transparent transparent #0d6efd;
-    font-weight: 600;
-}
-
-.table thead th {
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
-    color: #6c757d;
-    border-bottom: 2px solid #dee2e6;
-    padding: 1rem;
-}
-
-.table tbody td {
-    padding: 1rem;
-    vertical-align: middle;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(13, 110, 253, 0.05);
-    cursor: pointer;
-}
-
-.avatar-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 1.1rem;
-    flex-shrink: 0;
-}
-
-.card {
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-}
-
-.btn-group-sm .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-
-.input-group-text {
-    background-color: #f8f9fa;
-    border-right: none;
-}
-
-.input-group .form-control {
-    border-left: none;
-}
-
-.input-group .form-control:focus {
-    border-color: #ced4da;
-    box-shadow: none;
-}
-
-.badge {
-    padding: 0.35rem 0.65rem;
-    font-weight: 500;
-    font-size: 0.75rem;
-}
-
-.pagination {
-    margin-bottom: 0;
-}
-
-.page-link {
-    color: #6c757d;
-    border: 1px solid #dee2e6;
-    margin: 0 2px;
-    border-radius: 4px;
-}
-
-.page-link:hover {
-    color: #0d6efd;
-    background-color: rgba(13, 110, 253, 0.1);
-    border-color: #0d6efd;
-}
-
-.page-item.active .page-link {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-.page-item.disabled .page-link {
-    color: #adb5bd;
-    background-color: #fff;
-    border-color: #dee2e6;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .table {
-        font-size: 0.875rem;
-    }
-    
-    .avatar-circle {
-        width: 32px;
-        height: 32px;
-        font-size: 0.9rem;
-    }
-    
-    .nav-tabs .nav-link {
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-}
-
-/* Loading spinner animation */
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.spinner-border {
-    animation: spin 1s linear infinite;
-}
-
-
-                    `
-                }
-            </style>
-            {/* Attendance Management Modal */}
-            {showAttendanceModal && (
-                <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <div className="modal-dialog modal-xl">
-                        <div className="modal-content">
-                            <div className="modal-header">
-                                <h5 className="modal-title">
-                                    <i className="fas fa-calendar-check me-2"></i>
-                                    Attendance Management - {batchName}
-                                </h5>
-                                <button
-                                    type="button"
-                                    className="btn-close"
-                                    onClick={() => setShowAttendanceModal(false)}
-                                ></button>
-                            </div>
-                            <div className="modal-body">
-                                {loadingAttendance ? (
-                                    <div className="text-center py-4">
-                                        <div className="spinner-border text-primary" role="status">
-                                            <span className="visually-hidden">Loading attendance...</span>
-                                        </div>
-                                        <p className="mt-2">Loading attendance data...</p>
-                                    </div>
-                                ) : (
-                                    <div className="table-responsive">
-                                        <table className="table table-striped">
-                                            <thead className="bg-primary text-white">
-                                                <tr>
-                                                    <th>S.No</th>
-                                                    <th>Student Name</th>
-                                                    <th>Email</th>
-                                                    <th>Phone</th>
-                                                    <th>Today's Date</th>
-                                                    <th>Attendance Status</th>
-                                                    <th>Mark Attendance</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {allProfiles.map((profile, index) => (
-                                                    <tr key={profile._id}>
-                                                        <td>{index + 1}</td>
-                                                        <td>
-                                                            <div className="d-flex align-items-center">
-                                                                <div className="avatar-circle me-2">
-                                                                    {profile._candidate?.name ? (
-                                                                        profile._candidate.name.charAt(0).toUpperCase()
-                                                                    ) : 'N'}
-                                                                </div>
-                                                                <div>
-                                                                    <div className="fw-bold">
-                                                                        {profile._candidate?.name || 'N/A'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td>{profile._candidate?.email || 'N/A'}</td>
-                                                        <td>{profile._candidate?.mobile || 'N/A'}</td>
-                                                        <td>{new Date().toLocaleDateString()}</td>
-                                                        <td>
-                                                            <span className={`badge ${getAttendanceStatus(profile._id).class === 'present' ? 'bg-success' : getAttendanceStatus(profile._id).class === 'absent' ? 'bg-danger' : 'bg-secondary'}`}>
-                                                                {getAttendanceStatus(profile._id).symbol}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <div className="d-flex gap-2">
-                                                                <button
-                                                                    className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'present' ? 'btn-success' : 'btn-outline-success'}`}
-                                                                    onClick={() => markAttendance(profile._id, 'Present')}
-                                                                >
-                                                                    <i className="fas fa-check me-1"></i>Present
-                                                                </button>
-                                                                <button
-                                                                    className={`btn btn-sm ${getAttendanceStatus(profile._id).class === 'absent' ? 'btn-danger' : 'btn-outline-danger'}`}
-                                                                    onClick={() => markAttendance(profile._id, 'Absent')}
-                                                                >
-                                                                    <i className="fas fa-times me-1"></i>Absent
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="modal-footer">
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowAttendanceModal(false)}
-                                >
-                                    Close
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={fetchAttendanceData}
-                                >
-                                    <i className="fas fa-sync-alt me-1"></i>Refresh
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showDailyDiaryModal && (
-          
-                <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <div className="modal-dialog modal-lg modal-dialog-scrollable">
-                        <div className="modal-content">
-                            <div className="modal-header bg-primary text-white">
-                                <h5 className="modal-title">
-                                    Daily Diary - {batchName}
-                                </h5>
-                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowDailyDiaryModal(false)}></button>
-                            </div>
-
-                            <div className="modal-body p-4">
-                                {/* Send To Section */}
-                                <div className="mb-4 p-3 border rounded bg-light">
-                                    <label className="form-label fw-bold d-flex align-items-center">
-                                        Send To
-                                    </label>
-                                    <div className="d-flex gap-3 mb-3">
-                                        <div className="form-check">
-                                            <input
-                                                className="form-check-input"
-                                                type="radio"
-                                                name="sendTo"
-                                                id="sendAll"
-                                                checked={sendTo === "all"}
-                                                onChange={() => setSendTo("all")}
-                                            />
-                                            <label className="form-check-label" htmlFor="sendAll">
-                                                All Students
-                                            </label>
-                                        </div>
-                                        <div className="form-check">
-                                            <input
-                                                className="form-check-input"
-                                                type="radio"
-                                                name="sendTo"
-                                                id="sendIndividual"
-                                                checked={sendTo === "individual"}
-                                                onChange={() => setSendTo("individual")}
-                                            />
-                                            <label className="form-check-label" htmlFor="sendIndividual">
-                                                Individual Students
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {sendTo === "individual" && (
-                                        <div className="mt-3">
-                                            <label className="form-label small text-muted">Select Students:</label>
-                                            <div className="d-flex flex-wrap gap-2">
-                                                {allProfiles.map(profile => (
-                                                    <div
-                                                        key={profile._id}
-                                                        className={`badge p-2 cursor-pointer ${selectedStudents.includes(profile._id) ? 'bg-primary' : 'bg-secondary'}`}
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={() => handleStudentToggle(profile._id)}
-                                                    >
-                                                        {profile._candidate?.name || 'N/A'}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mb-4">
-                                    <label className="form-label fw-bold d-flex align-items-center">
-                                        Assignment Detail
-                                    </label>
-                                    <textarea
-                                        className="form-control"
-                                        rows="3"
-                                        placeholder="Enter assignment details here..."
-                                        value={assignmentDetail}
-                                        onChange={(e) => setAssignmentDetail(e.target.value)}
-                                    ></textarea>
-                                </div>
-                                <div className="mb-4">
-                                    <label className="form-label fw-bold d-flex align-items-center">
-                                        Study Material (PDF/Images/Videos) (Optional)
-                                    </label>
-                                    <div className="border rounded p-3 bg-light">
-                                        <input
-                                            type="file"
-                                            className="form-control mb-3"
-                                            multiple
-                                            accept=".pdf,image/*,video/*"
-                                            onChange={(e) => handleFileUpload('study', e)}
-                                        />
-                                        {studyMaterials.length > 0 && (
-                                            <div className="mt-2">
-                                                {studyMaterials.map((file, index) => (
-                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
-                                                        <span className="small">
-                                                            {file.type?.includes('pdf') ? <FileText size={16} className="text-danger me-2" /> : <Image size={16} className="text-primary me-2" />}
-                                                            {file.name}
-                                                        </span>
-                                                        <button
-                                                            className="btn btn-sm btn-outline-danger"
-                                                            onClick={() => removeFile('study', index)}
-                                                        >
-                                                            <Trash2 size={16} className="text-danger" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Project Videos Section */}
-                                <div className="mb-4">
-                                    <label className="form-label fw-bold d-flex align-items-center">
-                                        <Video size={18} className="me-2" />
-                                        Project Videos (Optional)
-                                    </label>
-                                    <div className="border rounded p-3 bg-light">
-                                        <input
-                                            type="file"
-                                            className="form-control mb-3"
-                                            multiple
-                                            accept="video/*"
-                                            onChange={(e) => handleFileUpload('video', e)}
-                                        />
-                                        {projectVideos.length > 0 && (
-                                            <div className="mt-2">
-                                                {projectVideos.map((file, index) => (
-                                                    <div key={index} className="d-flex align-items-center justify-content-between bg-white p-2 mb-2 rounded border">
-                                                        <span className="small">
-                                                            <Video size={16} className="text-success me-2" />
-                                                            {file.name}
-                                                        </span>
-                                                        <button
-                                                            className="btn btn-sm btn-outline-danger"
-                                                            onClick={() => removeFile('video', index)}
-                                                        >
-                                                            <Trash2 size={16} className="text-danger" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="alert alert-info small">
-                                    <i className="fas fa-info-circle me-2"></i>
-                                    All fields are optional. Fill only what you want to share with students.
-                                </div>
-                            </div>
-
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowDailyDiaryModal(false)}>
-                                    <X size={18} className="me-1" />
-                                    Cancel
-                                </button>
-                                <button type="button" className="btn btn-primary" onClick={handleSend}>
-                                    <Send size={18} className="me-1" />
-                                    Send Daily Diary
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+  const handleQuestionChange = (id, value) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, question: value } : q))
     );
+  };
+
+  const handleOptionChange = (questionId, optionIndex, value) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        const next = [...q.options];
+        next[optionIndex] = value;
+        return { ...q, options: next };
+      })
+    );
+  };
+
+  const handleCorrectIndexChange = (questionId, index) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, correctIndex: index } : q))
+    );
+  };
+
+  const handleMarksChange = (questionId, value) => {
+    const n = Number(value);
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, marks: isNaN(n) ? 0 : n } : q))
+    );
+  };
+
+  const addQuestion = () => {
+    setQuestions((prev) => [
+      ...prev,
+      {
+        id: prev.length ? Math.max(...prev.map((x) => x.id)) + 1 : 1,
+        question: '',
+        options: ['', '', '', ''],
+        correctIndex: null,
+        marks: 5,
+      },
+    ]);
+  };
+
+  const removeQuestion = (id) => {
+    setQuestions((prev) => prev.filter((q) => q.id !== id));
+  };
+
+  const handleSave = () => {
+    if (!canSave) {
+      alert(
+        'Please fix errors before saving.\n- Make sure all fields are filled\n- Sum of marks = 100\n- Select correct answer for each question'
+      );
+      return;
+    }
+    const payload = {
+      meta: {
+        title: meta.title.trim(),
+        durationMins: Number(meta.durationMins),
+        passPercent: Number(meta.passPercent),
+        totalMarks: Number(meta.totalMarks),
+        negativeMarkPerWrong: Number(meta.negativeMarkPerWrong || 0),
+      },
+      questions,
+    };
+    localStorage.setItem('assignment:v1', JSON.stringify(payload));
+    alert('Assignment saved successfully!');
+  };
+
+  return (
+    <div className="create-assignment-container">
+      <div className="create-assignment-card">
+        <h1 className="create-title">Create Assignment</h1>
+
+       
+        <div className="meta-grid">
+          <div className="meta-field">
+            <label>Title</label>
+            <input
+              type="text"
+              value={meta.title}
+              onChange={(e) => setMeta({ ...meta, title: e.target.value })}
+              placeholder="e.g., Week 1 Quiz"
+            />
+          </div>
+          <div className="meta-field">
+            <label>Duration (mins)</label>
+            <input
+              type="number"
+              min={1}
+              value={meta.durationMins}
+              onChange={(e) => setMeta({ ...meta, durationMins: e.target.value })}
+            />
+          </div>
+          <div className="meta-field">
+            <label>Pass %</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={meta.passPercent}
+              onChange={(e) => setMeta({ ...meta, passPercent: e.target.value })}
+            />
+          </div>
+          <div className="meta-field">
+            <label>Total Marks</label>
+            <input type="number" value={meta.totalMarks} disabled />
+          </div>
+          <div className="meta-field">
+            <label>Negative Mark per wrong (optional)</label>
+            <input
+              type="number"
+              step="0.25"
+              min={0}
+              value={meta.negativeMarkPerWrong}
+              onChange={(e) =>
+                setMeta({ ...meta, negativeMarkPerWrong: e.target.value })
+              }
+            />
+          </div>
+        </div>
+
+        {/* Total allocated status */}
+        <div
+          className={`total-allocated ${totalAllocated === meta.totalMarks ? 'ok' : 'bad'}`}
+        >
+          Allocated Marks: <strong>{totalAllocated}</strong> / {meta.totalMarks}
+          {totalAllocated !== meta.totalMarks && (
+            <span className="warn">
+              <AlertTriangle size={16} /> Sum must be exactly {meta.totalMarks}
+            </span>
+          )}
+        </div>
+
+        {questions.map((q, questionIndex) => (
+          <div key={q.id} className="question-form">
+            <div className="question-header">
+              <h3>Question {questionIndex + 1}</h3>
+              <div className="marks-wrap">
+                <label>Marks</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={q.marks}
+                  onChange={(e) => handleMarksChange(q.id, e.target.value)}
+                  className="marks-input"
+                />
+              </div>
+              {questions.length > 1 && (
+                <button className="remove-btn" onClick={() => removeQuestion(q.id)}>
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+
+            <div className="form-group">
+              <input
+                type="text"
+                placeholder="Enter your question"
+                value={q.question}
+                onChange={(e) => handleQuestionChange(q.id, e.target.value)}
+                className="question-input"
+              />
+            </div>
+
+            <div className="options-group">
+              {q.options.map((option, optionIndex) => (
+                <div key={optionIndex} className="option-input-group">
+                  <input
+                    type="text"
+                    placeholder={`Option ${optionIndex + 1}`}
+                    value={option}
+                    onChange={(e) =>
+                      handleOptionChange(q.id, optionIndex, e.target.value)
+                    }
+                    className="option-input"
+                  />
+                  <label className="correct-flag">
+                    <input
+                      type="radio"
+                      name={`correct-${q.id}`}
+                      checked={q.correctIndex === optionIndex}
+                      onChange={() => handleCorrectIndexChange(q.id, optionIndex)}
+                      className="correct-radio"
+                    />
+                    Correct
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="buttons-container">
+          <button className="add-question-btn" onClick={addQuestion}>
+            <Plus size={20} />
+            Add Question
+          </button>
+          <button className="save-btn" onClick={handleSave} disabled={!canSave}>
+            <Save size={20} />
+            Save Assignment
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        .create-assignment-container {
+          padding: 2rem;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .create-assignment-card {
+          background-color: white;
+          border-radius: 12px;
+          padding: 2rem;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .create-title {
+          color: #333;
+          font-size: 2rem;
+          margin-bottom: 1.25rem;
+          padding-bottom: 1rem;
+          border-bottom: 2px solid #eee;
+        }
+        .meta-grid{
+          display:grid;
+          grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+          gap:1rem;
+          margin-bottom: 1rem;
+        }
+        .meta-field{
+          display:flex; flex-direction:column; gap:.5rem;
+        }
+        .meta-field label{ font-size:.9rem; color:#4a5568;}
+        .meta-field input{
+          padding:.6rem .75rem; border:1px solid #e2e8f0; border-radius:6px;
+        }
+        .total-allocated{
+          display:flex; align-items:center; gap:.75rem;
+          padding:.6rem .9rem; border-radius:8px; margin: .5rem 0 1rem;
+          font-size:.95rem;
+        }
+        .total-allocated.ok{ background:#f0fff4; color:#22543d; border:1px solid #c6f6d5;}
+        .total-allocated.bad{ background:#fff5f5; color:#742a2a; border:1px solid #fed7d7;}
+        .total-allocated .warn{ display:inline-flex; align-items:center; gap:.4rem; margin-left:.5rem;}
+        .question-form {
+          background-color: #f8f9fa;
+          border-radius: 8px;
+          padding: 1.25rem;
+          margin-bottom: 1rem;
+          border:1px solid #edf2f7;
+        }
+        .question-header {
+          display: grid;
+          grid-template-columns: 1fr auto auto;
+          align-items: center;
+          gap: .75rem;
+          margin-bottom: 1rem;
+        }
+        .marks-wrap{ display:flex; align-items:center; gap:.5rem;}
+        .marks-wrap label{ font-size:.9rem; color:#4a5568;}
+        .marks-input{
+          width:90px; padding:.5rem .6rem; border:1px solid #e2e8f0; border-radius:6px;
+        }
+        .remove-btn {
+          background: none; border: none; color: #e53e3e; cursor: pointer; padding: 0.5rem; border-radius: 4px;
+        }
+        .remove-btn:hover { background-color: #fff5f5; }
+        .form-group { margin-bottom: 1rem; }
+        .question-input, .option-input {
+          width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 1rem;
+        }
+        .options-group { display: flex; flex-direction: column; gap: .75rem; }
+        .option-input-group { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .75rem; }
+        .correct-flag{ display:flex; align-items:center; gap:.4rem; color:#2b6cb0; }
+        .correct-radio { width: 18px; height: 18px; cursor: pointer; }
+        .buttons-container { display: flex; justify-content: space-between; margin-top: 1.25rem; }
+        .add-question-btn, .save-btn {
+          display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.2rem;
+          border-radius: 6px; font-size: 1rem; cursor: pointer; transition: all 0.2s; border: none;
+        }
+        .add-question-btn { background-color: #48bb78; color: white; }
+        .add-question-btn:hover { background-color: #38a169; }
+        .save-btn { background-color: #4299e1; color: white; }
+        .save-btn:disabled { background:#a0aec0; cursor:not-allowed; }
+        .save-btn:not(:disabled):hover { background-color: #3182ce; }
+        @media (max-width: 768px) {
+          .create-assignment-container { padding: 1rem; }
+          .create-assignment-card { padding: 1rem; }
+          .buttons-container { flex-direction: column; gap: 1rem; }
+          .add-question-btn, .save-btn { width: 100%; justify-content: center; }
+        }
+      `}</style>
+    </div>
+  );
 }
 
-export default Students;
+export default CreateAssignment;

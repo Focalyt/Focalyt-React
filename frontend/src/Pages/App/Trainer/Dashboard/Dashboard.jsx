@@ -13,12 +13,29 @@ const MultiSelectCheckbox = ({
     isOpen,
     onToggle
 }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
     const handleCheckboxChange = (value) => {
         const newValues = selectedValues.includes(value)
             ? selectedValues.filter(v => v !== value)
             : [...selectedValues, value];
         onChange(newValues);
     };
+
+    const filteredOptions = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return options;
+        }
+        return options.filter(option =>
+            option.label.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [options, searchTerm]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSearchTerm('');
+        }
+    }, [isOpen]);
 
     // Get display text for selected items
     const getDisplayText = () => {
@@ -63,7 +80,6 @@ const MultiSelectCheckbox = ({
 
                 {isOpen && (
                     <div className="multi-select-options-new">
-                        {/* Search functionality (optional) */}
                         <div className="options-search">
                             <div className="input-group input-group-sm">
                                 <span className="input-group-text" style={{ height: '40px' }}>
@@ -73,14 +89,29 @@ const MultiSelectCheckbox = ({
                                     type="text"
                                     className="form-control"
                                     placeholder={`Search ${title.toLowerCase()}...`}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
                                 />
+                                {searchTerm && (
+                                    <button
+                                        className="btn btn-sm btn-outline-secondary"
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchTerm('');
+                                        }}
+                                        style={{ borderLeft: 'none' }}
+                                    >
+                                        <i className="fas fa-times"></i>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
                         {/* Options List */}
                         <div className="options-list-new">
-                            {options.map((option) => (
+                            {filteredOptions.map((option) => (
                                 <label key={option.value} className="option-item-new">
                                     <input
                                         type="checkbox"
@@ -96,22 +127,36 @@ const MultiSelectCheckbox = ({
                                 </label>
                             ))}
 
-                            {options.length === 0 && (
+                            {filteredOptions.length === 0 && (
                                 <div className="no-options">
-                                    <i className="fas fa-info-circle me-2"></i>
-                                    No {title.toLowerCase()} available
+                                    <i className="fas fa-search me-2"></i>
+                                    {searchTerm ? `No results found for "${searchTerm}"` : `No ${title.toLowerCase()} available`}
                                 </div>
                             )}
                         </div>
 
                         {/* Footer with count */}
-                        {selectedValues.length > 0 && (
-                            <div className="options-footer">
-                                <small className="text-muted">
-                                    {selectedValues.length} of {options.length} selected
-                                </small>
-                            </div>
-                        )}
+                        <div className="options-footer">
+                            <small className="text-muted">
+                                {selectedValues.length > 0 && (
+                                    <span className="me-2">
+                                        <i className="fas fa-check-circle text-success me-1"></i>
+                                        {selectedValues.length} selected
+                                    </span>
+                                )}
+                                {searchTerm && (
+                                    <span>
+                                        <i className="fas fa-filter me-1"></i>
+                                        {filteredOptions.length} of {options.length} shown
+                                    </span>
+                                )}
+                                {!searchTerm && selectedValues.length === 0 && (
+                                    <span>
+                                        {options.length} total items
+                                    </span>
+                                )}
+                            </small>
+                        </div>
                     </div>
                 )}
             </div>
@@ -1025,7 +1070,7 @@ function Dashboard() {
                         </div>
                         <div className="card-body">
                             {filteredStudents.length > 0 ? (
-                            <div className="table-responsive">
+                            <div className="table-responsive recent-students-table">
                                 <table className="table table-hover">
                                     <thead className="table-light">
                                         <tr>
@@ -1176,17 +1221,36 @@ function Dashboard() {
                                              data={[
                                                  { name: 'Active Batches', value: filteredBatchWiseData.filter(b => b.status === 'active').length },
                                                  { name: 'Inactive Batches', value: filteredBatchWiseData.filter(b => b.status !== 'active').length }
-                                             ]}
+                                             ].sort((a, b) => a.name.localeCompare(b.name))}
                                              dataKey="value"
                                              nameKey="name"
                                              cx="50%"
-                                             cy="50%"
-                                             outerRadius={100}
-                                             innerRadius={30}
-                                             label={({ name, value, percent }) => 
-                                                 `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
-                                             }
-                                             labelLine={false}
+                                             cy="45%"
+                                             outerRadius={80}
+                                             innerRadius={40}
+                                             label={({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) => {
+                                                 const RADIAN = Math.PI / 180;
+                                                 const radius = outerRadius + 25;
+                                                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                                 
+                                                 return (
+                                                     <text 
+                                                         x={x} 
+                                                         y={y} 
+                                                         fill="#333" 
+                                                         textAnchor={x > cx ? 'start' : 'end'} 
+                                                         dominantBaseline="central"
+                                                         style={{ fontSize: '13px', fontWeight: '600' }}
+                                                     >
+                                                         {`${value} (${((value / filteredBatchWiseData.length) * 100).toFixed(1)}%)`}
+                                                     </text>
+                                                 );
+                                             }}
+                                             labelLine={{
+                                                 stroke: '#999',
+                                                 strokeWidth: 1
+                                             }}
                                          >
                                              <Cell fill="#28a745" />
                                              <Cell fill="#dc3545" />
@@ -1201,12 +1265,14 @@ function Dashboard() {
                                          />
                                          <Legend 
                                              verticalAlign="bottom" 
-                                             height={36}
+                                             height={50}
                                              formatter={(value, entry) => (
-                                                 <span style={{ color: entry.color, fontSize: '12px' }}>
+                                                 <span style={{ fontSize: '13px', fontWeight: '500' }}>
                                                      {value}
                                                  </span>
                                              )}
+                                             iconSize={12}
+                                             iconType="circle"
                                          />
                                      </PieChart>
                                  </ResponsiveContainer>
@@ -1372,6 +1438,33 @@ function Dashboard() {
                     border-bottom: 1px solid #e9ecef;
                 }
 
+                .options-search .input-group-text {
+                    background-color: #f8f9fa;
+                    border-right: none;
+                }
+
+                .options-search .form-control {
+                    border-left: none;
+                    border-right: none;
+                }
+
+                .options-search .form-control:focus {
+                    box-shadow: none;
+                    border-color: #dee2e6;
+                }
+
+                .options-search .btn {
+                    padding: 0.25rem 0.5rem;
+                    border-top-left-radius: 0;
+                    border-bottom-left-radius: 0;
+                }
+
+                .options-search .btn:hover {
+                    background-color: #dc3545;
+                    border-color: #dc3545;
+                    color: white;
+                }
+
                 .options-list-new {
                     overflow-y: auto;
                     max-height: 200px;
@@ -1406,6 +1499,43 @@ function Dashboard() {
                     text-align: center;
                     color: #6c757d;
                     font-size: 0.875rem;
+                }
+
+                /* Recent Students Table - Fixed Height with Scroll */
+                .recent-students-table {
+                    max-height: 400px;
+                    overflow-y: auto;
+                    display: block;
+                }
+
+                .recent-students-table table {
+                    width: 100%;
+                    display: table;
+                }
+
+                .recent-students-table thead {
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    background-color: #f8f9fa;
+                }
+
+                .recent-students-table::-webkit-scrollbar {
+                    width: 8px;
+                }
+
+                .recent-students-table::-webkit-scrollbar-track {
+                    background: #f1f1f1;
+                    border-radius: 10px;
+                }
+
+                .recent-students-table::-webkit-scrollbar-thumb {
+                    background: #888;
+                    border-radius: 10px;
+                }
+
+                .recent-students-table::-webkit-scrollbar-thumb:hover {
+                    background: #555;
                 }
             `}</style>
         </div>

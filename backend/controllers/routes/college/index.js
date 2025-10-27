@@ -12330,6 +12330,32 @@ router.post('/assigntrainerstobatch', isCollege, async (req, res) => {
 
 })
 
+router.get('/centers', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const collegeId = req.college._id;
+		const trainerId = user._id;
+		const courses = await Courses.find({
+			college: collegeId,
+			trainers: trainerId
+		}).populate('center', 'name address')
+		.populate('centerId', 'name address');
+		
+		return res.status(200).json({
+			status: true,
+			message: 'Centers fetched successfully',
+			data: courses
+		});
+	}
+	catch (err) {
+		console.log(err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching centers'
+		});
+	}
+})
+
 router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 	try {
 		const { courseId } = req.query;
@@ -12367,29 +12393,38 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		}
 
 
-		const courses = await Courses.find({
-			college: collegeId,
-			trainers: trainerId
-		}).select('name description image trainers');
+	const courses = await Courses.find({
+		college: collegeId,
+		trainers: trainerId
+	})
+	.select('name description image trainers center centerId')
+	.populate('center', 'name address')
+	.populate('centerId', 'name address');
 
-		const trainer = await User.findOne({
-			_id: trainerId,
-			role: 4
-		}).select('name email mobile _id');
+	const trainer = await User.findOne({
+		_id: trainerId,
+		role: 4
+	}).select('name email mobile _id');
 
-		if (!trainer) {
-			return res.status(404).json({
-				status: false,
-				message: 'Trainer not found'
-			});
-		}
+	if (!trainer) {
+		return res.status(404).json({
+			status: false,
+			message: 'Trainer not found'
+		});
+	}
 
-		const assignedCourses = courses.map(course => ({
+	const assignedCourses = courses.map(course => {
+		// Get center info - prefer centerId, fallback to first center in array
+		const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+		
+		return {
 			_id: course._id,
 			name: course.name,
 			image: course.image,
-			description: course.description
-		}));
+			description: course.description,
+			center: centerInfo
+		};
+	});
 
 		const trainerWithCourses = {
 			_id: trainer._id,
@@ -12971,33 +13006,105 @@ router.get('/getCurriculum', isTrainer, async (req, res) => {
 router.post('/addDailyDiary', isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
-		const { batch, course, sendTo, selectedStudents, assignmentDetail, studyMaterials, projectVideos } = req.body;
-		console.log("req.body", req.body)
+		const { batch, course, sendTo, assignmentDetail } = req.body;
+		
+		let selectedStudents = [];
+		if (req.body.selectedStudents) {
+			try {
+				selectedStudents = JSON.parse(req.body.selectedStudents);
+			} catch (e) {
+				selectedStudents = [];
+			}
+		}
 
-		if (!batch || !course || !assignmentDetail) {
+		if (!batch || !course) {
 			return res.status(400).json({
 				status: false,
-				message: 'Missing required parameters: batch, course, assignmentDetail'
+				message: 'Missing required parameters: batch, course'
 			});
+		}
+
+		const uploadFileToS3 = async (file, folder) => {
+			const ext = file.name.split('.').pop().toLowerCase();
+			const key = `DailyDiary/${batch}/${folder}/${uuid()}.${ext}`;
+			
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: file.data,
+				ContentType: file.mimetype
+			};
+
+			await s3.upload(params).promise();
+			
+			return {
+				fileName: file.name,
+				fileType: file.mimetype,
+				fileUrl: `https://${bucketName}.s3.${region}.amazonaws.com/${key}`,
+				fileSize: file.size
+			};
+		};
+		const studyMaterials = [];
+		const projectVideos = [];
+
+		if (req.files && req.files.studyMaterials) {
+			const studyFiles = Array.isArray(req.files.studyMaterials) 
+				? req.files.studyMaterials 
+				: [req.files.studyMaterials];
+			
+			for (const file of studyFiles) {
+				const ext = file.name.split('.').pop().toLowerCase();
+				
+				if (!allowedExtensions.includes(ext)) {
+					return res.status(400).json({
+						status: false,
+						message: `Invalid file extension .${ext} for study material`
+					});
+				}
+
+				const uploadedFile = await uploadFileToS3(file, 'study-materials');
+				studyMaterials.push(uploadedFile);
+			}
+		}
+
+		if (req.files && req.files.projectVideos) {
+			const videoFiles = Array.isArray(req.files.projectVideos) 
+				? req.files.projectVideos 
+				: [req.files.projectVideos];
+			
+			for (const file of videoFiles) {
+				const ext = file.name.split('.').pop().toLowerCase();
+				
+				if (!allowedVideoExtensions.includes(ext)) {
+					return res.status(400).json({
+						status: false,
+						message: `Invalid video extension .${ext}. Only ${allowedVideoExtensions.join(', ')} are allowed`
+					});
+				}
+
+				const uploadedFile = await uploadFileToS3(file, 'project-videos');
+				projectVideos.push(uploadedFile);
+			}
 		}
 
 		const dailyDiary = new DailyDiary({
 			batch: batch,
 			course: course,
-			sendTo,
-			selectedStudents,
-			assignmentDetail,
+			sendTo: sendTo || 'all',
+			selectedStudents: sendTo === 'individual' ? selectedStudents : [],
+			assignmentDetail: assignmentDetail || '',
 			studyMaterials,
 			projectVideos,
 			createdBy: user._id
-		})
-		console.log(dailyDiary, 'dailyDiary')
-		// await dailyDiary.save();
-		// return res.status(200).json({
-		// 	status: true,
-		// 	message: 'Daily diary added successfully',
-		// 	data: dailyDiary
-		// });
+		});
+
+		await dailyDiary.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Daily diary added successfully',
+			data: dailyDiary
+		});
 		
 	} catch (error) {
 		console.error('Error adding daily diary:', error);
@@ -13007,7 +13114,6 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			error: error.message
 		});
 	}
-
 })
 
 router.post('/uploadmedia', isTrainer, async (req, res) => {

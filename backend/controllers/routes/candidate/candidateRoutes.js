@@ -59,7 +59,7 @@ const {
   Courses,
   AppliedCourses,
   CandidateProfile,
-  ReEnquire
+  ReEnquire, Curriculum
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -287,7 +287,7 @@ const getMetaParameters = (req) => {
 router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
   try {
     let { courseId } = req.params;
-    console.log("course appling")
+    // console.log("course appling")
     // Validate if it's a valid ObjectId before converting
     if (typeof courseId === "string" && mongoose.Types.ObjectId.isValid(courseId)) {
       courseId = new mongoose.Types.ObjectId(courseId); // Convert to ObjectId
@@ -492,7 +492,7 @@ router
   })
   .post(async (req, res) => {
     try {
-      console.log("Received data from frontend:", req.body); 
+      // console.log("Received data from frontend:", req.body); 
       let { value, error } = await CandidateValidators.register(req.body)
       if (error) {
         console.log('====== register error ', error, value)
@@ -565,7 +565,7 @@ router
         
       };
 
-      console.log("Candidate Data", candidateBody)
+      // console.log("Candidate Data", candidateBody)
       if (formData?.refCode && formData?.refCode !== '') {
         candidateBody["referredBy"] = formData?.refCode
       }
@@ -1232,7 +1232,7 @@ router.post("/document", [isCandidate], async (req, res) => {
       existingDocument.Signature = documentsData.Signature || existingDocument.Signature
 
       await existingDocument.save();
-      console.log("Document updated:", existingDocument);
+      // console.log("Document updated:", existingDocument);
     } else {
       const newDocument = new CandidateDoc({
         _candidate: candidate._id,
@@ -1256,7 +1256,7 @@ router.post("/document", [isCandidate], async (req, res) => {
       });
 
       await newDocument.save();
-      console.log("New document created:", newDocument);
+      // console.log("New document created:", newDocument);
     }
 
     // Fetch the updated documents for rendering
@@ -1460,6 +1460,9 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
             ? moment(assignedCourseData.assignDate).format('DD MMM YYYY')
             : "";
           course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
+          // Add batchId from assignedCourseData (field name is 'batch' in model)
+          course.batchId = assignedCourseData.batch || null;
+          console.log('Batch ID assigned to course:', course.batchId);
         }
       }
     }
@@ -1606,7 +1609,7 @@ router.get("/api/highestQualifications", async (req, res) => {
 
 router.get("/appliedCourses", [isCandidate], async (req, res) => {
   try {
-    console.log("API hitting");
+    // console.log("API hitting");
     const p = parseInt(req.query.page);
     const page = p || 1;
     const perPage = 10;
@@ -1723,7 +1726,7 @@ router.get("/dashboard", isCandidate, async (req, res) => {
         ],
       },
     ];
-    console.log("candidate verifying")
+    // console.log("candidate verifying")
 
     let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
@@ -2048,7 +2051,7 @@ router
       updatedFields["personalInfo.voiceIntro"] = Array.isArray(personalInfo.voiceIntro)
         ? personalInfo.voiceIntro
         : [personalInfo.voiceIntro];
-      console.log("📥 Voice Intro Received from Frontend:", personalInfo.voiceIntro);
+      // console.log("📥 Voice Intro Received from Frontend:", personalInfo.voiceIntro);
     }
 
 
@@ -2248,21 +2251,21 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
 
 
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
-    console.log("Already Applied")
+    // console.log("Already Applied")
     req.flash("error", "Already Applied");
     return res.send({ status: false, msg: "Already Applied" });
   } else {
-    console.log("Checking Applied")
+    // console.log("Checking Applied")
     let alreadyApplied = await AppliedJobs.findOne({
       _candidate: candidate._id,
       _job: vacancy._id,
     });
-    console.log("alreadyApplied checking", alreadyApplied)
+    // console.log("alreadyApplied checking", alreadyApplied)
     if (alreadyApplied) {
       req.flash("error", "Already Applied");
       return res.send({ status: false, msg: "Already Applied" });
     };
-    console.log("Appling job")
+    // console.log("Appling job")
     if (typeof jobId === 'string' && mongoose.Types.ObjectId.isValid(jobId)) {
       console.log('converting id')
       jobId = new mongoose.Types.ObjectId(jobId);
@@ -2735,7 +2738,7 @@ router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
         }
       }
     ]
-    console.log("Aggregation pipeline:", JSON.stringify(agg, null, 2));
+    // console.log("Aggregation pipeline:", JSON.stringify(agg, null, 2));
 
     const appliedJobs = await AppliedJobs.aggregate(agg);
     if (!appliedJobs || !appliedJobs.length || !appliedJobs[0].data) {
@@ -4123,7 +4126,7 @@ router.route('/reqDocs/:courseId')
       });
     }
 
-    console.log("mergedDocs", mergedDocs);
+    // console.log("mergedDocs", mergedDocs);
 
     res.json({
       docsRequired,
@@ -4605,8 +4608,108 @@ router.get("/applied-events", [isCandidate, authenti], async (req, res) => {
   }
 });
 
+router.get('/curriculum/:courseId', [isCandidate, authenti], async (req, res) => {
+  try {
+    const { courseId } = req.params; 
+    console.log('courseId:', courseId);
+    
+    if (!courseId) {
+      return res.status(400).json({ 
+        status: false, 
+        message: "courseId is required" 
+      });
+    }
+    
+    const curriculum = await Curriculum.find({ courseId });
+    console.log('curriculum found:', curriculum.length, 'items');
+    
+    return res.status(200).json(curriculum);
+  } catch (err) {
+    console.error("Error in /curriculum route:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
 
 
+router.get('/enrolledCourses', [isCandidate, authenti], async (req, res) => {
+  try {
+  
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    
+    if (error) {
+      console.log(error);
+      return res.send({ status: "failure", error: "Something went wrong!" });
+    }
 
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        status: false,
+        message: "Candidate not found"
+      });
+    }
+
+    const p = parseInt(req.query.page);
+    const page = p || 1;
+    const perPage = 10;
+
+    const appliedCourses = await AppliedCourses.find({
+      _candidate: candidate._id,
+      batch: { $exists: true, $ne: null },
+      isBatchAssigned: true
+    })
+      .populate({
+        path: '_course',
+        select: 'name code description registrationCharges courseFeeType'
+      })
+      .populate({
+        path: '_center',
+        select: 'name code address'
+      })
+      .populate({
+        path: 'batch',
+        select: 'name code startDate endDate mode status instructor maxStudents enrolledStudents'
+      })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage);
+
+    const count = await AppliedCourses.countDocuments({
+      _candidate: candidate._id,
+      batch: { $exists: true, $ne: null },
+      isBatchAssigned: true
+    });
+
+    const totalPages = Math.ceil(count / perPage);
+
+    return res.status(200).json({
+      status: true,
+      message: "Batch assigned students fetched successfully",
+      data: {
+        courses: appliedCourses,
+        pagination: {
+          page,
+          perPage,
+          totalPages,
+          totalCount: count
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error("Error in /batch-assigned-students route:", err);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: err.message
+    });
+  }
+});
 
 module.exports = router;

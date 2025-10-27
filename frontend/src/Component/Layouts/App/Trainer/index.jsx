@@ -26,9 +26,6 @@ function TrainerLayout({ children }){
     const navigate = useNavigate();
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-
-
-
     const [expanded, setExpanded] = useState(true);
     const [activeItem, setActiveItem] = useState('dashboard');
     const [openSubmenu, setOpenSubmenu] = useState({
@@ -186,8 +183,8 @@ function TrainerLayout({ children }){
                   transition: 'max-height 0.3s ease-in-out'
                 }}
               >
-                <li className={`nav-item ${location.pathname === '/trainer/mycourses' ? 'active' : ''}`}>
-                  <Link to="/trainer/mycourses" onClick={() => handleSidebarClose()}>
+                <li className={`nav-item ${location.pathname === '/trainer/center' ? 'active' : ''}`}>
+                  <Link to="/trainer/center" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faBookOpen} />
                     <span className="menu-title">My Courses</span>
                   </Link>
@@ -198,240 +195,10 @@ function TrainerLayout({ children }){
                     <span className="menu-title">Add Course Content</span>
                   </Link>
                 </li>
-                {/* <li className={`nav-item ${location.pathname === '/trainer/courses/materials' ? 'active' : ''}`}>
-                  <Link to="/trainer/studymaterial" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-file-text"></i>
-                    <span className="menu-title">Study Materials</span>
-                  </Link>
-                </li> */}
-                {/* <li className={`nav-item ${location.pathname === '/trainer/courses/schedule' ? 'active' : ''}`}>
-                  <Link to="/trainer/courses/schedule" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-calendar"></i>
-                    <span className="menu-title">Course Schedule</span>
-                  </Link>
-                </li> */}
+               
               </ul>
             </li>
-            
-            {/* <li className={`nav-item ${location.pathname === '/trainer/classes' ? 'active' : ''}`}>
-              <Link to="/trainer/classes" onClick={() => handleSidebarClose()}>
-                <i className="feather icon-video"></i>
-                <span className="menu-title">Classes & Sessions</span>
-              </Link>
-            </li> */}
-
-            
-            {/* <li className={`nav-item has-sub ${openSubmenu.attendance ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('attendance')}>
-                <i className="feather icon-check-square"></i>
-                <span className="menu-title">Attendance</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.attendance ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.attendance}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.attendance,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/attendance/mark' ? 'active' : ''}`}>
-                  <Link to="/trainer/attendance/mark" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-edit"></i>
-                    <span className="menu-title">Mark Attendance</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/attendance/reports' ? 'active' : ''}`}>
-                  <Link to="/trainer/attendance/reports" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-bar-chart"></i>
-                    <span className="menu-title">Attendance Reports</span>
-                  </Link>
-                </li>
-              </ul>
-            </li> */}
-
-           
-            {/* <li className={`nav-item has-sub ${openSubmenu.assignments ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('assignments')}>
-                <i className="feather icon-clipboard"></i>
-                <span className="menu-title">Assignments & Projects</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.assignments ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.assignments}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.assignments,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/assignments/create' ? 'active' : ''}`}>
-                  <Link to="/trainer/assignments/create" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-plus"></i>
-                    <span className="menu-title">Create Assignment</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/assignments/view' ? 'active' : ''}`}>
-                  <Link to="/trainer/assignments/view" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-eye"></i>
-                    <span className="menu-title">View Assignments</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/assignments/submissions' ? 'active' : ''}`}>
-                  <Link to="/trainer/assignments/submissions" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-upload"></i>
-                    <span className="menu-title">Submissions</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/assignments/grade' ? 'active' : ''}`}>
-                  <Link to="/trainer/assignments/grade" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-award"></i>
-                    <span className="menu-title">Grade Submissions</span>
-                  </Link>
-                </li>
-              </ul>
-            </li> */}
-
-            
-            {/* <li className={`nav-item has-sub ${openSubmenu.assessments ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('assessments')}>
-                <i className="feather icon-file-text"></i>
-                <span className="menu-title">Assessments & Tests</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.assessments ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.assessments}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.assessments,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/assessments/create' ? 'active' : ''}`}>
-                  <Link to="/trainer/assessments/create" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-plus-circle"></i>
-                    <span className="menu-title">Create Test</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/assessments/view' ? 'active' : ''}`}>
-                  <Link to="/trainer/assessments/view" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-list"></i>
-                    <span className="menu-title">View Tests</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/assessments/results' ? 'active' : ''}`}>
-                  <Link to="/trainer/assessments/results" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-bar-chart-2"></i>
-                    <span className="menu-title">Test Results</span>
-                  </Link>
-                </li>
-              </ul>
-            </li> */}
-
-           
-            {/* <li className={`nav-item has-sub ${openSubmenu.reports ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('reports')}>
-                <i className="feather icon-pie-chart"></i>
-                <span className="menu-title">Performance & Reports</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.reports ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.reports}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.reports,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/reports/student-performance' ? 'active' : ''}`}>
-                  <Link to="/trainer/reports/student-performance" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-activity"></i>
-                    <span className="menu-title">Student Performance</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/reports/course-completion' ? 'active' : ''}`}>
-                  <Link to="/trainer/reports/course-completion" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-check-circle"></i>
-                    <span className="menu-title">Course Completion</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/reports/analytics' ? 'active' : ''}`}>
-                  <Link to="/trainer/reports/analytics" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-trending-up"></i>
-                    <span className="menu-title">Analytics</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/reports/download' ? 'active' : ''}`}>
-                  <Link to="/trainer/reports/download" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-download"></i>
-                    <span className="menu-title">Download Reports</span>
-                  </Link>
-                </li>
-              </ul>
-            </li> */}
-
-
-            
-            {/* <li className={`nav-item has-sub ${openSubmenu.resources ? 'open' : ''}`}>
-              <a href="#" onClick={() => toggleSubmenu('resources')}>
-                <i className="feather icon-folder"></i>
-                <span className="menu-title">Resources & Library</span>
-                <span className="dropdown-arrow">
-                  <i className={`feather icon-chevron-right chevron-icon ${openSubmenu.resources ? 'rotate-90' : ''}`}></i>
-                </span>
-              </a>
-              <ul
-                ref={menuRefs.resources}
-                className="menu-content"
-                style={{
-                  maxHeight: submenuMaxHeight.resources,
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease-in-out'
-                }}
-              >
-                <li className={`nav-item ${location.pathname === '/trainer/resources/upload' ? 'active' : ''}`}>
-                  <Link to="/trainer/resources/upload" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-upload-cloud"></i>
-                    <span className="menu-title">Upload Materials</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/resources/videos' ? 'active' : ''}`}>
-                  <Link to="/trainer/resources/videos" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-video"></i>
-                    <span className="menu-title">Video Library</span>
-                  </Link>
-                </li>
-                <li className={`nav-item ${location.pathname === '/trainer/resources/documents' ? 'active' : ''}`}>
-                  <Link to="/trainer/resources/documents" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-file"></i>
-                    <span className="menu-title">Documents</span>
-                  </Link>
-                </li>
-              </ul>
-            </li> */}
-
-          
-            {/* <li className={`nav-item ${location.pathname === '/trainer/calendar' ? 'active' : ''}`}>
-              <Link to="/trainer/calendar" onClick={() => handleSidebarClose()}>
-                <i className="feather icon-calendar"></i>
-                <span className="menu-title">Schedule & Calendar</span>
-              </Link>
-            </li> */}
-
-
-           
+             
             <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
               <a href="#" onClick={() => toggleSubmenu('settings')}>
               <FontAwesomeIcon icon={faCogs} />
@@ -449,13 +216,7 @@ function TrainerLayout({ children }){
                   transition: 'max-height 0.3s ease-in-out'
                 }}
               >
-                <li className={`nav-item ${location.pathname === '/trainer/settings/notifications' ? 'active' : ''}`}>
-                  <Link to="/trainer/settings/notifications" onClick={() => handleSidebarClose()}>
-                    <i className="feather icon-bell"></i>
-                    <span className="menu-title">Notification Settings</span>
-                  </Link>
-                </li>
-              
+               
               </ul>
             </li>
 

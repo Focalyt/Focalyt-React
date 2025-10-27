@@ -81,9 +81,13 @@ function BatchMangement() {
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
                             <div className="d-flex align-items-center mb-2">
-                                <Link to="/trainer/mycourses" className="btn btn-sm btn-outline-secondary me-3">
+                                
+                                <button
+                                    onClick={() => navigate(-1)}
+                                    className="btn btn-sm btn-outline-secondary me-3"
+                                >
                                     <i className="feather icon-arrow-left me-1"></i> Back to Courses
-                                </Link>
+                                </button>
                                 <h2 className="mb-0">Batch Management</h2>
                             </div>
                             {courseInfo && (

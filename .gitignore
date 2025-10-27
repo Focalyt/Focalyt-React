@@ -56,6 +56,8 @@ frontend/.env
 /frontend/package-lock.json
 # /frontend/src/Component/Layouts/Front
 # /frontend/src/Pages/Front
+/frontend/src/Pages/App/Trainer/Vertical/Vertical.jsx
+/frontend/src/Pages/App/Trainer/Project/Project.jsx
 
 
 /frontend/src/Pages/App/College/Course/text.jsx
@@ -65,3 +67,4 @@ frontend/.env
 /frontend/src/Pages/App/College/Course/AdmissionList copy.jsx
 /frontend/src/Pages/App/College/Whatapp/WhatappWithWebSocket copy.jsx
 /frontend/src/Pages/App/Trainer/CourseManagement/AddCourseContent copy.jsx
+/frontend/src/Pages/App/Trainer/Assignment/Assignment copy.jsx

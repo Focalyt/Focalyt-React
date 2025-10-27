@@ -33,6 +33,10 @@ function TimeTable() {
     });
     const [uploadingFiles, setUploadingFiles] = useState(false);
 
+    // Media Viewer Modal States
+    const [showMediaViewer, setShowMediaViewer] = useState(false);
+    const [viewerMedia, setViewerMedia] = useState(null);
+
 
     // Form States
     const [chapterForm, setChapterForm] = useState({
@@ -604,6 +608,17 @@ function TimeTable() {
         }
     };
 
+    // Media Viewer Functions
+    const openMediaViewer = (media, type) => {
+        setViewerMedia({ ...media, type });
+        setShowMediaViewer(true);
+    };
+
+    const closeMediaViewer = () => {
+        setShowMediaViewer(false);
+        setViewerMedia(null);
+    };
+
 
     return (
         <div className="curriculum-container">
@@ -614,7 +629,6 @@ function TimeTable() {
                         <i className="fas fa-book me-2"></i>
                         Course Curriculum Manager
                     </h2>
-                    <p className="page-subtitle">Organize chapters, topics, and sub-topics like a book's table of contents</p>
                 </div>
             </div>
 
@@ -818,9 +832,7 @@ function TimeTable() {
                                                                             <i className="fas fa-image ml-1"></i> {topic.media?.images?.length || 0}
                                                                             <i className="fas fa-file-pdf ml-1"></i> {topic.media?.pdfs?.length || 0}
                                                                         </span>
-                                                                        {/* <span className="duration-badge small">
-                                                                            <i className="fas fa-clock"></i> {topic.duration}
-                                                                        </span> */}
+                                                                        
                                                                         <button
                                                                             className="btn-action btn-upload small"
                                                                             onClick={() => openMediaModal({
@@ -838,12 +850,7 @@ function TimeTable() {
 
                                                                 {expandedTopics.includes(topic.id) && (
                                                                     <div className="topic-content">
-                                                                        {/* {topic.description && (
-                                                                            <div className="topic-description">
-                                                                                {topic.description}
-                                                                            </div>
-                                                                        )} */}
-
+                                                                        
                                                                         {/* Show Uploaded Media */}
                                                                         {(topic.media?.videos?.length > 0 || topic.media?.images?.length > 0 || topic.media?.pdfs?.length > 0) && (
                                                                             <div className="media-preview-section">
@@ -863,7 +870,13 @@ function TimeTable() {
                                                                                         </div>
                                                                                     ))}
                                                                                     {topic.media.images?.map((image, idx) => (
-                                                                                        <div key={idx} className="media-item small image-container">
+                                                                                        <div 
+                                                                                            key={idx} 
+                                                                                            className="media-item small image-container"
+                                                                                            onClick={() => openMediaViewer(image, 'image')}
+                                                                                            style={{ cursor: 'pointer' }}
+                                                                                            title="Click to view full image"
+                                                                                        >
                                                                                             <img
                                                                                                 src={image.url}
                                                                                                 alt={image.name || `Image ${idx + 1}`}
@@ -874,11 +887,18 @@ function TimeTable() {
                                                                                         </div>
                                                                                     ))}
                                                                                     {topic.media.pdfs?.map((pdf, idx) => (
-                                                                                        <div key={idx} className="media-item small pdf-container">
+                                                                                        <div 
+                                                                                            key={idx} 
+                                                                                            className="media-item small pdf-container"
+                                                                                            onClick={() => openMediaViewer(pdf, 'pdf')}
+                                                                                            style={{ cursor: 'pointer' }}
+                                                                                            title="Click to view full PDF"
+                                                                                        >
                                                                                             <iframe
                                                                                                 src={pdf.url}
                                                                                                 title={pdf.name || `PDF ${idx + 1}`}
                                                                                                 className="embedded-pdf"
+                                                                                                style={{ pointerEvents: 'none' }}
                                                                                             >
                                                                                                 Your browser does not support PDFs.
                                                                                             </iframe>
@@ -888,30 +908,7 @@ function TimeTable() {
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        {/* 
-                                                                        {topic.subTopics && topic.subTopics.length > 0 ? (
-                                                                            <div className="subtopics-list">
-                                                                                {topic.subTopics.map((subTopic, subTopicIndex) => (
-                                                                                    <div key={subTopic.id} className="subtopic-item">
-                                                                                        <div className="subtopic-header">
-                                                                                            <div className="subtopic-left">
-                                                                                                <div className="subtopic-number">
-                                                                                                    {subTopic.subTopicNumber || '•'}
-                                                                                                </div>
-                                                                                                <div className="subtopic-title">
-                                                                                                    {subTopic.subTopicTitle}
-                                                                                                </div>
-                                                                                            </div>
-                                                                                      
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="empty-subtopics">
-                                                                                <p>No sub-topics added yet</p>
-                                                                            </div>
-                                                                        )} */}
+                                                                    
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1413,6 +1410,51 @@ function TimeTable() {
                 </div>
             )}
 
+            {/* Media Viewer Modal */}
+            {showMediaViewer && viewerMedia && (
+                <div className="media-viewer-overlay" onClick={closeMediaViewer}>
+                    <div className="media-viewer-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="media-viewer-header">
+                            <h3>
+                                <i className={`fas fa-${viewerMedia.type === 'image' ? 'image' : 'file-pdf'} me-2`}></i>
+                                {viewerMedia.name || `${viewerMedia.type === 'image' ? 'Image' : 'PDF'} Viewer`}
+                            </h3>
+                            <button className="btn-close" onClick={closeMediaViewer}>×</button>
+                        </div>
+                        <div className="media-viewer-body">
+                            {viewerMedia.type === 'image' ? (
+                                <img
+                                    src={viewerMedia.url}
+                                    alt={viewerMedia.name || 'Image'}
+                                    className="viewer-image"
+                                />
+                            ) : (
+                                <iframe
+                                    src={`${viewerMedia.url}#toolbar=0&navpanes=0&scrollbar=1`}
+                                    title={viewerMedia.name || 'PDF'}
+                                    className="viewer-pdf"
+                                >
+                                    Your browser does not support PDFs.
+                                </iframe>
+                            )}
+                        </div>
+                        <div className="media-viewer-footer">
+                            <a
+                                href={viewerMedia.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary"
+                            >
+                                <i className="fas fa-external-link-alt me-2"></i>
+                                Open in New Tab
+                            </a>
+                            <button className="btn btn-outline" onClick={closeMediaViewer}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Styles */}
             <style jsx>{`
@@ -2260,6 +2302,120 @@ function TimeTable() {
                     margin-right: 0.5rem;
                 }
 
+                /* Media Viewer Modal Styles */
+                .media-viewer-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.85);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 2000;
+                    padding: 1rem;
+                    animation: fadeIn 0.3s ease;
+                }
+
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                    }
+                    to {
+                        opacity: 1;
+                    }
+                }
+
+                .media-viewer-content {
+                    background: white;
+                    border-radius: 12px;
+                    width: 50%;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    animation: slideUp 0.3s ease;
+                }
+
+                @keyframes slideUp {
+                    from {
+                        transform: translateY(50px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+
+                .media-viewer-header {
+                    padding: 1.5rem;
+                    border-bottom: 2px solid #f5f7fa;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border-radius: 12px 12px 0 0;
+                }
+
+                .media-viewer-header h3 {
+                    margin: 0;
+                    font-size: 1.5rem;
+                    display: flex;
+                    align-items: center;
+                }
+
+                .media-viewer-body {
+                    flex: 1;
+                    padding: 1.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: auto;
+                    background: #f5f7fa;
+                }
+
+                .viewer-image {
+                    max-width: 100%;
+                    max-height: 100%;
+                    object-fit: contain;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                }
+
+                .viewer-pdf {
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    border-radius: 8px;
+                }
+
+                .media-viewer-footer {
+                    padding: 1.5rem;
+                    border-top: 2px solid #f5f7fa;
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 1rem;
+                    background: white;
+                    border-radius: 0 0 12px 12px;
+                }
+
+                .embedded-image:hover {
+                    transform: scale(1.05);
+                }
+
+                .pdf-container:hover {
+                    transform: scale(1.02);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                }
+
+                .image-container:hover {
+                    transform: scale(1.02);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                }
+
                 @media (max-width: 768px) {
                     .curriculum-container {
                         padding: 1rem;
@@ -2286,6 +2442,30 @@ function TimeTable() {
 
                     .chapter-actions, .topic-actions, .subtopic-actions {
                         justify-content: flex-end;
+                    }
+
+                    .media-viewer-content {
+                        max-width: 100vw;
+                        max-height: 100vh;
+                        border-radius: 0;
+                    }
+
+                    .media-viewer-header {
+                        border-radius: 0;
+                    }
+
+                    .media-viewer-footer {
+                        border-radius: 0;
+                        flex-direction: column;
+                    }
+
+                    .media-viewer-footer .btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+
+                    .media-viewer-body {
+                        padding: 0.5rem;
                     }
                 }
             `}</style>

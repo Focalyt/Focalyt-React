@@ -3,7 +3,7 @@ import axios from "axios";
 import moment from "moment";
 import { Link } from "react-router-dom";
 import feather from 'feather-icons';
-const AppliedCourses = () => {
+const EnrolledCourses = () => {
   const [courses, setCourses] = useState([]);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -13,20 +13,24 @@ const AppliedCourses = () => {
     feather.replace();
   }, []);
   useEffect(() => {
-    fetchAppliedCourses();
+    fetchEnrolledCourses();
   }, []);
 
-  const fetchAppliedCourses = async () => {
+  const fetchEnrolledCourses = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`${backendUrl}/candidate/appliedCourses`, {
+      const response = await axios.get(`${backendUrl}/candidate/enrolledCourses`, {
         headers: {
           'x-auth': localStorage.getItem('token'),
         },
       });
-      setCourses(res.data?.courses || []);
+      
+      if (response.data.status) {
+        setCourses(response.data.data.courses || []);
+        console.log('Enrolled Courses (Batch Assigned):', response.data.data.courses);
+      }
     } catch (err) {
-      console.error("Error fetching applied courses:", err);
+      console.error("Error fetching enrolled courses:", err);
+      setCourses([]);
     }
   };
 
@@ -37,7 +41,7 @@ const AppliedCourses = () => {
         <div className="content-header-left col-md-9 col-12 mb-2">
           <div className="row breadcrumbs-top">
             <div className="col-12 my-auto">
-              <h3 className="content-header-title float-left mb-0">Applied Courses</h3>
+              <h3 className="content-header-title float-left mb-0">My Enrolled Courses</h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
                   <li className="breadcrumb-item">
@@ -46,7 +50,7 @@ const AppliedCourses = () => {
                   <li className="breadcrumb-separator">
                     <i className="fas fa-angle-right mx-1 text-muted"></i>
                   </li>
-                  <li className="breadcrumb-item active">Applied Courses</li>
+                  <li className="breadcrumb-item active">Enrolled Courses</li>
                 </ol>
 
               </div>
@@ -65,7 +69,10 @@ const AppliedCourses = () => {
               <Link className="nav-link" to="/candidate/pendingFee">Pending for Fee</Link>
             </li>
             <li className="nav-item" role="presentation">
-              <Link className="nav-link active" to="/candidate/appliedCourses">Applied Courses</Link>
+              <Link className="nav-link" to="/candidate/appliedCourses">Applied Courses</Link>
+            </li>
+            <li className="nav-item" role="presentation">
+              <Link className="nav-link active" to="/candidate/myPurchase">Enrolled Courses</Link>
             </li>
           </ul>
         </div>
@@ -76,6 +83,8 @@ const AppliedCourses = () => {
           {courses && courses.length > 0 ? (
             courses.map((appliedCourse, index) => {
               const course = appliedCourse._course;
+              const batch = appliedCourse.batch;
+              const center = appliedCourse._center;
               return (
                 <div className="card mb-2" key={index}>
                   <div className="card-body">
@@ -90,15 +99,21 @@ const AppliedCourses = () => {
                               <span className="text-capitalize set-lineh">
                                 {course?.sectors?.length > 0 ? course.sectors[0].name : ""}
                               </span>
+                              
                             </div>
                           </div>
-                          <Link to={`/candidate/course/${course?._id || "#"}`}>
+                          {/* <Link to={`/candidate/course/${course?._id || "#"}`}> */}
+                          <Link to={`/candidate/enrolledCourses/${course?._id}`}>
                             <div className="job-overview mt-4">
                               <ul className="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
                                 <li style={{ display: "inline" }}>
                                   <i className="la la-money"></i>
                                   <h3 className="jobDetails-wrap">
-                                    {course?.cutPrice
+                                    {course?.registrationCharges
+                                      ? course.registrationCharges === "Free" || course.registrationCharges === ""
+                                        ? "Free"
+                                        : `₹ ${course.registrationCharges}`
+                                      : course?.cutPrice
                                       ? course.cutPrice.toLowerCase() === "free"
                                         ? "Free"
                                         : `₹ ${course.cutPrice}`
@@ -107,21 +122,21 @@ const AppliedCourses = () => {
                                   <span className="jobDetails-wrap">Course Fee</span>
                                 </li>
                                 <li style={{ display: "inline" }}>
-                                  <i className="la la-shield"></i>
+                                  <i className="la la-calendar"></i>
                                   <h3 className="jobDetails-wrap">
-                                    {course?.courseLevel || "N/A"}
+                                    {batch?.name || "N/A"}
                                   </h3>
-                                  <span className="jobDetails-wrap">Course Level</span>
+                                  <span className="jobDetails-wrap">Batch Name</span>
                                 </li>
                                 <li style={{ display: "inline" }}>
-                                  <i className="la la-graduation-cap"></i>
+                                  <i className="la la-user"></i>
                                   <h3 className="jobDetails-wrap">
-                                    {course?.certifyingAgency || "N/A"}
+                                    {batch?.instructor || "N/A"}
                                   </h3>
-                                  <span className="jobDetails-wrap">Course Agency</span>
+                                  <span className="jobDetails-wrap">Instructor</span>
                                 </li>
                                 <li style={{ display: "inline", float: "right", width: '35.334%' }}>
-                                  <i className="la la-money"></i>
+                                  <i className="la la-check-circle"></i>
                                   <h3 className="jobDetails-wrap">
                                     {appliedCourse.registrationFee === "Paid" ? "Paid" : "Unpaid"}
                                   </h3>
@@ -133,21 +148,19 @@ const AppliedCourses = () => {
                         </div>
                       </div>
                       <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0">
-                        <div className="extra-job-info mt-1">
-                          <span className="px-0">
-                            <i className="la la-map"></i>
-                            <strong>Last Date</strong>{" "}
-                            {moment(course?.lastDateForApply || course?.createdAt)
-                              .utcOffset("+05:30")
-                              .format("DD MMM YYYY")}
-                          </span>
-                        </div>
+                       
                         <div className="add--documents mt-1">
                           <Link
                             to={`/candidate/reqDocs/${course?._id}`}
                             className="btn btn-success text-white waves-effect waves-light"
                           >
-                            Upload Documents
+                            <i className="fas fa-upload"></i> Upload Documents
+                          </Link>
+                          <Link
+                            to={`/candidate/enrolledCourses/${course?._id}`}
+                            className="btn btn-primary text-white waves-effect waves-light mt-2"
+                          >
+                            <i className="fas fa-graduation-cap"></i> View Course
                           </Link>
                         </div>
                       </div>
@@ -157,7 +170,7 @@ const AppliedCourses = () => {
               );
             })
           ) : (
-            <h4 className="text-center">No Course found</h4>
+            <h4 className="text-center">No Enrolled Courses Found</h4>
           )}
         </div>
       </section>
@@ -289,10 +302,45 @@ flex-direction: column;
 .breadcrumb-item a {
     color: #FC2B5A;
         }
+
+.badge-success {
+    background-color: #28c76f;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-success i {
+    margin-right: 4px;
+}
+
+.extra-job-info span {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.extra-job-info i {
+    color: #FC2B5A;
+    margin-right: 8px;
+}
+
+.btn-primary {
+    background-color: #7367f0;
+    border-color: #7367f0;
+}
+
+.btn-primary:hover {
+    background-color: #5e50ee;
+    border-color: #5e50ee;
+    box-shadow: 0 8px 25px -8px #7367f0;
+}
       `}
       </style>
     </>
   );
 };
 
-export default AppliedCourses;
+export default EnrolledCourses;

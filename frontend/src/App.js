@@ -51,6 +51,9 @@ import CandidateViewJobs from './Pages/App/Candidate/Jobs/CandidateViewJobs';
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
+import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCourses';
+import Curriculums from './Pages/App/Candidate/EnrolledCourses/Curriculums';
+
 import Registration from './Pages/Front/StudentRegistration/Registration';
 import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
@@ -71,7 +74,7 @@ import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
-import AdmissionPost from './Pages/App/College/Course/AdmissionPost';
+import AdmissionPost from './Pages/App/College/Course/AdmissionPost'; 
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 import ClgCourse from './Pages/App/College/Settings/Course';
 import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
@@ -129,6 +132,9 @@ import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
 import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
 import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
+import Center from './Pages/App/Trainer/Center/Center';
+import Assignment from './Pages/App/Trainer/Assignment/Assignment';
+import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -211,6 +217,8 @@ const Layout = () => {
           <Route path="pendingFee" element={<PaymentDetails />} />
           <Route path='candidateevent' element={<CandidatesEvents />} />
           <Route path='appliedevents' element={<AppliedEvents/>}/>
+          <Route path='enrolledCourses' element={<EnrolledCourses/>}/>
+          <Route path='enrolledCourses/:courseId' element={<Curriculums/>}/>
         </Route>
       
 
@@ -304,6 +312,9 @@ const Layout = () => {
         {/* <Route path='timetable' element={<TimeTable/>}/> */}
         <Route path='students' element={<Students/>}/>
         <Route path='dailydiary' element={<DailyDiary/>}/>
+        <Route path='center' element={<Center/>}/>
+        <Route path='assignment' element={<Assignment/>}/>
+        <Route path='createassignment' element={<CreateAssignment/>}/>
         </Route>
 
 

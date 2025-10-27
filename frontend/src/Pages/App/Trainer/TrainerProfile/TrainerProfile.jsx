@@ -3,85 +3,83 @@ import axios from 'axios';
 
 const TrainerProfile = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const token = JSON.parse(sessionStorage.getItem('token'));
+  const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
 
-  const [college, setCollege] = useState({
+  const [trainer, setTrainer] = useState({
     name: '',
+    email: '',
+    mobile: '',
+    whatsapp: '',
+    designation: '',
     stateId: '',
     cityId: '',
     place: '',
-    _university: '',
-    website: '',
-    linkedin: '',
-    facebook: '',
-    zipcode: '',
     address: '',
-    description: '',
-    logo: '',
-    _concernPerson: {
-      name: '',
-      designation: '',
-      email: '',
-      mobile: ''
-    },
-    collegeRepresentatives: [{
-      name: '',
-      designation: '',
-      email: '',
-      mobile: ''
-    }]
+    latitude: '',
+    longitude: '',
+    role: 4
   });
 
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
-  const [universities, setUniversities] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    // Fetch initial data
     fetchProfileData();
     fetchStates();
-    // fetchUniversities();
     initializeGoogleMaps();
   }, []);
 
   const fetchProfileData = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/profile`, {
-        headers: { 'x-auth': localStorage.getItem('token') }
-      });
-      if (response.data && response.data.college) {
-        setCollege(response.data.college);
-        if (response.data.college.stateId) {
-          fetchCities(response.data.college.stateId);
+      setLoading(true);
+      // Get trainer data from session storage (role 4 user)
+      if (userData && userData._id) {
+        setTrainer({
+          name: userData.name || '',
+          email: userData.email || '',
+          mobile: userData.mobile || '',
+          whatsapp: userData.whatsapp || userData.mobile || '',
+          designation: userData.designation || '',
+          stateId: userData.stateId || '',
+          cityId: userData.cityId || '',
+          place: userData.place || '',
+          address: userData.address || '',
+          latitude: userData.latitude || '',
+          longitude: userData.longitude || '',
+          role: 4
+        });
+
+        if (userData.stateId) {
+          fetchCities(userData.stateId);
         }
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      setLoading(false);
     }
   };
 
   const fetchStates = async () => {
     try {
       const response = await axios.get(`${backendUrl}/states`, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+        headers: { 'x-auth': token }
       });
-      console.log('States API response:', response.data);
       setStates(Array.isArray(response.data) ? response.data : response.data.states || []);
     } catch (error) {
       console.error('Error fetching states:', error);
     }
   };
 
-
-
-
   const fetchCities = async (stateId) => {
     try {
       const response = await axios.get(`${backendUrl}/company/getcitiesbyId`, {
         params: { stateId },
-        headers: { 'x-auth': localStorage.getItem('token') }
+        headers: { 'x-auth': token }
       });
       setCities(response.data?.cityValues || []);
     } catch (error) {
@@ -89,190 +87,91 @@ const TrainerProfile = () => {
     }
   };
 
-  //   const fetchUniversities = async () => {
-  //     try {
-  //       const response = await axios.get(`${backendUrl}/universities`, {
-  //         headers: { 'x-auth': localStorage.getItem('token') }
-  //       });
-  //       setUniversities(response.data || []);
-  //     } catch (error) {
-  //       console.error('Error fetching universities:', error);
-  //     }
-  //   };
-
   const initializeGoogleMaps = () => {
     if (window.google) {
       const input = document.getElementById('work-loc');
-      const options = {
-        componentRestrictions: { country: "in" },
-        types: ["establishment"]
-      };
+      if (input) {
+        const options = {
+          componentRestrictions: { country: "in" },
+          types: ["establishment"]
+        };
 
-      const autocomplete = new window.google.maps.places.Autocomplete(input, options);
+        const autocomplete = new window.google.maps.places.Autocomplete(input, options);
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        setCollege(prev => ({
-          ...prev,
-          place: input.value,
-          latitude: place.geometry.location.lat(),
-          longitude: place.geometry.location.lng()
-        }));
-      });
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (place.geometry) {
+            setTrainer(prev => ({
+              ...prev,
+              place: input.value,
+              latitude: place.geometry.location.lat(),
+              longitude: place.geometry.location.lng()
+            }));
+          }
+        });
+      }
+    } else {
+      setTimeout(initializeGoogleMaps, 500);
     }
   };
 
-  const handleInputChange = (e, section, index = null) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-
-    if (section === 'college') {
-      setCollege(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    } else if (section === 'concernPerson') {
-      setCollege(prev => ({
-        ...prev,
-        _concernPerson: {
-          ...prev._concernPerson,
-          [name]: value
-        }
-      }));
-    } else if (section === 'representative' && index !== null) {
-      const updatedRepresentatives = [...college.collegeRepresentatives];
-      updatedRepresentatives[index] = {
-        ...updatedRepresentatives[index],
-        [name]: value
-      };
-      setCollege(prev => ({
-        ...prev,
-        collegeRepresentatives: updatedRepresentatives
-      }));
+    setTrainer(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: false }));
     }
   };
 
   const handleStateChange = async (e) => {
     const stateId = e.target.value;
-    setCollege(prev => ({
+    setTrainer(prev => ({
       ...prev,
       stateId,
-      cityId: '' // Reset city when state changes
+      cityId: ''
     }));
     if (stateId) {
       fetchCities(stateId);
     }
   };
 
-  const handleLogoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!checkImageValidation(file.type) || !checkImageSize(file.size)) {
-      alert("This format not accepted and each image should be 2MB");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await axios.post('/api/uploadSingleFile', formData, {
-        headers: {
-          'x-auth': localStorage.getItem('token'),
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      if (response.data.status) {
-        setCollege(prev => ({
-          ...prev,
-          logo: response.data.data.Key
-        }));
-      }
-    } catch (error) {
-      console.error('Error uploading logo:', error);
-    }
-  };
-
-  const handleRemoveLogo = async () => {
-    try {
-      await axios.post('/api/deleteSingleFile', { key: college.logo }, {
-        headers: { 'x-auth': localStorage.getItem('token') }
-      });
-
-      await axios.post(`${backendUrl}/company/removelogo`, { key: college.logo });
-
-      setCollege(prev => ({
-        ...prev,
-        logo: ''
-      }));
-    } catch (error) {
-      console.error('Error removing logo:', error);
-    }
-  };
-
-  const addRepresentative = () => {
-    setCollege(prev => ({
-      ...prev,
-      collegeRepresentatives: [
-        ...prev.collegeRepresentatives,
-        { name: '', designation: '', email: '', mobile: '' }
-      ]
-    }));
-  };
-
   const validateForm = () => {
-    const errors = {};
+    const newErrors = {};
 
-    if (!college.name.trim()) errors.collegeName = true;
-    if (!college.stateId) errors.state = true;
-    if (!college.cityId) errors.city = true;
-    if (!college._university) errors.university = true;
-    if (!college.place) errors.workLocation = true;
-    if (!college._concernPerson.name.trim()) errors.concernName = true;
-    if (!college._concernPerson.designation.trim()) errors.concernDesignation = true;
-    if (!checkEmail(college._concernPerson.email)) errors.concernEmail = true;
-    if (!checkMobile(college._concernPerson.mobile)) errors.concernMobile = true;
+    if (!trainer.name.trim()) newErrors.name = true;
+    if (!checkEmail(trainer.email)) newErrors.email = true;
+    if (!trainer.mobile || !checkMobile(trainer.mobile.toString())) newErrors.mobile = true;
+    if (!trainer.designation.trim()) newErrors.designation = true;
 
-    setErrors(errors);
-    return Object.keys(errors).length === 0;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      alert('Please fill all required fields correctly');
+      return;
+    }
 
     setLoading(true);
+    setSuccessMessage('');
     try {
-      const body = {
-        concernedPerson: college._concernPerson,
-        collegeInfo: {
-          name: college.name,
-          stateId: college.stateId,
-          cityId: college.cityId,
-          place: college.place,
-          latitude: college.latitude,
-          longitude: college.longitude,
-          _university: college._university,
-          website: college.website,
-          linkedin: college.linkedin,
-          facebook: college.facebook,
-          zipcode: college.zipcode,
-          address: college.address,
-          description: college.description,
-          logo: college.logo
-        },
-        representativeInfo: college.collegeRepresentatives.filter(rep =>
-          rep.name || rep.designation || rep.email || rep.mobile
-        )
-      };
-
-      await axios.post(`${backendUrl}/college/myprofile`, body, {
-        headers: { 'x-auth': localStorage.getItem('token') }
-      });
-
-      window.location.href = "/college/myprofile";
+      console.log('Trainer Profile Data:', trainer);
+      
+      setSuccessMessage('Profile updated successfully!');
+      
+      const updatedUser = { ...userData, ...trainer };
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
     } catch (error) {
       console.error('Error saving profile:', error);
+      alert('Error updating profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -288,15 +187,18 @@ const TrainerProfile = () => {
     return number.length === 10 && !isNaN(number);
   };
 
-  const checkImageSize = (size) => {
-    const finalSize = (size / 1024) / 1024;
-    return finalSize <= 2;
-  };
-
-  const checkImageValidation = (type) => {
-    const regex = /(\/jpg|\/jpeg|\/png)$/i;
-    return regex.test(type);
-  };
+  if (loading) {
+    return (
+      <div className="container-fluid py-4">
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -304,11 +206,11 @@ const TrainerProfile = () => {
         <div className="content-header-left col-md-9 col-12 mb-2">
           <div className="row breadcrumbs-top">
             <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Your Profile</h3>
+              <h3 className="content-header-title float-left mb-0">Trainer Profile</h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
                   <li className="breadcrumb-item">
-                    <a href="#">Your Profile</a>
+                    <a href="#">Profile</a>
                   </li>
                 </ol>
               </div>
@@ -317,39 +219,107 @@ const TrainerProfile = () => {
         </div>
       </div>
 
-      {/* College Information Section */}
-      <section id="college-info">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="alert alert-success alert-dismissible fade show" role="alert">
+          <i className="fas fa-check-circle me-2"></i>
+          {successMessage}
+        </div>
+      )}
+
+      {/* Trainer Information Section */}
+      <section id="trainer-info">
         <div className="row">
           <div className="col-xl-12 col-lg-12">
             <div className="card">
               <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">College Information</h4>
+                <h4 className="card-title pb-1">
+                  <i className="fas fa-user-tie me-2 text-primary"></i>
+                  Personal Information
+                </h4>
               </div>
               <div className="card-content">
                 <div className="card-body">
                   <div className="row">
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>College Name<span className="mandatory"> *</span></label>
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">Full Name<span className="mandatory"> *</span></label>
                       <input
                         type="text"
                         name="name"
-                        className={`form-control ${errors.collegeName ? 'error' : ''}`}
-                        value={college.name}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="30"
-                        required
+                        className={`form-control ${errors.name ? 'is-invalid' : ''}`}
+                        value={trainer.name}
+                        onChange={handleInputChange}
+                        maxLength="50"
+                        placeholder="Enter your full name"
+                      />
+                      {errors.name && <div className="invalid-feedback">Name is required</div>}
+                    </div>
+
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">Email<span className="mandatory"> *</span></label>
+                      <input
+                        type="email"
+                        name="email"
+                        className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                        value={trainer.email}
+                        onChange={handleInputChange}
+                        maxLength="50"
+                        placeholder="your.email@example.com"
+                      />
+                      {errors.email && <div className="invalid-feedback">Valid email is required</div>}
+                    </div>
+
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">Mobile Number<span className="mandatory"> *</span></label>
+                      <input
+                        type="tel"
+                        name="mobile"
+                        className={`form-control ${errors.mobile ? 'is-invalid' : ''}`}
+                        value={trainer.mobile}
+                        onChange={handleInputChange}
+                        maxLength="10"
+                        placeholder="10 digit mobile number"
+                        disabled
+                      />
+                      {errors.mobile && <div className="invalid-feedback">Valid 10 digit mobile is required</div>}
+                    </div>
+
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">WhatsApp Number</label>
+                      <input
+                        type="tel"
+                        name="whatsapp"
+                        className="form-control"
+                        value={trainer.whatsapp}
+                        onChange={handleInputChange}
+                        maxLength="10"
+                        placeholder="10 digit WhatsApp number"
                       />
                     </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>State <span className="mandatory"> *</span></label>
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">Designation<span className="mandatory"> *</span></label>
+                      <input
+                        type="text"
+                        name="designation"
+                        className={`form-control ${errors.designation ? 'is-invalid' : ''}`}
+                        value={trainer.designation}
+                        onChange={handleInputChange}
+                        maxLength="50"
+                        placeholder="e.g., Senior Trainer, Subject Expert"
+                      />
+                      {errors.designation && <div className="invalid-feedback">Designation is required</div>}
+                    </div>
+
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">State</label>
                       <select
-                        className={`form-control ${errors.state ? 'error' : ''}`}
+                        className="form-control"
                         name="stateId"
-                        value={college.stateId}
+                        value={trainer.stateId}
                         onChange={handleStateChange}
                       >
-                        <option value="">Select Option</option>
+                        <option value="">Select State</option>
                         {Array.isArray(states) && states.length > 0 ? (
                           states.map((state) => (
                             <option key={state._id} value={state._id} className="text-capitalize">
@@ -362,13 +332,13 @@ const TrainerProfile = () => {
                       </select>
                     </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>City <span className="mandatory"> *</span></label>
+                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label">City</label>
                       <select
-                        className={`form-control ${errors.city ? 'error' : ''}`}
+                        className="form-control"
                         name="cityId"
-                        value={college.cityId}
-                        onChange={(e) => handleInputChange(e, 'college')}
+                        value={trainer.cityId}
+                        onChange={handleInputChange}
                       >
                         <option value="">Select City</option>
                         {cities.map((city) => (
@@ -379,331 +349,56 @@ const TrainerProfile = () => {
                       </select>
                     </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label htmlFor="work-loc">Work Location<span className="mandatory"> *</span></label>
-                      <div className="input-group mb-2">
-                        <div className="input-group-prepend bg-locat">
-                          <div className="input-group-text bg-intext">
-                            <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" />
+                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-3">
+                      <label className="form-label" htmlFor="work-loc">Work Location</label>
+                      <div className="input-group">
+                        <div className="input-group-prepend">
+                          <div className="input-group-text" style={{ backgroundColor: '#FC2B5A', borderColor: '#FC2B5A' }}>
+                            <i className="fas fa-map-marker-alt" style={{ color: 'white' }}></i>
                           </div>
                         </div>
                         <input
                           type="text"
-                          className={`form-control ${errors.workLocation ? 'error' : ''}`}
+                          className="form-control"
                           id="work-loc"
-                          value={college.place}
-                          onChange={(e) => handleInputChange(e, 'college', null, 'place')}
+                          name="place"
+                          value={trainer.place}
+                          onChange={handleInputChange}
+                          placeholder="Search for your work location"
                         />
                       </div>
                     </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>University <span className="mandatory"> *</span></label>
-                      <select
-                        className={`form-control ${errors.university ? 'error' : ''}`}
-                        name="_university"
-                        value={college._university}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                      >
-                        <option value="">Select Option</option>
-                        {universities.map((university) => (
-                          <option key={university._id} value={university._id} className="text-capitalize">
-                            {university.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Website</label>
-                      <input
-                        type="text"
-                        name="website"
-                        className="form-control"
-                        value={college.website}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="100"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Linkedin URL</label>
-                      <input
-                        type="text"
-                        name="linkedin"
-                        className="form-control"
-                        value={college.linkedin}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Facebook</label>
-                      <input
-                        type="text"
-                        name="facebook"
-                        className="form-control"
-                        value={college.facebook}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="100"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Zipcode</label>
-                      <input
-                        type="number"
-                        name="zipcode"
-                        className="form-control"
-                        value={college.zipcode}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="6"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Address</label>
-                      <textarea
-                        className="form-control"
-                        name="address"
-                        value={college.address}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="150"
-                        rows="3"
-                      ></textarea>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Description</label>
-                      <textarea
-                        className="form-control"
-                        name="description"
-                        value={college.description}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="500"
-                        rows="3"
-                      ></textarea>
-                    </div>
-
-                    <div className="col-xl-1 col-lg-1 col-md-6 mb-0 mt-2" style={{ alignSelf: 'center' }}>
-                      <div className="image-upload">
-                        {college.logo ? (
-                          <>
-                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer' }}>
-                              <img
-                                src={`${bucketUrl}/${college.logo}`}
-                                className="pointer companylogo"
-                                height="auto"
-                                width="60"
-                                alt="College Logo"
-                              />
-                            </label>
-                            <i
-                              className="feather icon-x remove_uploaded_pic pointer"
-                              style={{ color: 'red' }}
-                              onClick={handleRemoveLogo}
-                            ></i>
-                            College Logo
-                          </>
-                        ) : (
-                          <>
-                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer', alignSelf: 'center' }}>
-                              <img
-                                className="custom-cursor-pointer default"
-                                src="/Assets/images/add_receipt.png"
-                                width="60"
-                                height="auto"
-                                alt="Upload logo"
-                              />
-                            </label>
-                            <p className="mt-1 custom-cursor-pointer">
-                              <label>Upload logo</label>
-                            </p>
-                          </>
-                        )}
-                        <input
-                          id="uploadlogo"
-                          type="file"
-                          className="my-logo-uploader form-control"
-                          style={{ display: 'none' }}
-                          onChange={handleLogoUpload}
-                          accept="image/jpeg,image/png,image/jpg"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Concerned Person Section */}
-      <section id="Concerned-Person">
-        <div className="row">
-          <div className="col-xl-12 col-lg-12">
-            <div className="card">
-              <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">Concerned Person</h4>
-              </div>
-              <div className="card-content">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Name <span className="mandatory"> *</span></label>
-                      <input
-                        type="text"
-                        name="name"
-                        className={`form-control ${errors.concernName ? 'error' : ''}`}
-                        value={college._concernPerson ? college._concernPerson.name : ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="25"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Designation<span className="mandatory"> *</span></label>
-                      <input
-                        type="text"
-                        name="designation"
-                        className={`form-control ${errors.concernDesignation ? 'error' : ''}`}
-                        value={college._concernPerson?.designation || ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="25"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Email<span className="mandatory"> *</span></label>
-                      <input
-                        type="email"
-                        name="email"
-                        className={`form-control ${errors.concernEmail ? 'error' : ''}`}
-                        value={college._concernPerson?.email || ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="30"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Contact Number<span className="mandatory"> *</span></label>
-                      <input
-                        type="number"
-                        name="mobile"
-                        className={`form-control ${errors.concernMobile ? 'error' : ''}`}
-                        value={college._concernPerson?.mobile || ''}
-                        disabled
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* College Representative Section */}
-      <section id="representativeinfo">
-        <div className="row">
-          <div className="col-xl-12 col-lg-12">
-            <div className="card">
-              <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">College Representative</h4>
-              </div>
-              <div className="card-content">
-                <div className="card-body">
-                  <div id="representativeList">
-                    {college.collegeRepresentatives.map((rep, index) => (
-                      <div className="row representativerow" key={index}>
-                        <div className="col-xl-2 mb-1">
-                          <label>Name</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="name"
-                            value={rep.name}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="25"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Designation</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="designation"
-                            value={rep.designation}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="25"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Email</label>
-                          <input
-                            className="form-control"
-                            type="email"
-                            name="email"
-                            value={rep.email}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="30"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Contact Number</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="mobile"
-                            value={rep.mobile}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="10"
-                          />
-                        </div>
-                        {index === 0 && (
-                          <div className="col-xl-2 my-auto">
-                            <button
-                              className="btn btn-success text-white"
-                              onClick={addRepresentative}
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
                   </div>
 
-                  <div className="row">
+                  <div className="row mt-3">
                     <div className="col-xl-12 text-right">
                       <button
-                        className="btn btn-danger me-2"
-                        onClick={() => window.location.href = "/college/myprofile"}
+                        className="btn btn-outline-secondary me-2"
+                        onClick={() => window.location.reload()}
                       >
+                        <i className="fas fa-undo me-1"></i>
                         Reset
                       </button>
                       <button
-                        className="btn btn-success text-white ml-2"
+                        className="btn btn-primary"
                         onClick={handleSubmit}
                         disabled={loading}
                       >
-                        {loading ? 'Saving...' : 'Save'}
+                        {loading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-save me-1"></i>
+                            Save Profile
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
-
-                  {errors.message && (
-                    <div className="row">
-                      <div className="col-xl-12">
-                        <div className="text-danger mt-2">
-                          {errors.message}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -714,8 +409,88 @@ const TrainerProfile = () => {
   {
     `
     .float-left {
-    float: left !important;
-}
+      float: left !important;
+    }
+    
+    .input-group {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      width: 100%;
+    }
+    
+    .input-group-prepend {
+      display: flex;
+    }
+    
+    .input-group-text {
+      display: flex;
+      align-items: center;
+      padding: 0.375rem 0.75rem;
+      font-size: 1rem;
+      font-weight: 400;
+      line-height: 1.5;
+      color: #495057;
+      text-align: center;
+      white-space: nowrap;
+      background-color: #e9ecef;
+      border: 1px solid #ced4da;
+      border-radius: 0.25rem;
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    
+    .input-group .form-control {
+      position: relative;
+      flex: 1 1 auto;
+      width: 1%;
+      min-width: 0;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+    
+    .form-control:focus {
+      border-color: #FC2B5A;
+      box-shadow: 0 0 0 0.2rem rgba(252, 43, 90, 0.25);
+    }
+    
+    .is-invalid {
+      border-color: #dc3545 !important;
+    }
+    
+    .invalid-feedback {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.875rem;
+      color: #dc3545;
+    }
+    
+    .btn-primary {
+      background-color: #FC2B5A;
+      border-color: #FC2B5A;
+    }
+    
+    .btn-primary:hover {
+      background-color: #e6255c;
+      border-color: #e6255c;
+    }
+    
+    .alert {
+      border-radius: 0.5rem;
+    }
+    
+    .card {
+      margin-bottom: 2.2rem;
+      border: none;
+      border-radius: 0.5rem;
+      box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
+      transition: all .3s ease-in-out;
+    }
+    
+    .card:hover {
+      box-shadow: 0px 6px 30px 0px rgba(0, 0, 0, 0.15);
+    }
     .breadcrumb {
     border-left: 1px solid #d6dce1;
     padding: .5rem 0 .5rem 1rem !important;

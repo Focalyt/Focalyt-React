@@ -154,7 +154,14 @@
         align-items: center;
     }
 }
-
+@media(min-width:992px) and (max-width:1199px) {
+  .site-menu-main .nav-link-item {
+  padding: 16px 10px 14px!important;
+  }
+  .site-menu-main .nav-link-item{
+    font-size: 15px!important;
+  }
+}
 @media (max-width: 991px) {
     .mobile-menu-trigger {
         display: block;

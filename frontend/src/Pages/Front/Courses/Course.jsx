@@ -104,7 +104,7 @@ function Course() {
       }, {
         headers: { "Content-Type": "application/json" }
       });
-console.log( "response callback" , response )
+// console.log( "response callback" , response )
       if (response.status === 200 || response.status === 201) {
         alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
         window.location.reload(); // ✅ Page Refresh करेगा
@@ -147,7 +147,7 @@ console.log( "response callback" , response )
     // Then filter by search term if it exists
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
-      console.log("Filtering by search term:", term);
+      // console.log("Filtering by search term:", term);
 
       filtered = filtered.filter(course => {
         const nameMatch = course.name && course.name?.toLowerCase().includes(term);
