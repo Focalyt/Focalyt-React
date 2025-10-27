@@ -134,6 +134,7 @@ import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
 import Assignment from './Pages/App/Trainer/Assignment/Assignment';
+import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -313,6 +314,7 @@ const Layout = () => {
         <Route path='dailydiary' element={<DailyDiary/>}/>
         <Route path='center' element={<Center/>}/>
         <Route path='assignment' element={<Assignment/>}/>
+        <Route path='createassignment' element={<CreateAssignment/>}/>
         </Route>
 
 
