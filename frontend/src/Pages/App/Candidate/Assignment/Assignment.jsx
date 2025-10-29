@@ -1,32 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { 
-  CheckCircle2, 
-  Eye, 
-  EyeOff, 
-  Save, 
-  AlertTriangle, 
-  Clock,
-  Award,
-  Target,
-  BookOpen,
-  ChevronRight,
-  CircleCheck,
-  XCircle,
-  Minus,
-  FileText,
-  Timer,
-  TrendingUp,
-  User,
-  Calendar,
-  Info
-} from 'lucide-react';
+import {CheckCircle2, Clock, Eye, EyeOff, Save, AlertTriangle, lock,Award,Target,BookOpen,ChevronRight,CircleCheck, XCircle,Minus, FileText,Timer,TrendingUp,User,Calendar,Info} from 'lucide-react';
 import axios from 'axios';
-import 'bootstrap/dist/css/bootstrap.min.css';
 
-function Assignment() {
+function Assignment({ courseId }) {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const token = JSON.parse(sessionStorage.getItem('token'));
-
+  const token = localStorage.getItem("token");
   const [assignment, setAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [selected, setSelected] = useState({});
@@ -36,18 +14,20 @@ function Assignment() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [timerActive, setTimerActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [timeStarted, setTimeStarted] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const formatAssignment = (assignmentData) => {
     return {
       meta: {
+        id: assignmentData._id,
         title: assignmentData.title,
         durationMins: assignmentData.durationMins,
         passPercent: assignmentData.passPercent,
         totalMarks: assignmentData.totalMarks,
-        // negativeMarkPerWrong removed
       },
       questions: (assignmentData.questions || []).map((q, index) => ({
-        id: q._id || `q-${index}`,
+        id: q._id?.toString() || `q-${index}`,
         question: q.question,
         options: q.options || [],
         correctIndex: q.correctIndex,
@@ -56,7 +36,6 @@ function Assignment() {
     };
   };
 
-  // Timer functionality
   useEffect(() => {
     if (timerActive && timeLeft > 0) {
       const timer = setTimeout(() => {
@@ -68,22 +47,36 @@ function Assignment() {
     }
   }, [timeLeft, timerActive]);
 
-  // Format time display
+  
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Fetch all assignments on mount
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/college/assignments?publishedOnly=true`, {
+        const query = courseId ? `?courseId=${courseId}` : '';
+        const res = await axios.get(`${backendUrl}/candidate/assignments${query}`, {
           headers: { 'x-auth': token }
         });
         if (res?.data?.status) {
-          setAssignments(res.data.data || []);
+          const all = res.data.data || [];
+    const matchesCourse = (a) => {
+            if (!courseId) return true;
+            try {
+              const cid = String(courseId);
+              if (a.courseId && String(a.courseId) === cid) return true;
+              if (a.meta && (a.meta.courseId || a.meta.course) && String(a.meta.courseId || a.meta.course) === cid) return true;
+              if (a.questions && a.questions.some(q => q.course && String(q.course) === cid)) return true;
+            } catch (e) {
+            }
+            return false;
+          };
+
+          const filtered = all.filter(matchesCourse);
+          setAssignments(filtered);
         }
       } catch (err) {
         console.error('Failed to fetch assignments:', err);
@@ -92,7 +85,7 @@ function Assignment() {
       }
     };
     fetchAssignments();
-  }, [backendUrl, token]);
+  }, [courseId]);
 
   const hasAttemptedQuestions = useMemo(() => {
     if (!assignment?.questions?.length) return false;
@@ -107,7 +100,6 @@ function Assignment() {
   let correctCount = 0;
   let wrongCount = 0;
   let marksFromCorrect = 0;
-  // negative marking removed - no deduction for wrong answers
   const negEach = 0;
 
     for (const q of questions) {
@@ -148,18 +140,67 @@ function Assignment() {
   }, [submitted, assignment, selected]);
 
   const handleAnswerChange = (questionId, optionIndex) => {
-    if (!submitted) {
+    if (!submitted && timerActive) {
       setSelected((prev) => ({ ...prev, [questionId]: optionIndex }));
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!hasAttemptedQuestions) {
       alert('Please attempt at least one question before submitting.');
       return;
     }
-    setSubmitted(true);
+
+    if (!assignment) return;
+
+    setSubmitting(true);
     setTimerActive(false);
+
+    try {
+      const answers = {};
+      assignment.questions.forEach(q => {
+        if (selected[q.id] !== undefined) {
+          answers[q.id] = selected[q.id];
+        }
+      });
+
+      const timeTakenSeconds = timeStarted 
+        ? Math.floor((new Date() - new Date(timeStarted)) / 1000)
+        : 0;
+
+      const assignmentId = assignment.meta?.id;
+      if (!assignmentId) {
+        alert('Assignment ID not found');
+        setSubmitting(false);
+        setTimerActive(true);
+        return;
+      }
+
+      const res = await axios.post(
+        `${backendUrl}/candidate/assignment/${assignmentId}/submit`,
+        {
+          answers,
+          timeStarted,
+          timeTakenSeconds
+        },
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (res?.data?.status) {
+        setSubmitted(true);
+      } else {
+        alert(res?.data?.message || 'Failed to submit assignment');
+        setSubmitting(false);
+        setTimerActive(true);
+      }
+    } catch (err) {
+      console.error('Submit error:', err);
+      alert(err?.response?.data?.message || 'Failed to submit assignment. Please try again.');
+      setSubmitting(false);
+      setTimerActive(true);
+    }
   };
 
   const selectAssignment = (a) => {
@@ -170,12 +211,14 @@ function Assignment() {
     setCurrentQuestion(0);
     setTimeLeft(null);
     setTimerActive(false);
+    setTimeStarted(null);
   };
 
   const startTest = () => {
     if (assignment?.meta?.durationMins) {
       setTimeLeft(assignment.meta.durationMins * 60);
       setTimerActive(true);
+      setTimeStarted(new Date());
     }
   };
 
@@ -224,7 +267,6 @@ function Assignment() {
     );
   }
 
-  // Test Selection Screen
   if (assignments.length > 0 && !assignment) {
     return (
       <div className="container-fluid min-vh-100 bg-light py-5">
@@ -232,10 +274,9 @@ function Assignment() {
           <div className="row justify-content-center">
             <div className="col-lg-10">
               <div className="text-center mb-5">
-                <h1 className="display-4 fw-bold text-primary mb-3">
-                  <BookOpen size={48} className="me-3" />
+                <h5 className="display-4 fw-bold text-primary mb-3">
                   Available Tests
-                </h1>
+                </h5>
                 <p className="lead text-muted">Select a test to begin your assessment</p>
               </div>
 
@@ -243,9 +284,9 @@ function Assignment() {
                 {assignments.map((a) => (
                   <div key={a._id} className="col-md-6 col-lg-4">
                     <div 
-                      className="card h-100 shadow-sm test-card"
-                      onClick={() => selectAssignment(a)}
-                      style={{ cursor: 'pointer', transition: 'all 0.3s' }}
+                      className={`card h-100 shadow-sm test-card ${a.submitted ? 'opacity-75' : ''}`}
+                      onClick={() => a.submitted ? alert('You have already submitted this test and cannot retake it.') : selectAssignment(a)}
+                      style={{ cursor: a.submitted ? 'not-allowed' : 'pointer', transition: 'all 0.3s' }}
                     >
                       <div className="card-body">
                         <h5 className="card-title text-dark fw-bold mb-3">
@@ -271,9 +312,15 @@ function Assignment() {
                           </div>
                         </div>
                       </div>
-                      <div className="card-footer bg-primary bg-gradient text-white text-center">
-                        <span className="fw-bold">Start Test</span>
-                        <ChevronRight size={20} className="ms-2" />
+                      <div className="card-footer bg-primary bg-gradient text-white text-center d-flex justify-content-center align-items-center">
+                        {a.submitted ? (
+                          <span className="fw-bold">Submitted</span>
+                        ) : (
+                          <>
+                            <span className="fw-bold">Start Test</span>
+                            <ChevronRight size={20} className="ms-2" />
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -288,7 +335,6 @@ function Assignment() {
 
   const { meta, questions } = assignment;
 
-  // Test Interface
   if (!submitted && assignment) {
     const currentQ = questions[currentQuestion];
     
@@ -296,10 +342,8 @@ function Assignment() {
       <div className="container-fluid min-vh-100 bg-light py-4">
         <div className="container">
           <div className="row">
-            {/* Main Test Area */}
             <div className="col-lg-9">
               <div className="card shadow-sm mb-4">
-                {/* Test Header */}
                 <div className="card-header bg-primary bg-gradient text-white">
                   <div className="row align-items-center">
                     <div className="col-md-8">
@@ -326,7 +370,6 @@ function Assignment() {
                   </div>
                 </div>
 
-                {/* Start Test Button */}
                 {!timerActive && timeLeft === null && (
                   <div className="card-body text-center py-5">
                     <h3 className="mb-4">Ready to begin?</h3>
@@ -344,8 +387,7 @@ function Assignment() {
                   </div>
                 )}
 
-                {/* Question Display */}
-                {(timerActive || timeLeft === null) && (
+                {timerActive && (
                   <div className="card-body">
                     <div className="mb-3">
                       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -363,19 +405,20 @@ function Assignment() {
                         {currentQ.options.map((option, optionIndex) => (
                           <div key={optionIndex} className="mb-3">
                             <div className="form-check p-0">
-                              <label 
+                              <label
                                 className={`option-label w-100 p-3 rounded border ${
                                   selected[currentQ.id] === optionIndex 
                                     ? 'border-primary bg-primary bg-opacity-10' 
                                     : 'border-secondary bg-white'
                                 }`}
-                                style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                                style={{ cursor: (!timerActive || submitted) ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
                               >
                                 <input
                                   className="form-check-input me-3"
                                   type="radio"
                                   name={`question-${currentQ.id}`}
                                   checked={selected[currentQ.id] === optionIndex}
+                                  disabled={!timerActive || submitted}
                                   onChange={() => handleAnswerChange(currentQ.id, optionIndex)}
                                 />
                                 <span className="badge bg-secondary me-3">
@@ -389,7 +432,6 @@ function Assignment() {
                       </div>
                     </div>
 
-                    {/* Navigation Buttons */}
                     <div className="d-flex justify-content-between mt-4">
                       <button 
                         className="btn btn-outline-secondary"
@@ -403,10 +445,19 @@ function Assignment() {
                         <button 
                           className="btn btn-success btn-lg px-5"
                           onClick={handleSubmit}
-                          disabled={!hasAttemptedQuestions}
+                          disabled={!hasAttemptedQuestions || submitting}
                         >
-                          <Save size={20} className="me-2" />
-                          Submit Test
+                          {submitting ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              <Save size={20} className="me-2" />
+                              Submit Test
+                            </>
+                          )}
                         </button>
                       ) : (
                         <button 
@@ -429,9 +480,8 @@ function Assignment() {
               </div>
             </div>
 
-            {/* Question Navigator Sidebar */}
             <div className="col-lg-3">
-              <div className="card shadow-sm sticky-top" style={{ top: '20px' }}>
+              <div className="card shadow-sm " style={{ top: '20px' }}>
                 <div className="card-header bg-secondary text-white">
                   <h6 className="mb-0">Question Navigator</h6>
                 </div>
@@ -466,7 +516,6 @@ function Assignment() {
                     </div>
                   </div>
 
-                  {/* Summary */}
                   <div className="mt-3 pt-3 border-top">
                     <h6 className="mb-2">Test Summary</h6>
                     <small className="text-muted">
@@ -484,23 +533,21 @@ function Assignment() {
     );
   }
 
-  // Result Screen
-  if (submitted) {
+  if (submitted && result) {
     return (
       <div className="container-fluid min-vh-100 bg-light py-5">
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-lg-10">
-              {/* Result Header */}
               <div className="text-center mb-4">
                 <div className="mb-3">
                   {result.pass ? (
                     <div className="text-success">
-                      <XCircle size={72} />
+                      <CheckCircle2 size={72} />
                     </div>
                   ) : (
                     <div className="text-danger">
-                      <CheckCircle2  size={72} />
+                      <XCircle size={72} />
                     </div>
                   )}
                 </div>
@@ -508,16 +555,21 @@ function Assignment() {
                 <p className="lead text-muted">Your response has been recorded successfully.</p>
               </div>
 
-
               {/* Action Buttons */}
               <div className="text-center">
-                               
-                <div className="mt-3">
-                  <small className="text-muted">
-                    <Info size={16} className="me-1" />
-                    Test results have been saved. Contact your instructor for detailed feedback.
-                  </small>
-                </div>
+                <button 
+                  className="btn btn-primary btn-lg"
+                  onClick={() => {
+                    setAssignment(null);
+                    setSubmitted(false);
+                    setSelected({});
+                    setTimeLeft(null);
+                    setTimeStarted(null);
+                  }}
+                >
+                  <BookOpen size={20} className="me-2" />
+                  Back to Tests
+                </button>
               </div>
             </div>
           </div>

@@ -4,7 +4,8 @@ const { Schema, model, Types } = require('mongoose');
 const SnapQuestionSchema = new Schema(
   {
     questionRef: { type: Types.ObjectId, ref: 'BankQuestion' },
-
+    course: { type: Types.ObjectId, ref: 'Course' },
+    centers: [{ type: Types.ObjectId, ref: 'Center'}],
     question: {
       type: String,
       required: true,
@@ -33,7 +34,6 @@ const SnapQuestionSchema = new Schema(
     marks: { type: Number, required: true, min: 0.25 },
 
     shuffleOptions: { type: Boolean, default: false },
-    negativeMarkPerWrong: { type: Number, min: 0, default: 0 }
   },
 );
 
@@ -43,7 +43,6 @@ const questionAnswerSchema = new Schema(
     durationMins: { type: Number, required: true, min: 1 },
     passPercent: { type: Number, required: true, min: 0, max: 100, default: 33 },
     totalMarks: { type: Number, required: true, min: 1 },
-    negativeMarkPerWrong: { type: Number, min: 0, default: 0 },
 
     questions: {
       type: [SnapQuestionSchema],

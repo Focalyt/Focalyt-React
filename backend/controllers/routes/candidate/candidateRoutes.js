@@ -59,7 +59,9 @@ const {
   Courses,
   AppliedCourses,
   CandidateProfile,
-  ReEnquire, Curriculum
+  ReEnquire, Curriculum,
+  AssignmentQuestions,
+  AssignmentSubmission
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -4707,6 +4709,239 @@ router.get('/enrolledCourses', [isCandidate, authenti], async (req, res) => {
     return res.status(500).json({
       status: false,
       message: "Internal Server Error",
+      error: err.message
+    });
+  }
+});
+
+router.get('/assignments', isCandidate, async (req, res) => {
+  try {
+    const courseId = (req.params && req.params.courseId) || req.query?.courseId || null;
+    const filter = {
+      isPublished: true,
+      title: { $ne: 'Question Bank' }
+    };
+    if (courseId) {
+      filter.$or = [
+        { 'questions.course': courseId },
+        { courseId: courseId },
+        { 'meta.courseId': courseId },
+        { 'meta.course': courseId }
+      ];
+    }
+    const assignments = await AssignmentQuestions.find(filter)
+      .select('-owner -createdAt -updatedAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const user = req.user;
+    let candidate = null;
+    if (user && user.mobile) {
+      candidate = await Candidate.findOne({ mobile: user.mobile }).lean();
+    }
+
+    if (!candidate) {
+    
+      return res.status(200).json({ status: true, message: 'Assignments fetched', data: assignments });
+    }
+
+   
+    const assignmentIds = assignments.map(a => a._id);
+    const submissions = await AssignmentSubmission.find({ assignment: { $in: assignmentIds }, candidate: candidate._id })
+      .select('assignment')
+      .lean();
+
+    const submittedSet = new Set(submissions.map(s => s.assignment.toString()));
+
+    
+    const annotated = assignments.map(a => ({
+      ...a,
+      submitted: submittedSet.has(a._id.toString())
+    }));
+
+    return res.status(200).json({ status: true, message: 'Assignments fetched successfully', data: annotated });
+  } catch (err) {
+    console.error('Get assignments error:', err);
+    return res.status(500).json({ status: false, message: err.message || 'Failed to fetch assignments', error: err.message });
+  }
+});
+
+
+router.get('/assignment/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const assignment = await AssignmentQuestions.findOne({
+      _id: id,
+      isPublished: true,
+      title: { $ne: 'Question Bank' }
+    })
+      .select('-owner -createdAt -updatedAt') 
+      .lean();
+
+    if (!assignment) {
+      return res.status(404).json({ 
+        status: false, 
+        message: 'Assignment not found or not published' 
+      });
+    }
+
+    return res.status(200).json({ 
+      status: true, 
+      message: 'Assignment fetched successfully', 
+      data: assignment 
+    });
+
+  } catch (err) {
+    console.error('Get assignment error:', err);
+    return res.status(500).json({ 
+      status: false, 
+      message: err.message || 'Failed to fetch assignment',
+      error: err.message
+    });
+  }
+});
+
+
+router.post('/assignment/:id/submit', isCandidate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { answers, timeStarted, timeTakenSeconds } = req.body;
+    const user = req.user;
+
+    if (!user || !user.mobile) {
+      return res.status(401).json({ status: false, message: 'Unauthorized: candidate not authenticated' });
+    }
+    const candidateProfile = await Candidate.findOne({ mobile: user.mobile }).lean();
+    if (!candidateProfile) {
+      return res.status(404).json({ 
+        status: false, 
+        message: 'Candidate profile not found' 
+      });
+    }
+
+    const assignment = await AssignmentQuestions.findOne({
+      _id: id,
+      isPublished: true,
+      title: { $ne: 'Question Bank' }
+    }).lean();
+
+    if (!assignment) {
+      return res.status(404).json({ 
+        status: false, 
+        message: 'Assignment not found or not published' 
+      });
+    }
+
+    const existingSubmission = await AssignmentSubmission.findOne({
+      assignment: id,
+      candidate: candidateProfile._id
+    });
+
+    if (existingSubmission) {
+      return res.status(400).json({ 
+        status: false, 
+        message: 'You have already submitted this assignment' 
+      });
+    }
+
+  const { questions, totalMarks, passPercent } = assignment;
+    let score = 0;
+    let correctCount = 0;
+    let wrongCount = 0;
+    let attemptedCount = 0;
+    let marksFromCorrect = 0;
+  const negEach = 0;
+
+    const answerDetails = questions.map((q) => {
+      const questionIdStr = q._id?.toString();
+      let selectedOption = -1;
+      
+      if (answers[questionIdStr] !== undefined) {
+        selectedOption = Number(answers[questionIdStr]);
+      } else {
+        Object.keys(answers).forEach(key => {
+          if (key.includes(questionIdStr) || answers[key] !== undefined) {
+            selectedOption = Number(answers[key]);
+          }
+        });
+      }
+      
+      let isCorrect = false;
+      let marksObtained = 0;
+
+      if (selectedOption !== -1 && selectedOption >= 0) {
+        attemptedCount++;
+        if (selectedOption === q.correctIndex) {
+          isCorrect = true;
+          marksObtained = Number(q.marks || 0);
+          score += marksObtained;
+          marksFromCorrect += marksObtained;
+          correctCount++;
+        } else {
+          wrongCount++;
+        }
+      }
+
+      return {
+        questionId: questionIdStr,
+        selectedOption,
+        isCorrect,
+        marksObtained
+      };
+    });
+
+    if (score < 0) score = 0;
+
+    const percentage = totalMarks ? Math.round((score / totalMarks) * 10000) / 100 : 0;
+    const pass = percentage >= Number(passPercent || 40);
+    const unattemptedCount = questions.length - attemptedCount;
+  const negativeDeducted = 0;
+
+    const submission = new AssignmentSubmission({
+      assignment: id,
+      candidate: candidateProfile._id,
+      answers: answerDetails,
+      score,
+      totalMarks,
+      percentage,
+      pass,
+      correctCount,
+      wrongCount,
+      attemptedCount,
+      unattemptedCount,
+      marksFromCorrect,
+      negativeDeducted,
+      timeStarted: timeStarted ? new Date(timeStarted) : new Date(),
+      timeSubmitted: new Date(),
+      timeTakenSeconds: timeTakenSeconds || 0
+    });
+
+    await submission.save();
+
+    return res.status(200).json({ 
+      status: true, 
+      message: 'Assignment submitted successfully', 
+      data: {
+        submissionId: submission._id,
+        score,
+        totalMarks,
+        percentage,
+        pass,
+        correctCount,
+        wrongCount,
+        attemptedCount,
+        unattemptedCount,
+        marksFromCorrect,
+        negativeDeducted
+      }
+    });
+
+  } catch (err) {
+    console.error('Submit assignment error:', err);
+    return res.status(500).json({ 
+      status: false, 
+      message: err.message || 'Failed to submit assignment',
       error: err.message
     });
   }

@@ -13303,7 +13303,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 router.post('/questionBank', isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
-		const { question, options, correctIndex, marks, shuffleOptions = false, negativeMarkPerWrong = 0 } = req.body;
+		const { question, options, correctIndex, marks, shuffleOptions = false, providedTotalMarks, courseId, centers } = req.body;
 
 		console.log("req.body", req.body);
 		if (!question || typeof question !== 'string' || !question.trim()) {
@@ -13330,8 +13330,10 @@ router.post('/questionBank', isTrainer, async (req, res) => {
 			correctAnswer: options[correctIndex].trim(),
 			marks: parsedMarks,
 			shuffleOptions: !!shuffleOptions,
-			negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0
 		};
+
+		if (courseId) snap.course = courseId;
+		if (centers) snap.centers = Array.isArray(centers) ? centers : [centers];
 
 		let bank = await AssignmentQuestions.findOne({ owner: user._id, title: 'Question Bank' });
 
@@ -13347,16 +13349,26 @@ router.post('/questionBank', isTrainer, async (req, res) => {
 		}
 
 
-		const newBank = new AssignmentQuestions({
-			title: 'Question Bank',
-			durationMins: 30,
-			passPercent: 33,
-			// totalMarks: ,
-			negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0,
-			questions: [snap],
-			owner: user._id,
-			isPublished: false
-		});
+			let bankTotal;
+			if (providedTotalMarks !== undefined) {
+				const parsedTotal = Number(providedTotalMarks);
+				if (isNaN(parsedTotal) || parsedTotal <= 0) {
+					return res.status(400).json({ status: false, message: 'providedTotalMarks must be a positive number' });
+				}
+				bankTotal = parsedTotal;
+			} else {
+				bankTotal = Math.max(100, parsedMarks);
+			}
+
+			const newBank = new AssignmentQuestions({
+				title: 'Question Bank',
+				durationMins: 30,
+				passPercent: 33,
+				totalMarks: bankTotal,
+				questions: [snap],
+				owner: user._id,
+				isPublished: false
+			});
 
 		await newBank.save();
 		return res.status(200).json({ status: true, message: 'Question bank created and question added', data: newBank });
@@ -13370,18 +13382,108 @@ router.post('/questionBank', isTrainer, async (req, res) => {
 router.get('/allquestionandanswers', isTrainer, async (req, res) => {
   try {
     const user = req.user;
-    const bank = await AssignmentQuestions
-      .findOne({ owner: user._id, title: 'Question Bank' })
-      .lean();
+		const bank = await AssignmentQuestions
+			.findOne({ owner: user._id, title: 'Question Bank' })
+			.lean();
 
-    if (!bank) {
-      return res.status(200).json({ status: true, message: 'No bank yet', data: { questions: [] } });
-    }
-    return res.status(200).json({ status: true, message: 'Question bank retrieved', data: bank });
+		if (!bank) {
+			return res.status(200).json({ status: true, message: 'No bank yet', data: { questions: [] } });
+		}
+
+		const { courseId } = req.query || {};
+		if (courseId) {
+			const filtered = (bank.questions || []).filter(q => {
+				if (!q.course) return false;
+				return String(q.course) === String(courseId);
+			});
+			return res.status(200).json({ status: true, message: 'Question bank retrieved', data: { ...bank, questions: filtered } });
+		}
+
+		return res.status(200).json({ status: true, message: 'Question bank retrieved', data: bank });
   } catch (err) {
     console.log('GET /allquestionandanswers error:', err.message);
     return res.status(500).json({ status: false, message: err.message });
   }
 });
 
+router.post('/assignment', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+    const { meta, questions } = req.body;
+
+    if (!meta || !meta.title || !meta.title.trim()) {
+      return res.status(400).json({ status: false, message: 'Assignment title is required' });
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ status: false, message: 'At least one question is required' });
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.question || !q.question.trim()) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Question text is required` });
+      }
+      if (!Array.isArray(q.options) || q.options.length !== 4) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Must have exactly 4 options` });
+      }
+      if (q.options.some(opt => !opt || !opt.trim())) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: All options must be non-empty` });
+      }
+      if (typeof q.correctIndex !== 'number' || q.correctIndex < 0 || q.correctIndex > 3) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid correctIndex (0-3) is required` });
+      }
+      if (!q.marks || Number(q.marks) <= 0) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid marks is required` });
+      }
+    }
+
+		const snapQuestions = questions.map(q => ({
+      question: q.question.trim(),
+      options: q.options.map(opt => opt.trim()),
+      correctIndex: q.correctIndex,
+		correctAnswer: q.options[q.correctIndex].trim(),
+		marks: Number(q.marks),
+		shuffleOptions: q.shuffleOptions || false,
+		course: q.course || undefined,
+		centers: q.centers && q.centers.length ? q.centers : undefined,
+    }));
+
+    const allocatedMarks = snapQuestions.reduce((sum, q) => sum + q.marks, 0);
+    const totalMarks = Number(meta.totalMarks) || allocatedMarks;
+
+    if (allocatedMarks > totalMarks) {
+      return res.status(400).json({ 
+        status: false, 
+        message: `Allocated marks (${allocatedMarks}) cannot exceed total marks (${totalMarks})` 
+      });
+    }
+
+		const assignment = new AssignmentQuestions({
+			title: meta.title.trim(),
+			durationMins: Number(meta.durationMins) || 30,
+			passPercent: Number(meta.passPercent) || 40,
+			totalMarks: totalMarks,
+			questions: snapQuestions,
+			owner: user._id,
+			isPublished: true 
+		});
+
+    await assignment.save();
+
+    return res.status(200).json({ 
+      status: true, 
+      message: 'Assignment created successfully', 
+      data: assignment 
+    });
+
+  } catch (err) {
+    console.error('Create assignment error:', err);
+    return res.status(500).json({ 
+      status: false, 
+      message: err.message || 'Failed to create assignment',
+      error: err.message
+    });
+  }
+});
 module.exports = router;

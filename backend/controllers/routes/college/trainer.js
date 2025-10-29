@@ -325,7 +325,6 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 
 		// console.log("req.body", req.body);
 
-		// Validate required fields
 		if (!appliedCourseId || !date || !status) {
 			return res.status(400).json({
 				status: false,
@@ -333,7 +332,6 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			});
 		}
 
-		// Validate status
 		if (!['Present', 'Absent'].includes(status)) {
 			return res.status(400).json({
 				status: false,
@@ -341,7 +339,6 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			});
 		}
 
-		// Validate period
 		if (!['zeroPeriod', 'regularPeriod'].includes(period)) {
 			return res.status(400).json({
 				status: false,
@@ -349,7 +346,6 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			});
 		}
 
-		// Find the applied course
 		const appliedCourse = await AppliedCourses.findById(appliedCourseId)
 			.populate('_course')
 			.populate('batch');
@@ -361,7 +357,6 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			});
 		}
 
-		// Verify that the course belongs to the college
 		const college = await College.findOne({
 			'trainers': user._id 
 		});
@@ -380,10 +375,8 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			});
 		}
 
-		// Mark attendance using the schema method
 		await appliedCourse.markAttendance(date, status, period, user._id, remarks);
 
-		// Get updated attendance data
 		const updatedCourse = await AppliedCourses.findById(appliedCourseId)
 			.populate('_course')
 			.populate('batch');
@@ -414,9 +407,9 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 router.post('/questionBank', isTrainer, async (req, res) => {
     try {
         const user = req.user;
-        const { question, options, correctIndex, marks, shuffleOptions = false, negativeMarkPerWrong = 0 } = req.body;
+        const { question, options, correctIndex, marks, shuffleOptions, providedTotalMarks, courseId, centers } = req.body;
 
-        console.log("req.body", req.body);
+        // console.log("req.body", req.body);
         if (!question || typeof question !== 'string' || !question.trim()) {
             return res.status(400).json({ status: false, message: 'Question text is required' });
         }
@@ -442,8 +435,14 @@ router.post('/questionBank', isTrainer, async (req, res) => {
             correctAnswer: options[correctIndex].trim(),
             marks: parsedMarks,
             shuffleOptions: !!shuffleOptions,
-            negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0
         };
+
+        if (courseId) {
+            snap.course = courseId;
+        }
+        if (centers) {
+            snap.centers = Array.isArray(centers) ? centers : [centers];
+        }
 
         let bank = await AssignmentQuestions.findOne({ owner: user._id, title: 'Question Bank' });
 
@@ -465,7 +464,6 @@ router.post('/questionBank', isTrainer, async (req, res) => {
             durationMins: 30,
             passPercent: 33,
             totalMarks: bankTotal,
-            negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0,
             questions: [snap],
             owner: user._id,
             isPublished: false

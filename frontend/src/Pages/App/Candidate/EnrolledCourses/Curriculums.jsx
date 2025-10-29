@@ -9,6 +9,8 @@ import {
   Video, Film, FileVideo
 } from 'lucide-react';
 
+import Assignment from '../Assignment/Assignment';
+
 function Enrolled() {
     const { courseId } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
@@ -53,7 +55,8 @@ function Enrolled() {
             
             // Find the course with matching courseId
             const appliedCourses = response.data?.courses || [];
-            const appliedCourse = appliedCourses.find(ac => ac._course?._id === courseId);
+            // Be defensive: compare as strings to handle ObjectId vs string mismatch
+            const appliedCourse = appliedCourses.find(ac => String(ac._course?._id) === String(courseId));
             
             if (appliedCourse && appliedCourse._course) {
                 const courseData = appliedCourse._course;
@@ -173,6 +176,7 @@ const fetchCurriculum = async () => {
     const tabs = [
         { id: 'overview', label: 'Curriculum' },
         { id: 'attendance', label: 'Attendance' },
+        { id: 'assignment', label: 'Assignment' },
 
     ];
 
@@ -742,6 +746,11 @@ const fetchCurriculum = async () => {
                                 </div>
                             </div>
                         )}
+                                {activeTab === 'assignment' && (
+                                     <div className="tab-pane fade show active">
+                                         <Assignment courseId={course._id} />
+                                     </div>
+                                )}
 
                         {/*
                         {activeTab === 'reviews' && (

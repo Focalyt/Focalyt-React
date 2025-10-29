@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, Trash2, Database, Search, Filter, CheckSquare, Square } from 'lucide-react';
 import axios from 'axios';
 
@@ -9,21 +10,16 @@ function CreateAssignment() {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = JSON.parse(sessionStorage.getItem('token'));
 
-  const [meta, setMeta] = useState({
-    title: '',
-    durationMins: 30,
-    passPercent: 40,
-    totalMarks: 100,
-    negativeMarkPerWrong: 0,
-  });
-
-  const [questions, setQuestions] = useState([]);
 
 
   const [questionBank, setQuestionBank] = useState([]);
   const [bankSearchTerm, setBankSearchTerm] = useState('');
   const [bankFilterMarks, setBankFilterMarks] = useState('');
   const [selectedBankQuestions, setSelectedBankQuestions] = useState(new Set());
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const courseIdFromQuery = params.get('courseId') || '';
+
   const [newBankQuestion, setNewBankQuestion] = useState({
     question: '',
     options: ['', '', '', ''],
@@ -31,34 +27,18 @@ function CreateAssignment() {
     marks: 1
   });
 
+  const [selectedCourseForBank, setSelectedCourseForBank] = useState(courseIdFromQuery);
+
   // Assignment settings in Question Bank
   const [bankAssignmentSettings, setBankAssignmentSettings] = useState({
     title: '',
     durationMins: 30,
     passPercent: 40,
     totalMarks: 100,
-    negativeMarkPerWrong: 0
+    // negativeMarkPerWrong removed
   });
 
 
-  const totalAllocated = useMemo(
-    () => questions.reduce((sum, q) => sum + Number(q.marks || 0), 0),
-    [questions]
-  );
-
-  const isQuestionsValid = useMemo(() => {
-    if (!questions.length) return false;
-    for (const q of questions) {
-      if (!q.question?.trim()) return false;
-      // Removed correct answer requirement - students can submit without correct answers set
-      if (!q.options || q.options.length !== 4) return false;
-      for (const op of q.options) {
-        if (!op?.trim()) return false;
-      }
-      if (!q.marks || Number(q.marks) <= 0) return false;
-    }
-    return true;
-  }, [questions]);
 
   // Filtered question bank
   const filteredQuestionBank = useMemo(() => {
@@ -71,61 +51,6 @@ function CreateAssignment() {
     });
   }, [questionBank, bankSearchTerm, bankFilterMarks]);
 
-  const canSave =
-    meta.title.trim() &&
-    Number(meta.durationMins) > 0 &&
-    Number(meta.passPercent) >= 0 &&
-    Number(meta.passPercent) <= 100 &&
-    questions.length > 0 &&
-    isQuestionsValid &&
-    Number(totalAllocated) <= Number(meta.totalMarks);
-
-  const handleQuestionChange = (id, value) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, question: value } : q))
-    );
-  };
-
-  const handleOptionChange = (questionId, optionIndex, value) => {
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id !== questionId) return q;
-        const next = [...q.options];
-        next[optionIndex] = value;
-        return { ...q, options: next };
-      })
-    );
-  };
-
-  const handleCorrectIndexChange = (questionId, index) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, correctIndex: index } : q))
-    );
-  };
-
-  const handleMarksChange = (questionId, value) => {
-    const n = Number(value);
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, marks: isNaN(n) ? 0 : n } : q))
-    );
-  };
-
-  const addQuestion = () => {
-    setQuestions((prev) => [
-      ...prev,
-      {
-        id: prev.length ? Math.max(...prev.map((x) => x.id)) + 1 : 1,
-        question: '',
-        options: ['', '', '', ''],
-        correctIndex: null,  // Start with no correct answer selected
-        marks: 1,
-      },
-    ]);
-  };
-
-  const removeQuestion = (id) => {
-    setQuestions((prev) => prev.filter((q) => q.id !== id));
-  };
 
   const addToQuestionBank = async () => {
     try {
@@ -150,7 +75,8 @@ function CreateAssignment() {
         options: options.map(o => o.trim()),
         correctIndex,
         marks: parsedMarks,
-
+        shuffleOptions: false,
+        courseId: selectedCourseForBank,
       };
 
       const headers = {
@@ -171,6 +97,9 @@ function CreateAssignment() {
             options: Array.isArray(q.options) ? q.options : [],
             correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
             marks: Number(q.marks) || 0,
+            // preserve metadata so assignments keep course/centers
+            course: q.course || undefined,
+            centers: Array.isArray(q.centers) ? q.centers : (q.centers ? [q.centers] : []),
           }));
 
           setQuestionBank(normalized);
@@ -198,7 +127,9 @@ function CreateAssignment() {
   useEffect(() => {
     const run = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/college/allquestionandanswers`, {
+        // if courseId is provided in query, fetch only that course's questions
+        const courseQuery = courseIdFromQuery ? `?courseId=${courseIdFromQuery}` : '';
+        const res = await axios.get(`${backendUrl}/college/allquestionandanswers${courseQuery}`, {
           headers: { 'x-auth': token }
         });
         // console.log('Bank fetch response:', res);
@@ -210,6 +141,8 @@ function CreateAssignment() {
             options: Array.isArray(q.options) ? q.options : [],
             correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
             marks: Number(q.marks) || 0,
+            course: q.course || undefined,
+            centers: Array.isArray(q.centers) ? q.centers : (q.centers ? [q.centers] : []),
           }));
           setQuestionBank(normalized);
         }
@@ -220,13 +153,7 @@ function CreateAssignment() {
     run();
   }, []);
   const removeFromQuestionBank = (id) => {
-    const updatedBank = questionBank.filter(q => q.id !== id);
-    setQuestionBank(updatedBank);
-    setSelectedBankQuestions(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
+   
   };
 
   const toggleBankQuestionSelection = (id) => {
@@ -241,32 +168,81 @@ function CreateAssignment() {
     });
   };
 
-  const addSelectedQuestionsToAssignment = () => {
-   try{}
-   catch(err){
-    console.error('Add selected questions error:', err);
-   }
+  const addSelectedQuestionsToAssignment = async () => {
+    try {
+      // Check if any questions are selected
+      if (selectedBankQuestions.size === 0) {
+        alert('Please select at least one question to add.');
+        return;
+      }
+
+     
+      if (!bankAssignmentSettings.title || !bankAssignmentSettings.title.trim()) {
+        alert('Please enter assignment title in Assignment Settings.');
+        return;
+      }
+
+      const selectedQuestionsList = questionBank.filter(q => 
+        selectedBankQuestions.has(q.id)
+      );
+
+      if (selectedQuestionsList.length === 0) {
+        alert('No valid questions found. Please try again.');
+        return;
+      }
+
+      const questionsToSave = selectedQuestionsList.map((q) => ({
+        question: q.question || '',
+        options: q.options || [],
+        correctIndex: q.correctIndex !== undefined && q.correctIndex !== null ? q.correctIndex : 0,
+        marks: Number(q.marks) || 1,
+        shuffleOptions: false,
+        course: q.course || undefined,
+        centers: q.centers && q.centers.length ? q.centers : undefined,
+      }));
+
+      const payload = {
+        meta: {
+          title: bankAssignmentSettings.title.trim(),
+          durationMins: Number(bankAssignmentSettings.durationMins) || 30,
+          passPercent: Number(bankAssignmentSettings.passPercent) || 40,
+          totalMarks: Number(bankAssignmentSettings.totalMarks) || 100,
+          // negativeMarkPerWrong removed
+        },
+        questions: questionsToSave,
+      };
+
+      const headers = {
+        'x-auth': token
+      };
+
+      const response = await axios.post(`${backendUrl}/college/assignment`, payload, { headers });
+
+      if (response && response.data) {
+        if (response.data.status) {
+          setSelectedBankQuestions(new Set());
+          
+          setBankAssignmentSettings({
+            title: '',
+            durationMins: 30,
+            passPercent: 40,
+            totalMarks: 100,
+            negativeMarkPerWrong: 0
+          });
+
+          alert(response.data.message || `Assignment "${bankAssignmentSettings.title}" saved successfully!`);
+        } else {
+          alert(response.data.message || 'Failed to save assignment.');
+        }
+      } else {
+        alert('Unexpected server response.');
+      }
+    } catch(err) {
+      console.error('Add selected questions error:', err);
+      alert(err.response?.data?.message || err.message || 'Failed to save assignment. Please try again.');
+    }
   };
 
-  const handleSave = () => {
-    if (!canSave) {
-      alert(
-        'Please fix errors before saving.\n- Make sure all fields are filled\n- Sum of marks should not exceed total marks'
-      );
-      return;
-    }
-    const payload = {
-      meta: {
-        title: meta.title.trim(),
-        durationMins: Number(meta.durationMins),
-        passPercent: Number(meta.passPercent),
-        totalMarks: Number(meta.totalMarks),
-        negativeMarkPerWrong: Number(meta.negativeMarkPerWrong || 0),
-      },
-      questions,
-    };
-    alert('Assignment saved successfully!');
-  };
 
   return (
     <div className="create-assignment-container">
@@ -376,16 +352,7 @@ function CreateAssignment() {
                     onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, totalMarks: Number(e.target.value) })}
                   />
                 </div>
-                <div className="meta-field">
-                  <label>Negative Mark per wrong (optional)</label>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min={0}
-                    value={bankAssignmentSettings.negativeMarkPerWrong}
-                    onChange={(e) => setBankAssignmentSettings({ ...bankAssignmentSettings, negativeMarkPerWrong: Number(e.target.value) })}
-                  />
-                </div>
+                {/* negativeMarkPerWrong removed */}
               </div>
             </div>
           )}
@@ -455,14 +422,14 @@ function CreateAssignment() {
                     </div>
                   </div>
 
-                  <div className="question-actions">
+                  {/* <div className="question-actions">
                     <button
                       className="remove-bank-btn"
                       onClick={() => removeFromQuestionBank(q.id)}
                     >
                       <Trash2 size={16} />
                     </button>
-                  </div>
+                  </div> */}
                 </div>
               ))}
 
