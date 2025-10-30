@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -12397,9 +12397,10 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 			college: collegeId,
 			trainers: trainerId
 		})
-			.select('name description image trainers center centerId')
+			.select('name description image trainers center centerId project')
 			.populate('center', 'name address')
-			.populate('centerId', 'name address');
+			.populate('centerId', 'name address')
+			.populate('project', 'name');
 
 		const trainer = await User.findOne({
 			_id: trainerId,
@@ -12422,7 +12423,8 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 				name: course.name,
 				image: course.image,
 				description: course.description,
-				center: centerInfo
+				center: centerInfo,
+				project: course.project
 			};
 		});
 
@@ -12445,6 +12447,164 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		return res.status(500).json({
 			status: false,
 			message: 'Error while fetching trainer courses'
+		});
+	}
+});
+
+// New API for Dashboard - Get All Trainers with their Courses (Combined View)
+router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
+	try {
+		const { trainerId: filterTrainerId, centerId, projectId, search, collegeId: filterCollegeId } = req.query;
+		const loggedInCollegeId = req.college._id;
+
+		console.log('🔍 Dashboard API called - Fetching all trainers courses');
+		console.log('👤 Logged-in user college:', loggedInCollegeId);
+		console.log('📊 Filters:', { filterTrainerId, centerId, projectId, search, filterCollegeId });
+
+		// Build course query
+		// IMPORTANT: When filters are provided, they determine the data, not the logged-in user
+		let courseQuery = {};
+		
+		// Strategy: If specific filters (trainer/project) are provided, find the college from them
+		// This ensures same filters = same results regardless of who's logged in
+		let targetCollegeId = filterCollegeId || loggedInCollegeId;
+
+		// If trainer filter is provided, get college from that trainer
+		if (filterTrainerId) {
+			const trainer = await User.findOne({ _id: filterTrainerId, role: 4 }).select('collegeId');
+			if (trainer && trainer.collegeId) {
+				targetCollegeId = trainer.collegeId;
+				console.log('✅ Using college from filtered trainer:', targetCollegeId);
+			}
+		}
+		
+		// If project filter is provided, get college from that project
+		if (projectId && !filterTrainerId) {
+			const Project = require('../models/project');
+			const project = await Project.findOne({ _id: projectId }).select('collegeId college');
+			if (project && (project.collegeId || project.college)) {
+				targetCollegeId = project.collegeId || project.college;
+				console.log('✅ Using college from filtered project:', targetCollegeId);
+			}
+		}
+
+		courseQuery.college = targetCollegeId;
+		console.log('🎯 Final Target College ID for query:', targetCollegeId);
+		
+		// Add other filters if provided
+		if (filterTrainerId) {
+			courseQuery.trainers = filterTrainerId;
+		}
+		if (centerId) {
+			courseQuery.centerId = centerId;
+		}
+		if (projectId) {
+			courseQuery.project = projectId;
+		}
+
+		// Get all courses based on filters
+		const courses = await Courses.find(courseQuery)
+			.select('name description image trainers center centerId project')
+			.populate('center', 'name address')
+			.populate('centerId', 'name address')
+			.populate('project', 'name')
+			.populate('trainers', 'name email mobile _id');
+
+		console.log('📚 Total courses found:', courses.length);
+
+		// Get all unique trainers from these courses
+		const trainerIds = new Set();
+		courses.forEach(course => {
+			if (course.trainers && Array.isArray(course.trainers)) {
+				course.trainers.forEach(trainer => {
+					trainerIds.add(trainer._id.toString());
+				});
+			}
+		});
+
+		console.log('👥 Unique trainer IDs found:', trainerIds.size);
+
+		// Get all trainers
+		let trainers = await User.find({
+			_id: { $in: Array.from(trainerIds) },
+			role: 4,
+			isDeleted: false
+		}).select('name email mobile _id');
+
+		console.log('✅ Trainers fetched from DB:', trainers.length);
+
+		// Apply search filter on trainers if provided
+		if (search && search.trim()) {
+			const searchLower = search.toLowerCase().trim();
+			trainers = trainers.filter(trainer => 
+				trainer.name.toLowerCase().includes(searchLower) ||
+				(trainer.email && trainer.email.toLowerCase().includes(searchLower)) ||
+				(trainer.mobile && trainer.mobile.includes(search))
+			);
+		}
+
+		// Map courses to trainers
+		const trainersWithCourses = trainers.map(trainer => {
+			const trainerCourses = courses.filter(course => {
+				return course.trainers && course.trainers.some(t => t._id.toString() === trainer._id.toString());
+			});
+
+			const assignedCourses = trainerCourses.map(course => {
+				const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+				return {
+					_id: course._id,
+					name: course.name,
+					image: course.image,
+					description: course.description,
+					center: centerInfo,
+					project: course.project
+				};
+			});
+
+			return {
+				_id: trainer._id,
+				name: trainer.name,
+				email: trainer.email,
+				mobile: trainer.mobile,
+				assignedCourses: assignedCourses,
+				totalCourses: assignedCourses.length
+			};
+		});
+
+		console.log('📦 Final trainers with courses:', trainersWithCourses.length);
+
+		// Calculate statistics
+		const totalCourses = courses.length;
+		const totalTrainers = trainersWithCourses.length;
+		const totalAssignments = trainersWithCourses.reduce((sum, trainer) => sum + trainer.totalCourses, 0);
+
+		// Get unique centers and projects for filter options
+		const centers = [...new Set(courses.map(c => c.centerId).filter(c => c))];
+		const projects = [...new Set(courses.map(c => c.project).filter(p => p))];
+
+		return res.status(200).json({
+			status: true,
+			message: 'All trainers with courses fetched successfully',
+			data: trainersWithCourses,
+			statistics: {
+				totalTrainers,
+				totalCourses,
+				totalAssignments,
+				uniqueCenters: centers.length,
+				uniqueProjects: projects.length
+			},
+			filterOptions: {
+				centers: centers,
+				projects: projects,
+				trainers: trainers.map(t => ({ _id: t._id, name: t.name }))
+			}
+		});
+	} catch (err) {
+		console.log('❌ Error in dashboard/alltrainerscourses:', err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching trainers courses for dashboard',
+			error: err.message
 		});
 	}
 });
@@ -13486,4 +13646,120 @@ router.post('/assignment', isTrainer, async (req, res) => {
     });
   }
 });
+
+router.get('/assignment-submissions', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+    const { courseId, assignmentId } = req.query;
+
+    let filter = {};
+    if (assignmentId) {
+      filter.assignment = assignmentId;
+    }
+    const submissions = await AssignmentSubmission.find(filter)
+      .populate({
+        path: 'candidate',
+        select: 'name email mobile'
+      })
+      .populate({
+        path: 'assignment',
+        select: 'title totalMarks durationMins passPercent questions'
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+    const courseIds = new Set();
+    submissions.forEach(sub => {
+      if (sub.assignment && sub.assignment.questions) {
+        sub.assignment.questions.forEach(q => {
+          if (q.course) courseIds.add(String(q.course));
+        });
+      }
+    });
+
+    const courseMap = {};
+    if (courseIds.size > 0) {
+      try {
+        const courses = await Courses.find({ _id: { $in: Array.from(courseIds) } })
+          .select('name project')
+          .populate('project', 'name')
+          .lean();
+        courses.forEach(course => {
+          courseMap[String(course._id)] = {
+            name: course.name,
+            projectId: course.project?._id,
+            projectName: course.project?.name
+          };
+        });
+      } catch (err) {
+        console.error('Error fetching courses:', err);
+      }
+    }
+    let filteredSubmissions = submissions;
+    if (courseId) {
+      filteredSubmissions = submissions.filter(sub => {
+        if (!sub.assignment || !sub.assignment.questions) return false;
+        return sub.assignment.questions.some(q => 
+          q.course && String(q.course) === String(courseId)
+        );
+      });
+    }
+
+    const formattedSubmissions = filteredSubmissions.map(sub => {
+      let courseName = 'N/A';
+      let extractedCourseId = null;
+      let projectId = null;
+      let projectName = 'N/A';
+      
+      if (sub.assignment && sub.assignment.questions && sub.assignment.questions.length > 0) {
+        const firstCourse = sub.assignment.questions.find(q => q.course);
+        if (firstCourse && firstCourse.course) {
+          extractedCourseId = String(firstCourse.course);
+          const courseInfo = courseMap[extractedCourseId];
+          if (courseInfo) {
+            courseName = courseInfo.name || 'N/A';
+            projectId = courseInfo.projectId;
+            projectName = courseInfo.projectName || 'N/A';
+          }
+        }
+      }
+
+      return {
+        _id: sub._id,
+        studentName: sub.candidate?.name || 'Unknown',
+        studentEmail: sub.candidate?.email || 'N/A',
+        studentMobile: sub.candidate?.mobile || 'N/A',
+        assignmentTitle: sub.assignment?.title || 'N/A',
+        courseName: courseName,
+        courseId: extractedCourseId,
+        projectId: projectId,
+        projectName: projectName,
+        score: sub.score || 0,
+        totalMarks: sub.totalMarks || 0,
+        percentage: sub.percentage || 0,
+        pass: sub.pass || false,
+        correctCount: sub.correctCount || 0,
+        wrongCount: sub.wrongCount || 0,
+        attemptedCount: sub.attemptedCount || 0,
+        unattemptedCount: sub.unattemptedCount || 0,
+        timeTakenSeconds: sub.timeTakenSeconds || 0,
+        submittedAt: sub.timeSubmitted || sub.createdAt
+      };
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Assignment submissions fetched successfully',
+      data: formattedSubmissions
+    });
+
+  } catch (err) {
+    console.error('Get assignment submissions error:', err);
+    return res.status(500).json({
+      status: false,
+      message: err.message || 'Failed to fetch assignment submissions',
+      error: err.message
+    });
+  }
+});
+
 module.exports = router;

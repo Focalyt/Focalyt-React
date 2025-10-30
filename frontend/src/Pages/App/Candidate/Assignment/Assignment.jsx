@@ -54,36 +54,37 @@ function Assignment({ courseId }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        const query = courseId ? `?courseId=${courseId}` : '';
-        const res = await axios.get(`${backendUrl}/candidate/assignments${query}`, {
-          headers: { 'x-auth': token }
-        });
-        if (res?.data?.status) {
-          const all = res.data.data || [];
-    const matchesCourse = (a) => {
-            if (!courseId) return true;
-            try {
-              const cid = String(courseId);
-              if (a.courseId && String(a.courseId) === cid) return true;
-              if (a.meta && (a.meta.courseId || a.meta.course) && String(a.meta.courseId || a.meta.course) === cid) return true;
-              if (a.questions && a.questions.some(q => q.course && String(q.course) === cid)) return true;
-            } catch (e) {
-            }
-            return false;
-          };
+  const fetchAssignments = async () => {
+    try {
+      const query = courseId ? `?courseId=${courseId}` : '';
+      const res = await axios.get(`${backendUrl}/candidate/assignments${query}`, {
+        headers: { 'x-auth': token }
+      });
+      if (res?.data?.status) {
+        const all = res.data.data || [];
+  const matchesCourse = (a) => {
+          if (!courseId) return true;
+          try {
+            const cid = String(courseId);
+            if (a.courseId && String(a.courseId) === cid) return true;
+            if (a.meta && (a.meta.courseId || a.meta.course) && String(a.meta.courseId || a.meta.course) === cid) return true;
+            if (a.questions && a.questions.some(q => q.course && String(q.course) === cid)) return true;
+          } catch (e) {
+          }
+          return false;
+        };
 
-          const filtered = all.filter(matchesCourse);
-          setAssignments(filtered);
-        }
-      } catch (err) {
-        console.error('Failed to fetch assignments:', err);
-      } finally {
-        setLoading(false);
+        const filtered = all.filter(matchesCourse);
+        setAssignments(filtered);
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch assignments:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAssignments();
   }, [courseId]);
 
@@ -282,7 +283,7 @@ function Assignment({ courseId }) {
 
               <div className="row g-4">
                 {assignments.map((a) => (
-                  <div key={a._id} className="col-md-6 col-lg-4">
+                  <div key={a._id} className="col-md-6 col-lg-6">
                     <div 
                       className={`card h-100 shadow-sm test-card ${a.submitted ? 'opacity-75' : ''}`}
                       onClick={() => a.submitted ? alert('You have already submitted this test and cannot retake it.') : selectAssignment(a)}
@@ -565,6 +566,7 @@ function Assignment({ courseId }) {
                     setSelected({});
                     setTimeLeft(null);
                     setTimeStarted(null);
+                    fetchAssignments();
                   }}
                 >
                   <BookOpen size={20} className="me-2" />

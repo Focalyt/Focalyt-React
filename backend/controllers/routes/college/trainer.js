@@ -477,4 +477,23 @@ router.post('/questionBank', isTrainer, async (req, res) => {
     }
 
 });
+router.get('/list-projects', async (req, res) => {
+	try {
+		let filter = {};
+		let vertical = req.query.vertical;
+		if (vertical && typeof vertical !== 'string') { 
+			vertical = new mongoose.Types.ObjectId(vertical); 
+		}
+		if (vertical) {
+			filter.vertical = vertical;
+		}
+
+		const projects = await Project.find(filter).sort({ createdAt: -1 });
+		res.json({ success: true, data: projects });
+	} catch (error) {
+		console.error('Error fetching projects:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
 module.exports = router;
