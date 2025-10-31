@@ -1532,9 +1532,14 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 				}
 			}
 			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+				if (typeof doc._candidate.personalInfo.permanentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.city)) {
+					try {
 					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
 					if (city) {
 						doc._candidate.personalInfo.permanentAddress.city = city.name;
+						}
+					} catch (err) {
+					}
 					}
 				}
 			}
