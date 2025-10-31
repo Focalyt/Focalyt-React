@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8080';
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
   useEffect(() => {
     const socket = io(`${backendUrl}`, { query: { userId } });
