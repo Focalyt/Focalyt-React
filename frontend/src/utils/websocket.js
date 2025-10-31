@@ -75,6 +75,7 @@ function useWebsocket(userId) {
     socket.on("missedFollowup", (data) => {
       console.log("⚠️ Missed followup received:", data);
       setUpdates(prev => [...prev, data]);
+    });
 
     socket.on("whatsapp_message_status_update", (data) => {
       console.log("⚠️ WhatsApp message status update received:", data);
