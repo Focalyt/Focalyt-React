@@ -948,6 +948,12 @@ function CandidateLayout({ children }) {
                       <span className="menu-title">Applied Course</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/candidate/enrolledCourses' ? 'active' : ''}`}>
+                    <Link to="/candidate/enrolledCourses" onClick={() => { handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farPaperPlane} />
+                      <span className="menu-title">Enrolled Course</span>
+                    </Link>
+                  </li>
                 </ul>
               </li>
 

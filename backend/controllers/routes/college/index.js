@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -1496,38 +1496,39 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		// Execute aggregation
 		const response = await AppliedCourses.aggregate(aggregationPipeline);
 
-	for (let doc of response) {
-		if (doc._candidate && doc._candidate.personalInfo) {
-			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
-				if (typeof doc._candidate.personalInfo.currentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.state)) {
-					try {
-						const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
-						if (state) {
-							doc._candidate.personalInfo.currentAddress.state = state.name;
+		for (let doc of response) {
+			if (doc._candidate && doc._candidate.personalInfo) {
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.state) {
+					if (typeof doc._candidate.personalInfo.currentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.state)) {
+						try {
+							const state = await State.findById(doc._candidate.personalInfo.currentAddress.state);
+							if (state) {
+								doc._candidate.personalInfo.currentAddress.state = state.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
-			}
-			if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
-				if (typeof doc._candidate.personalInfo.currentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.city)) {
-					try {
-						const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
-						if (city) {
-							doc._candidate.personalInfo.currentAddress.city = city.name;
+				if (doc._candidate.personalInfo.currentAddress && doc._candidate.personalInfo.currentAddress.city) {
+					if (typeof doc._candidate.personalInfo.currentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.currentAddress.city)) {
+						try {
+							const city = await City.findById(doc._candidate.personalInfo.currentAddress.city);
+							if (city) {
+								doc._candidate.personalInfo.currentAddress.city = city.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
-			}
-			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
-				if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
-					try {
-						const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
-						if (state) {
-							doc._candidate.personalInfo.permanentAddress.state = state.name;
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+					if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
+						try {
+							const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+							if (state) {
+								doc._candidate.personalInfo.permanentAddress.state = state.name;
+							}
+						} catch (err) {
 						}
-					} catch (err) {
 					}
 				}
 			}
@@ -12344,8 +12345,8 @@ router.get('/centers', isTrainer, async (req, res) => {
 			college: collegeId,
 			trainers: trainerId
 		}).populate('center', 'name address')
-		.populate('centerId', 'name address');
-		
+			.populate('centerId', 'name address');
+
 		return res.status(200).json({
 			status: true,
 			message: 'Centers fetched successfully',
@@ -12398,38 +12399,40 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		}
 
 
-	const courses = await Courses.find({
-		college: collegeId,
-		trainers: trainerId
-	})
-	.select('name description image trainers center centerId')
-	.populate('center', 'name address')
-	.populate('centerId', 'name address');
+		const courses = await Courses.find({
+			college: collegeId,
+			trainers: trainerId
+		})
+			.select('name description image trainers center centerId project')
+			.populate('center', 'name address')
+			.populate('centerId', 'name address')
+			.populate('project', 'name');
 
-	const trainer = await User.findOne({
-		_id: trainerId,
-		role: 4
-	}).select('name email mobile _id');
+		const trainer = await User.findOne({
+			_id: trainerId,
+			role: 4
+		}).select('name email mobile _id');
 
-	if (!trainer) {
-		return res.status(404).json({
-			status: false,
-			message: 'Trainer not found'
+		if (!trainer) {
+			return res.status(404).json({
+				status: false,
+				message: 'Trainer not found'
+			});
+		}
+
+		const assignedCourses = courses.map(course => {
+			// Get center info - prefer centerId, fallback to first center in array
+			const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+
+			return {
+				_id: course._id,
+				name: course.name,
+				image: course.image,
+				description: course.description,
+				center: centerInfo,
+				project: course.project
+			};
 		});
-	}
-
-	const assignedCourses = courses.map(course => {
-		// Get center info - prefer centerId, fallback to first center in array
-		const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
-		
-		return {
-			_id: course._id,
-			name: course.name,
-			image: course.image,
-			description: course.description,
-			center: centerInfo
-		};
-	});
 
 		const trainerWithCourses = {
 			_id: trainer._id,
@@ -12450,6 +12453,164 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		return res.status(500).json({
 			status: false,
 			message: 'Error while fetching trainer courses'
+		});
+	}
+});
+
+// New API for Dashboard - Get All Trainers with their Courses (Combined View)
+router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
+	try {
+		const { trainerId: filterTrainerId, centerId, projectId, search, collegeId: filterCollegeId } = req.query;
+		const loggedInCollegeId = req.college._id;
+
+		console.log('🔍 Dashboard API called - Fetching all trainers courses');
+		console.log('👤 Logged-in user college:', loggedInCollegeId);
+		console.log('📊 Filters:', { filterTrainerId, centerId, projectId, search, filterCollegeId });
+
+		// Build course query
+		// IMPORTANT: When filters are provided, they determine the data, not the logged-in user
+		let courseQuery = {};
+		
+		// Strategy: If specific filters (trainer/project) are provided, find the college from them
+		// This ensures same filters = same results regardless of who's logged in
+		let targetCollegeId = filterCollegeId || loggedInCollegeId;
+
+		// If trainer filter is provided, get college from that trainer
+		if (filterTrainerId) {
+			const trainer = await User.findOne({ _id: filterTrainerId, role: 4 }).select('collegeId');
+			if (trainer && trainer.collegeId) {
+				targetCollegeId = trainer.collegeId;
+				console.log('✅ Using college from filtered trainer:', targetCollegeId);
+			}
+		}
+		
+		// If project filter is provided, get college from that project
+		if (projectId && !filterTrainerId) {
+			const Project = require('../models/project');
+			const project = await Project.findOne({ _id: projectId }).select('collegeId college');
+			if (project && (project.collegeId || project.college)) {
+				targetCollegeId = project.collegeId || project.college;
+				console.log('✅ Using college from filtered project:', targetCollegeId);
+			}
+		}
+
+		courseQuery.college = targetCollegeId;
+		console.log('🎯 Final Target College ID for query:', targetCollegeId);
+		
+		// Add other filters if provided
+		if (filterTrainerId) {
+			courseQuery.trainers = filterTrainerId;
+		}
+		if (centerId) {
+			courseQuery.centerId = centerId;
+		}
+		if (projectId) {
+			courseQuery.project = projectId;
+		}
+
+		// Get all courses based on filters
+		const courses = await Courses.find(courseQuery)
+			.select('name description image trainers center centerId project')
+			.populate('center', 'name address')
+			.populate('centerId', 'name address')
+			.populate('project', 'name')
+			.populate('trainers', 'name email mobile _id');
+
+		console.log('📚 Total courses found:', courses.length);
+
+		// Get all unique trainers from these courses
+		const trainerIds = new Set();
+		courses.forEach(course => {
+			if (course.trainers && Array.isArray(course.trainers)) {
+				course.trainers.forEach(trainer => {
+					trainerIds.add(trainer._id.toString());
+				});
+			}
+		});
+
+		console.log('👥 Unique trainer IDs found:', trainerIds.size);
+
+		// Get all trainers
+		let trainers = await User.find({
+			_id: { $in: Array.from(trainerIds) },
+			role: 4,
+			isDeleted: false
+		}).select('name email mobile _id');
+
+		console.log('✅ Trainers fetched from DB:', trainers.length);
+
+		// Apply search filter on trainers if provided
+		if (search && search.trim()) {
+			const searchLower = search.toLowerCase().trim();
+			trainers = trainers.filter(trainer => 
+				trainer.name.toLowerCase().includes(searchLower) ||
+				(trainer.email && trainer.email.toLowerCase().includes(searchLower)) ||
+				(trainer.mobile && trainer.mobile.includes(search))
+			);
+		}
+
+		// Map courses to trainers
+		const trainersWithCourses = trainers.map(trainer => {
+			const trainerCourses = courses.filter(course => {
+				return course.trainers && course.trainers.some(t => t._id.toString() === trainer._id.toString());
+			});
+
+			const assignedCourses = trainerCourses.map(course => {
+				const centerInfo = course.centerId || (course.center && course.center.length > 0 ? course.center[0] : null);
+				return {
+					_id: course._id,
+					name: course.name,
+					image: course.image,
+					description: course.description,
+					center: centerInfo,
+					project: course.project
+				};
+			});
+
+			return {
+				_id: trainer._id,
+				name: trainer.name,
+				email: trainer.email,
+				mobile: trainer.mobile,
+				assignedCourses: assignedCourses,
+				totalCourses: assignedCourses.length
+			};
+		});
+
+		console.log('📦 Final trainers with courses:', trainersWithCourses.length);
+
+		// Calculate statistics
+		const totalCourses = courses.length;
+		const totalTrainers = trainersWithCourses.length;
+		const totalAssignments = trainersWithCourses.reduce((sum, trainer) => sum + trainer.totalCourses, 0);
+
+		// Get unique centers and projects for filter options
+		const centers = [...new Set(courses.map(c => c.centerId).filter(c => c))];
+		const projects = [...new Set(courses.map(c => c.project).filter(p => p))];
+
+		return res.status(200).json({
+			status: true,
+			message: 'All trainers with courses fetched successfully',
+			data: trainersWithCourses,
+			statistics: {
+				totalTrainers,
+				totalCourses,
+				totalAssignments,
+				uniqueCenters: centers.length,
+				uniqueProjects: projects.length
+			},
+			filterOptions: {
+				centers: centers,
+				projects: projects,
+				trainers: trainers.map(t => ({ _id: t._id, name: t.name }))
+			}
+		});
+	} catch (err) {
+		console.log('❌ Error in dashboard/alltrainerscourses:', err);
+		return res.status(500).json({
+			status: false,
+			message: 'Error while fetching trainers courses for dashboard',
+			error: err.message
 		});
 	}
 });
@@ -12869,7 +13030,7 @@ router.post('/addNewSubTopic', isTrainer, async (req, res) => {
 			content
 		} = req.body;
 
-		if (!courseId || !batchId || !chapterNumber ) {
+		if (!courseId || !batchId || !chapterNumber) {
 			return res.status(400).json({
 				status: false,
 				message: 'Missing required fields: courseId, batchId, chapterNumber, topicNumber, subTopicTitle'
@@ -13012,7 +13173,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 	try {
 		const user = req.user;
 		const { batch, course, sendTo, assignmentDetail } = req.body;
-		
+
 		let selectedStudents = [];
 		if (req.body.selectedStudents) {
 			try {
@@ -13032,7 +13193,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		const uploadFileToS3 = async (file, folder) => {
 			const ext = file.name.split('.').pop().toLowerCase();
 			const key = `DailyDiary/${batch}/${folder}/${uuid()}.${ext}`;
-			
+
 			const params = {
 				Bucket: bucketName,
 				Key: key,
@@ -13041,7 +13202,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			};
 
 			await s3.upload(params).promise();
-			
+
 			return {
 				fileName: file.name,
 				fileType: file.mimetype,
@@ -13053,13 +13214,13 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		const projectVideos = [];
 
 		if (req.files && req.files.studyMaterials) {
-			const studyFiles = Array.isArray(req.files.studyMaterials) 
-				? req.files.studyMaterials 
+			const studyFiles = Array.isArray(req.files.studyMaterials)
+				? req.files.studyMaterials
 				: [req.files.studyMaterials];
-			
+
 			for (const file of studyFiles) {
 				const ext = file.name.split('.').pop().toLowerCase();
-				
+
 				if (!allowedExtensions.includes(ext)) {
 					return res.status(400).json({
 						status: false,
@@ -13073,13 +13234,13 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		}
 
 		if (req.files && req.files.projectVideos) {
-			const videoFiles = Array.isArray(req.files.projectVideos) 
-				? req.files.projectVideos 
+			const videoFiles = Array.isArray(req.files.projectVideos)
+				? req.files.projectVideos
 				: [req.files.projectVideos];
-			
+
 			for (const file of videoFiles) {
 				const ext = file.name.split('.').pop().toLowerCase();
-				
+
 				if (!allowedVideoExtensions.includes(ext)) {
 					return res.status(400).json({
 						status: false,
@@ -13110,7 +13271,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			message: 'Daily diary added successfully',
 			data: dailyDiary
 		});
-		
+
 	} catch (error) {
 		console.error('Error adding daily diary:', error);
 		return res.status(500).json({
@@ -13122,7 +13283,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 })
 
 router.post('/uploadmedia', isTrainer, async (req, res) => {
-		
+
 	try {
 		const { courseId, batchId, chapterNumber, topicNumber, mediaType } = req.body;
 		// console.log("req.body", req.body)
@@ -13174,7 +13335,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 		}
 
 		const topic = chapter.topics.find(t => t.topicNumber === topicNumber);
-		
+
 		if (!topic) {
 			return res.status(404).json({
 				status: false,
@@ -13194,14 +13355,14 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 			images: [],
 			pdfs: []
 		};
-// console.log("targetMediaObject", targetMediaObject)
-// console.log("targetLocation", targetLocation)
-// console.log("uploadedFiles", uploadedFiles)
+		// console.log("targetMediaObject", targetMediaObject)
+		// console.log("targetLocation", targetLocation)
+		// console.log("uploadedFiles", uploadedFiles)
 		const uploadPromises = [];
 
 		const uploadToS3 = async (file, fileType) => {
 			const ext = file.name.split('.').pop().toLowerCase();
-			
+
 			let allowedExtensions = [];
 			if (fileType === 'videos') {
 				allowedExtensions = allowedVideoExtensions;
@@ -13236,7 +13397,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.videos) {
 			const videoFiles = Array.isArray(req.files.videos) ? req.files.videos : [req.files.videos];
-			
+
 			for (const video of videoFiles) {
 				uploadPromises.push(
 					uploadToS3(video, 'videos').then(result => {
@@ -13248,7 +13409,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.images) {
 			const imageFiles = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
-			
+
 			for (const image of imageFiles) {
 				uploadPromises.push(
 					uploadToS3(image, 'images').then(result => {
@@ -13260,7 +13421,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		if (req.files.pdfs) {
 			const pdfFiles = Array.isArray(req.files.pdfs) ? req.files.pdfs : [req.files.pdfs];
-			
+
 			for (const pdf of pdfFiles) {
 				uploadPromises.push(
 					uploadToS3(pdf, 'pdfs').then(result => {
@@ -13284,9 +13445,9 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 		await curriculum.save();
 
-console.log("uploadedFiles", uploadedFiles)
-console.log("totalFiles", uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length)
-console.log("targetLocation", targetLocation)
+		console.log("uploadedFiles", uploadedFiles)
+		console.log("totalFiles", uploadedFiles.videos.length + uploadedFiles.images.length + uploadedFiles.pdfs.length)
+		console.log("targetLocation", targetLocation)
 		return res.status(200).json({
 			status: true,
 			message: `Media uploaded successfully to ${targetLocation}`,
@@ -13305,5 +13466,306 @@ console.log("targetLocation", targetLocation)
 		});
 	}
 })
+router.post('/questionBank', isTrainer, async (req, res) => {
+	try {
+		const user = req.user;
+		const { question, options, correctIndex, marks, shuffleOptions = false, providedTotalMarks, courseId, centers } = req.body;
+
+		console.log("req.body", req.body);
+		if (!question || typeof question !== 'string' || !question.trim()) {
+			return res.status(400).json({ status: false, message: 'Question text is required' });
+		}
+
+		if (!Array.isArray(options) || options.length !== 4 || options.some(o => !o || typeof o !== 'string' || !o.trim())) {
+			return res.status(400).json({ status: false, message: 'Options must be an array of 4 non-empty strings' });
+		}
+
+		if (typeof correctIndex !== 'number' || correctIndex < 0 || correctIndex > 3) {
+			return res.status(400).json({ status: false, message: 'correctIndex must be a number between 0 and 3' });
+		}
+
+		const parsedMarks = Number(marks);
+		if (isNaN(parsedMarks) || parsedMarks <= 0) {
+			return res.status(400).json({ status: false, message: 'marks must be a positive number' });
+		}
+
+		const snap = {
+			question: question.trim(),
+			options: options.map(o => o.trim()),
+			correctIndex,
+			correctAnswer: options[correctIndex].trim(),
+			marks: parsedMarks,
+			shuffleOptions: !!shuffleOptions,
+		};
+
+		if (courseId) snap.course = courseId;
+		if (centers) snap.centers = Array.isArray(centers) ? centers : [centers];
+
+		let bank = await AssignmentQuestions.findOne({ owner: user._id, title: 'Question Bank' });
+
+		if (bank) {
+			const allocated = (bank.questions || []).reduce((s, q) => s + (Number(q.marks) || 0), 0) + snap.marks;
+			if (allocated > bank.totalMarks) {
+				return res.status(400).json({ status: false, message: `Allocated ${allocated} > totalMarks ${bank.totalMarks}` });
+			}
+
+			bank.questions.push(snap);
+			await bank.save();
+			return res.status(200).json({ status: true, message: 'Question added to bank', data: bank });
+		}
+
+
+			let bankTotal;
+			if (providedTotalMarks !== undefined) {
+				const parsedTotal = Number(providedTotalMarks);
+				if (isNaN(parsedTotal) || parsedTotal <= 0) {
+					return res.status(400).json({ status: false, message: 'providedTotalMarks must be a positive number' });
+				}
+				bankTotal = parsedTotal;
+			} else {
+				bankTotal = Math.max(100, parsedMarks);
+			}
+
+			const newBank = new AssignmentQuestions({
+				title: 'Question Bank',
+				durationMins: 30,
+				passPercent: 33,
+				totalMarks: bankTotal,
+				questions: [snap],
+				owner: user._id,
+				isPublished: false
+			});
+
+		await newBank.save();
+		return res.status(200).json({ status: true, message: 'Question bank created and question added', data: newBank });
+	} catch (err) {
+		console.log('====================>!err ', err.message);
+		return res.status(500).send({ status: false, error: err.message });
+	}
+
+});
+
+router.get('/allquestionandanswers', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+		const bank = await AssignmentQuestions
+			.findOne({ owner: user._id, title: 'Question Bank' })
+			.lean();
+
+		if (!bank) {
+			return res.status(200).json({ status: true, message: 'No bank yet', data: { questions: [] } });
+		}
+
+		const { courseId } = req.query || {};
+		if (courseId) {
+			const filtered = (bank.questions || []).filter(q => {
+				if (!q.course) return false;
+				return String(q.course) === String(courseId);
+			});
+			return res.status(200).json({ status: true, message: 'Question bank retrieved', data: { ...bank, questions: filtered } });
+		}
+
+		return res.status(200).json({ status: true, message: 'Question bank retrieved', data: bank });
+  } catch (err) {
+    console.log('GET /allquestionandanswers error:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
+router.post('/assignment', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+    const { meta, questions } = req.body;
+
+    if (!meta || !meta.title || !meta.title.trim()) {
+      return res.status(400).json({ status: false, message: 'Assignment title is required' });
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ status: false, message: 'At least one question is required' });
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.question || !q.question.trim()) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Question text is required` });
+      }
+      if (!Array.isArray(q.options) || q.options.length !== 4) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Must have exactly 4 options` });
+      }
+      if (q.options.some(opt => !opt || !opt.trim())) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: All options must be non-empty` });
+      }
+      if (typeof q.correctIndex !== 'number' || q.correctIndex < 0 || q.correctIndex > 3) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid correctIndex (0-3) is required` });
+      }
+      if (!q.marks || Number(q.marks) <= 0) {
+        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid marks is required` });
+      }
+    }
+
+		const snapQuestions = questions.map(q => ({
+      question: q.question.trim(),
+      options: q.options.map(opt => opt.trim()),
+      correctIndex: q.correctIndex,
+		correctAnswer: q.options[q.correctIndex].trim(),
+		marks: Number(q.marks),
+		shuffleOptions: q.shuffleOptions || false,
+		course: q.course || undefined,
+		centers: q.centers && q.centers.length ? q.centers : undefined,
+    }));
+
+    const allocatedMarks = snapQuestions.reduce((sum, q) => sum + q.marks, 0);
+    const totalMarks = Number(meta.totalMarks) || allocatedMarks;
+
+    if (allocatedMarks > totalMarks) {
+      return res.status(400).json({ 
+        status: false, 
+        message: `Allocated marks (${allocatedMarks}) cannot exceed total marks (${totalMarks})` 
+      });
+    }
+
+		const assignment = new AssignmentQuestions({
+			title: meta.title.trim(),
+			durationMins: Number(meta.durationMins) || 30,
+			passPercent: Number(meta.passPercent) || 40,
+			totalMarks: totalMarks,
+			questions: snapQuestions,
+			owner: user._id,
+			isPublished: true 
+		});
+
+    await assignment.save();
+
+    return res.status(200).json({ 
+      status: true, 
+      message: 'Assignment created successfully', 
+      data: assignment 
+    });
+
+  } catch (err) {
+    console.error('Create assignment error:', err);
+    return res.status(500).json({ 
+      status: false, 
+      message: err.message || 'Failed to create assignment',
+      error: err.message
+    });
+  }
+});
+
+router.get('/assignment-submissions', isTrainer, async (req, res) => {
+  try {
+    const user = req.user;
+    const { courseId, assignmentId } = req.query;
+
+    let filter = {};
+    if (assignmentId) {
+      filter.assignment = assignmentId;
+    }
+    const submissions = await AssignmentSubmission.find(filter)
+      .populate({
+        path: 'candidate',
+        select: 'name email mobile'
+      })
+      .populate({
+        path: 'assignment',
+        select: 'title totalMarks durationMins passPercent questions'
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+    const courseIds = new Set();
+    submissions.forEach(sub => {
+      if (sub.assignment && sub.assignment.questions) {
+        sub.assignment.questions.forEach(q => {
+          if (q.course) courseIds.add(String(q.course));
+        });
+      }
+    });
+
+    const courseMap = {};
+    if (courseIds.size > 0) {
+      try {
+        const courses = await Courses.find({ _id: { $in: Array.from(courseIds) } })
+          .select('name project')
+          .populate('project', 'name')
+          .lean();
+        courses.forEach(course => {
+          courseMap[String(course._id)] = {
+            name: course.name,
+            projectId: course.project?._id,
+            projectName: course.project?.name
+          };
+        });
+      } catch (err) {
+        console.error('Error fetching courses:', err);
+      }
+    }
+    let filteredSubmissions = submissions;
+    if (courseId) {
+      filteredSubmissions = submissions.filter(sub => {
+        if (!sub.assignment || !sub.assignment.questions) return false;
+        return sub.assignment.questions.some(q => 
+          q.course && String(q.course) === String(courseId)
+        );
+      });
+    }
+
+    const formattedSubmissions = filteredSubmissions.map(sub => {
+      let courseName = 'N/A';
+      let extractedCourseId = null;
+      let projectId = null;
+      let projectName = 'N/A';
+      
+      if (sub.assignment && sub.assignment.questions && sub.assignment.questions.length > 0) {
+        const firstCourse = sub.assignment.questions.find(q => q.course);
+        if (firstCourse && firstCourse.course) {
+          extractedCourseId = String(firstCourse.course);
+          const courseInfo = courseMap[extractedCourseId];
+          if (courseInfo) {
+            courseName = courseInfo.name || 'N/A';
+            projectId = courseInfo.projectId;
+            projectName = courseInfo.projectName || 'N/A';
+          }
+        }
+      }
+
+      return {
+        _id: sub._id,
+        studentName: sub.candidate?.name || 'Unknown',
+        studentEmail: sub.candidate?.email || 'N/A',
+        studentMobile: sub.candidate?.mobile || 'N/A',
+        assignmentTitle: sub.assignment?.title || 'N/A',
+        courseName: courseName,
+        courseId: extractedCourseId,
+        projectId: projectId,
+        projectName: projectName,
+        score: sub.score || 0,
+        totalMarks: sub.totalMarks || 0,
+        percentage: sub.percentage || 0,
+        pass: sub.pass || false,
+        correctCount: sub.correctCount || 0,
+        wrongCount: sub.wrongCount || 0,
+        attemptedCount: sub.attemptedCount || 0,
+        unattemptedCount: sub.unattemptedCount || 0,
+        timeTakenSeconds: sub.timeTakenSeconds || 0,
+        submittedAt: sub.timeSubmitted || sub.createdAt
+      };
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Assignment submissions fetched successfully',
+      data: formattedSubmissions
+    });
+
+  } catch (err) {
+    console.error('Get assignment submissions error:', err);
+    return res.status(500).json({
+      status: false,
+      message: err.message || 'Failed to fetch assignment submissions',
+      error: err.message
+    });
+  }
+});
 
 module.exports = router;
