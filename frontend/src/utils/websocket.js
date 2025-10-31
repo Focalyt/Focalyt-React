@@ -4,47 +4,90 @@ import { io } from "socket.io-client";
 function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
+  const [isConnected, setIsConnected] = useState(false);
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
  
 
   useEffect(() => {
     if(!backendUrl) {
-      console.error('backendUrl is not set');
-      return { messages: [], updates: [] };
+      console.error('❌ backendUrl is not set. Please check REACT_APP_MIPIE_BACKEND_URL in .env file');
+      return;
     }
-    console.log('backendUrl from websocket', backendUrl);
-    const socket = io(`${backendUrl}`, { query: { userId } });
+    
+    console.log('🔗 Attempting to connect to:', backendUrl);
+    
+    // Socket.io configuration with better options for production
+    const socket = io(backendUrl, { 
+      query: { userId },
+      transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
+      autoConnect: true,
+      forceNew: false,
+      withCredentials: false, // Set to true if you need cookies
+    });
 
-    socket.on("connect", () => console.log("✅ Connected:", socket.id));
+    // Connection events
+    socket.on("connect", () => {
+      console.log("✅ WebSocket Connected:", socket.id);
+      console.log("   - Transport:", socket.io.engine.transport.name);
+      setIsConnected(true);
+    });
 
-    // Chat messages
+    socket.on("disconnect", (reason) => {
+      console.log("❌ WebSocket Disconnected:", reason);
+      setIsConnected(false);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("🔴 Connection Error:", error.message);
+      console.error("   - Backend URL:", backendUrl);
+      console.error("   - Error details:", error);
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber) => {
+      console.log(`🔄 Reconnection attempt ${attemptNumber}...`);
+    });
+
+    socket.on("reconnect", (attemptNumber) => {
+      console.log(`✅ Reconnected after ${attemptNumber} attempts`);
+      setIsConnected(true);
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("🔴 Reconnection failed after all attempts");
+    });
+
+    // Data events
     socket.on("message", (data) => {
       console.log("📩 Message received:", data);
-      setMessages(prev => [...prev, data]); // update messages state
+      setMessages(prev => [...prev, data]);
     });
 
-    // Product updates
     socket.on("productUpdate", (data) => {
       console.log("🆕 Product update received:", data);
-      setUpdates(prev => [...prev, data]); // update product updates state
+      setUpdates(prev => [...prev, data]);
     });
 
-    // Missed followup notifications
     socket.on("missedFollowup", (data) => {
       console.log("⚠️ Missed followup received:", data);
-      setUpdates(prev => [...prev, data]); // ya alag state maintain kar sakte ho
-    });
+      setUpdates(prev => [...prev, data]);
 
     socket.on("whatsapp_message_status_update", (data) => {
       console.log("⚠️ WhatsApp message status update received:", data);
-      setUpdates(prev => [...prev, data]); // ya alag state maintain kar sakte ho
+      setUpdates(prev => [...prev, data]);
     });
 
-    return () => socket.disconnect();
-  }, [userId]);
+    return () => {
+      console.log("🔌 Disconnecting socket...");
+      socket.disconnect();
+    };
+  }, [userId, backendUrl]);
 
-  // Return data so component can use it
-  return { messages, updates };
+  return { messages, updates, isConnected };
 }
 
 export default useWebsocket;
