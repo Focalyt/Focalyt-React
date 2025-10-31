@@ -4,11 +4,16 @@ import { io } from "socket.io-client";
 function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
-  console.log('backendUrl from websocket', backendUrl);
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  if(!backendUrl) {
+    console.error('backendUrl is not set');
+    return { messages: [], updates: [] };
+  }
+  const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
+  console.log('wsUrl from websocket', wsUrl);
 
   useEffect(() => {
-    const socket = io(`${backendUrl}`, { query: { userId } });
+    const socket = io(wsUrl, { query: { userId } });
 
     socket.on("connect", () => console.log("✅ Connected:", socket.id));
 
