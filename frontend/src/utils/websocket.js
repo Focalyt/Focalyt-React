@@ -5,13 +5,14 @@ function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  if(!backendUrl) {
-    console.error('backendUrl is not set');
-    return { messages: [], updates: [] };
-  }
-  console.log('backendUrl from websocket', backendUrl);
+ 
 
   useEffect(() => {
+    if(!backendUrl) {
+      console.error('backendUrl is not set');
+      return { messages: [], updates: [] };
+    }
+    console.log('backendUrl from websocket', backendUrl);
     const socket = io(`${backendUrl}`, { query: { userId } });
 
     socket.on("connect", () => console.log("✅ Connected:", socket.id));
