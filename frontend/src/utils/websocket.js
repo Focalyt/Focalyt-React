@@ -9,11 +9,10 @@ function useWebsocket(userId) {
     console.error('backendUrl is not set');
     return { messages: [], updates: [] };
   }
-  const wsUrl = `${backendUrl.replace('http', 'ws')}/ws/whatsapp`;
-  console.log('wsUrl from websocket', wsUrl);
+  console.log('backendUrl from websocket', backendUrl);
 
   useEffect(() => {
-    const socket = io(wsUrl, { query: { userId } });
+    const socket = io(`${backendUrl}`, { query: { userId } });
 
     socket.on("connect", () => console.log("✅ Connected:", socket.id));
 
