@@ -7,6 +7,8 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 
+import useWebsocket from '../../../../utils/websocket';
+
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const MultiSelectCheckbox = ({
@@ -701,8 +703,11 @@ const CRMDashboard = () => {
   const candidateRef = useRef();
   // Refs
   const addressInputRef = useRef(null);
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000';
-
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+  const { messages, updates } = useWebsocket(userData._id || userData._id);
+ 
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -725,8 +730,7 @@ const CRMDashboard = () => {
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
+        
         const res = await axios.get(`${backendUrl}/college/filters-data`, {
           headers: { 'x-auth': token }
         });
@@ -769,8 +773,7 @@ const CRMDashboard = () => {
     }
   };
 
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
+
 
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
@@ -976,106 +979,11 @@ const CRMDashboard = () => {
     }
   }, []);
 
-  // Initialize WhatsApp Socket.io connection
   useEffect(() => {
-    const collegeId = userData.collegeId;
-    if (!collegeId) {
-      return;
-    }
+    console.log('📩 WhatsApp message status updates:', updates);
+    handleMessageStatusUpdate(updates);
+  }, [updates]);
 
-    // Handle both absolute URLs (https://focalyt.com/api) and relative URLs (/api)
-    let socketUrl;
-    let protocol;
-
-    if (backendUrl.startsWith('http://') || backendUrl.startsWith('https://')) {
-      // Absolute URL - extract hostname and path
-      socketUrl = backendUrl
-
-    } else {
-      // Relative URL like /api - use current browser's domain
-      socketUrl = `${process.env.REACT_APP_FOCALYT_BASE_URL}${backendUrl}`
-    }
-
-    // Socket.io connection (no port needed - uses same port as backend)
-    const socket = io(`${socketUrl}`, {
-      query: {
-        userId: userData._id,
-        collegeId: collegeId
-      },
-      transports: ['websocket', 'polling'], // Enable both transports for production
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      forceNew: false,
-      upgrade: true
-    });
-
-
-    socket.on("connect", () => {
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("❌ WhatsApp Socket.io connection error:", error);
-    });
-
-    socket.on("disconnect", (reason) => {
-    });
-
-    socket.on("reconnect", (attemptNumber) => {
-    });
-
-    socket.on("reconnect_attempt", (attemptNumber) => {
-    });
-
-    socket.on("reconnect_error", (error) => {
-      console.error("❌ WhatsApp Socket.io reconnection error:", error);
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("❌ WhatsApp Socket.io reconnection failed after all attempts");
-    });
-
-    // Listen for WhatsApp status updates
-    socket.on("whatsapp_status_update", (data) => {
-
-      // Only process if this update is for the current college
-      if (data.collegeId === collegeId) {
-        handleMessageStatusUpdate(data);
-      }
-    });
-
-    // Listen for template sync notifications
-    socket.on("whatsapp_template_sync", (data) => {
-     
-
-     
-    });
-
-    // Listen for template sync errors
-    socket.on("whatsapp_template_sync_error", (data) => {
-      console.log("❌ WhatsApp template sync error received:", data);
-
-      // Only process if this update is for the current college
-      if (data.collegeId === collegeId) {
-        console.error("❌ Template sync error:", data.error);
-      }
-    });
-
-    socket.on("disconnect", () => {
-      console.log("🔌 WhatsApp Socket.io disconnected");
-    });
-
-    socket.on("error", (error) => {
-      console.error("❌ Socket.io error:", error);
-    });
-
-    // Cleanup on unmount
-    return () => {
-      socket.disconnect();
-    };
-  }, [backendUrl, userData._id, userData.collegeId, handleMessageStatusUpdate]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {

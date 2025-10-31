@@ -3113,18 +3113,8 @@ async function handleStatusUpdates(statuses) {
 				// Send Socket.io notification for WhatsApp status updates
 				if (global.io) {
 					try {
-						global.io.emit('whatsapp_status_update', {
-							collegeId: updatedMessage.collegeId,
-							type: 'message_status_update',
-							messageId: messageId,
-							status: statusValue,
-							to: recipientId,
-							candidateId: updatedMessage.candidateId,
-							timestamp: new Date(parseInt(timestamp) * 1000),
-							message: updatedMessage.message
-						});
+						global.io.emit('whatsapp_message_status_update', status);
 						console.log('🔔 Socket.io event emitted: whatsapp_status_update');
-						console.log('   - College ID:', updatedMessage.collegeId);
 						console.log('   - Message ID:', messageId);
 						console.log('   - Status:', statusValue);
 						console.log('   - To:', recipientId);

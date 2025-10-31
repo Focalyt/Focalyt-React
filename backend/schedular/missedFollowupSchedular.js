@@ -27,7 +27,6 @@ function missedFollowupSchedular() {
         // console.log(`[Cron] Marked ${ids.length} followups as missed`);
 
         console.log(global.userSockets, "global.userSockets");
-        const socketIds = global.userSockets[ids] || [];
         // Emit socket for each followup (example)
         ids.forEach(id => {
           const socketIds = global.userSockets[id] || [];
