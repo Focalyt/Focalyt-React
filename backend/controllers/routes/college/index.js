@@ -1518,33 +1518,31 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 							}
 						} catch (err) {
 						}
-					}
-				}
-				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
-					if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
-						try {
-							const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
-							if (state) {
-								doc._candidate.personalInfo.permanentAddress.state = state.name;
-							}
-						} catch (err) {
-						}
-					}
-				}
 			}
-			if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
-				if (typeof doc._candidate.personalInfo.permanentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.city)) {
-					try {
-					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
-					if (city) {
-						doc._candidate.personalInfo.permanentAddress.city = city.name;
-						}
-					} catch (err) {
+		}
+		if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+			if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
+				try {
+					const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+					if (state) {
+						doc._candidate.personalInfo.permanentAddress.state = state.name;
 					}
-					}
+				} catch (err) {
 				}
 			}
 		}
+		if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+			if (typeof doc._candidate.personalInfo.permanentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.city)) {
+				try {
+					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
+					if (city) {
+						doc._candidate.personalInfo.permanentAddress.city = city.name;
+					}
+				} catch (err) {
+				}
+			}
+		}
+	}}
 		// Process results for document counts and other formatting
 		const results = response.map(doc => {
 			let selectedSubstatus = null;
