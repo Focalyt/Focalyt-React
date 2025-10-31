@@ -5,7 +5,7 @@ function useWebsocket(userId) {
   const [messages, setMessages] = useState([]);
   const [updates, setUpdates] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const backendUrl = process.env.REACT_APP_WEBSOCKET_URL;
  
 
   useEffect(() => {
