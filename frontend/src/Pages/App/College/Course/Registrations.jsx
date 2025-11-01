@@ -3266,6 +3266,8 @@ const CRMDashboard = () => {
       );
 
       if (response.data.success) {
+        console.log('📥 Fetched chat history from backend:', response.data.data.length, 'messages');
+        console.log('📥 Sample message from backend:', response.data.data[0]);
 
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
@@ -3285,6 +3287,14 @@ const CRMDashboard = () => {
           deliveredAt: msg.deliveredAt,
           readAt: msg.readAt
         }));
+
+        console.log('📤 Formatted messages for state:', formattedMessages.map(m => ({
+          id: m.id,
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
+          status: m.status
+        })));
 
         setWhatsappMessages(formattedMessages);
       }
@@ -4615,6 +4625,13 @@ const CRMDashboard = () => {
 
 
       if (response.data.success) {
+        console.log('✅ Template sent successfully. Backend response:', {
+          messageId: response.data.data.messageId,
+          to: response.data.data.to,
+          templateName: response.data.data.templateName,
+          status: response.data.data.status,
+          hasFilledMessage: !!response.data.data.filledMessage
+        });
 
         // Refresh templates list
 
@@ -4710,11 +4727,11 @@ const CRMDashboard = () => {
 
         // Add sent template to existing WhatsApp chat with FILLED variables
         const templateMessage = {
-          id: response.data.data._id || response.data.data.wamid || `msg-${Date.now()}`,
+          id: response.data.data.messageId || response.data.data._id || `msg-${Date.now()}`,
           dbId: response.data.data._id, // Database message ID
-          wamid: response.data.data.wamid || response.data.data.whatsappMessageId, // WhatsApp message ID
-          whatsappMessageId: response.data.data.whatsappMessageId || response.data.data.wamid, // Consistent field name
-          text: filledMessage || `Template: ${response.data.data.templateName}`,
+          wamid: response.data.data.messageId, // WhatsApp message ID (backend sends as 'messageId')
+          whatsappMessageId: response.data.data.messageId, // Consistent field name
+          text: filledMessage || response.data.data.filledMessage || `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
@@ -4723,6 +4740,14 @@ const CRMDashboard = () => {
           deliveredAt: null,
           readAt: null
         };
+
+        console.log('✅ Adding new message to state:', {
+          id: templateMessage.id,
+          wamid: templateMessage.wamid,
+          whatsappMessageId: templateMessage.whatsappMessageId,
+          text: templateMessage.text?.substring(0, 50),
+          status: templateMessage.status
+        });
 
         setWhatsappMessages([...whatsappMessages, templateMessage]);
 
