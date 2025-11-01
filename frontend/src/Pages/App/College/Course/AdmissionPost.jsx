@@ -188,6 +188,21 @@ const CRMDashboard = (profile) => {
     const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
     const [viewMode, setViewMode] = useState('grid');
     const [isMobile, setIsMobile] = useState(false);
+    
+    useEffect(() => {
+        const checkIfMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        
+        checkIfMobile();
+        
+        window.addEventListener('resize', checkIfMobile);
+        
+        return () => {
+            window.removeEventListener('resize', checkIfMobile);
+        };
+    }, []);
+    
     const [allProfiles, setAllProfiles] = useState([]);
     const [totalPages, setTotalPages] = useState(1);
     const [currentPage, setCurrentPage] = useState(1);
@@ -932,9 +947,12 @@ const CRMDashboard = (profile) => {
                                 minHeight: '200px'
                             }}
                         >
-                            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+                            {(() => {
+                                return selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0;
+                            })() ? (
                                 <div className="timeline">
-                                    {selectedProfile.logs.map((log, index) => (
+                                    {selectedProfile.logs.map((log, index) => {
+                                        return (
                                         <div key={index} className="timeline-item mb-4">
                                             <div className="timeline-marker">
                                                 <div className="timeline-marker-icon">
@@ -965,24 +983,24 @@ const CRMDashboard = (profile) => {
                                                         </div>
 
                                                         <div className="mb-2">
-                                                            <strong className="text-dark d-block mb-1">Action:</strong>
-                                                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                                            <strong className="text-dark d-block mb-1" style={{ fontSize: '14px' }}>Action:</strong>
+                                                            <div style={{ lineHeight: '1.6', minHeight: '20px', color: '#495057', fontSize: '14px', display: 'block' }}>
                                                                 {log.action ? (
                                                                     log.action.split(';').map((actionPart, actionIndex) => (
-                                                                        <div key={actionIndex} className="mb-1">
+                                                                        <div key={actionIndex} className="mb-1" style={{ color: '#495057', fontSize: '14px', display: 'block', opacity: 1 }}>
                                                                             • {actionPart.trim()}
                                                                         </div>
                                                                     ))
                                                                 ) : (
-                                                                    <div className="text-muted">No action specified</div>
+                                                                    <div style={{ color: '#6c757d', fontSize: '14px' }}>No action specified</div>
                                                                 )}
                                                             </div>
                                                         </div>
 
                                                         {log.remarks && (
-                                                            <div>
-                                                                <strong className="text-dark d-block mb-1">Remarks:</strong>
-                                                                <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                                            <div className="mb-2">
+                                                                <strong className="text-dark d-block mb-1" style={{ fontSize: '14px' }}>Remarks:</strong>
+                                                                <p className="mb-0" style={{ lineHeight: '1.4', color: '#495057', fontSize: '14px', display: 'block' }}>
                                                                     {log.remarks}
                                                                 </p>
                                                             </div>
@@ -991,7 +1009,8 @@ const CRMDashboard = (profile) => {
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
@@ -1025,14 +1044,104 @@ const CRMDashboard = (profile) => {
             return (
                 <div
                     className={`modal ${showPanel === 'leadHistory' ? 'show d-block' : 'd-none'}`}
-                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}
                     onClick={(e) => {
-                        if (e.target === e.currentTarget) closeleadHistoryPanel();
+                        if (e.target === e.currentTarget) closePanel();
                     }}
                 >
-                    <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-                        <div className="modal-content" style={{ height: '85vh' }}>
-                            {panelContent}
+                    <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh', margin: '1rem auto' }}>
+                        <div className="modal-content" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    <i className="fas fa-history me-2"></i>
+                                    Lead History - {selectedProfile?._candidate?.name || 'Unknown'}
+                                </h5>
+                                <button type="button" className="btn-close" onClick={closePanel}></button>
+                            </div>
+                            <div className="modal-body" style={{ overflowY: 'auto', flex: '1', padding: '1rem' }}>
+                                {isHistoryLoading ? (
+                                    <div className="d-flex justify-content-center align-items-center h-100">
+                                        <div className="spinner-border text-primary" role="status">
+                                            <span className="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span className="ms-2 mt-2">Loading...</span>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {(() => {
+                                            return selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0;
+                                        })() ? (
+                                            <div className="timeline">
+                                                {selectedProfile.logs.map((log, index) => {
+                                                    return (
+                                                    <div key={index} className="timeline-item mb-4">
+                                                        <div className="card border-start border-primary border-3">
+                                                            <div className="card-body">
+                                                                <div className="d-flex justify-content-between align-items-start mb-2 flex-column">
+                                                                    <span className="badge bg-light text-dark border">
+                                                                        {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                                                            day: '2-digit',
+                                                                            month: 'short',
+                                                                            year: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
+                                                                        }) : 'Unknown Date'}
+                                                                    </span>
+                                                                    <small className="text-muted">
+                                                                        <i className="fas fa-user me-1"></i>
+                                                                        Modified By: {log.user?.name || 'Unknown User'}
+                                                                    </small>
+                                                                </div>
+                                                                <div className="mb-2">
+                                                                    <strong className="text-dark d-block mb-1" style={{ fontSize: '14px' }}>Action:</strong>
+                                                                    <div style={{ lineHeight: '1.6', minHeight: '20px', color: '#495057', fontSize: '14px', display: 'block' }}>
+                                                                        {log.action ? (
+                                                                            log.action.split(';').map((actionPart, actionIndex) => (
+                                                                                <div key={actionIndex} className="mb-1" style={{ color: '#495057', fontSize: '14px', display: 'block', opacity: 1 }}>
+                                                                                    • {actionPart.trim()}
+                                                                                </div>
+                                                                            ))
+                                                                        ) : (
+                                                                            <div style={{ color: '#6c757d', fontSize: '14px' }}>No action specified</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {log.remarks && (
+                                                                    <div className="mb-2">
+                                                                        <strong className="text-dark d-block mb-1" style={{ fontSize: '14px' }}>Remarks:</strong>
+                                                                        <p className="mb-0" style={{ lineHeight: '1.4', color: '#495057', fontSize: '14px', display: 'block' }}>
+                                                                            {log.remarks}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="d-flex flex-column align-items-center justify-content-center text-center py-5">
+                                                <div className="mb-3">
+                                                    <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                                                </div>
+                                                <h6 className="text-muted mb-2">No History Available</h6>
+                                                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={closePanel}
+                                >
+                                    <i className="fas fa-times me-1"></i>
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1154,14 +1263,83 @@ const CRMDashboard = (profile) => {
             return (
                 <div
                     className={`modal ${showPanel === 'SetFollowup' ? 'show d-block' : 'd-none'}`}
-                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}
                     onClick={(e) => {
-                        if (e.target === e.currentTarget) closeEditPanel();
+                        if (e.target === e.currentTarget) closePanel();
                     }}
                 >
                     <div className="modal-dialog modal-dialog-centered modal-lg">
                         <div className="modal-content">
-                            {panelContent}
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    <i className="fas fa-calendar-alt me-2"></i>
+                                    Set Followup for {selectedProfile?._candidate?.name || 'Unknown'}
+                                </h5>
+                                <button type="button" className="btn-close" onClick={closePanel}></button>
+                            </div>
+                            <div className="modal-body">
+                                <form>
+                                    <div className="row mb-3">
+                                        <div className="col-6">
+                                            <label htmlFor="nextActionDate" className="form-label fw-bold text-dark">
+                                                Next Action Date <span className="text-danger">*</span>
+                                            </label>
+                                            <div className="input-group">
+                                                <DatePicker
+                                                    className="form-control"
+                                                    onChange={setFollowupDate}
+                                                    value={followupDate}
+                                                    format="dd/MM/yyyy"
+                                                    minDate={today}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-6">
+                                            <label htmlFor="actionTime" className="form-label fw-bold text-dark">
+                                                Time <span className="text-danger">*</span>
+                                            </label>
+                                            <div className="input-group">
+                                                <input
+                                                    type="time"
+                                                    className="form-control"
+                                                    id="actionTime"
+                                                    onChange={handleTimeChange}
+                                                    value={followupTime}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label htmlFor="comment" className="form-label fw-bold text-dark">Comment</label>
+                                        <textarea
+                                            className="form-control"
+                                            id="comment"
+                                            rows="4"
+                                            placeholder="Enter your remarks..."
+                                            value={remarks}
+                                            onChange={(e) => setRemarks(e.target.value)}
+                                            style={{ resize: 'none' }}
+                                        ></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={closePanel}
+                                >
+                                    CLOSE
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleUpdateStatus}
+                                    style={{ backgroundColor: '#fd7e14', border: 'none' }}
+                                >
+                                    SET FOLLOWUP
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2760,7 +2938,7 @@ const CRMDashboard = (profile) => {
           }
 
           .action-btn {
-              background: none;
+            //   background: none;
               border: none;
               cursor: pointer;
               padding: 5px 8px;
@@ -3558,8 +3736,32 @@ const CRMDashboard = (profile) => {
           .filter-tabs {
               display: flex;
               gap: 1rem;
-              flex-wrap: wrap;
-          }
+             flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
+}
+
+.filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
 
           .filter-btn {
               background: #f8f9fa;
@@ -3881,16 +4083,26 @@ const CRMDashboard = (profile) => {
               }
 
               .stats-grid {
-                  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
               }
+               .stat-card{
+                 padding: 0.5rem
+               }
 
               .documents-grid-enhanced {
                   grid-template-columns: 1fr;
               }
 
               .filter-tabs {
-                  justify-content: center;
-              }
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+     .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
+    }
 
               .document-header {
                   flex-direction: column;
@@ -5393,7 +5605,7 @@ background: #fd2b5a;
 }
 
 .action-btn {
-    background: none;
+    // background: none;
     border: none;
     cursor: pointer;
     padding: 5px 8px;
@@ -6092,398 +6304,6 @@ background: #fd2b5a;
     transition: stroke-dasharray 1s ease-in-out;
 }
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    transition: all 0.3s ease;
-}
-
-.stat-card.total-docs::before {
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-}
-
-.stat-card.uploaded-docs::before {
-    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.stat-card.pending-docs::before {
-    background: linear-gradient(90deg, #fa709a 0%, #fee140 100%);
-}
-
-.stat-card.verified-docs::before {
-    background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
-}
-
-.stat-card.rejected-docs::before {
-    background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-}
-
-.stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    color: white;
-}
-
-.total-docs .stat-icon {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.uploaded-docs .stat-icon {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.pending-docs .stat-icon {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-}
-
-.verified-docs .stat-icon {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-}
-
-.rejected-docs .stat-icon {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-}
-
-.stat-info h4 {
-    margin: 0;
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: #333;
-}
-
-.stat-info p {
-    margin: 0;
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.stat-trend {
-    margin-left: auto;
-    font-size: 1.2rem;
-    color: #4facfe;
-}
-
-.filter-section-enhanced {
-    background: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.filter-title {
-    margin: 0 0 1rem 0;
-    color: #333;
-    font-weight: 600;
-}
-
-.filter-tabs {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.filter-btn {
-    background: #f8f9fa;
-    border: 2px solid transparent;
-    border-radius: 25px;
-    padding: 0.75rem 1.5rem;
-    color: #666;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    position: relative;
-}
-
-.filter-btn .badges {
-    background: #dee2e6;
-    color: #495057;
-    border-radius: 10px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    margin-left: 0.5rem;
-}
-
-.filter-btn:hover {
-    background: #e9ecef;
-    transform: translateY(-2px);
-}
-
-.filter-btn.active {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-    border-color: #4facfe;
-    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
-}
-
-.filter-btn.active .badges {
-    background: rgba(255, 255, 255, 0.2);
-    color: #fc2b5a;
-}
-
-.filter-btn.pending.active {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    box-shadow: 0 5px 15px rgba(250, 112, 154, 0.4);
-}
-
-.filter-btn.verified.active {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #2d7d32;
-    box-shadow: 0 5px 15px rgba(168, 237, 234, 0.4);
-}
-
-.filter-btn.rejected.active {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #c62828;
-    box-shadow: 0 5px 15px rgba(255, 154, 158, 0.4);
-}
-
-.documents-grid-enhanced {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 2rem;
-}
-
-.document-card-enhanced {
-    background: white;
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.document-card-enhanced:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-}
-
-.document-image-container {
-    position: relative;
-    height: 200px;
-    overflow: hidden;
-    background: #f8f9fa;
-}
-
-.document-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.document-card-enhanced:hover .document-image {
-    transform: scale(1.05);
-}
-
-.image-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.document-card-enhanced:hover .image-overlay {
-    opacity: 1;
-}
-
-.preview-btn {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    border: none;
-    border-radius: 25px;
-    padding: 0.75rem 1.5rem;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
-}
-
-.preview-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(79, 172, 254, 0.6);
-}
-
-.no-document-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #ccc;
-    font-size: 3rem;
-}
-
-.no-document-placeholder p {
-    margin-top: 1rem;
-    font-size: 1rem;
-    color: #999;
-}
-
-.status-badges-overlay {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-}
-
-.status-badges-new {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-
-.status-badges-new.pending {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    color: white;
-}
-
-.status-badges-new.verified {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #2d7d32;
-}
-
-.status-badges-new.rejected {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #c62828;
-}
-
-.status-badges-new.not-uploaded {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.document-info-section {
-    padding: 1.5rem;
-}
-
-.document-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-
-.document-title {
-    margin: 0;
-    color: #333;
-    font-size: 0.9rem;
-    font-weight: 700;
-    flex: 1;
-}
-
-.document-actions {
-    margin-left: 1rem;
-}
-
-.action-btn {
-    border: none;
-    border-radius: 20px;
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.upload-btn {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    color: white;
-    box-shadow: 0 3px 10px rgba(250, 112, 154, 0.4);
-}
-
-.verify-btn {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #c62828;
-    box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
-}
-
-.view-btn {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-    box-shadow: 0 3px 10px rgba(79, 172, 254, 0.4);
-}
-
-.action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.document-meta {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.meta-text {
-    color: #333;
-}
   /* Responsive Design */
   @media (max-width: 1200px) {
     .document-history .history-preview iframe.pdf-thumbnail {
@@ -6491,49 +6311,6 @@ background: #fd2b5a;
       max-height: 600px;
     }
   }
-
-@media (max-width: 768px) {
-    .enhanced-documents-panel {
-        padding: 1rem;
-    }
-
-    .candidate-info-card {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
-    }
-
-    .completion-ring {
-        margin-left: 0;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
-
-    .documents-grid-enhanced {
-        grid-template-columns: 1fr;
-    }
-
-    .filter-tabs {
-        justify-content: center;
-    }
-
-    .document-header {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .document-actions {
-        margin-left: 0;
-        align-self: stretch;
-    }
-
-    .action-btn {
-        width: 100%;
-        justify-content: center;
-    }
-}
 
 @media (max-width: 768px) {
     .document-history .history-preview iframe.pdf-thumbnail {

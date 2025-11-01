@@ -19,10 +19,10 @@ const MultiSelectCheckbox = ({
   onToggle
 }) => {
 
-  const [searchTerm , setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(()=>{
-    if(!isOpen){
+  useEffect(() => {
+    if (!isOpen) {
       setSearchTerm('');
     }
   }, [isOpen])
@@ -3190,7 +3190,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             }}>
               <div className="container-fluid py-2">
                 {/* Mobile Layout - Stack vertically */}
-                <div className="d-md-none" style={{margin: '15px'}}>
+                <div className="d-md-none" style={{ margin: '15px' }}>
                   {/* Filter Tabs - Mobile with horizontal scroll */}
                   <div className="mb-3">
                     <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
@@ -3893,7 +3893,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                               <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                             </div>
                                             <div className='pendingkyc'>
-                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' , marginBottom: '0.35rem' }}>
+                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '0.35rem' }}>
                                                 <i className="fas fa-phone"></i>
                                               </button>
                                               <img
@@ -3917,10 +3917,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                               </div>
                                             )}
-                                          </div>
-                                        </div>
-
-                                        <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                             <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                           <div className="btn-group">
                                             <div style={{ position: "relative", display: "inline-block" }}>
                                               <button
@@ -3931,161 +3928,193 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 <i className="fas fa-ellipsis-v"></i>
                                               </button>
 
+                                              {/* Mobile Bottom Sheet Modal */}
                                               {showPopup === profileIndex && (
-                                                <div
-                                                  onClick={() => setShowPopup(null)}
-                                                  style={{
-                                                    position: "fixed",
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: "100vw",
-                                                    height: "100vh",
-                                                    backgroundColor: "transparent",
-                                                    zIndex: 8,
-                                                  }}
-                                                ></div>
-                                              )}
-
-                                              <div
-                                                style={{
-                                                  position: "absolute",
-                                                  top: "28px",
-                                                  right: "-100px",
-                                                  width: "170px",
-                                                  backgroundColor: "white",
-                                                  border: "1px solid #ddd",
-                                                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                                  borderRadius: "4px",
-                                                  padding: "8px 0",
-                                                  zIndex: 9,
-                                                  transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                                  transition: "transform 0.3s ease-in-out",
-                                                  pointerEvents: showPopup ? "auto" : "none",
-                                                  display: showPopup === profileIndex ? "block" : "none"
-                                                }}
-                                              >
-                                                {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
-                                                  <button
-                                                    className="dropdown-item"
+                                                <>
+                                                  {/* Backdrop */}
+                                                  <div
+                                                    onClick={() => setShowPopup(null)}
                                                     style={{
-                                                      width: "100%",
-                                                      padding: "8px 16px",
-                                                      border: "none",
-                                                      background: "none",
-                                                      textAlign: "left",
-                                                      cursor: "pointer",
-                                                      fontSize: "12px",
-                                                      fontWeight: "600"
+                                                      position: "fixed",
+                                                      top: 0,
+                                                      left: 0,
+                                                      width: "100vw",
+                                                      height: "100vh",
+                                                      backgroundColor: "rgba(0, 0, 0, 0.5)",
+                                                      zIndex: 9998,
+                                                      animation: "fadeIn 0.3s ease"
                                                     }}
-                                                    onClick={() => handleMoveToAdmission(profile)}
+                                                  ></div>
+
+                                                  {/* Bottom Sheet */}
+                                                  <div
+                                                    style={{
+                                                      position: "fixed",
+                                                      bottom: 0,
+                                                      left: 0,
+                                                      right: 0,
+                                                      backgroundColor: "white",
+                                                      borderRadius: "20px 20px 0 0",
+                                                      boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
+                                                      zIndex: 9999,
+                                                      animation: "slideUpMobile 0.3s ease",
+                                                      maxHeight: "80vh",
+                                                      overflowY: "auto",
+                                                      padding: "20px 0"
+                                                    }}
                                                   >
-                                                    Move to Admission
-                                                  </button>)}
+                                                    {/* Handle Bar */}
+                                                    <div style={{
+                                                      width: "40px",
+                                                      height: "4px",
+                                                      backgroundColor: "#ddd",
+                                                      borderRadius: "2px",
+                                                      margin: "0 auto 20px",
+                                                    }}></div>
 
-                                                {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                                  <>
-                                                    <button
-                                                      className="dropdown-item"
+                                                    {/* Menu Items */}
+                                                    <div
                                                       style={{
-                                                        width: "100%",
-                                                        padding: "8px 16px",
-                                                        border: "none",
-                                                        background: "none",
-                                                        textAlign: "left",
-                                                        cursor: "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "600"
-                                                      }}
-                                                      onClick={() => handleMarkDropout(profile)}
-                                                    >
-                                                      Mark Dropout
-                                                    </button>
-                                                    <button
-                                                      className="dropdown-item"
-                                                      style={{
-                                                        width: "100%",
-                                                        padding: "8px 16px",
-                                                        border: "none",
-                                                        background: "none",
-                                                        textAlign: "left",
-                                                        cursor: "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "600"
-                                                      }}
-                                                      // onClick={() => {
-                                                      //   openEditPanel(profile, 'SetFollowup');
-                                                      //   console.log('selectedProfile', profile);
-                                                      // }}
-                                                      onClick={() => {
-                                                        setShowPopup(null)
-                                                        openPanel('SetFollowup', profile)
+                                                        padding: "0 20px"
                                                       }}
                                                     >
-                                                      Set Followup
-                                                    </button>
-                                                    <button
-                                                      className="dropdown-item"
-                                                      style={{
-                                                        width: "100%",
-                                                        padding: "8px 16px",
-                                                        border: "none",
-                                                        background: "none",
-                                                        textAlign: "left",
-                                                        cursor: "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "600"
-                                                      }}
-                                                      onClick={() => {
-                                                        handleFetchCandidate(profile);
-                                                        console.log('selectedProfile', profile);
-                                                      }}
-                                                    >
-                                                      Edit Profile
-                                                    </button>
-                                                    <button
-                                                      className="dropdown-item"
-                                                      style={{
-                                                        width: "100%",
-                                                        padding: "8px 16px",
-                                                        border: "none",
-                                                        background: "none",
-                                                        textAlign: "left",
-                                                        cursor: "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "600",
-                                                        textWrap: "auto"
-                                                      }}
-                                                      onClick={() => openPreVerificationModal(profile)}
-                                                    >
-                                                      Add Pre Verification
-                                                    </button>
+                                                      {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                                        <button
+                                                          className="dropdown-item"
+                                                          style={{
+                                                            width: "100%",
+                                                            padding: "16px 0",
+                                                            border: "none",
+                                                            background: "none",
+                                                            textAlign: "left",
+                                                            cursor: "pointer",
+                                                            fontSize: "15px",
+                                                            fontWeight: "500",
+                                                            borderBottom: "1px solid #f0f0f0",
+                                                            color: "#333"
+                                                          }}
+                                                          onClick={() => {
+                                                            setShowPopup(null);
+                                                            handleMoveToAdmission(profile);
+                                                          }}
+                                                        >
+                                                          Move to Admission
+                                                        </button>
+                                                      )}
 
-                                                  </>)}
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  // onClick={() => {
-                                                  //   openleadHistoryPanel(profile);
-                                                  //   console.log('selectedProfile', profile);
-                                                  // }}
-                                                  onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('leadHistory', profile)
-                                                  }}
-                                                >
-                                                  History List
-                                                </button>
+                                                      {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                                        <>
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              borderBottom: "1px solid #f0f0f0",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              handleMarkDropout(profile);
+                                                            }}
+                                                          >
+                                                            Mark Dropout
+                                                          </button>
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              borderBottom: "1px solid #f0f0f0",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              openPanel('SetFollowup', profile);
+                                                            }}
+                                                          >
+                                                            Set Followup
+                                                          </button>
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              borderBottom: "1px solid #f0f0f0",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              handleFetchCandidate(profile);
+                                                            }}
+                                                          >
+                                                            Edit Profile
+                                                          </button>
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              borderBottom: "1px solid #f0f0f0",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              openPreVerificationModal(profile);
+                                                            }}
+                                                          >
+                                                            Add Pre Verification
+                                                          </button>
 
-                                              </div>
+                                                        </>
+                                                      )}
+                                                      <button
+                                                        className="dropdown-item"
+                                                        style={{
+                                                          width: "100%",
+                                                          padding: "16px 0",
+                                                          border: "none",
+                                                          background: "none",
+                                                          textAlign: "left",
+                                                          cursor: "pointer",
+                                                          fontSize: "15px",
+                                                          fontWeight: "500",
+                                                          color: "#333"
+                                                        }}
+                                                        onClick={() => {
+                                                          setShowPopup(null);
+                                                          openPanel('leadHistory', profile);
+                                                        }}
+                                                      >
+                                                        History List
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </>
+                                              )}
                                             </div>
 
                                             <button
@@ -4103,6 +4132,11 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                             </button>
                                           </div>
                                         </div>
+                                            
+                                          </div>
+                                        </div>
+
+                                       
 
                                         <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                           <div className="btn-group">
@@ -4973,66 +5007,66 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         return (
                                                           <>
                                                             <div className="stat-card total-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-file-alt"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.totalRequired || 0}</h4>
                                                                 <p>Total Required</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-list"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card uploaded-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-cloud-upload-alt"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.uploadedCount || 0}</h4>
                                                                 <p>Uploaded</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-arrow-up"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card pending-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-clock"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                                 <p>Pending Review</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-exclamation-triangle"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card verified-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-check-circle"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.verifiedCount || 0}</h4>
                                                                 <p>Approved</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-thumbs-up"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card rejected-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-times-circle"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.RejectedCount || 0}</h4>
                                                                 <p>Rejected</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-arrow-down"></i>
                                                               </div>
                                                             </div>
@@ -6628,6 +6662,9 @@ background: #fd2b5a;
           html body .content .content-wrapper{
             padding: 1.8rem 0.9rem 0 !important;
           }
+          .stat-card{
+          padding:0.5rem;
+          }
           .resume-document-body {
             flex-direction: column;
           }
@@ -7106,7 +7143,7 @@ background: #fd2b5a;
 }
 
 .action-btn {
-    background: none;
+    // background: none;
     border: none;
     cursor: pointer;
     padding: 5px 8px;
@@ -7858,7 +7895,14 @@ background: #fd2b5a;
     font-size: 1.5rem;
     color: white;
 }
-
+.stat-icon i{
+display:flex;
+width:100%;
+height:100%;
+justify-content: center;
+align-items: center;
+text-align: center;
+}
 .total-docs .stat-icon {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -7915,7 +7959,31 @@ background: #fd2b5a;
 .filter-tabs {
     display: flex;
     gap: 1rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
+}
+
+.filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .filter-btn {
@@ -8209,7 +8277,10 @@ background: #fd2b5a;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    }
+    .stat-card{
+    padding: 0.5rem
     }
 
     .documents-grid-enhanced {
@@ -8217,7 +8288,14 @@ background: #fd2b5a;
     }
 
     .filter-tabs {
-        justify-content: center;
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
     }
 
     .document-header {
@@ -8670,6 +8748,65 @@ background: #fd2b5a;
           .ekycimg{
           width:75px!important
           }
+          
+          .card-header {
+            position: relative;
+            overflow: visible;
+          }
+          
+          /* Scroll Indicator - Right Side Gradient */
+          .card-header::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95));
+            pointer-events: none;
+            z-index: 2;
+          }
+          
+          .nav.nav-pills {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 10px !important;
+            padding-right: 30px !important;
+            margin-bottom: 0 !important;
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+          }
+          
+          .nav.nav-pills::-webkit-scrollbar {
+            display: none;
+          }
+          
+          .nav.nav-pills .nav-item {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            margin-right: 8px;
+            scroll-snap-align: start;
+          }
+          
+          .nav.nav-pills .nav-link {
+            white-space: nowrap !important;
+            padding: 10px 16px !important;
+            font-size: 13px !important;
+            border-radius: 20px !important;
+            min-width: fit-content !important;
+            display: inline-block !important;
+            transition: all 0.3s ease;
+          }
+          
+          .nav.nav-pills .nav-link.active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
+          }
         }
 
 
@@ -8870,6 +9007,9 @@ background: #fd2b5a;
 }
 
 @media (max-width: 768px) {
+html body .content .content-wrapper{
+padding: 1.0rem 1.2rem 0;
+}
   .document-history .history-preview iframe.pdf-thumbnail {
     height: 50vh !important;
     min-height: 300px;
@@ -9922,6 +10062,47 @@ animation: pulse 1.5s infinite;
 100% { transform: scale(1); }
 }
 
+/* Mobile Bottom Sheet Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile Bottom Sheet Dropdown Item Hover/Active Effects */
+@media (max-width: 768px) {
+  .dropdown-item:active {
+    background-color: #f5f5f5 !important;
+    transform: scale(0.98);
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f9f9f9 !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  .dropdown-item {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+}
+
 .recordings-list {
 margin-top: 30px;
 }
@@ -10819,7 +11000,10 @@ max-width: 600px;
 
         /* Responsive design */
         @media (max-width: 768px) {
-
+ .new-modal-content {
+    width: 100%!important;
+    transform: translateX(0);
+} 
             .verification-table {
                 font-size: 14px;
             }
