@@ -917,6 +917,71 @@ const CRMDashboard = () => {
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
 
+  // Handle incoming messages from users
+  const handleIncomingMessage = useCallback((data) => {
+    console.log('📬 Processing incoming message:', data);
+
+    // Check if this message is for the currently opened chat
+    if (!selectedProfile?._candidate?.mobile) {
+      console.log('⚠️ No chat currently open');
+      return;
+    }
+
+    const currentChatPhone = selectedProfile._candidate.mobile.replace(/\D/g, '');
+    const incomingFrom = data.from.replace(/\D/g, '');
+
+    if (!incomingFrom.includes(currentChatPhone) && !currentChatPhone.includes(incomingFrom)) {
+      console.log('⚠️ Message not for current chat:', { currentChatPhone, incomingFrom });
+      return;
+    }
+
+    // Add incoming message to chat
+    setWhatsappMessages((prevMessages) => {
+      // Check if message already exists
+      const exists = prevMessages.some(msg => 
+        msg.whatsappMessageId === data.whatsappMessageId || 
+        msg.dbId === data.messageId
+      );
+
+      if (exists) {
+        console.log('⚠️ Message already exists in chat');
+        return prevMessages;
+      }
+
+      const newMessage = {
+        id: data.messageId,
+        dbId: data.messageId,
+        whatsappMessageId: data.whatsappMessageId,
+        text: data.message,
+        sender: 'user', // Incoming message from user
+        time: new Date(data.sentAt).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        type: data.messageType,
+        mediaUrl: data.mediaUrl,
+        status: 'received',
+        timestamp: data.sentAt
+      };
+
+      console.log('✅ Adding incoming message to chat:', {
+        from: data.from,
+        type: data.messageType,
+        text: data.message.substring(0, 50)
+      });
+
+      return [...prevMessages, newMessage];
+    });
+
+    // Optional: Show browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New WhatsApp Message', {
+        body: data.message.substring(0, 100),
+        icon: '/whatsapp-icon.png'
+      });
+    }
+  }, [selectedProfile]);
+
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
     console.log('📩 Received status update:', data);
@@ -1003,6 +1068,17 @@ const CRMDashboard = () => {
       });
     }
   }, [updates]);
+
+  // Handle incoming messages from users
+  useEffect(() => {
+    console.log('📬 WhatsApp incoming messages:', messages);
+    
+    if (messages && messages.length > 0) {
+      messages.forEach(message => {
+        handleIncomingMessage(message);
+      });
+    }
+  }, [messages]);
 
 
   // Fetch filter options from backend API on mount
@@ -3276,14 +3352,15 @@ const CRMDashboard = () => {
           wamid: msg.wamid || msg.whatsappMessageId, // WhatsApp message ID (check both fields)
           whatsappMessageId: msg.whatsappMessageId || msg.wamid, // Also store as whatsappMessageId for consistency
           text: msg.message,
-          sender: 'agent', // All sent messages are from agent
+          sender: msg.direction === 'incoming' ? 'user' : 'agent', // Check direction to determine sender
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
           }),
           type: msg.messageType, // 'text' or 'template'
           templateData: msg.templateData, // Will contain components for template messages
-          status: msg.status || 'sent',
+          mediaUrl: msg.mediaUrl, // Media URL if it's an image/video/document
+          status: msg.status || (msg.direction === 'incoming' ? 'received' : 'sent'),
           deliveredAt: msg.deliveredAt,
           readAt: msg.readAt
         }));
@@ -6021,11 +6098,72 @@ const CRMDashboard = () => {
                       </div>
                     </>
                   ) : (
-                    /* Regular text message */
+                    /* Regular text/media message */
                     <>
-                      <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
-                        {message.text}
-                      </p>
+                      {/* Render media if present */}
+                      {message.mediaUrl && message.type === 'image' && (
+                        <img 
+                          src={message.mediaUrl} 
+                          alt="Shared image"
+                          style={{ 
+                            maxWidth: '100%', 
+                            borderRadius: '8px', 
+                            marginBottom: message.text !== '[Image]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        />
+                      )}
+                      {message.mediaUrl && message.type === 'video' && (
+                        <video 
+                          controls 
+                          style={{ 
+                            maxWidth: '100%', 
+                            borderRadius: '8px', 
+                            marginBottom: message.text !== '[Video]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      )}
+                      {message.mediaUrl && message.type === 'audio' && (
+                        <audio 
+                          controls 
+                          style={{ 
+                            width: '100%', 
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="audio/mpeg" />
+                          Your browser does not support the audio tag.
+                        </audio>
+                      )}
+                      {message.mediaUrl && message.type === 'document' && (
+                        <a 
+                          href={message.mediaUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="d-flex align-items-center text-decoration-none"
+                          style={{ 
+                            padding: '8px', 
+                            backgroundColor: 'rgba(0,0,0,0.05)', 
+                            borderRadius: '4px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+                          <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+                        </a>
+                      )}
+                      
+                      {/* Render text if it's not a default placeholder */}
+                      {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+                        <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                          {message.text}
+                        </p>
+                      )}
+                      
                       <div
                         className="d-flex align-items-center justify-content-end"
                         style={{

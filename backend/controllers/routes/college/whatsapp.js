@@ -2968,11 +2968,19 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 		// Format phone number
 		const formattedPhone = formatPhoneNumber(phone);
 		
-		// Fetch messages from database
+		// Fetch BOTH sent and received messages
+		// Sent messages: collegeId + to = phone
+		// Received messages: from = phone
 		const messages = await WhatsAppMessage.find({
-			collegeId: collegeId,
-			to: formattedPhone
+			$or: [
+				{ collegeId: collegeId, to: formattedPhone }, // Sent by college
+				{ from: formattedPhone } // Received from user
+			]
 		}).sort({ sentAt: 1 });
+		
+		console.log(`📥 Fetched ${messages.length} messages for ${formattedPhone}`);
+		console.log(`   - Sent: ${messages.filter(m => m.direction !== 'incoming').length}`);
+		console.log(`   - Received: ${messages.filter(m => m.direction === 'incoming').length}`);
 		
 		res.json({
 			success: true,
@@ -3143,7 +3151,93 @@ async function handleStatusUpdates(statuses) {
 }
 
 /**
- * Handle incoming messages (for future implementation)
+ * Download media from WhatsApp and upload to S3
+ */
+async function downloadAndUploadMedia(mediaId, mediaType) {
+	try {
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
+		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+		
+		// Step 1: Get media URL from WhatsApp
+		console.log(`📥 Fetching media URL for ID: ${mediaId}`);
+		const mediaResponse = await axios.get(`${WHATSAPP_API_URL}/${mediaId}`, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`
+			}
+		});
+
+		const mediaUrl = mediaResponse.data.url;
+		const mimeType = mediaResponse.data.mime_type;
+		
+		console.log(`📥 Media URL received: ${mediaUrl}`);
+		console.log(`📥 MIME type: ${mimeType}`);
+
+		// Step 2: Download media from WhatsApp
+		const downloadResponse = await axios.get(mediaUrl, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`
+			},
+			responseType: 'arraybuffer'
+		});
+
+		const mediaBuffer = Buffer.from(downloadResponse.data);
+		
+		// Step 3: Determine file extension
+		const extensionMap = {
+			'image/jpeg': 'jpg',
+			'image/jpg': 'jpg',
+			'image/png': 'png',
+			'image/gif': 'gif',
+			'image/webp': 'webp',
+			'video/mp4': 'mp4',
+			'video/3gpp': '3gp',
+			'audio/aac': 'aac',
+			'audio/mp4': 'm4a',
+			'audio/mpeg': 'mp3',
+			'audio/amr': 'amr',
+			'audio/ogg': 'ogg',
+			'application/pdf': 'pdf',
+			'application/vnd.ms-powerpoint': 'ppt',
+			'application/msword': 'doc',
+			'application/vnd.ms-excel': 'xls',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+			'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx'
+		};
+
+		const fileExtension = extensionMap[mimeType] || 'bin';
+		const fileName = `whatsapp_incoming_${Date.now()}_${uuid()}.${fileExtension}`;
+		
+		// Step 4: Upload to S3
+		console.log(`📤 Uploading to S3: ${fileName}`);
+		const s3Params = {
+			Bucket: bucketName,
+			Key: `whatsapp/incoming/${fileName}`,
+			Body: mediaBuffer,
+			ContentType: mimeType,
+			ACL: 'public-read'
+		};
+
+		await s3.upload(s3Params).promise();
+		const s3Url = `https://${bucketName}.s3.${region}.amazonaws.com/whatsapp/incoming/${fileName}`;
+		
+		console.log(`✅ Media uploaded to S3: ${s3Url}`);
+		
+		return {
+			s3Url,
+			fileName,
+			mimeType,
+			mediaType
+		};
+		
+	} catch (error) {
+		console.error('❌ Error downloading/uploading media:', error.response?.data || error.message);
+		throw error;
+	}
+}
+
+/**
+ * Handle incoming messages from users
  */
 async function handleIncomingMessages(messages, metadata) {
 	try {
@@ -3155,12 +3249,144 @@ async function handleIncomingMessages(messages, metadata) {
 				messageId: message.id
 			});
 
-			// Future: Save incoming messages to database
-			// Future: Send WebSocket notification to agent dashboard
-			// Future: Auto-reply logic
+			const from = message.from;
+			const messageId = message.id;
+			const timestamp = message.timestamp;
+			const messageType = message.type;
+
+			let messageText = '';
+			let mediaUrl = null;
+			let mediaData = null;
+
+			// Extract message content based on type
+			switch (messageType) {
+				case 'text':
+					messageText = message.text?.body || '';
+					break;
+					
+				case 'image':
+					messageText = message.image?.caption || '[Image]';
+					// Download and upload image to S3
+					if (message.image?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.image.id, 'image');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process image:', error.message);
+						}
+					}
+					break;
+					
+				case 'video':
+					messageText = message.video?.caption || '[Video]';
+					if (message.video?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.video.id, 'video');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process video:', error.message);
+						}
+					}
+					break;
+					
+				case 'audio':
+					messageText = '[Audio]';
+					if (message.audio?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.audio.id, 'audio');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process audio:', error.message);
+						}
+					}
+					break;
+					
+				case 'document':
+					messageText = message.document?.filename || '[Document]';
+					if (message.document?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.document.id, 'document');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process document:', error.message);
+						}
+					}
+					break;
+					
+				case 'sticker':
+					messageText = '[Sticker]';
+					if (message.sticker?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.sticker.id, 'sticker');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process sticker:', error.message);
+						}
+					}
+					break;
+					
+				case 'location':
+					const lat = message.location?.latitude;
+					const lng = message.location?.longitude;
+					messageText = `[Location: ${lat}, ${lng}]`;
+					break;
+					
+				case 'contacts':
+					messageText = '[Contact Card]';
+					break;
+					
+				default:
+					messageText = `[Unsupported message type: ${messageType}]`;
+			}
+
+			// Save incoming message to database
+			try {
+				const incomingMessageDoc = {
+					from: from,
+					to: metadata?.phone_number_id || 'unknown',
+					message: messageText,
+					messageType: messageType,
+					whatsappMessageId: messageId,
+					status: 'received',
+					sentAt: new Date(parseInt(timestamp) * 1000),
+					receivedAt: new Date(),
+					direction: 'incoming', // Important: Mark as incoming
+					mediaUrl: mediaUrl,
+					mediaData: mediaData,
+					collegeId: null // Will be set if we can identify the college
+				};
+
+				const savedMessage = await WhatsAppMessage.create(incomingMessageDoc);
+				console.log('✅ Incoming message saved to database:', savedMessage._id);
+
+				// Send WebSocket notification to frontend
+				if (global.io) {
+					try {
+						global.io.emit('whatsapp_incoming_message', {
+							messageId: savedMessage._id,
+							whatsappMessageId: messageId,
+							from: from,
+							message: messageText,
+							messageType: messageType,
+							mediaUrl: mediaUrl,
+							timestamp: timestamp,
+							sentAt: new Date(parseInt(timestamp) * 1000).toISOString()
+						});
+						console.log('🔔 Socket.io event emitted: whatsapp_incoming_message');
+						console.log('   - From:', from);
+						console.log('   - Type:', messageType);
+						console.log('   - Message:', messageText.substring(0, 50));
+					} catch (ioError) {
+						console.error('❌ Socket.io notification failed:', ioError.message);
+					}
+				}
+			} catch (dbError) {
+				console.error('❌ Failed to save incoming message:', dbError.message);
+			}
 		}
 	} catch (error) {
 		console.error('Error handling incoming messages:', error);
+		throw error;
 	}
 }
 
