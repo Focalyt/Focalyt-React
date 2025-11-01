@@ -922,6 +922,7 @@ const CRMDashboard = () => {
     expiresAt: null,
     remainingTimeMs: 0
   });
+  const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
 
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
@@ -3467,6 +3468,46 @@ const CRMDashboard = () => {
     }
   }, [showPanel, whatsappMessages.length, isLoadingChatHistory]);
 
+  // Countdown timer for session window
+  useEffect(() => {
+    if (!sessionWindow.isOpen || !sessionWindow.expiresAt) {
+      setSessionCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const expiresAt = new Date(sessionWindow.expiresAt);
+      const diff = expiresAt - now;
+
+      if (diff <= 0) {
+        setSessionCountdown('00:00:00');
+        // Session expired, refresh status
+        if (selectedProfile?._candidate?.mobile) {
+          checkSessionWindow(selectedProfile._candidate.mobile);
+        }
+        return;
+      }
+
+      // Convert to hours, minutes, seconds
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      // Format as HH:MM:SS
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setSessionCountdown(formatted);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [sessionWindow.isOpen, sessionWindow.expiresAt, selectedProfile]);
+
   // Render message status icon (WhatsApp style)
   const renderMessageStatus = (status, errorMessage = null) => {
     switch (status) {
@@ -3970,17 +4011,79 @@ const CRMDashboard = () => {
 
   const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
 
-  const handleWhatsappSendMessage = () => {
-    if (whatsappNewMessage.trim() && hasActiveSession) {
-      setWhatsappMessages([...whatsappMessages, {
-        id: whatsappMessages.length + 1,
-        text: whatsappNewMessage,
-        sender: 'agent',
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        type: 'session'
-      }]);
-      setWhatsappNewMessage('');
-      setShowWhatsappEmojiPicker(false);
+  const handleWhatsappSendMessage = async () => {
+    if (!whatsappNewMessage.trim()) return;
+    
+    if (!sessionWindow.isOpen) {
+      alert('24-hour window is closed. Please use a template message.');
+      return;
+    }
+
+    const messageText = whatsappNewMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Add message to UI immediately (optimistic update)
+    const newMessage = {
+      id: tempId,
+      text: messageText,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      status: 'sending'
+    };
+    
+    setWhatsappMessages(prev => [...prev, newMessage]);
+    setWhatsappNewMessage('');
+    setShowWhatsappEmojiPicker(false);
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/whatsapp/send-message`,
+        {
+          to: selectedProfile._candidate.mobile,
+          message: messageText,
+          candidateId: selectedProfile._candidate._id,
+          candidateName: selectedProfile._candidate.name
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // Update message with real ID and status
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                  ...msg,
+                  id: response.data.data.messageId,
+                  wamid: response.data.data.messageId,
+                  status: 'sent'
+                }
+              : msg
+          )
+        );
+        
+        console.log('✅ Message sent successfully:', response.data);
+      }
+    } catch (error) {
+      console.error('❌ Error sending message:', error);
+      
+      // Update message status to failed
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+      
+      // Show error to user
+      alert(error.response?.data?.message || 'Failed to send message. Please try again.');
     }
   };
 
@@ -6073,7 +6176,8 @@ const CRMDashboard = () => {
                   }}
                 ></div>
                 <span className="fw-semibold" style={{ color: '#0A6E44' }}>
-                  24-Hour Window Active
+                  <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+                  {sessionCountdown} remaining
                 </span>
               </div>
             ) : (
@@ -13381,9 +13485,7 @@ margin-left:15px;
         `}
       </style>
       <style>
-        {
-
-          `
+        {`
           
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
@@ -13708,14 +13810,10 @@ margin-left:15px;
               padding: 15px 9px;
               }
 }
-
-    
-            `
-        }
-
+        `}
       </style>
-      <style> {
-        ` .bg-gradient-primary {
+      <style>
+        {`.bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -16302,15 +16400,11 @@ margin-left:15px;
                   min-height: 200px;
               }
           }
-
-          `
-      }
-
+        `}
       </style>
 
       <style>
-        {
-          `
+        {`
           input[type="text"], 
 input[type="email"], 
 input[type="number"],
@@ -17828,10 +17922,7 @@ max-width: 600px;
   .pac-container {
     z-index: 10000 !important;
   }
-
- 
-          `
-        }
+        `}
       </style>
 
     </div>

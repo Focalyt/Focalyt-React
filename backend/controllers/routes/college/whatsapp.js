@@ -2884,13 +2884,30 @@ router.get('/verify-template/:templateName', async (req, res) => {
 // Send regular WhatsApp message (not template)
 router.post('/send-message', isCollege, async (req, res) => {
 	try {
-		const { to, message, collegeId } = req.body;
+		const { to, message, candidateId, candidateName } = req.body;
+		
+		// Get college ID from authenticated user
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+
+		console.log('📤 Sending free text message:', { 
+			to, 
+			message: message.substring(0, 50), 
+			candidateId,
+			collegeId 
+		});
 
 		// Validation
 		if (!to || !message) {
 			return res.status(400).json({
 				success: false,
 				message: 'to and message are required'
+			});
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				success: false,
+				message: 'College ID not found in session'
 			});
 		}
 
@@ -2917,6 +2934,8 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		};
 
+		console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
+
 		const response = await axios.post(url, messageData, {
 			headers: {
 				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
@@ -2924,13 +2943,43 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		});
 
+		console.log('✅ WhatsApp API response:', response.data);
+
 		// Save message to database
-		await saveMessageToDatabase({
+		const messageDoc = {
+			collegeId: collegeId,
 			to: formattedPhone,
 			message: message,
-			collegeId: collegeId,
-			messageType: 'text'
+			messageType: 'text',
+			status: 'sent',
+			direction: 'outgoing',
+			whatsappMessageId: response.data.messages[0].id,
+			sentAt: new Date(),
+			candidateId: candidateId || null,
+			candidateName: candidateName || null
+		};
+
+		console.log('💾 Saving message to database:', { 
+			collegeId, 
+			to: formattedPhone, 
+			messageType: 'text',
+			whatsappMessageId: response.data.messages[0].id 
 		});
+
+		const savedMessage = await WhatsAppMessage.create(messageDoc);
+		console.log('✅ Message saved to database with ID:', savedMessage._id);
+
+		// Send WebSocket notification
+		if (global.io) {
+			global.io.emit('whatsapp_message_sent', {
+				messageId: response.data.messages[0].id,
+				to: formattedPhone,
+				message: message,
+				candidateId: candidateId,
+				timestamp: new Date()
+			});
+			console.log('📡 WebSocket notification sent');
+		}
 
 		res.json({
 			success: true,
@@ -2943,7 +2992,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 		});
 
 	} catch (error) {
-		console.error('Send Message Error:', error);
+		console.error('❌ Send Message Error:', error.response?.data || error.message);
 		res.status(500).json({
 			success: false,
 			message: error.response?.data?.error?.message || 'Failed to send message',
@@ -3005,38 +3054,68 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
 	try {
 		const mobileString = req.params.mobile;
-		const mobile = parseInt(mobileString.replace(/\D/g, ''));
+		const mobileStr = mobileString.replace(/\D/g, '');
+		const mobile = parseInt(mobileStr);
+		
+		// Try with and without country code
+		const mobileWithoutCode = mobileStr.startsWith('91') ? mobileStr.substring(2) : mobileStr;
+		const mobileWithoutCodeNumber = parseInt(mobileWithoutCode);
 		
 		console.log('🔍 Debug: Searching candidate');
 		console.log('   - Input:', mobileString);
-		console.log('   - Parsed as number:', mobile);
+		console.log('   - Cleaned:', mobileStr);
+		console.log('   - With country code:', mobile);
+		console.log('   - Without country code:', mobileWithoutCodeNumber);
 		
-		const candidate = await Candidate.findOne({ mobile: mobile });
+		// Try finding with multiple formats
+		const candidate = await Candidate.findOne({
+			$or: [
+				{ mobile: mobile },                    // 918699081947
+				{ mobile: mobileWithoutCodeNumber },   // 8699081947
+				{ mobile: mobileStr },                 // "918699081947"
+				{ mobile: mobileWithoutCode },         // "8699081947"
+				{ mobile: mobileString },              // Original input
+				{ mobile: `+${mobileStr}` },          // "+918699081947"
+				{ mobile: `+91${mobileWithoutCode}` }  // "+918699081947"
+			]
+		});
 		
 		if (candidate) {
+			const now = new Date();
+			const expiresAt = candidate.whatsappSessionWindowExpiresAt;
+			const isOpen = expiresAt && new Date(expiresAt) > now;
+			
 			res.json({
 				success: true,
 				found: true,
+				searchedFormats: {
+					withCode: mobile,
+					withoutCode: mobileWithoutCodeNumber,
+					stringWithCode: mobileStr,
+					stringWithoutCode: mobileWithoutCode
+				},
 				candidate: {
 					_id: candidate._id,
 					name: candidate.name,
 					mobile: candidate.mobile,
+					mobileType: typeof candidate.mobile,
 					whatsappLastIncomingMessageAt: candidate.whatsappLastIncomingMessageAt,
-					whatsappSessionWindowExpiresAt: candidate.whatsappSessionWindowExpiresAt
+					whatsappSessionWindowExpiresAt: candidate.whatsappSessionWindowExpiresAt,
+					sessionWindowOpen: isOpen,
+					remainingTimeMs: isOpen ? new Date(expiresAt) - now : 0
 				}
 			});
 		} else {
-			// Try searching with string
-			const candidateByString = await Candidate.findOne({ mobile: mobileString });
 			res.json({
 				success: true,
 				found: false,
-				searchedAsNumber: mobile,
-				candidateByString: candidateByString ? {
-					_id: candidateByString._id,
-					name: candidateByString.name,
-					mobile: candidateByString.mobile
-				} : null
+				searchedFormats: {
+					withCode: mobile,
+					withoutCode: mobileWithoutCodeNumber,
+					stringWithCode: mobileStr,
+					stringWithoutCode: mobileWithoutCode
+				},
+				message: 'No candidate found with any mobile format'
 			});
 		}
 	} catch (error) {
@@ -3047,55 +3126,76 @@ router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
 /**
  * Check WhatsApp 24-hour session window status
  * GET /api/college/whatsapp/session-window/:mobile
+ * Checks directly from WhatsAppMessage collection instead of Candidate
  */
 router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 	try {
-		const mobile = parseInt(req.params.mobile.replace(/\D/g, ''));
+		const mobileStr = req.params.mobile.replace(/\D/g, '');
 		
-		console.log('🔍 Checking session window for mobile:', mobile);
+		// Prepare mobile number formats for matching
+		const mobileWithoutCode = mobileStr.startsWith('91') ? mobileStr.substring(2) : mobileStr;
+		const mobileWithPlus91 = `+91${mobileWithoutCode}`;
+		const mobileWith91 = `91${mobileWithoutCode}`;
+		const mobilePlus = `+${mobileStr}`;
 		
-		// Find candidate by mobile number
-		const candidate = await Candidate.findOne({ mobile: mobile });
+		console.log('🔍 Checking session window from WhatsAppMessage collection');
+		console.log('   - Mobile formats to search:', {
+			withPlus91: mobileWithPlus91,
+			with91: mobileWith91,
+			withPlus: mobilePlus,
+			original: mobileStr,
+			withoutCode: mobileWithoutCode
+		});
 		
-		if (!candidate) {
-			console.log('❌ Candidate not found with mobile:', mobile);
-			return res.status(404).json({
-				success: false,
-				message: 'Candidate not found'
-			});
-		}
+		// Find last incoming message from this mobile number (try multiple formats)
+		const lastIncomingMessage = await WhatsAppMessage.findOne({
+			direction: 'incoming',
+			$or: [
+				{ from: mobileWithPlus91 },      // "+918699081947"
+				{ from: mobileWith91 },          // "918699081947"
+				{ from: mobilePlus },             // "+918699081947"
+				{ from: mobileStr },              // "918699081947"
+				{ from: mobileWithoutCode },     // "8699081947"
+				{ from: `+${mobileStr}` }         // "+918699081947"
+			]
+		})
+		.sort({ sentAt: -1 })  // Latest message first
+		.lean();
 		
 		const now = new Date();
-		const expiresAt = candidate.whatsappSessionWindowExpiresAt;
+		let isSessionWindowOpen = false;
+		let lastIncomingMessageAt = null;
+		let expiresAt = null;
+		let remainingTimeMs = 0;
 		
-		console.log('📊 Session Window Check:');
-		console.log('   - Candidate:', candidate.name, '(', candidate._id, ')');
-		console.log('   - Last incoming message:', candidate.whatsappLastIncomingMessageAt);
-		console.log('   - Window expires at:', expiresAt);
-		console.log('   - Current time:', now);
-		console.log('   - Has expiry date?', !!expiresAt);
-		
-		const isSessionWindowOpen = expiresAt && new Date(expiresAt) > now;
-		
-		if (expiresAt) {
-			const expiryDate = new Date(expiresAt);
-			const diff = expiryDate - now;
-			console.log('   - Time difference (ms):', diff);
-			console.log('   - Time difference (hours):', (diff / (1000 * 60 * 60)).toFixed(2));
+		if (lastIncomingMessage && lastIncomingMessage.sentAt) {
+			lastIncomingMessageAt = new Date(lastIncomingMessage.sentAt);
+			expiresAt = new Date(lastIncomingMessageAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours from message
+			isSessionWindowOpen = expiresAt > now;
+			
+			if (isSessionWindowOpen) {
+				remainingTimeMs = expiresAt - now;
+			}
+			
+			console.log('📊 Session Window Check (from WhatsAppMessage):');
+			console.log('   - Last incoming message at:', lastIncomingMessageAt.toISOString());
+			console.log('   - Window expires at:', expiresAt.toISOString());
+			console.log('   - Current time:', now.toISOString());
 			console.log('   - Is window open?', isSessionWindowOpen);
+			console.log('   - Remaining time (hours):', (remainingTimeMs / (1000 * 60 * 60)).toFixed(2));
 		} else {
-			console.log('   - ⚠️ No expiry date set - window closed');
+			console.log('📊 Session Window Check:');
+			console.log('   - ⚠️ No incoming messages found - window closed');
+			console.log('   - User must send a message first to open 24-hour window');
 		}
 		
 		const response = {
 			success: true,
 			sessionWindow: {
 				isOpen: isSessionWindowOpen,
-				lastIncomingMessageAt: candidate.whatsappLastIncomingMessageAt,
-				expiresAt: candidate.whatsappSessionWindowExpiresAt,
-				remainingTimeMs: isSessionWindowOpen 
-					? new Date(candidate.whatsappSessionWindowExpiresAt) - now 
-					: 0
+				lastIncomingMessageAt: lastIncomingMessageAt,
+				expiresAt: expiresAt,
+				remainingTimeMs: remainingTimeMs
 			},
 			messaging: {
 				canSendManualMessages: isSessionWindowOpen,
@@ -3105,7 +3205,8 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 		
 		console.log('✅ Returning response:', {
 			isOpen: response.sessionWindow.isOpen,
-			canSendManualMessages: response.messaging.canSendManualMessages
+			canSendManualMessages: response.messaging.canSendManualMessages,
+			requiresTemplate: response.messaging.requiresTemplate
 		});
 		
 		res.json(response);
@@ -3513,15 +3614,32 @@ async function handleIncomingMessages(messages, metadata) {
 				// Update Candidate's WhatsApp 24-hour session window
 				try {
 					const phoneWithoutPlus = from.replace('+', '');
-					const phoneNumber = parseInt(phoneWithoutPlus);
+					const phoneNumberWithCode = parseInt(phoneWithoutPlus); // e.g., 918699081947
+					const phoneWithoutCountryCode = phoneWithoutPlus.startsWith('91') 
+						? phoneWithoutPlus.substring(2) 
+						: phoneWithoutPlus; // e.g., 8699081947
+					const phoneNumberWithoutCode = parseInt(phoneWithoutCountryCode);
 					
 					const now = new Date();
 					const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 					
-					console.log('🔍 Looking for candidate with mobile:', phoneNumber);
+					console.log('🔍 Looking for candidate with mobile formats:');
+					console.log('   - With country code (91):', phoneNumberWithCode);
+					console.log('   - Without country code:', phoneNumberWithoutCode);
+					console.log('   - String formats:', phoneWithoutPlus, phoneWithoutCountryCode);
 					
+					// Try multiple mobile number formats to match candidate
 					const updateResult = await Candidate.updateOne(
-						{ mobile: phoneNumber },
+						{
+							$or: [
+								{ mobile: phoneNumberWithCode },        // 918699081947
+								{ mobile: phoneNumberWithoutCode },     // 8699081947
+								{ mobile: phoneWithoutPlus },           // "918699081947"
+								{ mobile: phoneWithoutCountryCode },    // "8699081947"
+								{ mobile: `+${phoneWithoutPlus}` },     // "+918699081947"
+								{ mobile: from }                         // Original "+918699081947"
+							]
+						},
 						{
 							$set: {
 								whatsappLastIncomingMessageAt: now,
@@ -3531,19 +3649,39 @@ async function handleIncomingMessages(messages, metadata) {
 					);
 					
 					if (updateResult.matchedCount > 0) {
-						console.log('✅ Updated 24-hour session window for candidate:', phoneNumber);
+						console.log('✅ Updated 24-hour session window for candidate');
 						console.log('   - Window opens at:', now.toISOString());
 						console.log('   - Window expires at:', expiresAt.toISOString());
 						console.log('   - Documents matched:', updateResult.matchedCount);
 						console.log('   - Documents modified:', updateResult.modifiedCount);
 					} else {
-						console.warn('⚠️ Candidate not found with mobile number:', phoneNumber);
-						console.warn('   - Trying to find candidate to debug...');
-						const candidate = await Candidate.findOne({ mobile: phoneNumber });
+						console.warn('⚠️ Candidate not found with any mobile format');
+						console.warn('   - Tried formats:', {
+							withCode: phoneNumberWithCode,
+							withoutCode: phoneNumberWithoutCode,
+							stringWithCode: phoneWithoutPlus,
+							stringWithoutCode: phoneWithoutCountryCode,
+							original: from
+						});
+						
+						// Debug: Try to find any candidate to understand the format
+						console.warn('   - Searching for any candidate with similar number...');
+						const candidate = await Candidate.findOne({
+							$or: [
+								{ mobile: phoneNumberWithCode },
+								{ mobile: phoneNumberWithoutCode },
+								{ mobile: { $regex: phoneWithoutCountryCode, $options: 'i' } }
+							]
+						});
 						if (candidate) {
-							console.log('   - Found candidate:', candidate._id, candidate.name);
+							console.log('   - Found candidate:', {
+								id: candidate._id,
+								name: candidate.name,
+								mobile: candidate.mobile,
+								mobileType: typeof candidate.mobile
+							});
 						} else {
-							console.log('   - No candidate exists with this mobile number');
+							console.log('   - No candidate exists with this mobile number in any format');
 						}
 					}
 				} catch (candidateUpdateError) {
