@@ -6,6 +6,10 @@ const whatsappMessageSchema = new mongoose.Schema({
     ref: 'College',
     required: true
   },
+  from: {
+    type: String,
+    default: null // For incoming messages
+  },
   to: {
     type: String,
     required: true
@@ -16,7 +20,7 @@ const whatsappMessageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'template', 'image', 'video', 'document'],
+    enum: ['text', 'template', 'image', 'video', 'document', 'audio', 'voice', 'sticker', 'location', 'contacts'],
     default: 'text'
   },
   templateName: {
@@ -29,8 +33,13 @@ const whatsappMessageSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['sending', 'sent', 'delivered', 'read', 'failed'],
+    enum: ['sending', 'sent', 'delivered', 'read', 'failed', 'received'],
     default: 'sent'
+  },
+  direction: {
+    type: String,
+    enum: ['outgoing', 'incoming'],
+    default: 'outgoing'
   },
   whatsappMessageId: {
     type: String,
@@ -39,6 +48,10 @@ const whatsappMessageSchema = new mongoose.Schema({
   sentAt: {
     type: Date,
     default: Date.now
+  },
+  receivedAt: {
+    type: Date,
+    default: null
   },
   deliveredAt: {
     type: Date,
@@ -50,6 +63,14 @@ const whatsappMessageSchema = new mongoose.Schema({
   },
   errorMessage: {
     type: String,
+    default: null
+  },
+  mediaUrl: {
+    type: String,
+    default: null
+  },
+  mediaData: {
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   candidateId: {
@@ -67,7 +88,11 @@ const whatsappMessageSchema = new mongoose.Schema({
 
 // Index for better query performance
 whatsappMessageSchema.index({ collegeId: 1, to: 1, sentAt: -1 });
+whatsappMessageSchema.index({ collegeId: 1, from: 1, sentAt: -1 });
+whatsappMessageSchema.index({ from: 1, sentAt: -1 });
+whatsappMessageSchema.index({ to: 1, sentAt: -1 });
 whatsappMessageSchema.index({ status: 1 });
 whatsappMessageSchema.index({ messageType: 1 });
+whatsappMessageSchema.index({ direction: 1 });
 
 module.exports = mongoose.model('WhatsAppMessage', whatsappMessageSchema);

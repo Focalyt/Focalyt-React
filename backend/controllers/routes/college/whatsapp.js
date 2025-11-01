@@ -3341,6 +3341,30 @@ async function handleIncomingMessages(messages, metadata) {
 
 			// Save incoming message to database
 			try {
+				// Look up collegeId from the last message with this phone number
+				let collegeId = null;
+				try {
+					const lastMessage = await WhatsAppMessage.findOne({
+						$or: [
+							{ from: from },
+							{ to: from }
+						]
+					}).sort({ sentAt: -1 }).limit(1);
+					
+					if (lastMessage && lastMessage.collegeId) {
+						collegeId = lastMessage.collegeId;
+						console.log('✅ Found collegeId from previous conversation:', collegeId);
+					} else {
+						console.warn('⚠️ No previous message found for phone number:', from);
+						// Skip saving this message if we can't find the college
+						console.log('⚠️ Skipping message save - collegeId is required');
+						return;
+					}
+				} catch (lookupError) {
+					console.error('❌ Failed to lookup collegeId:', lookupError.message);
+					return;
+				}
+
 				const incomingMessageDoc = {
 					from: from,
 					to: metadata?.phone_number_id || 'unknown',
@@ -3353,7 +3377,7 @@ async function handleIncomingMessages(messages, metadata) {
 					direction: 'incoming', // Important: Mark as incoming
 					mediaUrl: mediaUrl,
 					mediaData: mediaData,
-					collegeId: null // Will be set if we can identify the college
+					collegeId: collegeId
 				};
 
 				const savedMessage = await WhatsAppMessage.create(incomingMessageDoc);
@@ -3365,14 +3389,17 @@ async function handleIncomingMessages(messages, metadata) {
 						global.io.emit('whatsapp_incoming_message', {
 							messageId: savedMessage._id,
 							whatsappMessageId: messageId,
+							collegeId: collegeId,
 							from: from,
 							message: messageText,
 							messageType: messageType,
 							mediaUrl: mediaUrl,
 							timestamp: timestamp,
-							sentAt: new Date(parseInt(timestamp) * 1000).toISOString()
+							sentAt: new Date(parseInt(timestamp) * 1000).toISOString(),
+							direction: 'incoming'
 						});
 						console.log('🔔 Socket.io event emitted: whatsapp_incoming_message');
+						console.log('   - College ID:', collegeId);
 						console.log('   - From:', from);
 						console.log('   - Type:', messageType);
 						console.log('   - Message:', messageText.substring(0, 50));
