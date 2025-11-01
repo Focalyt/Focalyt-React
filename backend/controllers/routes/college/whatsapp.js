@@ -2999,6 +2999,52 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 });
 
 /**
+ * Debug endpoint - Check if candidate exists with mobile number
+ * GET /api/college/whatsapp/debug-candidate/:mobile
+ */
+router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
+	try {
+		const mobileString = req.params.mobile;
+		const mobile = parseInt(mobileString.replace(/\D/g, ''));
+		
+		console.log('🔍 Debug: Searching candidate');
+		console.log('   - Input:', mobileString);
+		console.log('   - Parsed as number:', mobile);
+		
+		const candidate = await Candidate.findOne({ mobile: mobile });
+		
+		if (candidate) {
+			res.json({
+				success: true,
+				found: true,
+				candidate: {
+					_id: candidate._id,
+					name: candidate.name,
+					mobile: candidate.mobile,
+					whatsappLastIncomingMessageAt: candidate.whatsappLastIncomingMessageAt,
+					whatsappSessionWindowExpiresAt: candidate.whatsappSessionWindowExpiresAt
+				}
+			});
+		} else {
+			// Try searching with string
+			const candidateByString = await Candidate.findOne({ mobile: mobileString });
+			res.json({
+				success: true,
+				found: false,
+				searchedAsNumber: mobile,
+				candidateByString: candidateByString ? {
+					_id: candidateByString._id,
+					name: candidateByString.name,
+					mobile: candidateByString.mobile
+				} : null
+			});
+		}
+	} catch (error) {
+		res.status(500).json({ success: false, error: error.message });
+	}
+});
+
+/**
  * Check WhatsApp 24-hour session window status
  * GET /api/college/whatsapp/session-window/:mobile
  */
@@ -3006,10 +3052,13 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 	try {
 		const mobile = parseInt(req.params.mobile.replace(/\D/g, ''));
 		
+		console.log('🔍 Checking session window for mobile:', mobile);
+		
 		// Find candidate by mobile number
 		const candidate = await Candidate.findOne({ mobile: mobile });
 		
 		if (!candidate) {
+			console.log('❌ Candidate not found with mobile:', mobile);
 			return res.status(404).json({
 				success: false,
 				message: 'Candidate not found'
@@ -3017,8 +3066,26 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 		}
 		
 		const now = new Date();
-		const isSessionWindowOpen = candidate.whatsappSessionWindowExpiresAt && 
-			new Date(candidate.whatsappSessionWindowExpiresAt) > now;
+		const expiresAt = candidate.whatsappSessionWindowExpiresAt;
+		
+		console.log('📊 Session Window Check:');
+		console.log('   - Candidate:', candidate.name, '(', candidate._id, ')');
+		console.log('   - Last incoming message:', candidate.whatsappLastIncomingMessageAt);
+		console.log('   - Window expires at:', expiresAt);
+		console.log('   - Current time:', now);
+		console.log('   - Has expiry date?', !!expiresAt);
+		
+		const isSessionWindowOpen = expiresAt && new Date(expiresAt) > now;
+		
+		if (expiresAt) {
+			const expiryDate = new Date(expiresAt);
+			const diff = expiryDate - now;
+			console.log('   - Time difference (ms):', diff);
+			console.log('   - Time difference (hours):', (diff / (1000 * 60 * 60)).toFixed(2));
+			console.log('   - Is window open?', isSessionWindowOpen);
+		} else {
+			console.log('   - ⚠️ No expiry date set - window closed');
+		}
 		
 		const response = {
 			success: true,
@@ -3035,6 +3102,11 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 				requiresTemplate: !isSessionWindowOpen
 			}
 		};
+		
+		console.log('✅ Returning response:', {
+			isOpen: response.sessionWindow.isOpen,
+			canSendManualMessages: response.messaging.canSendManualMessages
+		});
 		
 		res.json(response);
 	} catch (error) {
