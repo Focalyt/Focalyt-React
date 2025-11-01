@@ -3459,6 +3459,14 @@ const CRMDashboard = () => {
     }
   };
 
+  // Auto-refresh session window when WhatsApp panel opens and messages load
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && selectedProfile?._candidate?.mobile && !isLoadingChatHistory) {
+      // Check session window after messages are loaded
+      checkSessionWindow(selectedProfile._candidate.mobile);
+    }
+  }, [showPanel, whatsappMessages.length, isLoadingChatHistory]);
+
   // Render message status icon (WhatsApp style)
   const renderMessageStatus = (status, errorMessage = null) => {
     switch (status) {
@@ -6086,45 +6094,6 @@ const CRMDashboard = () => {
             )}
           </div>
 
-          {/* Info Banner */}
-          {sessionWindow.isOpen ? (
-            <div
-              className="d-flex align-items-start mt-3 p-2 rounded"
-              style={{
-                backgroundColor: '#D1F4E0',
-                border: '1px solid #25D366'
-              }}
-            >
-              <i className="fas fa-check-circle me-2 mt-1" style={{ color: '#25D366', fontSize: '14px' }}></i>
-              <div style={{ fontSize: '12px', color: '#0A6E44' }}>
-                <p className="mb-1 fw-semibold">✅ 24-Hour Window Open!</p>
-                <p className="mb-0">User ne reply kiya hai. Aap <strong>manual messages</strong> bhej sakte hain bina template ke. 
-                  {sessionWindow.expiresAt && (
-                    <span className="ms-1">
-                      Window expires: {new Date(sessionWindow.expiresAt).toLocaleString('en-IN', { 
-                        dateStyle: 'short', 
-                        timeStyle: 'short' 
-                      })}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="d-flex align-items-start mt-3 p-2 rounded"
-              style={{
-                backgroundColor: '#E3F2FD',
-                border: '1px solid #2196F3'
-              }}
-            >
-              <i className="fas fa-info-circle me-2 mt-1" style={{ color: '#1976D2', fontSize: '14px' }}></i>
-              <div style={{ fontSize: '12px', color: '#1565C0' }}>
-                <p className="mb-1 fw-semibold">WhatsApp Business API Rule:</p>
-                <p className="mb-0">No active 24-hour window. Aap sirf <strong>approved template</strong> bhej sakte hain. User ka reply milne par window open ho jayegi.</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Messages Area */}
@@ -6927,7 +6896,7 @@ const CRMDashboard = () => {
                   </>
                 )}
               </button>
-            ) : hasActiveSession ? (
+            ) : sessionWindow.isOpen ? (
               // Active Session - Show Input
               <>
                 <div className="position-relative flex-grow-1">
@@ -7040,12 +7009,26 @@ const CRMDashboard = () => {
                 )}
               </>
             ) : (
-              // No Session - Disabled
-              <div className="flex-grow-1 bg-light border border-2 border-dashed rounded d-flex align-items-center justify-content-center" style={{ height: '45px' }}>
-                <p className="mb-0 small text-muted">
-                  <i className="fas fa-info-circle me-2"></i>
-                  Session message sirf active session me bhej sakte hain
-                </p>
+              // No Session - Disabled Input with Tooltip
+              <div 
+                className="position-relative flex-grow-1"
+                title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+              >
+                <input
+                  type="text"
+                  className="form-control"
+                  disabled
+                  placeholder="No active window - Use templates only"
+                  style={{
+                    height: '42px',
+                    borderRadius: '24px',
+                    border: '1px solid #E9EDEF',
+                    fontSize: '15px',
+                    backgroundColor: '#F5F5F5',
+                    color: '#8696A0',
+                    cursor: 'not-allowed'
+                  }}
+                />
               </div>
             )}
           </div>

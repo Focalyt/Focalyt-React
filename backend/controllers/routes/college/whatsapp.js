@@ -3446,7 +3446,9 @@ async function handleIncomingMessages(messages, metadata) {
 					const now = new Date();
 					const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 					
-					await Candidate.updateOne(
+					console.log('🔍 Looking for candidate with mobile:', phoneNumber);
+					
+					const updateResult = await Candidate.updateOne(
 						{ mobile: phoneNumber },
 						{
 							$set: {
@@ -3455,9 +3457,23 @@ async function handleIncomingMessages(messages, metadata) {
 							}
 						}
 					);
-					console.log('✅ Updated 24-hour session window for candidate:', phoneNumber);
-					console.log('   - Window opens at:', now.toISOString());
-					console.log('   - Window expires at:', expiresAt.toISOString());
+					
+					if (updateResult.matchedCount > 0) {
+						console.log('✅ Updated 24-hour session window for candidate:', phoneNumber);
+						console.log('   - Window opens at:', now.toISOString());
+						console.log('   - Window expires at:', expiresAt.toISOString());
+						console.log('   - Documents matched:', updateResult.matchedCount);
+						console.log('   - Documents modified:', updateResult.modifiedCount);
+					} else {
+						console.warn('⚠️ Candidate not found with mobile number:', phoneNumber);
+						console.warn('   - Trying to find candidate to debug...');
+						const candidate = await Candidate.findOne({ mobile: phoneNumber });
+						if (candidate) {
+							console.log('   - Found candidate:', candidate._id, candidate.name);
+						} else {
+							console.log('   - No candidate exists with this mobile number');
+						}
+					}
 				} catch (candidateUpdateError) {
 					console.error('⚠️ Failed to update candidate session window:', candidateUpdateError.message);
 				}
