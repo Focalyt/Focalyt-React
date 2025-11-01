@@ -3249,7 +3249,13 @@ async function handleIncomingMessages(messages, metadata) {
 				messageId: message.id
 			});
 
-			const from = message.from;
+			// Normalize phone number by adding + prefix if not present
+			let from = message.from;
+			if (!from.startsWith('+')) {
+				from = '+' + from;
+				console.log(`📞 Normalized phone number: ${message.from} → ${from}`);
+			}
+			
 			const messageId = message.id;
 			const timestamp = message.timestamp;
 			const messageType = message.type;
