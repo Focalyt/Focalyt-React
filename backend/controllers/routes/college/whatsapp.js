@@ -5,7 +5,7 @@ const AWS = require("aws-sdk");
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const FormData = require('form-data');
-const { College, WhatsAppMessage, WhatsAppTemplate } = require('../../models');
+const { College, WhatsAppMessage, WhatsAppTemplate, Candidate } = require('../../models');
 const { isCollege } = require('../../../helpers');
 const {
 	accessKeyId,
@@ -2999,6 +2999,55 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 });
 
 /**
+ * Check WhatsApp 24-hour session window status
+ * GET /api/college/whatsapp/session-window/:mobile
+ */
+router.get('/session-window/:mobile', [isCollege], async (req, res) => {
+	try {
+		const mobile = parseInt(req.params.mobile.replace(/\D/g, ''));
+		
+		// Find candidate by mobile number
+		const candidate = await Candidate.findOne({ mobile: mobile });
+		
+		if (!candidate) {
+			return res.status(404).json({
+				success: false,
+				message: 'Candidate not found'
+			});
+		}
+		
+		const now = new Date();
+		const isSessionWindowOpen = candidate.whatsappSessionWindowExpiresAt && 
+			new Date(candidate.whatsappSessionWindowExpiresAt) > now;
+		
+		const response = {
+			success: true,
+			sessionWindow: {
+				isOpen: isSessionWindowOpen,
+				lastIncomingMessageAt: candidate.whatsappLastIncomingMessageAt,
+				expiresAt: candidate.whatsappSessionWindowExpiresAt,
+				remainingTimeMs: isSessionWindowOpen 
+					? new Date(candidate.whatsappSessionWindowExpiresAt) - now 
+					: 0
+			},
+			messaging: {
+				canSendManualMessages: isSessionWindowOpen,
+				requiresTemplate: !isSessionWindowOpen
+			}
+		};
+		
+		res.json(response);
+	} catch (error) {
+		console.error('Error checking session window:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Failed to check session window',
+			error: error.message
+		});
+	}
+});
+
+/**
  * Webhook Verification (GET)
  * Facebook/WhatsApp will send a verification request to this endpoint
  */
@@ -3389,9 +3438,36 @@ async function handleIncomingMessages(messages, metadata) {
 				const savedMessage = await WhatsAppMessage.create(incomingMessageDoc);
 				console.log('✅ Incoming message saved to database:', savedMessage._id);
 
+				// Update Candidate's WhatsApp 24-hour session window
+				try {
+					const phoneWithoutPlus = from.replace('+', '');
+					const phoneNumber = parseInt(phoneWithoutPlus);
+					
+					const now = new Date();
+					const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+					
+					await Candidate.updateOne(
+						{ mobile: phoneNumber },
+						{
+							$set: {
+								whatsappLastIncomingMessageAt: now,
+								whatsappSessionWindowExpiresAt: expiresAt
+							}
+						}
+					);
+					console.log('✅ Updated 24-hour session window for candidate:', phoneNumber);
+					console.log('   - Window opens at:', now.toISOString());
+					console.log('   - Window expires at:', expiresAt.toISOString());
+				} catch (candidateUpdateError) {
+					console.error('⚠️ Failed to update candidate session window:', candidateUpdateError.message);
+				}
+
 				// Send WebSocket notification to frontend
 				if (global.io) {
 					try {
+						const now = new Date();
+						const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+						
 						global.io.emit('whatsapp_incoming_message', {
 							messageId: savedMessage._id,
 							whatsappMessageId: messageId,
@@ -3402,7 +3478,12 @@ async function handleIncomingMessages(messages, metadata) {
 							mediaUrl: mediaUrl,
 							timestamp: timestamp,
 							sentAt: new Date(parseInt(timestamp) * 1000).toISOString(),
-							direction: 'incoming'
+							direction: 'incoming',
+							sessionWindow: {
+								isOpen: true,
+								openedAt: now.toISOString(),
+								expiresAt: expiresAt.toISOString()
+							}
 						});
 						console.log('🔔 Socket.io event emitted: whatsapp_incoming_message');
 						console.log('   - College ID:', collegeId);

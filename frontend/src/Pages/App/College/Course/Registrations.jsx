@@ -916,6 +916,12 @@ const CRMDashboard = () => {
   const whatsappMessagesEndRef = useRef(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState({
+    isOpen: false,
+    openedAt: null,
+    expiresAt: null,
+    remainingTimeMs: 0
+  });
 
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
@@ -972,6 +978,19 @@ const CRMDashboard = () => {
 
       return [...prevMessages, newMessage];
     });
+
+    // Update session window state if provided
+    if (data.sessionWindow) {
+      setSessionWindow({
+        isOpen: data.sessionWindow.isOpen,
+        openedAt: data.sessionWindow.openedAt,
+        expiresAt: data.sessionWindow.expiresAt,
+        remainingTimeMs: new Date(data.sessionWindow.expiresAt) - new Date()
+      });
+      console.log('✅ 24-hour session window opened:', {
+        expiresAt: data.sessionWindow.expiresAt
+      });
+    }
 
     // Optional: Show browser notification
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -3245,6 +3264,7 @@ const CRMDashboard = () => {
       // Use profile parameter directly instead of selectedProfile state
       if (profile?._candidate?.mobile) {
         await fetchWhatsappHistory(profile._candidate.mobile);
+        await checkSessionWindow(profile._candidate.mobile);
       } else {
         alert('Mobile number not found for this candidate');
       }
@@ -3391,6 +3411,51 @@ const CRMDashboard = () => {
       setWhatsappMessages([]);
     } finally {
       setIsLoadingChatHistory(false);
+    }
+  };
+
+  // Check WhatsApp 24-hour session window status
+  const checkSessionWindow = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('❌ Phone number or token missing');
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/session-window/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const { sessionWindow: sw } = response.data;
+        setSessionWindow({
+          isOpen: sw.isOpen,
+          openedAt: sw.lastIncomingMessageAt,
+          expiresAt: sw.expiresAt,
+          remainingTimeMs: sw.remainingTimeMs
+        });
+        
+        console.log('✅ Session window status:', {
+          isOpen: sw.isOpen,
+          canSendManualMessages: response.data.messaging.canSendManualMessages,
+          requiresTemplate: response.data.messaging.requiresTemplate,
+          expiresAt: sw.expiresAt
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking session window:', error.response?.data || error.message);
+      // Set default state if error
+      setSessionWindow({
+        isOpen: false,
+        openedAt: null,
+        expiresAt: null,
+        remainingTimeMs: 0
+      });
     }
   };
 
@@ -5981,7 +6046,7 @@ const CRMDashboard = () => {
 
           {/* Session Status Badge - Below name */}
           <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
-            {hasActiveSession ? (
+            {sessionWindow.isOpen ? (
               <div
                 className="d-flex align-items-center px-2 py-1 rounded"
                 style={{
@@ -6000,7 +6065,7 @@ const CRMDashboard = () => {
                   }}
                 ></div>
                 <span className="fw-semibold" style={{ color: '#0A6E44' }}>
-                  Active
+                  24-Hour Window Active
                 </span>
               </div>
             ) : (
@@ -6015,14 +6080,37 @@ const CRMDashboard = () => {
               >
                 <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
                 <span className="fw-semibold" style={{ color: '#856404' }}>
-                  No Session
+                  No Active Window
                 </span>
               </div>
             )}
           </div>
 
           {/* Info Banner */}
-          {!hasActiveSession && (
+          {sessionWindow.isOpen ? (
+            <div
+              className="d-flex align-items-start mt-3 p-2 rounded"
+              style={{
+                backgroundColor: '#D1F4E0',
+                border: '1px solid #25D366'
+              }}
+            >
+              <i className="fas fa-check-circle me-2 mt-1" style={{ color: '#25D366', fontSize: '14px' }}></i>
+              <div style={{ fontSize: '12px', color: '#0A6E44' }}>
+                <p className="mb-1 fw-semibold">✅ 24-Hour Window Open!</p>
+                <p className="mb-0">User ne reply kiya hai. Aap <strong>manual messages</strong> bhej sakte hain bina template ke. 
+                  {sessionWindow.expiresAt && (
+                    <span className="ms-1">
+                      Window expires: {new Date(sessionWindow.expiresAt).toLocaleString('en-IN', { 
+                        dateStyle: 'short', 
+                        timeStyle: 'short' 
+                      })}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
             <div
               className="d-flex align-items-start mt-3 p-2 rounded"
               style={{
@@ -6033,7 +6121,7 @@ const CRMDashboard = () => {
               <i className="fas fa-info-circle me-2 mt-1" style={{ color: '#1976D2', fontSize: '14px' }}></i>
               <div style={{ fontSize: '12px', color: '#1565C0' }}>
                 <p className="mb-1 fw-semibold">WhatsApp Business API Rule:</p>
-                <p className="mb-0">No active session hai. Aap sirf <strong>approved template</strong> bhej sakte hain.</p>
+                <p className="mb-0">No active 24-hour window. Aap sirf <strong>approved template</strong> bhej sakte hain. User ka reply milne par window open ho jayegi.</p>
               </div>
             </div>
           )}

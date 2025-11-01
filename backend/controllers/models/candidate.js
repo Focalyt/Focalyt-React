@@ -206,6 +206,15 @@ const candidateSchema = new Schema(
     verified: {
       type: Boolean,
       default: false
+    },
+    // WhatsApp Business API 24-hour session window tracking
+    whatsappLastIncomingMessageAt: {
+      type: Date,
+      default: null
+    },
+    whatsappSessionWindowExpiresAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }
