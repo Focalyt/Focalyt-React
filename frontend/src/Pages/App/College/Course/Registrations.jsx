@@ -3012,6 +3012,20 @@ const CRMDashboard = () => {
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
+    
+    // Auto-scroll tab into view on mobile
+    if (isMobile) {
+      setTimeout(() => {
+        const tabButton = document.querySelector(`.nav-pills .nav-link:nth-child(${tabIndex + 1})`);
+        if (tabButton) {
+          tabButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }
+      }, 100);
+    }
   };
 
   // const handleTabClick = (index) => {
@@ -3109,6 +3123,9 @@ const CRMDashboard = () => {
 
     if (!isMobile) {
       setMainContentClass('col-8');
+    } else {
+      // On mobile, add body class to prevent scrolling
+      document.body.classList.add('panel-open');
     }
   };
 
@@ -3123,6 +3140,9 @@ const CRMDashboard = () => {
     setSelectedSubStatus(null)
     if (!isMobile) {
       setMainContentClass('col-12');
+    } else {
+      // On mobile, remove body class to allow scrolling again
+      document.body.classList.remove('panel-open');
     }
   };
 
@@ -3156,6 +3176,9 @@ const CRMDashboard = () => {
 
     if (!isMobile) {
       setMainContentClass('col-8');
+    } else {
+      // On mobile, add body class to prevent scrolling
+      document.body.classList.add('panel-open');
     }
   };
   const handleFetchCandidate = async (profile = null) => {
@@ -5239,6 +5262,129 @@ const CRMDashboard = () => {
         {panelContent}
       </div>
     ) : null;
+  };
+
+  // Render Actions Modal for Mobile (Three-dot menu)
+  const renderActionsModal = () => {
+    if (!isMobile || showPopup === null) return null;
+
+    const profile = allProfiles[showPopup];
+    if (!profile) return null;
+
+    return (
+      <div
+        className="modal show d-block"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+        onClick={() => setShowPopup(null)}
+      >
+        <div 
+          className="modal-dialog modal-dialog-bottom"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            margin: 0,
+            maxWidth: '100%',
+            animation: 'slideUp 0.3s ease-out'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modal-content" style={{ borderRadius: '20px 20px 0 0' }}>
+            <div className="modal-header border-0 pb-0">
+              <h6 className="modal-title fw-semibold">Lead Actions</h6>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => setShowPopup(null)}
+              ></button>
+            </div>
+            <div className="modal-body pt-2">
+              <div className="list-group list-group-flush">
+                {/* Move To KYC List */}
+                {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                  <>
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        handleMoveToKyc(profile);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-arrow-right me-3 text-primary"></i>
+                      <span className="fw-medium">Move To KYC List</span>
+                    </button>
+
+                    {/* Set Followup */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        openEditPanel(profile, 'SetFollowup');
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-calendar me-3 text-warning"></i>
+                      <span className="fw-medium">Set Followup</span>
+                    </button>
+
+                    {/* Profile Edit */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        handleFetchCandidate(profile);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-user-edit me-3 text-info"></i>
+                      <span className="fw-medium">Profile Edit</span>
+                    </button>
+
+                    {/* Change Branch */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        getBranches(profile);
+                        setShowBranchModal(true);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-building me-3 text-success"></i>
+                      <span className="fw-medium">Change Branch</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Refer */}
+                {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                  <button
+                    className="list-group-item list-group-item-action border-0 py-3"
+                    onClick={() => {
+                      openPanel(profile, 'Reffer');
+                      setShowPopup(null);
+                    }}
+                  >
+                    <i className="fas fa-user-plus me-3 text-secondary"></i>
+                    <span className="fw-medium">Refer to Counselor</span>
+                  </button>
+                )}
+
+                {/* History List */}
+                <button
+                  className="list-group-item list-group-item-action border-0 py-3"
+                  onClick={() => {
+                    openleadHistoryPanel(profile);
+                    setShowPopup(null);
+                  }}
+                >
+                  <i className="fas fa-history me-3" style={{ color: '#6c757d' }}></i>
+                  <span className="fw-medium">History List</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderAllLeadPanel = () => {
@@ -8003,174 +8149,16 @@ const CRMDashboard = () => {
 
                                   <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
+                                      {/* Three-dot button for mobile - Opens Modal */}
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => togglePopup(profileIndex)}
+                                        aria-label="Options"
+                                      >
+                                        <i className="fas fa-ellipsis-v"></i>
+                                      </button>
 
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                            <>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => (handleMoveToKyc(profile))}
-                                              >
-                                                Move To KYC List
-                                              </button>
-
-
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  openPanel(profile, 'SetFollowup');
-                                                }}
-                                              >
-                                                Set Followup
-                                              </button>
-                                              <button
-                                                className="btn btn-primary border-0 text-black"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  handleFetchCandidate(profile);
-
-                                                }}
-                                              >
-                                                Profile Edit
-                                              </button>
-                                              <button
-                                                className="btn btn-primary border-0 text-black"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  getBranches(profile);
-                                                  setShowBranchModal(true);
-
-                                                }}
-                                              >
-                                                Change Branch
-                                              </button>
-                                            </>
-                                          )}
-
-                                          {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openPanel(profile, 'Reffer');
-                                              }}
-                                            >
-                                              Reffer
-                                            </button>
-                                          )}
-
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-
-                                            onClick={() => {
-                                              openleadHistoryPanel(profile);
-                                            }}
-                                          >
-                                            History List
-                                          </button>
-
-                                        </div>
-                                      </div>
-
+                                      {/* Expand/Collapse button */}
                                       <button
                                         className="btn btn-sm btn-outline-secondary border-0"
                                         onClick={() => setLeadDetailsVisible(profileIndex)}
@@ -8373,12 +8361,39 @@ const CRMDashboard = () => {
                             {/* Tab Navigation and Content Card */}
                             <div className="card border-0 shadow-sm mb-4">
                               <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul className="nav nav-pills nav-pills-sm">
+                                <ul 
+                                  className="nav nav-pills nav-pills-sm"
+                                  style={{
+                                    display: 'flex',
+                                    flexWrap: isMobile ? 'nowrap' : 'wrap',
+                                    overflowX: isMobile ? 'auto' : 'visible',
+                                    overflowY: 'hidden',
+                                    WebkitOverflowScrolling: 'touch',
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none',
+                                    gap: '8px',
+                                    paddingBottom: isMobile ? '8px' : '0'
+                                  }}
+                                >
                                   {tabs.map((tab, tabIndex) => (
-                                    <li className="nav-item" key={tabIndex}>
+                                    <li 
+                                      className="nav-item" 
+                                      key={tabIndex}
+                                      style={{
+                                        flexShrink: isMobile ? 0 : 1,
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
                                       <button
                                         className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
                                         onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
+                                        style={{
+                                          minWidth: isMobile ? 'auto' : 'unset',
+                                          padding: isMobile ? '8px 16px' : '0.5rem 1rem',
+                                          fontSize: isMobile ? '13px' : '14px',
+                                          borderRadius: '8px',
+                                          whiteSpace: 'nowrap'
+                                        }}
                                       >
                                         {tab}
                                       </button>
@@ -8413,41 +8428,31 @@ const CRMDashboard = () => {
                                                   : 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">Lead Owner</div>
-                                                <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">COURSE / JOB NAME</div>
-                                                <div className="info-value">{profile._course?.name}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BATCH NAME</div>
-                                                <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                              </div>
-
-                                              {/* <div className="info-group">
-                                                <div className="info-label">Source Contact Name</div>
-                                                <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
-                                              </div> */}
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">TYPE OF PROJECT</div>
-                                                <div className="info-value">{profile._course?.typeOfProject}</div>
-                                              </div>
-                                              <div className="info-group">
                                                 <div className="info-label">PROJECT</div>
                                                 <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">SECTOR</div>
-                                                <div className="info-value">{profile.sector}</div>
+                                                <div className="info-label">NEXT ACTION DATE</div>
+                                                <div className="info-value">
+                                                  {profile.followup?.followupDate ? (() => {
+                                                    const dateObj = new Date(profile.followup?.followupDate);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">LEAD CREATION DATE</div>
-                                                <div className="info-value">{profile.createdAt ?
-                                                  new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                <div className="info-label">LEAD MODIFICATION BY</div>
+                                                <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || 'N/A' : 'N/A'}</div>
                                               </div>
                                             </div>
 
@@ -8457,17 +8462,76 @@ const CRMDashboard = () => {
                                                 <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">City</div>
+                                                <div className="info-label">SECTOR</div>
+                                                <div className="info-value">{profile._course?.sectors || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">
+                                                  {profile.createdAt ? (() => {
+                                                    const dateObj = new Date(profile.createdAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Counsellor Name</div>
+                                                <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">CITY</div>
                                                 <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{profile._course?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">
+                                                  {profile.updatedAt ? (() => {
+                                                    const dateObj = new Date(profile.updatedAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD OWNER</div>
+                                                <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{profile._course?.typeOfProject || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">BRANCH NAME</div>
                                                 <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                <div className="info-value">{profile.updatedAt ?
-                                                  new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">Remarks</div>
@@ -9147,66 +9211,66 @@ const CRMDashboard = () => {
                                                   return (
                                                     <>
                                                       <div className="stat-card total-docs">
-                                                        <div className="stat-icon">
+                                                        <div className="stat-icon d-md-block d-sm-none d-none">
                                                           <i className="fas fa-file-alt"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.totalRequired || 0}</h4>
                                                           <p>Total Required</p>
                                                         </div>
-                                                        <div className="stat-trend">
+                                                        <div className="stat-trend d-md-block d-sm-none d-none">
                                                           <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
                                                       <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon">
+                                                        <div className="stat-icon d-md-block d-sm-none d-none">
                                                           <i className="fas fa-cloud-upload-alt"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.uploadedCount || 0}</h4>
                                                           <p>Uploaded</p>
                                                         </div>
-                                                        <div className="stat-trend">
+                                                        <div className="stat-trend d-md-block d-sm-none d-none">
                                                           <i className="fas fa-arrow-up"></i>
                                                         </div>
                                                       </div>
 
                                                       <div className="stat-card pending-docs">
-                                                        <div className="stat-icon">
+                                                        <div className="stat-icon d-md-block d-sm-none d-none">
                                                           <i className="fas fa-clock"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                           <p>Pending Review</p>
                                                         </div>
-                                                        <div className="stat-trend">
+                                                        <div className="stat-trend d-md-block d-sm-none d-none">
                                                           <i className="fas fa-exclamation-triangle"></i>
                                                         </div>
                                                       </div>
 
                                                       <div className="stat-card verified-docs">
-                                                        <div className="stat-icon">
+                                                        <div className="stat-icon d-md-block d-sm-none d-none">
                                                           <i className="fas fa-check-circle"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.verifiedCount || 0}</h4>
                                                           <p>Approved</p>
                                                         </div>
-                                                        <div className="stat-trend">
+                                                        <div className="stat-trend d-md-block d-sm-none d-none">
                                                           <i className="fas fa-thumbs-up"></i>
                                                         </div>
                                                       </div>
 
                                                       <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon">
+                                                        <div className="stat-icon d-md-block d-sm-none d-none">
                                                           <i className="fas fa-times-circle"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.RejectedCount || 0}</h4>
                                                           <p>Rejected</p>
                                                         </div>
-                                                        <div className="stat-trend">
+                                                        <div className="stat-trend d-md-block d-sm-none d-none">
                                                           <i className="fas fa-arrow-down"></i>
                                                         </div>
                                                       </div>
@@ -9782,6 +9846,7 @@ const CRMDashboard = () => {
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
         {isMobile && renderChangeCenterPanel()}
+        {renderActionsModal()}
       </div>
       <UploadModal />
 
@@ -10089,12 +10154,114 @@ const CRMDashboard = () => {
           display: flex;
           flex-direction: column;
         }
+        
+        /* Mobile: WhatsApp panel as full-screen modal */
+        @media (max-width: 992px) {
+          .whatsapp-chat {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            min-width: 100vw !important;
+            animation: slideInRight 0.3s ease !important;
+          }
+        }
 
         .right-side-panel {
           background: #ffffff !important;
           box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.04);
           width: 100%;
           height: 73dvh;
+        }
+        
+        /* Mobile: Make side panels full-screen modals */
+        @media (max-width: 992px) {
+          .right-side-panel {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            border-radius: 0 !important;
+            animation: slideInRight 0.3s ease !important;
+            overflow-y: auto !important;
+          }
+          
+          /* Panel header sticky on mobile for easy close */
+          .right-side-panel .topbar-container,
+          .right-side-panel .panel-header {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: white !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+          }
+          
+          /* Make close button more prominent on mobile */
+          .right-side-panel .close-btn,
+          .right-side-panel .btn-close {
+            min-width: 44px !important;
+            min-height: 44px !important;
+            font-size: 24px !important;
+          }
+          
+          /* Add backdrop for mobile panels */
+          .right-side-panel::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: -1;
+          }
+        }
+        
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        
+        /* Generic mobile panel styles - apply to all col-4 panels on mobile */
+        @media (max-width: 992px) {
+          /* Make all col-4 columns (side panels) fullscreen on mobile */
+          .row > .col-4,
+          .row > .col-lg-4,
+          .row > .col-md-4,
+          [class*="col-4"] {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            background: white !important;
+            animation: slideInRight 0.3s ease !important;
+            padding: 0 !important;
+            overflow-y: auto !important;
+          }
+          
+          /* Prevent body scroll when panel is open */
+          body.panel-open {
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+          }
         }
 
         .whatsapp-chat .topbar-container {
@@ -10204,6 +10371,17 @@ const CRMDashboard = () => {
         @keyframes message {
           to {
             transform: scale(1);
+          }
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
           }
         }
 
@@ -10373,6 +10551,46 @@ const CRMDashboard = () => {
         }
 .nav-pills .nav-link.active{
 background: #fd2b5a;
+}
+
+/* Hide scrollbar for mobile tabs */
+.nav-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-pills {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+/* Mobile tab styling */
+@media (max-width: 768px) {
+  .nav-pills {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .nav-pills .nav-item {
+    flex-shrink: 0;
+  }
+  
+  .nav-pills .nav-link {
+    white-space: nowrap;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+  }
+  
+  .nav-pills .nav-link.active {
+    background: #fd2b5a;
+    color: white;
+    box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
+  }
 }
         .resume-document {
           max-width: 1200px;
@@ -12197,7 +12415,7 @@ margin-left:15px;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     }
 
     .documents-grid-enhanced {
@@ -15234,11 +15452,36 @@ margin-left:15px;
               font-weight: 600;
           }
 
-          .filter-tabs {
+                 .filter-tabs {
               display: flex;
               gap: 1rem;
-              flex-wrap: wrap;
-          }
+             flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
+}
+
+.filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
           .filter-btn {
               background: #f8f9fa;
@@ -15599,16 +15842,23 @@ margin-left:15px;
               }
 
               .stats-grid {
-                  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
               }
 
               .documents-grid-enhanced {
                   grid-template-columns: 1fr;
               }
 
-              .filter-tabs {
-                  justify-content: center;
-              }
+                         .filter-tabs {
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+     .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
+    }
 
               .document-header {
                   flex-direction: column;

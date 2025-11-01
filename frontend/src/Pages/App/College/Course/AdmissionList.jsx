@@ -119,12 +119,12 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
-  const [searchTerm , setSearchTerm] = useState('')
-  useEffect(()=>{
-    if(!isOpen){
+  const [searchTerm, setSearchTerm] = useState('')
+  useEffect(() => {
+    if (!isOpen) {
       setSearchTerm('')
     }
-  },[isOpen])
+  }, [isOpen])
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
@@ -189,7 +189,7 @@ const MultiSelectCheckbox = ({
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
                   value={searchTerm}
-                  onChange={(e)=>{setSearchTerm(e.target.value)}}
+                  onChange={(e) => { setSearchTerm(e.target.value) }}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -2938,7 +2938,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                             <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                           </div>
                                           <div className="ekycImg">
-                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' , marginBottom: '8px'}}>
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '8px' }}>
                                               <i className="fas fa-phone"></i>
                                             </button>
                                             <img
@@ -2958,57 +2958,145 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                             />
                                           </div>
 
-                                          <div>
+                                          <div className="d-md-none d-sm-block d-block">
+                                            <div className="btn-group">
+                                              <div style={{ position: "relative", display: "inline-block" }}>
+                                                <button
+                                                  className="btn btn-sm btn-outline-secondary border-0"
+                                                  onClick={() => togglePopup(profileIndex)}
+                                                  aria-label="Options"
+                                                >
+                                                  <i className="fas fa-ellipsis-v"></i>
+                                                </button>
 
-                                          </div>
-                                        </div>
-                                      </div>
+                                                {showPopup === profileIndex && (
+                                                  <div
+                                                    onClick={() => setShowPopup(null)}
+                                                    style={{
+                                                      position: "fixed",
+                                                      top: 0,
+                                                      left: 0,
+                                                      width: "100vw",
+                                                      height: "100vh",
+                                                      backgroundColor: "transparent",
+                                                      zIndex: 8,
+                                                    }}
+                                                  ></div>
+                                                )}
 
-                                      <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                        <div className="btn-group">
-                                          <div style={{ position: "relative", display: "inline-block" }}>
-                                            <button
-                                              className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => togglePopup(profileIndex)}
-                                              aria-label="Options"
-                                            >
-                                              <i className="fas fa-ellipsis-v"></i>
-                                            </button>
-
-                                            {showPopup === profileIndex && (
-                                              <div
-                                                onClick={() => setShowPopup(null)}
-                                                style={{
-                                                  position: "fixed",
-                                                  top: 0,
-                                                  left: 0,
-                                                  width: "100vw",
-                                                  height: "100vh",
-                                                  backgroundColor: "transparent",
-                                                  zIndex: 8,
-                                                }}
-                                              ></div>
-                                            )}
-
-                                            <div
-                                              style={{
-                                                position: "absolute",
-                                                top: "28px",
-                                                right: "-100px",
-                                                width: "170px",
-                                                backgroundColor: "white",
-                                                border: "1px solid #ddd",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                                borderRadius: "4px",
-                                                padding: "8px 0",
-                                                zIndex: 8,
-                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                                transition: "transform 0.3s ease-in-out",
-                                                pointerEvents: showPopup ? "auto" : "none",
-                                                display: showPopup === profileIndex ? "block" : "none"
-                                              }}
-                                            >
-                                              <button
+                                                <div
+                                                  style={{
+                                                    position: "absolute",
+                                                    top: "28px",
+                                                    right: "-100px",
+                                                    width: "170px",
+                                                    backgroundColor: "white",
+                                                    border: "1px solid #ddd",
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                    borderRadius: "4px",
+                                                    padding: "8px 0",
+                                                    zIndex: 8,
+                                                    transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                    transition: "transform 0.3s ease-in-out",
+                                                    pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                    display: showPopup === profileIndex ? "block" : "none"
+                                                  }}
+                                                >
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleDownloadAdmissionForm(profile)}
+                                                  >
+                                                    Download Admission Form
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleMarkDropout(profile)}
+                                                  >
+                                                    Mark Dropout
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    // onClick={() => openleadHistoryPanel(profile)}
+                                                    onClick={() => {
+                                                      setShowPopup(null)
+                                                      openPanel('leadHistory', profile)
+                                                    }}
+                                                  >
+                                                    History List
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    // onClick={() => {
+                                                    //   openEditPanel(profile, 'SetFollowup');
+                                                    //   console.log('selectedProfile', profile);
+                                                    // }}
+                                                    onClick={() => {
+                                                      setShowPopup(null)
+                                                      openPanel('SetFollowup', profile)
+                                                    }}
+                                                  >
+                                                    Set Followup
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => {
+                                                      handleFetchCandidate(profile);
+                                                      console.log('selectedProfile', profile);
+                                                    }}
+                                                  >
+                                                    Edit Profile
+                                                  </button>
+                                                  {/* <button
                                                 className="dropdown-item"
                                                 style={{
                                                   width: "100%",
@@ -3020,148 +3108,56 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   fontSize: "12px",
                                                   fontWeight: "600"
                                                 }}
-                                                onClick={() => handleDownloadAdmissionForm(profile)}
-                                              >
-                                                Download Admission Form
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => handleMarkDropout(profile)}
-                                              >
-                                                Mark Dropout
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                // onClick={() => {
-                                                //   openleadHistoryPanel(profile);
-                                                //   console.log('selectedProfile', profile);
-                                                // }}
                                                 onClick={() => {
-                                                  setShowPopup(null)
-                                                  openPanel('leadHistory', profile)
-                                                }}
-                                              >
-                                                History List
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                // onClick={() => {
-                                                //   openEditPanel(profile, 'SetFollowup');
-                                                //   console.log('selectedProfile', profile);
-                                                // }}
-                                                onClick={() => {
-                                                  setShowPopup(null)
-                                                  openPanel('SetFollowup', profile)
-                                                }}
-                                              >
-                                                Set Followup
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  handleFetchCandidate(profile);
-                                                  console.log('selectedProfile', profile);
-                                                }}
-                                              >
-                                                Edit Profile
-                                              </button>
-                                              {/* <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                 onClick={() => {
                                                   openAssignBatchPanel(profile);
                                                   console.log('selectedProfile', profile);
-                                                 }}
-                                                                                             
+                                                }}
+                                               
                                               >
                                                 Assign Batch
                                               </button> */}
+                                                  <button
+                                                    className="btn btn-primary border-0 text-black"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => {
+                                                      setSelectedProfile(profile);
+                                                      getBranches(profile);
+                                                      setShowBranchModal(true);
+
+
+                                                    }}
+                                                  >
+                                                    Change Branch
+                                                  </button>
+                                                </div>
+                                              </div>
+
                                               <button
-                                                className="btn btn-primary border-0 text-black"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  setSelectedProfile(profile);
-                                                  getBranches(profile);
-                                                  setShowBranchModal(true);
-
-
-                                                }}
+                                                className="btn btn-sm btn-outline-secondary border-0"
+                                                onClick={() => setLeadDetailsVisible(profileIndex)}
                                               >
-                                                Change Branch
+                                                {leadDetailsVisible === profileIndex ? (
+                                                  <i className="fas fa-chevron-up"></i>
+                                                ) : (
+                                                  <i className="fas fa-chevron-down"></i>
+                                                )}
                                               </button>
                                             </div>
                                           </div>
-
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => setLeadDetailsVisible(profileIndex)}
-                                          >
-                                            {leadDetailsVisible === profileIndex ? (
-                                              <i className="fas fa-chevron-up"></i>
-                                            ) : (
-                                              <i className="fas fa-chevron-down"></i>
-                                            )}
-                                          </button>
                                         </div>
+
                                       </div>
+
+
 
                                       <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                         <div className="btn-group">
@@ -4194,66 +4190,66 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     return (
                                                       <>
                                                         <div className="stat-card total-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon  d-md-block d-sm-none d-none">
                                                             <i className="fas fa-file-alt"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.totalRequired || 0}</h4>
                                                             <p>Total Required</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-list"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card uploaded-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-cloud-upload-alt"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.uploadedCount || 0}</h4>
                                                             <p>Uploaded</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-arrow-up"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card pending-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-clock"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                             <p>Pending Review</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-exclamation-triangle"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card verified-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-check-circle"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.verifiedCount || 0}</h4>
                                                             <p>Approved</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-thumbs-up"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card rejected-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-times-circle"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.RejectedCount || 0}</h4>
                                                             <p>Rejected</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-arrow-down"></i>
                                                           </div>
                                                         </div>
@@ -5513,6 +5509,71 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+        html body .content .content-wrapper{
+         padding: 1.0rem 1.2rem 0;
+        }
+        .stat-card{
+          padding:0.5rem;
+        }
+ .card-header {
+            position: relative;
+            overflow: visible;
+          }
+          
+          /* Scroll Indicator - Right Side Gradient */
+          .card-header::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95));
+            pointer-events: none;
+            z-index: 2;
+          }
+          
+          .nav.nav-pills {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 10px !important;
+            padding-right: 30px !important;
+            margin-bottom: 0 !important;
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+          }
+          
+          .nav.nav-pills::-webkit-scrollbar {
+            display: none;
+          }
+          
+          .nav.nav-pills .nav-item {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            margin-right: 8px;
+            scroll-snap-align: start;
+          }
+          
+          .nav.nav-pills .nav-link {
+            white-space: nowrap !important;
+            padding: 10px 16px !important;
+            font-size: 13px !important;
+            border-radius: 20px !important;
+            min-width: fit-content !important;
+            display: inline-block !important;
+            transition: all 0.3s ease;
+          }
+          
+          .nav.nav-pills .nav-link.active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
+          }
+
         .ekycImg{
         margin-left:5px
         }
@@ -6018,7 +6079,7 @@ background: #fd2b5a;
 }
 
 .action-btn {
-    background: none;
+    // background: none;
     border: none;
     cursor: pointer;
     padding: 5px 8px;
@@ -6841,9 +6902,33 @@ background: #fd2b5a;
 
 .filter-tabs {
     display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+              gap: 1rem;
+             flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
 }
+    .filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
 .filter-btn {
     background: #f8f9fa;
@@ -7143,8 +7228,15 @@ background: #fd2b5a;
         grid-template-columns: 1fr;
     }
 
-    .filter-tabs {
-        justify-content: center;
+        .filter-tabs {
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
     }
 
     .document-header {
@@ -8237,6 +8329,46 @@ animation: pulse 1.5s infinite;
 0% { transform: scale(1); }
 50% { transform: scale(1.05); }
 100% { transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile Bottom Sheet Dropdown Item Hover/Active Effects */
+@media (max-width: 768px) {
+  .dropdown-item:active {
+    background-color: #f5f5f5 !important;
+    transform: scale(0.98);
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f9f9f9 !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  .dropdown-item {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
 }
 
 .recordings-list {

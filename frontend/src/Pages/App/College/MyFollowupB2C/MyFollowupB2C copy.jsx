@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -121,155 +121,7 @@ const MultiSelectCheckbox = ({
     </div>
   );
 };
-const useNavHeight = (dependencies = []) => {
-  const navRef = useRef(null);
-  const [navHeight, setNavHeight] = useState(140); // Default fallback
-  const widthRef = useRef(null);
-  const [width, setWidth] = useState(0);
 
-  const calculateHeight = useCallback(() => {
-    if (navRef.current) {
-      const height = navRef.current.offsetHeight;
-      setNavHeight(height);
-
-    }
-  }, []);
-
-  const calculateWidth = useCallback(() => {
-
-    if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
-
-    }
-  }, []);
-
-
-  useEffect(() => {
-    // Initial calculation
-    calculateHeight();
-    calculateWidth();
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateHeight, 100);
-      setTimeout(calculateWidth, 100);
-    };
-
-    // Mutation observer for nav content changes
-    const observer = new MutationObserver(() => {
-      setTimeout(calculateHeight, 50);
-      setTimeout(calculateWidth, 50);
-    });
-
-    window.addEventListener('resize', handleResize);
-
-    if (navRef.current) {
-      observer.observe(navRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true
-      });
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      observer.disconnect();
-    };
-  }, [calculateHeight, calculateWidth]);
-
-  // Recalculate when dependencies change
-  useEffect(() => {
-    setTimeout(calculateHeight, 50);
-    setTimeout(calculateWidth, 50);
-  }, dependencies);
-
-  return { navRef, navHeight, calculateHeight, width };
-};
-const useMainWidth = (dependencies = []) => {// Default fallback
-  const widthRef = useRef(null);
-  const [width, setWidth] = useState(0);
-
-  const calculateWidth = useCallback(() => {
-
-    if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
-    }
-  }, []);
-
-
-  useEffect(() => {
-    calculateWidth();
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateWidth, 100);
-    };
-
-    // Mutation observer for nav content changes
-    const observer = new MutationObserver(() => {
-      setTimeout(calculateWidth, 50);
-    });
-
-    window.addEventListener('resize', handleResize);
-
-    if (widthRef.current) {
-      observer.observe(widthRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class']
-      });
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      observer.disconnect();
-    };
-  }, [calculateWidth]);
-
-  // Recalculate when dependencies change
-  useEffect(() => {
-    setTimeout(calculateWidth, 100);
-  }, dependencies);
-
-  return { widthRef, width };
-};
-const useScrollBlur = (navbarHeight = 140) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const contentRef = useRef(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.pageYOffset;
-      const shouldBlur = currentScrollY > navbarHeight / 3;
-
-      setIsScrolled(shouldBlur);
-      setScrollY(currentScrollY);
-    };
-
-    // Throttle scroll event for better performance
-    let ticking = false;
-    const throttledScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', throttledScroll, { passive: true });
-    handleScroll(); // Initial check
-
-    return () => {
-      window.removeEventListener('scroll', throttledScroll);
-    };
-  }, [navbarHeight]);
-
-  return { isScrolled, scrollY, contentRef };
-};
 const MyFollowups = () => {
   //Calendar Stats
   // State management
@@ -302,9 +154,9 @@ const MyFollowups = () => {
   const [plannedCount, setPlannedCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [missedCount, setMissedCount] = useState(0);
-  const [showCalendarModal, setCalendarModal] = useState(false);
+  const [showCalendarModal, setCalendarModal] = useState(true);
   const [showPanel, setShowPanel] = useState(null);
-  const [mainContentClass, setMainContentClass] = useState('col-12');
+  const [mainContentClass, setMainContentClass] = useState('col-8');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
@@ -1350,11 +1202,6 @@ const MyFollowups = () => {
     { _id: '', name: '', count: 0 },
 
   ]);
-  const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
-  const blurIntensity = Math.min(scrollY / 10, 15);
-  const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
 
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
@@ -1392,16 +1239,8 @@ const MyFollowups = () => {
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
 
-  // Set mainContentClass based on screen size
-  useEffect(() => {
-    if (!isMobile) {
-      // Desktop: col-8 to accommodate calendar sidebar (col-4)
-      setMainContentClass('col-8');
-    } else {
-      // Mobile: col-12 for full width
-      setMainContentClass('col-12');
-    }
-  }, [isMobile]);
+
+
 
 
   // Date range handlers
@@ -2216,11 +2055,7 @@ const MyFollowups = () => {
     setLeadHistoryPanel(false)
 
     if (!isMobile) {
-      // Desktop: Keep col-8 because calendar sidebar is always visible
       setMainContentClass('col-8');
-    } else {
-      // Mobile: Full width when panels close
-      setMainContentClass('col-12');
     }
   };
 
@@ -2237,12 +2072,7 @@ const MyFollowups = () => {
 
     setShowPopup(null)
     setShowPanel(panel)
-    setCalendarModal(false); // Hide calendar modal on mobile when opening other panels
     if (!isMobile) {
-      // Desktop: Keep col-8 because sidebar (col-4) is always visible
-      setMainContentClass('col-8');
-    } else {
-      // Mobile: Use col-8 when panel opens
       setMainContentClass('col-8');
     }
   };
@@ -2258,11 +2088,7 @@ const MyFollowups = () => {
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
     if (!isMobile) {
-      // Desktop: Keep col-8 because calendar sidebar is always visible
       setMainContentClass('col-8');
-    } else {
-      // Mobile: Full width when panel closes
-      setMainContentClass('col-12');
     }
   };
 
@@ -2598,11 +2424,7 @@ const MyFollowups = () => {
                     <span className="fs-5 fw-bold text-dark">Followup Calendar</span>
                   </div>
                   <div className="d-xl-none">
-                    <button 
-                      className="btn-close" 
-                      aria-label="Close"
-                      onClick={() => setCalendarModal(false)}
-                    ></button>
+                    <button className="btn-close" aria-label="Close"></button>
                   </div>
 
                 </div>
@@ -3017,7 +2839,7 @@ const MyFollowups = () => {
           className={`modal ${showCalendarModal ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setCalendarModal(false);
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -3029,12 +2851,11 @@ const MyFollowups = () => {
       );
     }
 
-    // Desktop: Always render calendar in sidebar (col-4)
-    return (
-      <div className="mb-3">
+    return showCalendarModal ? (
+      <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
-    );
+    ) : null;
   };
 
 
@@ -3456,45 +3277,9 @@ const MyFollowups = () => {
     <div className="container-fluid">
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
-        <div
-            className="content-blur-overlay"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: `${navHeight + 50}px`,
-              background: `linear-gradient(
-                180deg,
-                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
-                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
-                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
-                transparent 100%
-              )`,
-              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              pointerEvents: 'none',
-              zIndex: 9,
-              transition: 'all 0.3s ease',
-              opacity: isScrolled ? 1 : 0
-            }}
-          />
+
           {/* Header */}
-          <div className="position-relative" ref={widthRef} >
-          <nav ref={navRef} className="" style={{
-              zIndex: 11, 
-              backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, 
-              position: 'fixed', 
-              width: `${width}px`, 
-              backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', 
-              paddingBlock: '10px',
-              transition: 'all 0.3s ease',
-            }}
-            >
+          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--my--followup" >
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
@@ -3547,10 +3332,7 @@ const MyFollowups = () => {
                       )} */}
                     </div>
                     <button
-                      onClick={() => {
-                        setIsFilterCollapsed(!isFilterCollapsed);
-                        setCalendarModal(false); // Close calendar when opening filters
-                      }}
+                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
                       className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
                       style={{ whiteSpace: 'nowrap' }}
                     >
@@ -3561,19 +3343,6 @@ const MyFollowups = () => {
                           {Object.values(filterData).filter(val => val && val !== 'true').length}
                         </span>
                       )}
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setCalendarModal(!showCalendarModal);
-                        setIsFilterCollapsed(true); // Close filters when opening calendar
-                      }}
-                      className={`btn ${showCalendarModal ? 'btn-primary' : 'btn-outline-primary'} d-md-none`}
-                      style={{ whiteSpace: 'nowrap' }}
-                      title="Toggle Calendar"
-                    >
-                      <i className={`fas fa-calendar me-1`}></i>
-                      Calendar
                     </button>
                     {/* <div className="btn-group">
                       <button
@@ -3594,7 +3363,7 @@ const MyFollowups = () => {
 
 
                 <div className="card-body p-3">
-                  <div className="d-flex flex-wrap gap-2 align-items-center followup-status-buttons-container">
+                  <div className="d-flex flex-wrap gap-2 align-items-center">
 
 
                     <div key={0} className="d-flex align-items-center gap-1">
@@ -3657,8 +3426,6 @@ const MyFollowups = () => {
 
               </div>
             </div>
-            </nav>
-          {/* </div> */}
           </div>
           {!isFilterCollapsed && (
             <div
@@ -3880,7 +3647,7 @@ const MyFollowups = () => {
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     {isLoadingAllProfiles ? (
-                      <div className="text-center mt-5">
+                      <div className="text-center">
                         <div className="spinner-border text-primary" role="status">
                           <span className="visually-hidden">Loading...</span>
                         </div>
@@ -6235,45 +6002,6 @@ background: #fd2b5a;
         .content-body{
           margin-top:25px
         }
-        
-        /* Mobile: Horizontal scrollable followup status buttons */
-        .followup-status-buttons-container {
-          flex-wrap: nowrap !important;
-          overflow-x: auto;
-          overflow-y: hidden;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: thin;
-          scrollbar-color: #cbd5e0 #f7fafc;
-          padding-bottom: 10px;
-        }
-        
-        .followup-status-buttons-container::-webkit-scrollbar {
-          height: 4px;
-        }
-        
-        .followup-status-buttons-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 10px;
-        }
-        
-        .followup-status-buttons-container::-webkit-scrollbar-thumb {
-          background: #cbd5e0;
-          border-radius: 10px;
-        }
-        
-        .followup-status-buttons-container > div {
-          flex-shrink: 0;
-        }
-        
-        .followup-status-buttons-container button {
-          white-space: nowrap;
-        }
-        
-        /* Mobile: Adjust margin-top for crm-main-row */
-        #crm-main-row {
-          margin-top: 225px !important;
-        }
-        
           .resume-document-body {
             flex-direction: column;
           }
@@ -6538,6 +6266,7 @@ background: #fd2b5a;
     .whatsapp-chat .modal-content {
         height: 90vh;
     }
+
     .col-md-6,
     .col-md-5,
     .col-md-1 {
@@ -7101,9 +6830,6 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-.modal-content{
-width:100%
-}
     .document-modal-content {
         width: 98%;
         margin: 1rem;
@@ -8152,49 +7878,12 @@ width:100%
   top: 100px;
   z-index: 10;
 }
-#crm-main-row{
-margin-top: 20px;
-}
+
 .site-header--sticky--my--followup--panels:not(.mobile-sticky-enable){
-  // top: 258px;
-  z-index: 10;
+  top: 258px;
   position: fixed !important;
-  max-height: calc(100vh - 130px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
-  padding-right: 10px;
+  
 }
-
-.site-header--sticky--my--followup--panels::-webkit-scrollbar {
-  width: 6px;
-}
-
-.site-header--sticky--my--followup--panels::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.site-header--sticky--my--followup--panels::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 10px;
-}
-
-.site-header--sticky--my--followup--panels::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-/* Calendar container in sidebar */
-.site-header--sticky--my--followup--panels .calendar-container {
-  max-width: 100%;
-  margin-bottom: 1rem;
-}
-
-.site-header--sticky--my--followup--panels .card {
-  margin-bottom: 1rem;
-}
-
     #editFollowupPanel {
    height: -webkit-fill-available
    
