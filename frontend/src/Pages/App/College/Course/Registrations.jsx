@@ -924,9 +924,12 @@ const CRMDashboard = () => {
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
       const updatedMessages = prevMessages.map((msg) => {
+        // WhatsApp API sends 'id' field which is the wamid (WhatsApp message ID)
         // Try to match by database ID or wamid first (most reliable)
         const matchById = (data.messageId && msg.dbId === data.messageId) || 
-                         (data.wamid && msg.wamid === data.wamid);
+                         (data.wamid && msg.wamid === data.wamid) ||
+                         (data.id && msg.wamid === data.id) || // ← NEW: Match WhatsApp 'id' field
+                         (data.id && msg.whatsappMessageId === data.id); // ← NEW: Also check whatsappMessageId field
         
         // Fallback: Match by text/template (less reliable, but for backwards compatibility)
         const matchByText = msg.type === 'template'
@@ -938,6 +941,8 @@ const CRMDashboard = () => {
         if (isMatchingMessage && msg.sender === 'agent') {
           console.log('✅ Updating message status:', {
             messageId: msg.id,
+            wamid: msg.wamid,
+            matchedWith: data.id,
             oldStatus: msg.status,
             newStatus: data.status
           });
@@ -945,9 +950,9 @@ const CRMDashboard = () => {
           return {
             ...msg,
             status: data.status,
-            errorMessage: data.status === 'failed' ? data.errorMessage : msg.errorMessage,
-            deliveredAt: data.status === 'delivered' ? data.timestamp : msg.deliveredAt,
-            readAt: data.status === 'read' ? data.timestamp : msg.readAt
+            errorMessage: data.status === 'failed' ? (data.errors?.[0]?.title || data.errorMessage) : msg.errorMessage,
+            deliveredAt: data.status === 'delivered' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.deliveredAt,
+            readAt: data.status === 'read' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.readAt
           };
         }
         return msg;
@@ -956,12 +961,20 @@ const CRMDashboard = () => {
       // Log if no message was updated
       const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
       if (!wasUpdated) {
-        console.warn('⚠️ No message found to update. Data received:', data);
-        console.log('Current messages:', prevMessages.map(m => ({ 
+        console.warn('⚠️ No message found to update');
+        console.log('📨 Received data:', {
+          id: data.id,
+          wamid: data.wamid,
+          messageId: data.messageId,
+          status: data.status,
+          recipient_id: data.recipient_id
+        });
+        console.log('💬 Current messages:', prevMessages.map(m => ({ 
           id: m.id, 
           dbId: m.dbId, 
-          wamid: m.wamid, 
-          text: m.text?.substring(0, 50),
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
           status: m.status 
         })));
       }
@@ -981,7 +994,14 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     console.log('📩 WhatsApp message status updates:', updates);
-    handleMessageStatusUpdate(updates);
+    
+    // Process each update individually (updates is an array)
+    if (updates && updates.length > 0) {
+      updates.forEach(update => {
+        // Only process new updates (not already processed)
+        handleMessageStatusUpdate(update);
+      });
+    }
   }, [updates]);
 
 
@@ -3226,9 +3246,10 @@ const CRMDashboard = () => {
 
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
-          id: msg._id || msg.wamid || `msg-${index}`, // Use database ID or wamid
+          id: msg._id || msg.wamid || msg.whatsappMessageId || `msg-${index}`, // Use database ID or wamid
           dbId: msg._id, // Keep database ID separately
-          wamid: msg.wamid, // WhatsApp message ID
+          wamid: msg.wamid || msg.whatsappMessageId, // WhatsApp message ID (check both fields)
+          whatsappMessageId: msg.whatsappMessageId || msg.wamid, // Also store as whatsappMessageId for consistency
           text: msg.message,
           sender: 'agent', // All sent messages are from agent
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
@@ -4668,7 +4689,8 @@ const CRMDashboard = () => {
         const templateMessage = {
           id: response.data.data._id || response.data.data.wamid || `msg-${Date.now()}`,
           dbId: response.data.data._id, // Database message ID
-          wamid: response.data.data.wamid, // WhatsApp message ID
+          wamid: response.data.data.wamid || response.data.data.whatsappMessageId, // WhatsApp message ID
+          whatsappMessageId: response.data.data.whatsappMessageId || response.data.data.wamid, // Consistent field name
           text: filledMessage || `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
