@@ -927,8 +927,8 @@ const CRMDashboard = () => {
       return;
     }
 
-    const currentChatPhone = selectedProfile._candidate.mobile.replace(/\D/g, '');
-    const incomingFrom = data.from.replace(/\D/g, '');
+    const currentChatPhone = String(selectedProfile._candidate.mobile).replace(/\D/g, '');
+    const incomingFrom = String(data.from).replace(/\D/g, '');
 
     if (!incomingFrom.includes(currentChatPhone) && !currentChatPhone.includes(incomingFrom)) {
       console.log('⚠️ Message not for current chat:', { currentChatPhone, incomingFrom });
