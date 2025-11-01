@@ -7,6 +7,8 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 
+import useWebsocket from '../../../../utils/websocket';
+
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const MultiSelectCheckbox = ({
@@ -701,8 +703,11 @@ const CRMDashboard = () => {
   const candidateRef = useRef();
   // Refs
   const addressInputRef = useRef(null);
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+  const { messages, updates } = useWebsocket(userData._id || userData._id);
+ 
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -719,16 +724,13 @@ const CRMDashboard = () => {
 
     if (candidateRef.current) {
       candidateRef.current.fetchProfile(id);
-    } else {
-      console.log('candidateRef.current is null - this is the problem!');
-    }
+    } 
   };
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
+        
         const res = await axios.get(`${backendUrl}/college/filters-data`, {
           headers: { 'x-auth': token }
         });
@@ -771,8 +773,7 @@ const CRMDashboard = () => {
     }
   };
 
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
+
 
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
@@ -916,137 +917,31 @@ const CRMDashboard = () => {
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
 
-
-  // Initialize WhatsApp Socket.io connection
-  useEffect(() => {
-    const collegeId = userData.collegeId;
-    if (!collegeId) {
-      return;
-    }
-
-    // Handle both absolute URLs (https://focalyt.com/api) and relative URLs (/api)
-    let socketUrl;
-    let protocol;
-
-    if (backendUrl.startsWith('http://') || backendUrl.startsWith('https://')) {
-      // Absolute URL - extract hostname and path
-      socketUrl = backendUrl
-
-    } else {
-      // Relative URL like /api - use current browser's domain
-      socketUrl = `${process.env.REACT_APP_FOCALYT_BASE_URL}${backendUrl}`
-    }
-
-    // Socket.io connection (no port needed - uses same port as backend)
-    const socket = io(`${socketUrl}`, {
-      query: {
-        userId: userData._id,
-        collegeId: collegeId
-      },
-      transports: ['websocket', 'polling'], // Enable both transports for production
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      forceNew: false,
-      upgrade: true
-    });
-
-    console.log('🔌 Connecting to WhatsApp Socket.io');
-    console.log('📋 Socket URL:', `${socketUrl}`);
-    console.log('📋 Backend URL:', backendUrl);
-    console.log('📋 CollegeId:', collegeId);
-    console.log('📋 UserId:', userData._id);
-
-    socket.on("connect", () => {
-      console.log("✅ WhatsApp Socket.io connected:", socket.id);
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("❌ WhatsApp Socket.io connection error:", error);
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("⚠️ WhatsApp Socket.io disconnected:", reason);
-    });
-
-    socket.on("reconnect", (attemptNumber) => {
-      console.log("🔄 WhatsApp Socket.io reconnected after", attemptNumber, "attempts");
-    });
-
-    socket.on("reconnect_attempt", (attemptNumber) => {
-      console.log("🔄 WhatsApp Socket.io reconnection attempt:", attemptNumber);
-    });
-
-    socket.on("reconnect_error", (error) => {
-      console.error("❌ WhatsApp Socket.io reconnection error:", error);
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("❌ WhatsApp Socket.io reconnection failed after all attempts");
-    });
-
-    // Listen for WhatsApp status updates
-    socket.on("whatsapp_status_update", (data) => {
-      console.log("📨 WhatsApp status update received:", data);
-
-      // Only process if this update is for the current college
-      if (data.collegeId === collegeId) {
-        handleMessageStatusUpdate(data);
-      }
-    });
-
-    // Listen for template sync notifications
-    socket.on("whatsapp_template_sync", (data) => {
-      console.log("📨 WhatsApp template sync received:", data);
-
-      // Only process if this update is for the current college
-      if (data.collegeId === collegeId) {
-        // Optionally refresh templates or show notification
-        console.log("✅ Templates synced for college:", collegeId);
-      }
-    });
-
-    // Listen for template sync errors
-    socket.on("whatsapp_template_sync_error", (data) => {
-      console.log("❌ WhatsApp template sync error received:", data);
-
-      // Only process if this update is for the current college
-      if (data.collegeId === collegeId) {
-        console.error("❌ Template sync error:", data.error);
-      }
-    });
-
-    socket.on("disconnect", () => {
-      console.log("🔌 WhatsApp Socket.io disconnected");
-    });
-
-    socket.on("error", (error) => {
-      console.error("❌ Socket.io error:", error);
-    });
-
-    // Cleanup on unmount
-    return () => {
-      socket.disconnect();
-    };
-  }, [backendUrl, userData._id, userData.collegeId]);
-
   // Handle message status updates from Socket.io
-  const handleMessageStatusUpdate = (data) => {
-    console.log('📊 Message status update:', data);
+  const handleMessageStatusUpdate = useCallback((data) => {
+    console.log('📩 Received status update:', data);
 
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
-      return prevMessages.map((msg) => {
-        // Match message by checking if it's for the same recipient and has matching text/template
-        const isMatchingMessage =
-          msg.type === 'template'
-            ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
-            : msg.text === data.message;
+      const updatedMessages = prevMessages.map((msg) => {
+        // Try to match by database ID or wamid first (most reliable)
+        const matchById = (data.messageId && msg.dbId === data.messageId) || 
+                         (data.wamid && msg.wamid === data.wamid);
+        
+        // Fallback: Match by text/template (less reliable, but for backwards compatibility)
+        const matchByText = msg.type === 'template'
+          ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
+          : msg.text === data.message;
+
+        const isMatchingMessage = matchById || matchByText;
 
         if (isMatchingMessage && msg.sender === 'agent') {
-          console.log('✅ Updating message status to:', data.status);
+          console.log('✅ Updating message status:', {
+            messageId: msg.id,
+            oldStatus: msg.status,
+            newStatus: data.status
+          });
+          
           return {
             ...msg,
             status: data.status,
@@ -1057,17 +952,38 @@ const CRMDashboard = () => {
         }
         return msg;
       });
+
+      // Log if no message was updated
+      const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
+      if (!wasUpdated) {
+        console.warn('⚠️ No message found to update. Data received:', data);
+        console.log('Current messages:', prevMessages.map(m => ({ 
+          id: m.id, 
+          dbId: m.dbId, 
+          wamid: m.wamid, 
+          text: m.text?.substring(0, 50),
+          status: m.status 
+        })));
+      }
+
+      return updatedMessages;
     });
 
     // Show notification (optional)
     if (data.status === 'delivered') {
-      console.log('✅ Message delivered to:', data.to);
+      console.log('✓✓ Message delivered');
     } else if (data.status === 'read') {
-      console.log('👀 Message read by:', data.to);
+      console.log('✓✓ Message read');
     } else if (data.status === 'failed') {
       console.error('❌ Message failed:', data.to);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    console.log('📩 WhatsApp message status updates:', updates);
+    handleMessageStatusUpdate(updates);
+  }, [updates]);
+
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -1831,11 +1747,11 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     fetchCourseHistory();
+    fetchJobHistory();
+    console.log('selectedProfile',selectedProfile);
   }, [selectedProfile]);
 
-  useEffect(() => {
-    fetchJobHistory();
-  }, [selectedProfile]);
+ 
 
   const fetchCourseHistory = async () => {
     try {
@@ -2972,7 +2888,6 @@ const CRMDashboard = () => {
   const fetchLeadDetails = async () => {
     try {
       setIsLoadingProfilesData(true);
-      console.log('selectedProfile',selectedProfile);
       
       let leadId;
       let updateTarget;
@@ -2981,34 +2896,29 @@ const CRMDashboard = () => {
         // WhatsApp panel ke liye selectedProfile ki full detail fetch karo
         leadId = selectedProfile._id;
         updateTarget = 'whatsapp';
-        console.log('📱 Fetching candidate details for WhatsApp panel:', leadId);
       } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
         // Lead details panel ke liye
         leadId = allProfiles[leadDetailsVisible]._id || selectedProfile?._id;
         updateTarget = 'leadDetails';
-        console.log('📋 Fetching candidate details for lead details panel:', leadId);
+       
       } else {
-        console.log('❌ No valid target for fetching candidate details');
         return;
       }
       
-      console.log('leadId',leadId);
+  
       const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
         headers: { 'x-auth': token }
       });
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        console.log('✅ Candidate details fetched successfully:', data.data);
 
         if (updateTarget === 'whatsapp' && selectedProfile) {
           // WhatsApp panel ke liye selectedProfile ko update karo with full candidate details
           setSelectedProfile(data.data)
-          console.log('📱 Updated selectedProfile with full candidate details for WhatsApp');
         } else if (updateTarget === 'leadDetails' && !isLoadingProfiles) {
           // Lead details panel ke liye
           allProfiles[leadDetailsVisible] = data.data;
-          console.log('📋 Updated lead details for lead details panel');
         }
 
       } else {
@@ -3339,7 +3249,9 @@ const CRMDashboard = () => {
 
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
-          id: index + 1,
+          id: msg._id || msg.wamid || `msg-${index}`, // Use database ID or wamid
+          dbId: msg._id, // Keep database ID separately
+          wamid: msg.wamid, // WhatsApp message ID
           text: msg.message,
           sender: 'agent', // All sent messages are from agent
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
@@ -3348,7 +3260,9 @@ const CRMDashboard = () => {
           }),
           type: msg.messageType, // 'text' or 'template'
           templateData: msg.templateData, // Will contain components for template messages
-          status: msg.status || 'sent'
+          status: msg.status || 'sent',
+          deliveredAt: msg.deliveredAt,
+          readAt: msg.readAt
         }));
 
         setWhatsappMessages(formattedMessages);
@@ -3401,7 +3315,7 @@ const CRMDashboard = () => {
   };
 
   // Render WhatsApp Template Message
-  const renderTemplateMessage = (templateData) => {
+  const renderTemplateMessage = (templateData, useSavedExamples = false) => {
     if (!templateData || !templateData.components) {
       return null;
     }
@@ -3490,7 +3404,6 @@ const CRMDashboard = () => {
 
                           if (variableMappings && variableMappings.length > 0) {
                             // Use stored variable mappings from database
-                            console.log('🗺️ Frontend Carousel using stored variable mappings:', variableMappings);
 
                             variableMappings.forEach(mapping => {
                               const position = mapping.position;
@@ -3516,7 +3429,7 @@ const CRMDashboard = () => {
                                   value = selectedProfile?._course?.name || 'Course Name';
                                   break;
                                 case 'counselor_name':
-                                  value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                                  value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
                                   break;
                                 case 'job_name':
                                   value = candidate?.appliedJobs?.[0]?.title || 'Job Title';
@@ -3528,7 +3441,7 @@ const CRMDashboard = () => {
                                   value = selectedProfile?.batch?.name || 'Batch Not Assigned';
                                   break;
                                 case 'lead_owner_name':
-                                  value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                                  value = selectedProfile?.registeredBy?.name || 'Self Registered';
                                   break;
                                 default:
                                   // Try direct property access
@@ -3538,11 +3451,9 @@ const CRMDashboard = () => {
 
                               // Replace the numbered variable with actual value
                               text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
-                              console.log(`   Frontend Carousel {{${position}}} (${variableName}) → ${value}`);
                             });
                           } else {
                             // Fallback: Use default mapping if no stored mappings
-                            console.log('⚠️ Frontend Carousel: No variable mappings found, using fallback replacement');
 
                             // Replace {{1}} with name
                             text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
@@ -3560,7 +3471,7 @@ const CRMDashboard = () => {
                             text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
 
                             // Replace {{6}} with counselor name
-                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
 
                             // Replace {{7}} with job name
                             text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
@@ -3572,7 +3483,7 @@ const CRMDashboard = () => {
                             text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
 
                             // Replace {{10}} with lead owner name
-                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
                           }
 
                           return text;
@@ -3682,7 +3593,27 @@ const CRMDashboard = () => {
             {bodyComponent && (
               <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#000', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
                 {(() => {
-                  // Get candidate data for variable replacement
+                  // For saved messages (useSavedExamples=true), use database example values
+                  if (useSavedExamples && bodyComponent.example && bodyComponent.example.body_text && Array.isArray(bodyComponent.example.body_text[0])) {
+                    const exampleValues = bodyComponent.example.body_text[0];
+                    let text = bodyComponent.text || '';
+                    
+                    // Replace each numbered variable with its saved example value
+                    const variableRegex = /\{\{(\d+)\}\}/g;
+                    const matches = [...text.matchAll(variableRegex)];
+                    
+                    matches.forEach((match, index) => {
+                      if (index < exampleValues.length && exampleValues[index]) {
+                        const position = match[1];
+                        const replaceRegex = new RegExp(`\\{\\{${position}\\}\\}`, 'g');
+                        text = text.replace(replaceRegex, exampleValues[index]);
+                      }
+                    });
+                    
+                    return text;
+                  }
+                  
+                  // For preview mode, get candidate data for variable replacement
                   const candidate = selectedProfile?._candidate;
                   const registration = selectedProfile;
 
@@ -3694,7 +3625,6 @@ const CRMDashboard = () => {
 
                   if (variableMappings && variableMappings.length > 0) {
                     // Use stored variable mappings from database
-                    console.log('🗺️ Frontend Body using stored variable mappings:', variableMappings);
 
                     variableMappings.forEach(mapping => {
                       const position = mapping.position;
@@ -3720,7 +3650,7 @@ const CRMDashboard = () => {
                           value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
                           break;
                         case 'counselor_name':
-                          value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                          value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
                           break;
                         case 'job_name':
                           value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
@@ -3732,7 +3662,7 @@ const CRMDashboard = () => {
                           value = selectedProfile?.batch?.name || 'Batch Not Assigned';
                           break;
                         case 'lead_owner_name':
-                          value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                          value = selectedProfile?.registeredBy?.name || 'Self Registered';
                           break;
                         default:
                           // Try direct property access
@@ -3742,11 +3672,9 @@ const CRMDashboard = () => {
 
                       // Replace the numbered variable with actual value
                       text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
-                      console.log(`   Frontend Body {{${position}}} (${variableName}) → ${value}`);
                     });
                   } else {
                     // Fallback: Use default mapping if no stored mappings
-                    console.log('⚠️ Frontend Body: No variable mappings found, using fallback replacement');
 
                     // Replace {{1}} with name
                     text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
@@ -3764,7 +3692,7 @@ const CRMDashboard = () => {
                     text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
 
                     // Replace {{6}} with counselor name
-                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
 
                     // Replace {{7}} with job name
                     text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
@@ -3776,7 +3704,7 @@ const CRMDashboard = () => {
                     text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
 
                     // Replace {{10}} with lead owner name
-                    text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+                    text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
                   }
 
                   return text;
@@ -3837,7 +3765,6 @@ const CRMDashboard = () => {
       if (response.data.success) {
         const templates = response.data.data || [];
         setWhatsappTemplates(Array.isArray(templates) ? templates : []);
-        console.log('✅ WhatsApp templates fetched from backend:', templates.length);
       } else {
         console.error('❌ Backend API error:', response.data.message);
         setWhatsappTemplates([]);
@@ -4579,22 +4506,83 @@ const CRMDashboard = () => {
       }
 
 
+      // Generate variable values from frontend (same as preview logic)
+      const getVariableValue = (variableName) => {
+        const candidate = selectedProfile?._candidate;
+        const registration = selectedProfile;
+        
+        switch (variableName) {
+          case 'name':
+            return candidate?.name || registration?.name || 'User';
+          case 'gender':
+            return candidate?.gender || 'Male';
+          case 'mobile':
+            return candidate?.mobile || registration?.mobile || 'Mobile';
+          case 'email':
+            return candidate?.email || registration?.email || 'Email';
+          case 'course_name':
+            return selectedProfile?._course?.name || candidate?.appliedCourses?.[0]?.courseName || 'Course Name';
+          case 'counselor_name':
+            return selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+          case 'job_name':
+            return selectedProfile?._job?.title || selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+          case 'project_name':
+            return selectedProfile?._project?.name || selectedProfile?.project?.name || 'Project Name';
+          case 'batch_name':
+            return selectedProfile?._batch?.name || selectedProfile?.batch?.name || 'Batch Not Assigned';
+          case 'lead_owner_name':
+            return selectedProfile?.registeredBy?.name || 'Self Registered';
+          default:
+            return candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+        }
+      };
+
+      // Extract template variables and get their values
+      const templateBody = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+      const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+      
+      // Extract numbered variables ({{1}}, {{2}}, etc.) from template
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      const matches = [...templateBody.matchAll(variableRegex)];
+      
+      // Create array of actual values in order
+      const variableValues = matches.map(match => {
+        const position = parseInt(match[1]);
+        
+        if (variableMappings && variableMappings.length > 0) {
+          const mapping = variableMappings.find(m => m.position === position);
+          if (mapping) {
+            return getVariableValue(mapping.variableName);
+          }
+        }
+        
+        // Fallback to hardcoded mapping if no mappings found
+        switch (position) {
+          case 1: return getVariableValue('name');
+          case 2: return getVariableValue('gender');
+          case 3: return getVariableValue('mobile');
+          case 4: return getVariableValue('email');
+          case 5: return getVariableValue('course_name');
+          case 6: return getVariableValue('counselor_name');
+          case 7: return getVariableValue('job_name');
+          case 8: return getVariableValue('project_name');
+          case 9: return getVariableValue('batch_name');
+          case 10: return getVariableValue('lead_owner_name');
+          default: return '[Variable]';
+        }
+      });
+
       // Prepare clean payload - only send required fields for template sending
       const sendindData = {
         templateName: selectedWhatsappTemplate.name,  // Template name
         to: selectedProfile?._candidate?.mobile,       // Phone number
         candidateId: selectedProfile?._candidate?._id, // ✅ For automatic variable filling
         registrationId: selectedProfile?._id,          // ✅ Fallback if no candidateId
-        collegeId: userData.college || userData.collegeId  // ✅ College ID
+        collegeId: userData.college || userData.collegeId,  // ✅ College ID
+        variableValues: variableValues  // ✅ Send actual values from frontend (same as preview)
       }
 
-      console.log('🚀 Sending WhatsApp template with data:', {
-        templateName: sendindData.templateName,
-        to: sendindData.to,
-        candidateId: sendindData.candidateId,
-        registrationId: sendindData.registrationId,
-        hasCandidate: !!selectedProfile?._candidate
-      });
+    
 
       // Make API call to send template
       const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
@@ -4611,26 +4599,86 @@ const CRMDashboard = () => {
 
         await fetchWhatsappTemplates();
 
-        // Generate actual message text with variables filled
+        // Generate actual message text with variables filled using variable mappings
         const generateFilledMessage = (templateText) => {
           if (!templateText) return '';
 
           const candidate = selectedProfile?._candidate;
           const registration = selectedProfile;
 
+          // Get template variable mappings from selectedWhatsappTemplate
+          const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
           let text = templateText;
 
-          // Replace variables with actual candidate data
-          text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
-          text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
-          text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
-          text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
-          text = text.replace(/\{\{5\}\}/g, selectedProfile?._course?.name || 'Course Name');
-          text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
-          text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
-          text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
-          text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
-          text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+          // Use stored variable mappings from database if available
+          if (variableMappings && variableMappings.length > 0) {
+            variableMappings.forEach(mapping => {
+              const position = mapping.position;
+              const variableName = mapping.variableName;
+
+              // Get value based on actual variable name from mapping
+              let value = '';
+
+              switch (variableName) {
+                case 'name':
+                  value = candidate?.name || registration?.name || 'User';
+                  break;
+                case 'gender':
+                  value = candidate?.gender || 'Male';
+                  break;
+                case 'mobile':
+                  value = candidate?.mobile || registration?.mobile || 'Mobile';
+                  break;
+                case 'email':
+                  value = candidate?.email || registration?.email || 'Email';
+                  break;
+                case 'course_name':
+                  // ✅ Same as preview logic
+                  value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
+                  break;
+                case 'counselor_name':
+                  // ✅ Same as preview logic
+                  value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                  break;
+                case 'job_name':
+                  // ✅ Same as preview logic
+                  value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+                  break;
+                case 'project_name':
+                  // ✅ Same as preview logic
+                  value = selectedProfile?.project?.name || 'Project Name';
+                  break;
+                case 'batch_name':
+                  // ✅ Same as preview logic
+                  value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                  break;
+                case 'lead_owner_name':
+                  // ✅ Same as preview logic
+                  value = selectedProfile?.registeredBy?.name || 'Self Registered';
+                  break;
+                default:
+                  // Try direct property access
+                  value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+              }
+
+              // Replace the numbered variable with actual value
+              text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+            });
+          } else {
+            // Fallback: Use default mapping if no stored mappings (same as preview)
+            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+            // ✅ Same as preview logic
+            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
+            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+            text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+            text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+            text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+          }
 
           return text;
         };
@@ -4641,13 +4689,17 @@ const CRMDashboard = () => {
 
         // Add sent template to existing WhatsApp chat with FILLED variables
         const templateMessage = {
-          id: whatsappMessages.length + 1,
+          id: response.data.data._id || response.data.data.wamid || `msg-${Date.now()}`,
+          dbId: response.data.data._id, // Database message ID
+          wamid: response.data.data.wamid, // WhatsApp message ID
           text: filledMessage || `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
           templateData: response.data.data.templateData || templateData,
-          status: 'sent'
+          status: 'sent',
+          deliveredAt: null,
+          readAt: null
         };
 
         setWhatsappMessages([...whatsappMessages, templateMessage]);
@@ -5908,7 +5960,7 @@ const CRMDashboard = () => {
                   {/* Render template message with components */}
                   {message.type === 'template' && message.templateData ? (
                     <>
-                      {renderTemplateMessage(message.templateData)}
+                      {renderTemplateMessage(message.templateData, true)}
                       <div
                         className="d-flex align-items-center justify-content-end"
                         style={{
@@ -6168,7 +6220,7 @@ const CRMDashboard = () => {
                                             text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
 
                                             // Replace {{6}} with counselor name
-                                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+                                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
 
                                             // Replace {{7}} with job name
                                             text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
@@ -6180,7 +6232,7 @@ const CRMDashboard = () => {
                                             text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
 
                                             // Replace {{10}} with lead owner name
-                                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Lead Owner not Defined');
+                                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
 
                                             return text;
                                           })()}
@@ -6315,7 +6367,6 @@ const CRMDashboard = () => {
 
                                   if (variableMappings && variableMappings.length > 0) {
                                     // Use stored variable mappings from database
-                                    console.log('🗺️ Frontend using stored variable mappings:', variableMappings);
 
                                     variableMappings.forEach(mapping => {
                                       const position = mapping.position;
@@ -6341,7 +6392,7 @@ const CRMDashboard = () => {
                                           value = selectedProfile?._course?.name || 'Course Name';
                                           break;
                                         case 'counselor_name':
-                                          value = selectedProfile?.counsellor?.name || 'Counselor not assigned';
+                                          value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
                                           break;
                                         case 'job_name':
                                           value = selectedProfile?._job?.title || 'Job Title';
@@ -6353,7 +6404,7 @@ const CRMDashboard = () => {
                                           value = selectedProfile?._batch?.name || 'Batch Not Assigned';
                                           break;
                                         case 'lead_owner_name':
-                                          value = selectedProfile?.registeredBy?.name || 'Lead Owner not Defined';
+                                          value = selectedProfile?.registeredBy?.name || 'Self Registered';
                                           break;
                                         default:
                                           // Try direct property access
@@ -6363,12 +6414,10 @@ const CRMDashboard = () => {
 
                                       // Replace the numbered variable with actual value
                                       text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
-                                      console.log(`   Frontend {{${position}}} (${variableName}) → ${value}`);
-                                      console.log('selected profile in body', selectedProfile);
+                                     
                                     });
                                   } else {
                                     // Fallback: Use default mapping if no stored mappings
-                                    console.log('⚠️ Frontend: No variable mappings found, using fallback replacement');
 
                                     // Replace {{1}} with name
                                     text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
@@ -6386,7 +6435,7 @@ const CRMDashboard = () => {
                                     text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
 
                                     // Replace {{6}} with counselor name
-                                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || 'Counselor not assigned');
+                                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
 
                                     // Replace {{7}} with job name
                                     text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
@@ -6398,7 +6447,7 @@ const CRMDashboard = () => {
                                     text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
 
                                     // Replace {{10}} with lead owner name
-                                    text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Lead Owner not Defined');
+                                    text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Self Registered');
                                   }
 
                                   return text;

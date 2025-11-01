@@ -66,7 +66,6 @@ const io = new Server(server, {
 
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
-	let collegeId = socket.handshake.query.collegeId; // college ID from frontend
 
 	if(!userId){
 		userId = 'guestUser'
@@ -78,7 +77,6 @@ const io = new Server(server, {
 	const totalSockets = getTotalSockets();
 	console.log(`✅ Socket.io connected:`);
 	console.log(`   - User ID: ${userId}`);
-	console.log(`   - College ID: ${collegeId || 'N/A'}`);
 	console.log(`   - Socket ID: ${socket.id}`);
 	console.log(`   - Total Sockets: ${totalSockets}`);
 	console.log(`   - Total Users: ${Object.keys(userSockets).length}`);

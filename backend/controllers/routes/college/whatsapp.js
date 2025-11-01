@@ -1934,7 +1934,7 @@ async function saveMessageToDatabase(messageData) {
 /**
  * Send WhatsApp message with template
  */
-async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData = null) {
+async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData = null, variableValues = null) {
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const { getVariablesInText, replaceVariables } = require('../../../helpers/whatsappVariableMapper');
   
@@ -1968,11 +1968,28 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
   
   // Extract variables from template and prepare parameters
   let bodyParameters = [];
-  if (candidateData && fbTemplate && fbTemplate.components) {
+  if (fbTemplate && fbTemplate.components) {
     const bodyComponent = fbTemplate.components.find(c => c.type === 'BODY');
     if (bodyComponent && bodyComponent.text) {
       const variables = getVariablesInText(bodyComponent.text);
       console.log('📝 Variables found in template:', variables);
+      
+      // Use variableValues from frontend if provided (preferred method)
+      if (variableValues && Array.isArray(variableValues) && variableValues.length > 0) {
+        console.log('✅ Using variableValues from frontend (same as preview):', variableValues);
+        
+        bodyParameters = variableValues.map((value, index) => {
+          const varName = variables[index] || `${index + 1}`;
+          console.log(`   {{${varName}}} → ${value}`);
+          
+          return {
+            type: 'text',
+            text: value || `[Variable ${varName}]`
+          };
+        });
+      } else if (candidateData) {
+        // Fallback: Calculate from candidateData if variableValues not provided
+        console.log('⚠️  variableValues not provided, calculating from candidateData...');
       
       // Get variable mappings from database template
       const variableMappings = template.variableMappings || [];
@@ -1990,14 +2007,55 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
           const mapping = variableMappings.find(m => m.position === parseInt(varName));
           
           if (mapping) {
-            // Get the actual variable name (e.g., "name", "email")
+              // Get the actual variable name (e.g., "name", "email", "course_name")
             const actualVarName = mapping.variableName;
             console.log(`   {{${varName}}} → ${actualVarName}`);
             
-            // Get value from candidate data using the actual variable name
+              // Get value directly from candidate data based on variable name
+              switch (actualVarName) {
+                case 'name':
+                  actualValue = candidateData.name || candidateData.candidate_name || 'User';
+                  break;
+                case 'gender':
+                  actualValue = candidateData.gender || 'Male';
+                  break;
+                case 'mobile':
+                  actualValue = candidateData.mobile || candidateData.phone || 'Mobile';
+                  break;
+                case 'email':
+                  actualValue = candidateData.email || 'Email';
+                  break;
+                case 'course_name':
+                  actualValue = candidateData._appliedCourse?.courseName || candidateData.courseName || 'Course Name';
+                  break;
+                case 'counselor_name':
+                  actualValue = candidateData._concernPerson?.name || 
+                                (candidateData.leadAssignment && candidateData.leadAssignment.length > 0 
+                                  ? candidateData.leadAssignment[candidateData.leadAssignment.length - 1].counsellorName 
+                                  : null) || 'Counselor';
+                  break;
+                case 'job_name':
+                  actualValue = candidateData._appliedJob?.title || candidateData.jobTitle || 'Job Title';
+                  break;
+                case 'project_name':
+                  actualValue = candidateData._project?.name || candidateData._college?.name || 'Project Name';
+                  break;
+                case 'batch_name':
+                  actualValue = candidateData._batch?.name || candidateData.batchName || 'Batch Name';
+                  break;
+                case 'lead_owner_name':
+                  actualValue = candidateData.registeredBy?.name || candidateData._concernPerson?.name || 'Lead Owner';
+                  break;
+                default:
+                  // Try using replaceVariables for other variables
             actualValue = replaceVariables(`{{${actualVarName}}}`, candidateData);
-            // Remove brackets if variable wasn't found
             actualValue = actualValue.replace(/^\[|\]$/g, '');
+                  if (!actualValue || actualValue === `[${actualVarName}]`) {
+                    // Fallback to direct property access
+                    actualValue = candidateData[actualVarName] || `[${actualVarName}]`;
+                  }
+              }
+              
             console.log(`      Value: ${actualValue}`);
           } else {
             console.warn(`   ⚠️  No mapping found for {{${varName}}}`);
@@ -2007,6 +2065,10 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
           // If not numbered or no mappings, use direct replacement
           actualValue = replaceVariables(`{{${varName}}}`, candidateData);
           actualValue = actualValue.replace(/^\[|\]$/g, '');
+            if (!actualValue || actualValue === `[${varName}]`) {
+              // Fallback to direct property access
+              actualValue = candidateData[varName] || `[${varName}]`;
+            }
           console.log(`   ${varName} = ${actualValue}`);
         }
         
@@ -2015,6 +2077,7 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
           text: actualValue
         };
       });
+      }
     }
   }
   
@@ -2251,7 +2314,7 @@ router.post('/validate-template-variables', isCollege, async (req, res) => {
 
 router.post('/send-template', isCollege, async (req, res) => {
   try {
-    const { templateName, to, collegeId, candidateId, registrationId } = req.body;
+    const { templateName, to, collegeId, candidateId, registrationId, variableValues } = req.body;
 
     // Validation
     if (!templateName || !to) {
@@ -2275,7 +2338,7 @@ router.post('/send-template', isCollege, async (req, res) => {
     // Fetch candidate/registration data
     // Priority: candidateId > registrationId > mobile number
     let candidateData = null;
-    const { Candidate, CandidateRegister, Course, User, College, Vacancy } = require('../../models');
+    const { Candidate, CandidateRegister, Course, User, College, Vacancy, AppliedCourses } = require('../../models');
     const { replaceVariablesInComponents } = require('../../../helpers/whatsappVariableMapper');
     
     console.log('🔍 Request params:', { templateName, to, candidateId, registrationId, collegeId });
@@ -2302,15 +2365,79 @@ router.post('/send-template', isCollege, async (req, res) => {
       }
     } 
     
-    // If not found by ID, try registration ID
+    // If not found by ID, try registration ID (AppliedCourses model)
     if (!candidateData && registrationId) {
-      console.log('📥 Fetching registration data by ID:', registrationId);
-      candidateData = await CandidateRegister.findById(registrationId)
-        .populate('_concernPerson', 'name email mobile')
+      console.log('📥 Fetching registration data by ID from AppliedCourses:', registrationId);
+      const appliedCourse = await AppliedCourses.findById(registrationId)
+        .populate('_candidate', 'name gender mobile email')
+        .populate({
+          path: '_course',
+          select: 'name courseName fees duration courseType',
+          populate: {
+            path: 'project',
+            select: 'name'
+          }
+        })
+        .populate('counsellor', 'name email mobile')
+        .populate('registeredBy', 'name email mobile')
+        .populate('batch', 'name startDate timing')
         .lean();
       
-      if (candidateData) {
-        console.log('✅ Registration data found by ID');
+      if (appliedCourse) {
+        console.log('✅ AppliedCourses data found by ID');
+        
+        // Structure data to match variable mapper expectations
+        candidateData = {
+          // Basic info from candidate
+          name: appliedCourse._candidate?.name,
+          gender: appliedCourse._candidate?.gender,
+          mobile: appliedCourse._candidate?.mobile || appliedCourse._candidate?.mobile,
+          email: appliedCourse._candidate?.email,
+          
+          // Course info
+          _appliedCourse: {
+            courseName: appliedCourse._course?.name || appliedCourse._course?.courseName,
+            fees: appliedCourse._course?.fees,
+            duration: appliedCourse._course?.duration,
+            courseType: appliedCourse._course?.courseType
+          },
+          
+          // Counsellor info
+          _concernPerson: appliedCourse.counsellor ? {
+            name: appliedCourse.counsellor.name,
+            email: appliedCourse.counsellor.email,
+            mobile: appliedCourse.counsellor.mobile
+          } : (appliedCourse.leadAssignment && appliedCourse.leadAssignment.length > 0 ? {
+            name: appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1].counsellorName
+          } : null),
+          
+          // Lead owner (registeredBy)
+          registeredBy: appliedCourse.registeredBy ? {
+            name: appliedCourse.registeredBy.name
+          } : null,
+          
+          // Batch info
+          _batch: appliedCourse.batch ? {
+            name: appliedCourse.batch.name,
+            startDate: appliedCourse.batch.startDate,
+            timing: appliedCourse.batch.timing
+          } : null,
+          
+          // Project/College info
+          _project: appliedCourse._course?.project ? {
+            name: appliedCourse._course.project.name
+          } : null,
+          
+          // Lead assignment history (for fallback)
+          leadAssignment: appliedCourse.leadAssignment || []
+        };
+        
+        console.log('✅ Registration data structured:', {
+          name: candidateData.name,
+          course: candidateData._appliedCourse?.courseName,
+          counsellor: candidateData._concernPerson?.name,
+          registeredBy: candidateData.registeredBy?.name
+        });
       }
     }
     
@@ -2441,12 +2568,13 @@ router.post('/send-template', isCollege, async (req, res) => {
       );
     }
 
-    // Send WhatsApp message with candidate data for variable replacement
+    // Send WhatsApp message with variable values from frontend (or candidate data as fallback)
     const whatsappResponse = await sendWhatsAppMessage(
       formattedPhone,
       template,
       mediaUrls,
-      candidateData
+      candidateData,
+      variableValues // ✅ Pass variableValues from frontend (same as preview)
     );
     
     console.log('✅ WhatsApp message sent with variables:', candidateData ? 'YES' : 'NO');
@@ -2489,19 +2617,22 @@ router.post('/send-template', isCollege, async (req, res) => {
               value = candidateData._appliedCourse?.courseName || candidateData.courseName || 'Course Name';
               break;
             case 'counselor_name':
-              value = candidateData._concernPerson?.name || 'Counselor';
+              value = candidateData._concernPerson?.name || 
+                      (candidateData.leadAssignment && candidateData.leadAssignment.length > 0 
+                        ? candidateData.leadAssignment[candidateData.leadAssignment.length - 1].counsellorName 
+                        : null) || 'Counselor';
               break;
             case 'job_name':
               value = candidateData._appliedJob?.title || candidateData.jobTitle || 'Job Title';
               break;
             case 'project_name':
-              value = candidateData._college?.name || 'Project Name';
+              value = candidateData._project?.name || candidateData._college?.name || 'Project Name';
               break;
             case 'batch_name':
-              value = candidateData.batchName || 'Batch Name';
+              value = candidateData._batch?.name || candidateData.batchName || 'Batch Name';
               break;
             case 'lead_owner_name':
-              value = candidateData._concernPerson?.name || 'Lead Owner';
+              value = candidateData.registeredBy?.name || candidateData._concernPerson?.name || 'Lead Owner';
               break;
             default:
               // Try direct property access
@@ -2532,18 +2663,128 @@ router.post('/send-template', isCollege, async (req, res) => {
       return text;
     };
     
-    // Get filled message text using stored variable mappings
+    // Get filled message text - use variableValues from frontend if available
     const bodyComponent = fbTemplate?.components?.find(c => c.type === 'BODY');
-    const filledMessage = generateFilledMessageForDB(bodyComponent?.text, candidateData, template.variableMappings);
+    let filledMessage;
     
-    console.log('📝 Generated filled message for DB:', filledMessage);
+    if (variableValues && Array.isArray(variableValues) && variableValues.length > 0 && bodyComponent?.text) {
+      // Use variableValues from frontend (same as preview and delivery)
+      filledMessage = bodyComponent.text;
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      const matches = [...bodyComponent.text.matchAll(variableRegex)];
+      
+      matches.forEach((match, index) => {
+        if (index < variableValues.length && variableValues[index]) {
+          const position = match[1];
+          const replaceRegex = new RegExp(`\\{\\{${position}\\}\\}`, 'g');
+          filledMessage = filledMessage.replace(replaceRegex, variableValues[index]);
+        }
+      });
+      
+      console.log('✅ Generated filledMessage from variableValues (frontend):', filledMessage);
+    } else {
+      // Fallback: Calculate from candidateData
+      filledMessage = generateFilledMessageForDB(bodyComponent?.text, candidateData, template.variableMappings);
+      console.log('⚠️  Generated filledMessage from candidateData (fallback):', filledMessage);
+    }
+    
+    // Generate actual example values from candidateData for database storage
+    const generateActualExamples = (templateText, candidateData, variableMappings) => {
+      if (!templateText || !candidateData || !variableMappings || variableMappings.length === 0) {
+        return [];
+      }
+      
+      // Extract numbered variables from template ({{1}}, {{2}}, etc.)
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      const matches = [...templateText.matchAll(variableRegex)];
+      
+      // Create example values array based on variable mappings
+      const exampleValues = matches.map(match => {
+        const position = parseInt(match[1]);
+        const mapping = variableMappings.find(m => m.position === position);
+        
+        if (!mapping) return 'Sample Value';
+        
+        const variableName = mapping.variableName;
+        let value = '';
+        
+        switch (variableName) {
+          case 'name':
+            value = candidateData.name || candidateData.candidate_name || 'User';
+            break;
+          case 'gender':
+            value = candidateData.gender || 'Male';
+            break;
+          case 'mobile':
+            value = candidateData.mobile || candidateData.phone || 'Mobile';
+            break;
+          case 'email':
+            value = candidateData.email || 'Email';
+            break;
+          case 'course_name':
+            value = candidateData._appliedCourse?.courseName || candidateData.courseName || 'Course Name';
+            break;
+          case 'counselor_name':
+            value = candidateData._concernPerson?.name || 
+                    (candidateData.leadAssignment && candidateData.leadAssignment.length > 0 
+                      ? candidateData.leadAssignment[candidateData.leadAssignment.length - 1].counsellorName 
+                      : null) || 'Counselor';
+            break;
+          case 'job_name':
+            value = candidateData._appliedJob?.title || candidateData.jobTitle || 'Job Title';
+            break;
+          case 'project_name':
+            value = candidateData._project?.name || candidateData._college?.name || 'Project Name';
+            break;
+          case 'batch_name':
+            value = candidateData._batch?.name || candidateData.batchName || 'Batch Name';
+            break;
+          case 'lead_owner_name':
+            value = candidateData.registeredBy?.name || candidateData._concernPerson?.name || 'Lead Owner';
+            break;
+          default:
+            value = candidateData[variableName] || `[${variableName}]`;
+        }
+        
+        return value;
+      });
+      
+      return exampleValues;
+    };
     
     // Prepare template data with components for saving
+    let componentsToSave = fbTemplate ? JSON.parse(JSON.stringify(fbTemplate.components)) : [];
+    
+    // Update BODY component example with actual values used
+    if (bodyComponent) {
+      const bodyComponentIndex = componentsToSave.findIndex(c => c.type === 'BODY');
+      if (bodyComponentIndex !== -1) {
+        let actualExamples = [];
+        
+        // Use variableValues from frontend (same values that were sent to WhatsApp and shown in preview)
+        if (variableValues && Array.isArray(variableValues) && variableValues.length > 0) {
+          actualExamples = variableValues;
+          console.log('✅ Using variableValues for BODY component example (from frontend):', actualExamples);
+        } else if (candidateData && template.variableMappings) {
+          // Fallback: Calculate from candidateData if variableValues not provided
+          actualExamples = generateActualExamples(bodyComponent.text, candidateData, template.variableMappings);
+          console.log('⚠️  Calculated example values from candidateData (fallback):', actualExamples);
+        }
+        
+        if (actualExamples.length > 0) {
+          componentsToSave[bodyComponentIndex].example = {
+            body_text: [actualExamples]
+          };
+          console.log('✅ Updated BODY component example with values:', actualExamples);
+        }
+      }
+    }
+    
     const templateDataToSave = {
       templateName: template.templateName,
       language: fbTemplate ? fbTemplate.language : template.language,
       category: fbTemplate ? fbTemplate.category : template.category,
-      components: fbTemplate ? fbTemplate.components : [],
+      components: componentsToSave,
       headerMedia: template.headerMedia,
       carouselMedia: template.carouselMedia
     };
@@ -2576,6 +2817,7 @@ router.post('/send-template', isCollege, async (req, res) => {
         to: formattedPhone,
         templateName: template.templateName,
         templateData: templateDataToSave,
+        filledMessage: filledMessage, // Include filled message for frontend display
         status: 'sent'
       }
     });
@@ -2871,18 +3113,8 @@ async function handleStatusUpdates(statuses) {
 				// Send Socket.io notification for WhatsApp status updates
 				if (global.io) {
 					try {
-						global.io.emit('whatsapp_status_update', {
-							collegeId: updatedMessage.collegeId,
-							type: 'message_status_update',
-							messageId: messageId,
-							status: statusValue,
-							to: recipientId,
-							candidateId: updatedMessage.candidateId,
-							timestamp: new Date(parseInt(timestamp) * 1000),
-							message: updatedMessage.message
-						});
+						global.io.emit('whatsapp_message_status_update', status);
 						console.log('🔔 Socket.io event emitted: whatsapp_status_update');
-						console.log('   - College ID:', updatedMessage.collegeId);
 						console.log('   - Message ID:', messageId);
 						console.log('   - Status:', statusValue);
 						console.log('   - To:', recipientId);

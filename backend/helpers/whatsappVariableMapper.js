@@ -38,7 +38,7 @@ const VARIABLE_MAPPINGS = {
   
   // Counselor/Lead Owner
   'counselor_name': '_concernPerson.name',
-  'lead_owner_name': '_concernPerson.name',
+  'lead_owner_name': 'registeredBy.name', // Use registeredBy if available, fallback handled in getNestedValue
   'counselor_email': '_concernPerson.email',
   'counselor_mobile': '_concernPerson.mobile',
   
@@ -48,9 +48,9 @@ const VARIABLE_MAPPINGS = {
   'college_phone': '_college.phone',
   'college_address': '_college.address',
   
-  // Project/Institution Name (alias for college)
-  'project_name': '_college.name',
-  'institution_name': '_college.name',
+  // Project/Institution Name (prefer _project, fallback to _college)
+  'project_name': '_project.name', // Use _project if available, fallback handled in getNestedValue
+  'institution_name': '_project.name',
   
   // Batch Related
   'batch_name': '_batch.name',
@@ -130,6 +130,24 @@ function replaceVariables(text, candidateData, variableOrder = null) {
       const dataPath = VARIABLE_MAPPINGS[variableName];
       if (dataPath) {
         value = getNestedValue(candidateData, dataPath);
+        
+        // Add fallback logic for specific variables
+        if (!value) {
+          if (variableName === 'counselor_name') {
+            // Fallback to leadAssignment if _concernPerson is not available
+            if (candidateData.leadAssignment && candidateData.leadAssignment.length > 0) {
+              const lastAssignment = candidateData.leadAssignment[candidateData.leadAssignment.length - 1];
+              value = lastAssignment.counsellorName || null;
+            }
+          } else if (variableName === 'lead_owner_name') {
+            // Fallback to _concernPerson.name if registeredBy.name is not available
+            value = getNestedValue(candidateData, '_concernPerson.name');
+          } else if (variableName === 'project_name' || variableName === 'institution_name') {
+            // Fallback to _college.name if _project.name is not available
+            value = getNestedValue(candidateData, '_college.name');
+          }
+        }
+        
         value = formatValue(value, variableName);
       }
     }
