@@ -4423,7 +4423,7 @@ const Student = ({
 
                   {/* Tab Navigation */}
                   <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                    <div className="d-flex flex-wrap gap-2 align-items-center filterTab">
                       {mainTabs.map((tab, index) => (
                         <div
                           key={index}
@@ -4454,7 +4454,7 @@ const Student = ({
                           </button>
                         </div>
                       ))}
-                      <div className="ms-auto">
+                      <div className="ms-auto d-md-block d-sm-none d-none">
                         {/* <button
                           className="btn btn-sm btn-outline-primary me-2"
                           onClick={() => setShowBulkUpload(true)}
@@ -4472,6 +4472,23 @@ const Student = ({
                         <Link className="btn btn-sm btn-primary me-2" to={`/institute/misreport/${selectedBatch._id}`} >MIS Report</Link>
                       </div>
                     </div>
+                    <div className="ms-auto d-md-none d-sm-block d-block">
+                        {/* <button
+                          className="btn btn-sm btn-outline-primary me-2"
+                          onClick={() => setShowBulkUpload(true)}
+                        >
+                          <i className="fas fa-upload"></i> Bulk Upload
+                        </button> */}
+                        <button
+                          onClick={handleAttendanceManagement}
+                          className="btn btn-sm btn-primary me-2 mb-2"
+                        >
+                          <i className="fas fa-chart-line me-1"></i>
+                          Attendance Dashboard
+                        </button>
+                        {/* <button className="btn btn-sm btn-primary me-2" >MIS Report</button> */}
+                        <Link className="btn btn-sm btn-primary me-2" to={`/institute/misreport/${selectedBatch._id}`} >MIS Report</Link>
+                      </div>
                   </div>
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
@@ -9589,18 +9606,6 @@ background: #fd2b5a;
 
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
-
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
 
     .btn-group {
         flex-wrap: wrap;
@@ -9609,6 +9614,46 @@ background: #fd2b5a;
     .input-group {
         max-width: 100% !important;
         margin-bottom: 0.5rem;
+    }
+}
+
+/* Mobile horizontal scroll for filter tabs */
+@media (max-width: 768px) {
+    .filterTab {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #007bff #f1f1f1;
+        padding-bottom: 8px;
+    }
+    
+    .filterTab::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    .filterTab::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .filterTab::-webkit-scrollbar-thumb {
+        background: #007bff;
+        border-radius: 10px;
+    }
+    
+    .filterTab::-webkit-scrollbar-thumb:hover {
+        background: #0056b3;
+    }
+    
+    .filterTab > .d-flex {
+        flex-shrink: 0;
+    }
+    
+    .filterTab .btn {
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 }
 

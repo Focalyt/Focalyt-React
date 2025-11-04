@@ -45,14 +45,34 @@ function MyCourses() {
         trainersData.forEach(trainer => {
             if(trainer.assignedCourses && trainer.assignedCourses.length > 0){
                 trainer.assignedCourses.forEach(course => {
-                    allCourses.push({
-                        id: course._id,
-                        title: course.name,
-                        image: course.image || "/Assets/images/logo/logo.png",
-                        trainerName: trainer.name,
-                        trainerId: trainer._id,
-                        center: course.center // Add center information
-                    });
+                    // Check if course belongs to the selected center (if centerId exists in URL)
+                    let belongsToCenter = true;
+                    if (centerId) {
+                        // Handle both array and object center structure
+                        if (Array.isArray(course.center) && course.center.length > 0) {
+                            belongsToCenter = course.center[0]._id === centerId;
+                        } else if (course.center && course.center._id) {
+                            belongsToCenter = course.center._id === centerId;
+                        } else if (Array.isArray(course.centerId) && course.centerId.length > 0) {
+                            belongsToCenter = course.centerId[0]._id === centerId || course.centerId[0] === centerId;
+                        } else if (course.centerId) {
+                            belongsToCenter = course.centerId._id === centerId || course.centerId === centerId;
+                        } else {
+                            belongsToCenter = false;
+                        }
+                    }
+
+                    // Only add course if it belongs to the selected center (or if no center filter is active)
+                    if (belongsToCenter) {
+                        allCourses.push({
+                            id: course._id,
+                            title: course.name,
+                            image: course.image || "/Assets/images/logo/logo.png",
+                            trainerName: trainer.name,
+                            trainerId: trainer._id,
+                            center: course.center // Add center information
+                        });
+                    }
                 });
             }
         });
@@ -89,12 +109,12 @@ function MyCourses() {
                                 </button>
                                 <h2 className="mb-0">Course Management</h2>
                             </div>
-                            {/* {courseInfo && (
+                            {centerName && (
                                 <p className="text-muted mb-0">
-                                    <i className="feather icon-book me-1"></i>
-                                    Course: <strong>{courseInfo.name}</strong>
+                                    <i className="fas fa-building me-1 text-primary"></i>
+                                    Center: <strong>{decodeURIComponent(centerName)}</strong>
                                 </p>
-                            )} */}
+                            )}
                         </div>
                     </div>
                 </div>

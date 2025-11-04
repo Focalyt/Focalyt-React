@@ -6540,7 +6540,7 @@ const CRMDashboard = () => {
         <div className="bg-white border-top p-3">
           <div className="d-flex align-items-center gap-2">
             {/* File Upload Button */}
-            <button
+            {/* <button
               className="btn"
               title="Attach File"
               style={{
@@ -6557,7 +6557,7 @@ const CRMDashboard = () => {
               }}
             >
               <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
-            </button>
+            </button> */}
 
             {/* Template Button */}
             <div className="position-relative">
@@ -6694,13 +6694,13 @@ const CRMDashboard = () => {
                   {/* Emoji Picker */}
                   {showWhatsappEmojiPicker && (
                     <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
-                      <div className="d-flex flex-wrap gap-2" style={{ width: '250px' }}>
+                      <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
                         {emojis.map((emoji, index) => (
                           <button
                             key={index}
-                            className="btn btn-light btn-sm"
+                            className="btn btn-light"
                             onClick={() => handleWhatsappEmojiClick(emoji)}
-                            style={{ fontSize: '20px', width: '40px', height: '40px', padding: 0 }}
+                            style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
                           >
                             {emoji}
                           </button>
@@ -7231,6 +7231,21 @@ const CRMDashboard = () => {
 
   return (
     <div className="container-fluid">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .whatappemoji {
+              width: auto !important;
+            }
+            .whatsapp-emoji-trigger.position-absolute.end-0 {
+              right: -60px !important;
+            }
+            .whatsapp-emoji-trigger.position-absolute.top-0 {
+              top: -5px !important;
+            }
+          }
+        `}
+      </style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           <div

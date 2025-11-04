@@ -928,7 +928,7 @@ function Dashboard() {
          
             {/* Overview Stats */}
             <div className="row mb-4">
-                <div className="col-md-2 col-sm-6 mb-3">
+                <div className="col-md-3 col-sm-6 mb-3">
                     <div className="card bg-gradient-primary text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <BookOpen className="mb-2" size={32} />
@@ -937,7 +937,7 @@ function Dashboard() {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-2 col-sm-6 mb-3">
+                <div className="col-md-3 col-sm-6 mb-3">
                     <div className="card bg-gradient-success text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <Users className="mb-2" size={32} />
@@ -946,7 +946,7 @@ function Dashboard() {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-2 col-sm-6 mb-3">
+                <div className="col-md-3 col-sm-6 mb-3">
                     <div className="card bg-gradient-info text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <CheckCircle className="mb-2" size={32} />
@@ -955,30 +955,12 @@ function Dashboard() {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-2 col-sm-6 mb-3">
+                <div className="col-md-3 col-sm-6 mb-3">
                     <div className="card bg-gradient-warning text-white border-0 shadow-sm h-100">
                         <div className="card-body text-center">
                             <Target className="mb-2" size={32} />
                             <h3 className="mb-1 fw-bold">{overviewStats.totalStudents}</h3>
                             <p className="mb-0 small">Total Students</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-2 col-sm-6 mb-3">
-                    <div className="card bg-gradient-danger text-white border-0 shadow-sm h-100">
-                        <div className="card-body text-center">
-                            <AlertTriangle className="mb-2" size={32} />
-                            <h3 className="mb-1 fw-bold">{overviewStats.batchFreezeStudents}</h3>
-                            <p className="mb-0 small">Batch Freeze</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-2 col-sm-6 mb-3">
-                    <div className="card bg-gradient-dark text-white border-0 shadow-sm h-100">
-                        <div className="card-body text-center">
-                            <TrendingUp className="mb-2" size={32} />
-                            <h3 className="mb-1 fw-bold">{courseWiseData.length > 0 ? Math.round(studentsData.length / courseWiseData.length) : 0}</h3>
-                            <p className="mb-0 small">Avg/Course</p>
                         </div>
                     </div>
                 </div>
