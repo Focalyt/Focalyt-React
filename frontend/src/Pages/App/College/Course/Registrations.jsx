@@ -911,6 +911,7 @@ const CRMDashboard = () => {
   const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
   const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
   const [showWhatsappEmojiPicker, setShowWhatsappEmojiPicker] = useState(false);
+  const [showWhatsappFileMenu, setShowWhatsappFileMenu] = useState(false);
   const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
   const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
   const whatsappMessagesEndRef = useRef(null);
@@ -4092,6 +4093,154 @@ const CRMDashboard = () => {
     setShowWhatsappEmojiPicker(false);
   };
 
+  const handleWhatsappFileUpload = async (event, fileType) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Close the file menu
+    setShowWhatsappFileMenu(false);
+
+    // Validate that a chat is selected
+    console.log('📋 Selected Profile:', selectedProfile);
+    
+    if (!selectedProfile) {
+      alert('Please select a candidate to send the file to.');
+      event.target.value = '';
+      return;
+    }
+
+    console.log('🔍 Selected Profile:', selectedProfile);
+    
+
+    // Handle different profile structures
+    const candidate = selectedProfile._candidate || selectedProfile.candidate || selectedProfile;
+    
+    if (!candidate || !candidate.mobile) {
+      alert('Candidate mobile number not found. Please select a valid candidate.');
+      console.error('❌ Invalid candidate structure:', { selectedProfile, candidate });
+      event.target.value = '';
+      return;
+    }
+
+    // Check file size (25MB limit for WhatsApp)
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      alert('File size exceeds 25MB. Please choose a smaller file.');
+      event.target.value = '';
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    
+    // Add file message to UI immediately (optimistic update)
+    const newMessage = {
+      id: tempId,
+      text: file.name,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: fileType,
+      status: 'sending',
+      mediaUrl: URL.createObjectURL(file),
+      fileName: file.name
+    };
+    
+    setWhatsappMessages(prev => [...prev, newMessage]);
+
+    try {
+      // Prepare form data
+      const formData = new FormData();
+      
+      if (fileType === 'audio') {
+        formData.append('audio', file);
+      } else {
+        formData.append('file', file);
+      }
+      
+      const phoneNumber = candidate.mobile || candidate.phone;
+      const candidateId = candidate._id || candidate.id;
+      const candidateName = candidate.name;
+      
+      formData.append('to', phoneNumber);
+      formData.append('candidateId', candidateId);
+      formData.append('candidateName', candidateName);
+
+      console.log('🔍 Pre-send validation:');
+      console.log('  - phoneNumber:', formData.phoneNumber);
+      console.log('  - candidateId:', formData.candidateId);
+      console.log('  - file exists:', !!file);
+      console.log('  - file name:', file.name);
+      console.log('  - file size:', file.size);
+      
+      console.log('📤 Sending file:', {
+        fileType,
+        fileName: file.name,
+        fileSize: file.size,
+        to: phoneNumber,
+        candidateId: candidateId,
+        candidateName: candidateName
+      });
+      
+      // Debug: Log FormData contents
+      console.log('📋 FormData contents:');
+      for (let pair of formData.entries()) {
+        console.log(`  - ${pair[0]}:`, typeof pair[1] === 'object' ? pair[1].name : pair[1]);
+      }
+
+      // Determine endpoint based on file type
+      const endpoint = fileType === 'audio' 
+        ? `${backendUrl}/college/whatsapp/send-audio`
+        : `${backendUrl}/college/whatsapp/send-file`;
+
+      const response = await axios.post(endpoint, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        // Update message with real ID, S3 URL and status
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                  ...msg,
+                  id: response.data.data.messageId,
+                  wamid: response.data.data.messageId,
+                  status: 'sent',
+                  mediaUrl: response.data.data.s3Url
+                }
+              : msg
+          )
+        );
+        
+        console.log(`✅ ${fileType} sent successfully:`, response.data);
+      }
+    } catch (error) {
+      console.error(`❌ Error sending ${fileType}:`, error);
+      console.error('Error response:', error.response?.data);
+      
+      // Update message status to failed
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+      
+      // Show detailed error to user with debug info
+      const debugInfo = error.response?.data?.debug 
+        ? `\n\nDebug Info:\n${JSON.stringify(error.response.data.debug, null, 2)}`
+        : '';
+      
+      alert(error.response?.data?.message || `Failed to send ${fileType}. Please try again.` + debugInfo);
+    }
+
+    // Reset file input
+    event.target.value = '';
+  };
+
   const handleWhatsappSelectTemplate = (template) => {
     setSelectedWhatsappTemplate(template);
     handlePreparingSendingTemplate(template);
@@ -5130,15 +5279,23 @@ const CRMDashboard = () => {
           setShowWhatsappEmojiPicker(false);
         }
       }
+      // Check if click is outside file menu
+      if (showWhatsappFileMenu) {
+        const fileButton = event.target.closest('.whatsapp-file-trigger');
+        const fileMenu = event.target.closest('.whatsapp-file-menu');
+        if (!fileButton && !fileMenu) {
+          setShowWhatsappFileMenu(false);
+        }
+      }
     };
 
-    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker) {
+    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker || showWhatsappFileMenu) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker]);
+  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker, showWhatsappFileMenu]);
 
   // Fetch templates when WhatsApp panel opens
   useEffect(() => {
@@ -6886,24 +7043,103 @@ const CRMDashboard = () => {
         <div className="bg-white border-top p-3">
           <div className="d-flex align-items-center gap-2">
             {/* File Upload Button */}
-            <button
-              className="btn"
-              title="Attach File"
-              style={{
-                width: '42px',
-                height: '42px',
-                backgroundColor: 'transparent',
-                color: '#54656F',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
-            </button>
+            <div className="position-relative">
+              <button
+                className="btn whatsapp-file-trigger"
+                onClick={() => {
+                  setShowWhatsappFileMenu(!showWhatsappFileMenu);
+                  setShowWhatsappTemplateMenu(false);
+                  setShowWhatsappEmojiPicker(false);
+                }}
+                title="Attach File"
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  backgroundColor: 'transparent',
+                  color: '#54656F',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+              </button>
+
+              {/* File Menu Dropdown */}
+              {showWhatsappFileMenu && (
+                <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+                  <div className="p-2">
+                    <input
+                      type="file"
+                      id="whatsapp-document-input"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-image-input"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-video-input"
+                      accept="video/mp4,video/mkv,video/mov,video/avi"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-audio-input"
+                      accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+                      style={{ display: 'none' }}
+                    />
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-document-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+                      <span>Document</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-image-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+                      <span>Image</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-video-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+                      <span>Video</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start"
+                      onClick={() => document.getElementById('whatsapp-audio-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+                      <span>Audio</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Template Button */}
             <div className="position-relative">

@@ -24,7 +24,9 @@ const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
 
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
-const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, 'pdf'];
+const allowedAudioExtensions = ['mp3', 'aac', 'm4a', 'amr', 'ogg', 'opus'];
+const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
+const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedAudioExtensions, ...allowedDocumentExtensions];
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -35,10 +37,13 @@ const upload = multer({
 	},
 	fileFilter: (req, file, cb) => {
 		const ext = file.originalname.split('.').pop().toLowerCase();
+		console.log(`🔍 Multer fileFilter - checking extension: ${ext}`);
 		if (allowedExtensions.includes(ext)) {
+			console.log(`✅ Extension ${ext} is allowed`);
 			cb(null, true);
 		} else {
-			cb(new Error(`File type not supported: ${ext}`), false);
+			console.log(`❌ Extension ${ext} is NOT allowed`);
+			cb(new Error(`File type not supported: ${ext}. Allowed: ${allowedExtensions.join(', ')}`), false);
 		}
 	}
 });
@@ -3805,5 +3810,463 @@ async function handleTemplateStatusUpdate(templateStatusUpdates) {
 		throw error;
 	}
 }
+
+// Send emoji message (emojis are just text in WhatsApp)
+router.post('/send-emoji', isCollege, async (req, res) => {
+	try {
+		const { to, emoji, candidateId, candidateName } = req.body;
+		
+		// Get college ID from authenticated user
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+
+		console.log('😊 Sending emoji message:', { 
+			to, 
+			emoji, 
+			candidateId,
+			collegeId 
+		});
+
+		// Validation
+		if (!to || !emoji) {
+			return res.status(400).json({
+				success: false,
+				message: 'to and emoji are required'
+			});
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				success: false,
+				message: 'College ID not found in session'
+			});
+		}
+
+		// Format phone number
+		let formattedPhone;
+		try {
+			formattedPhone = formatPhoneNumber(to);
+		} catch (error) {
+			return res.status(400).json({
+				success: false,
+				message: error.message
+			});
+		}
+
+		// Send emoji via WhatsApp API (emojis are sent as text)
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
+		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+		
+		const messageData = {
+			messaging_product: 'whatsapp',
+			to: formattedPhone,
+			type: 'text',
+			text: {
+				body: emoji
+			}
+		};
+
+		console.log('📡 Calling WhatsApp API for emoji:', { url, to: formattedPhone });
+
+		const response = await axios.post(url, messageData, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+				'Content-Type': 'application/json'
+			}
+		});
+
+		console.log('✅ WhatsApp emoji API response:', response.data);
+
+		// Save message to database
+		const messageDoc = {
+			collegeId: collegeId,
+			candidateId: candidateId,
+			candidateName: candidateName,
+			phone: formattedPhone,
+			messageId: response.data.messages?.[0]?.id,
+			message: emoji,
+			messageType: 'emoji',
+			direction: 'outgoing',
+			status: 'sent',
+			timestamp: new Date(),
+			metadata: {
+				wamid: response.data.messages?.[0]?.id
+			}
+		};
+
+		// Save to database
+		if (WhatsAppMessage && typeof WhatsAppMessage.create === 'function') {
+			await WhatsAppMessage.create(messageDoc);
+			console.log('💾 Emoji message saved to database');
+		}
+
+		// Update candidate's last message time
+		if (candidateId && Candidate) {
+			await Candidate.findByIdAndUpdate(candidateId, {
+				lastWhatsAppMessageAt: new Date()
+			});
+		}
+
+		return res.status(200).json({
+			success: true,
+			message: 'Emoji sent successfully',
+			data: {
+				messageId: response.data.messages?.[0]?.id,
+				phone: formattedPhone
+			}
+		});
+
+	} catch (error) {
+		console.error('❌ Send Emoji Error:', error.response?.data || error.message);
+		return res.status(500).json({
+			success: false,
+			message: error.response?.data?.error?.message || 'Failed to send emoji',
+			error: error.message
+		});
+	}
+});
+
+// Send audio message with S3 upload
+router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) => {
+	try {
+		console.log('📥 Received audio upload request');
+		console.log('  - Body:', req.body);
+		console.log('  - File:', req.file ? { name: req.file.originalname, size: req.file.size } : 'No file');
+		console.log('  - Headers:', req.headers['content-type']);
+		
+		const { to, candidateId, candidateName } = req.body;
+		const audioFile = req.file;
+		
+		// Get college ID from authenticated user
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+
+		console.log('🎵 Sending audio message:', { 
+			to, 
+			candidateId,
+			collegeId,
+			fileName: audioFile?.originalname
+		});
+
+		// Validation
+		if (!to || !audioFile) {
+			console.error('❌ Validation failed:', { to: !!to, audioFile: !!audioFile });
+			return res.status(400).json({
+				success: false,
+				message: 'to and audio file are required',
+				debug: { hasTo: !!to, hasFile: !!audioFile, body: req.body }
+			});
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				success: false,
+				message: 'College ID not found in session'
+			});
+		}
+
+		// Validate audio file type
+		const audioExtensions = ['mp3', 'aac', 'm4a', 'amr', 'ogg', 'opus'];
+		const ext = audioFile.originalname.split('.').pop().toLowerCase();
+		if (!audioExtensions.includes(ext)) {
+			return res.status(400).json({
+				success: false,
+				message: `Audio format not supported. Allowed formats: ${audioExtensions.join(', ')}`
+			});
+		}
+
+		// Format phone number
+		let formattedPhone;
+		try {
+			formattedPhone = formatPhoneNumber(to);
+		} catch (error) {
+			return res.status(400).json({
+				success: false,
+				message: error.message
+			});
+		}
+
+		// Step 1: Upload audio to S3
+		console.log('📤 Uploading audio to S3...');
+		const fileName = `whatsapp_audio_${Date.now()}_${uuid()}.${ext}`;
+		const key = `whatsapp/outgoing/audio/${collegeId}/${fileName}`;
+		
+		const contentTypeMap = {
+			'mp3': 'audio/mpeg',
+			'aac': 'audio/aac',
+			'm4a': 'audio/mp4',
+			'amr': 'audio/amr',
+			'ogg': 'audio/ogg',
+			'opus': 'audio/opus'
+		};
+		
+		const s3Params = {
+			Bucket: bucketName,
+			Key: key,
+			Body: audioFile.buffer,
+			ContentType: contentTypeMap[ext] || 'audio/mpeg',
+			ACL: 'public-read'
+		};
+
+		const uploadResult = await s3.upload(s3Params).promise();
+		const s3Url = uploadResult.Location;
+		
+		console.log(`✅ Audio uploaded to S3: ${s3Url}`);
+
+		// Step 2: Send audio via WhatsApp API
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
+		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+		
+		const messageData = {
+			messaging_product: 'whatsapp',
+			to: formattedPhone,
+			type: 'audio',
+			audio: {
+				link: s3Url
+			}
+		};
+
+		console.log('📡 Calling WhatsApp API for audio:', { url, to: formattedPhone });
+
+		const response = await axios.post(url, messageData, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+				'Content-Type': 'application/json'
+			}
+		});
+
+		console.log('✅ WhatsApp audio API response:', response.data);
+
+		// Step 3: Save message to database
+		const messageDoc = {
+			collegeId: collegeId,
+			candidateId: candidateId,
+			candidateName: candidateName,
+			phone: formattedPhone,
+			messageId: response.data.messages?.[0]?.id,
+			message: '[Audio]',
+			messageType: 'audio',
+			direction: 'outgoing',
+			status: 'sent',
+			timestamp: new Date(),
+			mediaUrl: s3Url,
+			metadata: {
+				wamid: response.data.messages?.[0]?.id,
+				fileName: audioFile.originalname,
+				fileSize: audioFile.size,
+				s3Key: key
+			}
+		};
+
+		// Save to database
+		if (WhatsAppMessage && typeof WhatsAppMessage.create === 'function') {
+			await WhatsAppMessage.create(messageDoc);
+			console.log('💾 Audio message saved to database');
+		}
+
+		// Update candidate's last message time
+		if (candidateId && Candidate) {
+			await Candidate.findByIdAndUpdate(candidateId, {
+				lastWhatsAppMessageAt: new Date()
+			});
+		}
+
+		return res.status(200).json({
+			success: true,
+			message: 'Audio sent successfully',
+			data: {
+				messageId: response.data.messages?.[0]?.id,
+				phone: formattedPhone,
+				s3Url: s3Url
+			}
+		});
+
+	} catch (error) {
+		console.error('❌ Send Audio Error:', error.response?.data || error.message);
+		return res.status(500).json({
+			success: false,
+			message: error.response?.data?.error?.message || 'Failed to send audio',
+			error: error.message
+		});
+	}
+});
+
+// Send file message (document, image, video) with S3 upload
+router.post('/send-file', isCollege, upload.single('file'), async (req, res) => {
+	try {
+		console.log('📥 Received file upload request');
+		console.log('  - Body:', req.body);
+		console.log('  - File:', req.file ? { name: req.file.originalname, size: req.file.size } : 'No file');
+		console.log('  - Headers:', req.headers['content-type']);
+		
+		const { to, candidateId, candidateName, caption } = req.body;
+		const file = req.file;
+		
+		// Get college ID from authenticated user
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+
+		console.log('📎 Sending file message:', { 
+			to, 
+			candidateId,
+			collegeId,
+			fileName: file?.originalname,
+			caption: caption?.substring(0, 50)
+		});
+
+		// Validation
+		if (!to || !file) {
+			console.error('❌ Validation failed:', { to: !!to, file: !!file });
+			return res.status(400).json({
+				success: false,
+				message: 'to and file are required',
+				debug: { hasTo: !!to, hasFile: !!file, body: req.body }
+			});
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				success: false,
+				message: 'College ID not found in session'
+			});
+		}
+
+		// Format phone number
+		let formattedPhone;
+		try {
+			formattedPhone = formatPhoneNumber(to);
+		} catch (error) {
+			return res.status(400).json({
+				success: false,
+				message: error.message
+			});
+		}
+
+		// Determine file type and WhatsApp message type
+		const ext = file.originalname.split('.').pop().toLowerCase();
+		let messageType = 'document';
+		let contentType = file.mimetype;
+		
+		if (allowedImageExtensions.includes(ext)) {
+			messageType = 'image';
+		} else if (allowedVideoExtensions.includes(ext)) {
+			messageType = 'video';
+		} else if (ext === 'pdf') {
+			messageType = 'document';
+			contentType = 'application/pdf';
+		}
+
+		// Step 1: Upload file to S3
+		console.log(`📤 Uploading ${messageType} to S3...`);
+		const fileName = `whatsapp_${messageType}_${Date.now()}_${uuid()}.${ext}`;
+		const key = `whatsapp/outgoing/${messageType}/${collegeId}/${fileName}`;
+		
+		const s3Params = {
+			Bucket: bucketName,
+			Key: key,
+			Body: file.buffer,
+			ContentType: contentType,
+			ACL: 'public-read'
+		};
+
+		const uploadResult = await s3.upload(s3Params).promise();
+		const s3Url = uploadResult.Location;
+		
+		console.log(`✅ File uploaded to S3: ${s3Url}`);
+
+		// Step 2: Send file via WhatsApp API
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
+		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+		
+		const messageData = {
+			messaging_product: 'whatsapp',
+			to: formattedPhone,
+			type: messageType
+		};
+
+		// Add media object based on type
+		messageData[messageType] = {
+			link: s3Url
+		};
+
+		// Add caption if provided
+		if (caption) {
+			messageData[messageType].caption = caption;
+		}
+
+		// Add filename for documents
+		if (messageType === 'document') {
+			messageData[messageType].filename = file.originalname;
+		}
+
+		console.log(`📡 Calling WhatsApp API for ${messageType}:`, { url, to: formattedPhone });
+
+		const response = await axios.post(url, messageData, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+				'Content-Type': 'application/json'
+			}
+		});
+
+		console.log(`✅ WhatsApp ${messageType} API response:`, response.data);
+
+		// Step 3: Save message to database
+		const messageDoc = {
+			collegeId: collegeId,
+			candidateId: candidateId,
+			candidateName: candidateName,
+			phone: formattedPhone,
+			messageId: response.data.messages?.[0]?.id,
+			message: caption || `[${messageType.toUpperCase()}]`,
+			messageType: messageType,
+			direction: 'outgoing',
+			status: 'sent',
+			timestamp: new Date(),
+			mediaUrl: s3Url,
+			metadata: {
+				wamid: response.data.messages?.[0]?.id,
+				fileName: file.originalname,
+				fileSize: file.size,
+				s3Key: key,
+				caption: caption
+			}
+		};
+
+		// Save to database
+		if (WhatsAppMessage && typeof WhatsAppMessage.create === 'function') {
+			await WhatsAppMessage.create(messageDoc);
+			console.log(`💾 ${messageType} message saved to database`);
+		}
+
+		// Update candidate's last message time
+		if (candidateId && Candidate) {
+			await Candidate.findByIdAndUpdate(candidateId, {
+				lastWhatsAppMessageAt: new Date()
+			});
+		}
+
+		return res.status(200).json({
+			success: true,
+			message: `${messageType} sent successfully`,
+			data: {
+				messageId: response.data.messages?.[0]?.id,
+				phone: formattedPhone,
+				s3Url: s3Url,
+				messageType: messageType
+			}
+		});
+
+	} catch (error) {
+		console.error('❌ Send File Error:', error.response?.data || error.message);
+		return res.status(500).json({
+			success: false,
+			message: error.response?.data?.error?.message || 'Failed to send file',
+			error: error.message
+		});
+	}
+});
 
 module.exports = router;
