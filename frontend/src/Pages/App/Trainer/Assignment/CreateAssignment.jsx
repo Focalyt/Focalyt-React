@@ -47,9 +47,13 @@ function CreateAssignment() {
         q.question.toLowerCase().includes(bankSearchTerm.toLowerCase());
       const matchesMarks = !bankFilterMarks ||
         Number(q.marks) === Number(bankFilterMarks);
-      return matchesSearch && matchesMarks;
+      
+      const matchesCourse = !courseIdFromQuery || 
+        (q.course && String(q.course) === String(courseIdFromQuery));
+      
+      return matchesSearch && matchesMarks && matchesCourse;
     });
-  }, [questionBank, bankSearchTerm, bankFilterMarks]);
+  }, [questionBank, bankSearchTerm, bankFilterMarks, courseIdFromQuery]);
 
 
   const addToQuestionBank = async () => {
@@ -310,6 +314,95 @@ function CreateAssignment() {
             </div>
           </div>
 
+          {/* Question Bank Management */}
+          <div className="bank-management-section">
+            <div className="bank-header">
+              <h3>
+                Question Bank ({filteredQuestionBank.length} 
+                {courseIdFromQuery && questionBank.length !== filteredQuestionBank.length 
+                  ? ` of ${questionBank.length}` 
+                  : ''} questions)
+                {courseIdFromQuery && (
+                  <span style={{fontSize: '0.85rem', color: '#4299e1', marginLeft: '0.5rem'}}>
+                    (Filtered by Course)
+                  </span>
+                )}
+              </h3>
+              <div className="bank-filters">
+                <div className="search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search questions..."
+                    value={bankSearchTerm}
+                    onChange={(e) => setBankSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="filter-box">
+                  <Filter size={16} />
+                  <input
+                    type="number"
+                    placeholder="Filter by marks"
+                    value={bankFilterMarks}
+                    onChange={(e) => setBankFilterMarks(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Question Bank List */}
+            <div className="bank-questions-list">
+              {filteredQuestionBank.map((q) => (
+                <div key={q.id} className="bank-question-card">
+                  <div className="question-select">
+                    <button
+                      className="select-btn"
+                      onClick={() => toggleBankQuestionSelection(q.id)}
+                    >
+                      {selectedBankQuestions.has(q.id) ?
+                        <CheckSquare size={18} /> :
+                        <Square size={18} />
+                      }
+                    </button>
+                  </div>
+
+                  <div className="question-content">
+                    <div className="question-text">{q.question}</div>
+                    <div className="question-meta">
+                      <span className="meta-tag">{q.marks} marks</span>
+                      <span className="meta-tag">Correct: {q.options[q.correctIndex]}</span>
+                    </div>
+                  </div>
+
+                  {/* <div className="question-actions">
+                    <button
+                      className="remove-bank-btn"
+                      onClick={() => removeFromQuestionBank(q.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div> */}
+                </div>
+              ))}
+
+              {filteredQuestionBank.length === 0 && (
+                <div className="empty-bank">
+                  <Database size={48} />
+                  <p>
+                    {courseIdFromQuery && questionBank.length > 0 
+                      ? 'No questions found for this course' 
+                      : 'No questions found in bank'}
+                  </p>
+                  <small>
+                    {courseIdFromQuery && questionBank.length > 0
+                      ? 'Add questions using the form above or change filters'
+                      : 'Add questions using the form above'}
+                  </small>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Assignment Settings */}
           {selectedBankQuestions.size > 0 && (
             <div className="assignment-settings-section">
@@ -356,35 +449,8 @@ function CreateAssignment() {
               </div>
             </div>
           )}
-
-          {/* Question Bank Management */}
-          <div className="bank-management-section">
-            <div className="bank-header">
-              <h3>Question Bank ({questionBank.length} questions)</h3>
-              <div className="bank-filters">
-                <div className="search-box">
-                  <Search size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search questions..."
-                    value={bankSearchTerm}
-                    onChange={(e) => setBankSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="filter-box">
-                  <Filter size={16} />
-                  <input
-                    type="number"
-                    placeholder="Filter by marks"
-                    value={bankFilterMarks}
-                    onChange={(e) => setBankFilterMarks(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Selected Questions Actions */}
-            {selectedBankQuestions.size > 0 && (
+           {/* Selected Questions Actions */}
+           {selectedBankQuestions.size > 0 && (
               <div className="selected-actions">
                 <span>{selectedBankQuestions.size} questions selected</span>
                 <button
@@ -396,52 +462,7 @@ function CreateAssignment() {
                   Add to Assignment
                 </button>
               </div>
-            )}
-
-            {/* Question Bank List */}
-            <div className="bank-questions-list">
-              {filteredQuestionBank.map((q) => (
-                <div key={q.id} className="bank-question-card">
-                  <div className="question-select">
-                    <button
-                      className="select-btn"
-                      onClick={() => toggleBankQuestionSelection(q.id)}
-                    >
-                      {selectedBankQuestions.has(q.id) ?
-                        <CheckSquare size={18} /> :
-                        <Square size={18} />
-                      }
-                    </button>
-                  </div>
-
-                  <div className="question-content">
-                    <div className="question-text">{q.question}</div>
-                    <div className="question-meta">
-                      <span className="meta-tag">{q.marks} marks</span>
-                      <span className="meta-tag">Correct: {q.options[q.correctIndex]}</span>
-                    </div>
-                  </div>
-
-                  {/* <div className="question-actions">
-                    <button
-                      className="remove-bank-btn"
-                      onClick={() => removeFromQuestionBank(q.id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div> */}
-                </div>
-              ))}
-
-              {filteredQuestionBank.length === 0 && (
-                <div className="empty-bank">
-                  <Database size={48} />
-                  <p>No questions found in bank</p>
-                  <small>Add questions using the form above</small>
-                </div>
-              )}
-            </div>
-          </div>
+            )} 
         </>
       </div>
 
@@ -634,6 +655,7 @@ function CreateAssignment() {
           background: #e6fffa;
           border-radius: 8px;
           padding: 1.5rem;
+          margin-top: 2rem;
           margin-bottom: 2rem;
           border: 1px solid #81e6d9;
         }
@@ -718,7 +740,27 @@ function CreateAssignment() {
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
+          max-height: 500px;
+          overflow-y: auto;
+          padding-right: 0.5rem;
         }
+        
+        /* Scrollbar Styling */
+        .bank-questions-list::-webkit-scrollbar {
+          width: 8px;
+        }
+        .bank-questions-list::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .bank-questions-list::-webkit-scrollbar-thumb {
+          background: #cbd5e0;
+          border-radius: 10px;
+        }
+        .bank-questions-list::-webkit-scrollbar-thumb:hover {
+          background: #a0aec0;
+        }
+        
         .bank-question-card {
           display: grid;
           grid-template-columns: auto 1fr auto;

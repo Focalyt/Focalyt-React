@@ -2598,8 +2598,8 @@ const MyFollowups = () => {
                     <span className="fs-5 fw-bold text-dark">Followup Calendar</span>
                   </div>
                   <div className="d-xl-none">
-                    <button 
-                      className="btn-close" 
+                    <button
+                      className="btn-close"
                       aria-label="Close"
                       onClick={() => setCalendarModal(false)}
                     ></button>
@@ -2629,7 +2629,10 @@ const MyFollowups = () => {
                         <button
                           key={preset.value}
                           className={`preset-btn ${rangePreset === preset.value ? 'active' : ''}`}
-                          onClick={() => setPresetRange(preset.value)}
+                          onClick={() => {
+                            setPresetRange(preset.value);
+                            setCalendarModal(false);
+                          }}
                           disabled={preset.value === 'custom'}
                         >
                           <span className="preset-icon">{preset.icon}</span>
@@ -3059,12 +3062,16 @@ const MyFollowups = () => {
           </div>
         </div>
 
-        <div className="card-body">
+        <div className="card-body" style={{ 
+          maxHeight: isMobile ? 'calc(100vh - 180px)' : 'auto',
+          overflowY: isMobile ? 'auto' : 'visible',
+          WebkitOverflowScrolling: 'touch'
+        }}>
           <form>
 
 
             <div className="row mb-1">
-              <div className="col-6">
+              <div className="col-12 col-md-6 mb-2 mb-md-0">
                 <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
                   Next Action Date <span className="text-danger">*</span>
                 </label>
@@ -3088,7 +3095,7 @@ const MyFollowups = () => {
                 </div>
               </div>
 
-              <div className="col-6">
+              <div className="col-12 col-md-6 mb-2 mb-md-0">
                 <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
                   Time <span className="text-danger">*</span>
                 </label>
@@ -3149,13 +3156,23 @@ const MyFollowups = () => {
       return (
         <div
           className={`modal ${showPanel === 'followup' ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          style={{ 
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1055
+          }}
           onClick={(e) => {
             if (e.target === e.currentTarget) closePanel();
           }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ 
+            margin: '0.5rem',
+            maxWidth: 'calc(100% - 1rem)',
+            maxHeight: 'calc(100vh - 1rem)'
+          }}>
+            <div className="modal-content" style={{
+              maxHeight: 'calc(100vh - 1rem)',
+              overflow: 'hidden'
+            }}>
               {panelContent}
             </div>
           </div>
@@ -3456,7 +3473,7 @@ const MyFollowups = () => {
     <div className="container-fluid">
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
-        <div
+          <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
@@ -3481,59 +3498,59 @@ const MyFollowups = () => {
           />
           {/* Header */}
           <div className="position-relative" ref={widthRef} >
-          <nav ref={navRef} className="" style={{
-              zIndex: 11, 
-              backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, 
-              position: 'fixed', 
-              width: `${width}px`, 
+            <nav ref={navRef} className="" style={{
+              zIndex: 11,
+              backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`,
+              position: 'fixed',
+              width: `${width}px`,
               backdropFilter: `blur(${blurIntensity}px)`,
               WebkitBackdropFilter: `blur(${blurIntensity}px)`,
               boxShadow: isScrolled
                 ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', 
+                : '0 4px 25px 0 #0000001a',
               paddingBlock: '10px',
               transition: 'all 0.3s ease',
             }}
             >
-            <div className="container-fluid py-2 " >
-              <div className="row align-items-center">
-                <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">My Followups</h4>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">My Followups</li>
-                      </ol>
-                    </nav>
+              <div className="container-fluid py-2 " >
+                <div className="row align-items-center">
+                  <div className="col-md-6 d-md-block d-sm-none">
+                    <div className="d-flex align-items-center">
+                      <h4 className="fw-bold text-dark mb-0 me-3">My Followups</h4>
+                      <nav aria-label="breadcrumb">
+                        <ol className="breadcrumb mb-0 small">
+                          <li className="breadcrumb-item">
+                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                          </li>
+                          <li className="breadcrumb-item active">My Followups</li>
+                        </ol>
+                      </nav>
+                    </div>
                   </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group" style={{ maxWidth: '300px' }}>
-                      {/* <span className="input-group-text bg-white border-end-0 input-height">
+                  <div className="col-md-6">
+                    <div className="d-flex justify-content-end align-items-center gap-2">
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                        {/* <span className="input-group-text bg-white border-end-0 input-height">
                         <i className="fas fa-search text-muted"></i>
                       </span> */}
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Quick search..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
-                      <button
-                        onClick={() => fetchProfileData()}
-                        className={`btn btn-outline-primary`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-search me-1`}></i>
-                        Search
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control border-start-0 m-0"
+                          placeholder="Quick search..."
+                          value={filterData.name}
+                          onChange={handleFilterChange}
+                        />
+                        <button
+                          onClick={() => fetchProfileData()}
+                          className={`btn btn-outline-primary search-btn`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          <span className="btn-text">Search</span>
 
-                      </button>
-                      {/* {filterData.name && (
+                        </button>
+                        {/* {filterData.name && (
                         <button
                           className="btn btn-outline-secondary border-start-0"
                           type="button"
@@ -3545,37 +3562,51 @@ const MyFollowups = () => {
                           <i className="fas fa-times"></i>
                         </button>
                       )} */}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setIsFilterCollapsed(!isFilterCollapsed);
-                        setCalendarModal(false); // Close calendar when opening filters
-                      }}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
-                        </span>
-                      )}
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setCalendarModal(!showCalendarModal);
-                        setIsFilterCollapsed(true); // Close filters when opening calendar
-                      }}
-                      className={`btn ${showCalendarModal ? 'btn-primary' : 'btn-outline-primary'} d-md-none`}
-                      style={{ whiteSpace: 'nowrap' }}
-                      title="Toggle Calendar"
-                    >
-                      <i className={`fas fa-calendar me-1`}></i>
-                      Calendar
-                    </button>
-                    {/* <div className="btn-group">
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsFilterCollapsed(!isFilterCollapsed);
+                          setCalendarModal(false); 
+                        }}
+                        className={`d-none d-md-block btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'} filter-btn`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        <span className="btn-text">Filters</span>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1 filter-count">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFilterCollapsed(!isFilterCollapsed);
+                          setCalendarModal(false); 
+                        }}
+                        className={`d-block d-md-none btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'} filter-btn`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1 filter-count">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setCalendarModal(!showCalendarModal);
+                          setIsFilterCollapsed(true);
+                        }}
+                        className={`btn ${showCalendarModal ? 'btn-primary' : 'btn-outline-primary'} d-md-none calendar-btn`}
+                        style={{ whiteSpace: 'nowrap' }}
+                        title="Toggle Calendar"
+                      >
+                        <i className={`fas fa-calendar me-1`}></i>
+                      </button>
+                      {/* <div className="btn-group">
                       <button
                         onClick={() => setViewMode('grid')}
                         className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -3589,76 +3620,76 @@ const MyFollowups = () => {
                         <i className="fas fa-list"></i>
                       </button>
                     </div> */}
-                  </div>
-                </div>
-
-
-                <div className="card-body p-3">
-                  <div className="d-flex flex-wrap gap-2 align-items-center followup-status-buttons-container">
-
-
-                    <div key={0} className="d-flex align-items-center gap-1">
-                      <div className='d-flex'>
-                        <button
-                          className={`btn btn-sm ${activeCrmFilter === 0 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('planned', 0)}
-
-                        >
-                          Planned Followups
-                          <span className={`ms-1 ${activeCrmFilter === 0 ? 'text-white' : 'text-dark'}`}>
-                            {plannedCount}
-                          </span>
-                        </button>
-
-
-                      </div>
-
                     </div>
-
-                    <div key={1} className="d-flex align-items-center gap-1">
-                      <div className='d-flex'>
-                        <button
-                          className={`btn btn-sm ${activeCrmFilter === 1 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('done', 1)}
-
-                        >
-                          Done Followups
-                          <span className={`ms-1 ${activeCrmFilter === 1 ? 'text-white' : 'text-dark'}`}>
-                            {doneCount}
-                          </span>
-                        </button>
-
-
-                      </div>
-
-                    </div>
-
-                    <div key={2} className="d-flex align-items-center gap-1">
-                      <div className='d-flex'>
-                        <button
-                          className={`btn btn-sm ${activeCrmFilter === 2 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick('missed', 2)}
-
-                        >
-                          Missed Followups
-                          <span className={`ms-1 ${activeCrmFilter === 2 ? 'text-white' : 'text-dark'}`}>
-                            {missedCount}
-                          </span>
-                        </button>
-
-
-                      </div>
-
-                    </div>
-
                   </div>
 
-                </div>
 
+                  <div className="card-body p-3">
+                    <div className="d-flex flex-wrap gap-2 align-items-center followup-status-buttons-container">
+
+
+                      <div key={0} className="d-flex align-items-center gap-1">
+                        <div className='d-flex'>
+                          <button
+                            className={`btn btn-sm ${activeCrmFilter === 0 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                            onClick={() => handleCrmFilterClick('planned', 0)}
+
+                          >
+                            Planned Followups
+                            <span className={`ms-1 ${activeCrmFilter === 0 ? 'text-white' : 'text-dark'}`}>
+                              {plannedCount}
+                            </span>
+                          </button>
+
+
+                        </div>
+
+                      </div>
+
+                      <div key={1} className="d-flex align-items-center gap-1">
+                        <div className='d-flex'>
+                          <button
+                            className={`btn btn-sm ${activeCrmFilter === 1 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                            onClick={() => handleCrmFilterClick('done', 1)}
+
+                          >
+                            Done Followups
+                            <span className={`ms-1 ${activeCrmFilter === 1 ? 'text-white' : 'text-dark'}`}>
+                              {doneCount}
+                            </span>
+                          </button>
+
+
+                        </div>
+
+                      </div>
+
+                      <div key={2} className="d-flex align-items-center gap-1">
+                        <div className='d-flex'>
+                          <button
+                            className={`btn btn-sm ${activeCrmFilter === 2 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                            onClick={() => handleCrmFilterClick('missed', 2)}
+
+                          >
+                            Missed Followups
+                            <span className={`ms-1 ${activeCrmFilter === 2 ? 'text-white' : 'text-dark'}`}>
+                              {missedCount}
+                            </span>
+                          </button>
+
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
               </div>
-            </div>
             </nav>
-          {/* </div> */}
+            {/* </div> */}
           </div>
           {!isFilterCollapsed && (
             <div
@@ -3890,15 +3921,15 @@ const MyFollowups = () => {
                         <div className="row" id="crm-main-row">
 
                           {allProfiles.map((profile, profileIndex) => (
-                            <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                            <div className={`card-content transition-col mb-2 checkboxRow`} key={profileIndex} >
 
                               {/* Profile Header Card */}
                               <div className="card border-0 shadow-sm mb-0 mt-2">
                                 <div className="card-body px-1 py-0 my-2">
                                   <div className="row align-items-center justify-content-between">
-                                    <div className="col-md-6">
+                                    <div className="col-md-6 checkboxRow">
                                       <div className="d-flex align-items-center">
-                                        <div className="form-check me-3">
+                                        <div className="form-check me-md-3 me-sm-0 me-0">
                                           <input className="form-check-input" type="checkbox" />
                                         </div>
                                         <div className="me-3">
@@ -3919,7 +3950,7 @@ const MyFollowups = () => {
                                           <small className="text-muted">
                                             <i className="fas fa-envelope" style={{ fontSize: '12px', marginRight: '5px' }}></i>{profile?.email || 'Email'}</small>
                                         </div>
-                                        <div style={{ marginLeft: '15px' }}>
+                                        <div className='panelButtons'>
                                           <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
                                             <i className="fas fa-phone"></i>
                                           </button>
@@ -3931,6 +3962,161 @@ const MyFollowups = () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
+                                        </div>
+                                        <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                          <div className="btn-group">
+
+                                            <div style={{ position: "relative", display: "inline-block" }}>
+                                              <button
+                                                className="btn btn-sm btn-outline-secondary border-0"
+                                                onClick={() => togglePopup(profileIndex)}
+                                                aria-label="Options"
+                                              >
+                                                <i className="fas fa-ellipsis-v"></i>
+                                              </button>
+
+                                              {/* Overlay for click outside */}
+                                              {showPopup === profileIndex && (
+                                                <div
+                                                  onClick={(e) => {
+                                                    if (e.target === e.currentTarget) {
+                                                      setShowPopup(null);
+                                                    }
+                                                  }}
+                                                  style={{
+                                                    position: "fixed",
+                                                    top: 0,
+                                                    left: 0,
+                                                    width: "100vw",
+                                                    height: "100vh",
+                                                    backgroundColor: "transparent",
+                                                    zIndex: 8,
+                                                    pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                  }}
+                                                ></div>
+                                              )}
+
+                                              <div
+                                                style={{
+                                                  position: "absolute",
+                                                  top: "28px", // button ke thoda niche
+                                                  right: "-100px",
+                                                  width: "170px",
+                                                  backgroundColor: "white",
+                                                  border: "1px solid #ddd",
+                                                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                  borderRadius: "4px",
+                                                  padding: "8px 0",
+                                                  zIndex: 10,
+                                                  transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                  transition: "transform 0.3s ease-in-out",
+                                                  pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                  display: showPopup === profileIndex ? "block" : "none"
+                                                }}
+                                              >
+
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+                                                  onClick={() => alert("Reffer")}
+                                                >
+                                                  Reffer
+                                                </button>
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+
+                                                  onClick={() => {
+                                                    openPanel(profile, 'history');
+                                                    console.log('selectedProfile', profile);
+                                                  }}
+                                                >
+                                                  History List
+                                                </button>
+
+                                                {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    setShowPopup(null);
+                                                    setTimeout(() => {
+                                                      openPanel(profile, 'followup');
+                                                    }, 100);
+                                                  }}
+                                                >
+                                                  Update Followup
+                                                </button>
+                                                {/* // )} */}
+
+                                                {/* {activeFollowupStatus === 'planned' && (
+                                          <button
+                                            className="dropdown-item"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              handleMarkCompleteFollowup(profile);
+                                            }}
+                                            
+                                          >
+                                            Mark Complete Followup
+                                          </button>
+                                          )} */}
+
+
+                                              </div>
+                                            </div>
+
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={() => {
+                                                toggleLeadDetails(profileIndex, profile)
+                                              }}
+                                            >
+                                              {leadDetailsVisible === profileIndex ? (
+                                                <i className="fas fa-chevron-up"></i>
+                                              ) : (
+                                                <i className="fas fa-chevron-down"></i>
+                                              )}
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -3979,151 +4165,7 @@ const MyFollowups = () => {
                                     </div>
                                   </div> */}
 
-                                    <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                      <div className="btn-group">
 
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => togglePopup(profileIndex)}
-                                            aria-label="Options"
-                                          >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                          </button>
-
-                                          {/* Overlay for click outside */}
-                                          {showPopup === profileIndex && (
-                                            <div
-                                              onClick={() => setShowPopup(null)}
-                                              style={{
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                width: "100vw",
-                                                height: "100vh",
-                                                backgroundColor: "transparent",
-                                                zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px", // button ke thoda niche
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 9,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => alert("Reffer")}
-                                            >
-                                              Reffer
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-
-                                              onClick={() => {
-                                                openPanel(profile, 'history');
-                                                console.log('selectedProfile', profile);
-                                              }}
-                                            >
-                                              History List
-                                            </button>
-
-                                            {/* {activeCrmFilter === 'done' && activeCrmFilter === 'missed' && ( */}
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openPanel(profile, 'followup');
-                                              }}
-                                            >
-                                              Update Followup
-                                            </button>
-                                            {/* // )} */}
-
-                                            {/* {activeFollowupStatus === 'planned' && (
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleMarkCompleteFollowup(profile);
-                                            }}
-                                            
-                                          >
-                                            Mark Complete Followup
-                                          </button>
-                                          )} */}
-
-
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => {
-                                            toggleLeadDetails(profileIndex, profile)
-                                          }}
-                                        >
-                                          {leadDetailsVisible === profileIndex ? (
-                                            <i className="fas fa-chevron-up"></i>
-                                          ) : (
-                                            <i className="fas fa-chevron-down"></i>
-                                          )}
-                                        </button>
-                                      </div>
-                                    </div>
 
                                     <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                       <div className="btn-group">
@@ -4218,8 +4260,13 @@ const MyFollowups = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => {
-                                                openPanel(profile, 'followup');
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                setShowPopup(null);
+                                                setTimeout(() => {
+                                                  openPanel(profile, 'followup');
+                                                }, 100);
                                               }}
                                             >
                                               Update Followup
@@ -6232,6 +6279,9 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+        .checkboxRow{
+          padding-left: 0px;
+        }
         .content-body{
           margin-top:25px
         }
@@ -6313,6 +6363,57 @@ background: #fd2b5a;
 
 .modal-dialog {
     margin: 1rem;
+}
+
+/* Fix for mobile modal - Update Followup */
+@media (max-width: 992px) {
+    .modal.show {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+    }
+    
+    .modal-dialog-centered {
+        margin: 0.5rem auto;
+        max-width: calc(100vw - 1rem) !important;
+        width: calc(100vw - 1rem) !important;
+    }
+    
+    .modal-dialog-scrollable .modal-content {
+        max-height: calc(100vh - 1rem) !important;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-dialog-scrollable .modal-body,
+    .modal-dialog-scrollable .card-body {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        max-height: calc(100vh - 200px) !important;
+    }
+    
+    /* Ensure labels are visible on mobile */
+    .modal .form-label {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        font-size: 0.875rem !important;
+        margin-bottom: 0.5rem !important;
+        font-weight: 500 !important;
+        color: #212529 !important;
+    }
+    
+    /* Ensure proper spacing for form fields on mobile */
+    .modal .card-body .row {
+        margin-bottom: 1rem;
+    }
+    
+    .modal .card-body .col-12 {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
 }
 
 /* WhatsApp Panel Mobile Styles */
@@ -6546,30 +6647,36 @@ background: #fd2b5a;
         margin-bottom: 1rem;
     }
 
+    .card-header {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .card-header::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .card-header::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+
     .nav-pills {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow-x: visible;
     }
 
     .nav-pills .nav-link {
         font-size: 0.9rem;
         padding: 0.5rem 0.75rem;
+        white-space: nowrap;
     }
 }
 
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
-
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
 
 
     .input-group {
@@ -7071,7 +7178,9 @@ background: #fd2b5a;
 /* .document-history {
     overflow-y: auto;
 } */
-
+.panelButtons{
+margin-left:15px;
+}
 .history-item {
     display: flex;
     justify-content: space-between;
@@ -7101,6 +7210,10 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+
+.panelButtons{
+margin-left:0px
+}
 .modal-content{
 width:100%
 }
@@ -8210,6 +8323,24 @@ margin-top: 20px;
     inset: 0 !important;
     width: 300px !important;
 }
+
+/* Mobile DatePicker Fix */
+@media (max-width: 992px) {
+    .react-date-picker__calendar.react-date-picker__calendar--open {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        z-index: 1060 !important;
+        width: calc(100vw - 2rem) !important;
+        max-width: 350px !important;
+    }
+    
+    .react-calendar {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
   @media (min-width: 992px) {
     .site-header--sticky--my--followup:not(.mobile-sticky-enable) {
       position: fixed !important;
@@ -8450,6 +8581,9 @@ margin-top: 20px;
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+html body .content .content-wrapper{
+padding: 1.8rem 1.0rem 0!important;
+}
   .multi-select-options-new {
     max-height: 250px;
   }

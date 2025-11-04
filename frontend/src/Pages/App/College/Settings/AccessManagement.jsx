@@ -421,6 +421,26 @@ const fetchBatches = async () => {
 
   return (
     <div className="min-vh-100 bg-light">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .tabs-scroll-wrapper {
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+            }
+            .tabs-scroll-wrapper .nav-tabs {
+              flex-wrap: nowrap !important;
+              display: flex;
+            }
+            .tabs-scroll-wrapper .nav-item {
+              flex-shrink: 0;
+            }
+            .tabs-scroll-wrapper .nav-link span {
+              white-space: nowrap;
+            }
+          }
+        `}
+      </style>
       {/* Header */}
       <div className="bg-white shadow-sm border-bottom">
         <div className="container-fluid">
@@ -439,8 +459,8 @@ const fetchBatches = async () => {
         
 
         {/* Tabs */}
-        <div className="border-bottom mb-4">
-          <ul className="nav nav-tabs">
+        <div className="border-bottom mb-4 tabs-scroll-wrapper">
+        <ul className="nav nav-tabs navFiltersTabs">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
