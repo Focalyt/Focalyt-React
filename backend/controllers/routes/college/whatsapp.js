@@ -5,7 +5,7 @@ const AWS = require("aws-sdk");
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const FormData = require('form-data');
-const { College, WhatsAppMessage, WhatsAppTemplate } = require('../../models');
+const { College, WhatsAppMessage, WhatsAppTemplate, Candidate } = require('../../models');
 const { isCollege } = require('../../../helpers');
 const {
 	accessKeyId,
@@ -2884,13 +2884,30 @@ router.get('/verify-template/:templateName', async (req, res) => {
 // Send regular WhatsApp message (not template)
 router.post('/send-message', isCollege, async (req, res) => {
 	try {
-		const { to, message, collegeId } = req.body;
+		const { to, message, candidateId, candidateName } = req.body;
+		
+		// Get college ID from authenticated user
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+
+		console.log('📤 Sending free text message:', { 
+			to, 
+			message: message.substring(0, 50), 
+			candidateId,
+			collegeId 
+		});
 
 		// Validation
 		if (!to || !message) {
 			return res.status(400).json({
 				success: false,
 				message: 'to and message are required'
+			});
+		}
+		
+		if (!collegeId) {
+			return res.status(400).json({
+				success: false,
+				message: 'College ID not found in session'
 			});
 		}
 
@@ -2917,6 +2934,8 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		};
 
+		console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
+
 		const response = await axios.post(url, messageData, {
 			headers: {
 				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
@@ -2924,13 +2943,43 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		});
 
+		console.log('✅ WhatsApp API response:', response.data);
+
 		// Save message to database
-		await saveMessageToDatabase({
+		const messageDoc = {
+			collegeId: collegeId,
 			to: formattedPhone,
 			message: message,
-			collegeId: collegeId,
-			messageType: 'text'
+			messageType: 'text',
+			status: 'sent',
+			direction: 'outgoing',
+			whatsappMessageId: response.data.messages[0].id,
+			sentAt: new Date(),
+			candidateId: candidateId || null,
+			candidateName: candidateName || null
+		};
+
+		console.log('💾 Saving message to database:', { 
+			collegeId, 
+			to: formattedPhone, 
+			messageType: 'text',
+			whatsappMessageId: response.data.messages[0].id 
 		});
+
+		const savedMessage = await WhatsAppMessage.create(messageDoc);
+		console.log('✅ Message saved to database with ID:', savedMessage._id);
+
+		// Send WebSocket notification
+		if (global.io) {
+			global.io.emit('whatsapp_message_sent', {
+				messageId: response.data.messages[0].id,
+				to: formattedPhone,
+				message: message,
+				candidateId: candidateId,
+				timestamp: new Date()
+			});
+			console.log('📡 WebSocket notification sent');
+		}
 
 		res.json({
 			success: true,
@@ -2943,7 +2992,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 		});
 
 	} catch (error) {
-		console.error('Send Message Error:', error);
+		console.error('❌ Send Message Error:', error.response?.data || error.message);
 		res.status(500).json({
 			success: false,
 			message: error.response?.data?.error?.message || 'Failed to send message',
@@ -2968,11 +3017,19 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 		// Format phone number
 		const formattedPhone = formatPhoneNumber(phone);
 		
-		// Fetch messages from database
+		// Fetch BOTH sent and received messages
+		// Sent messages: collegeId + to = phone
+		// Received messages: from = phone
 		const messages = await WhatsAppMessage.find({
-			collegeId: collegeId,
-			to: formattedPhone
+			$or: [
+				{ collegeId: collegeId, to: formattedPhone }, // Sent by college
+				{ from: formattedPhone } // Received from user
+			]
 		}).sort({ sentAt: 1 });
+		
+		console.log(`📥 Fetched ${messages.length} messages for ${formattedPhone}`);
+		console.log(`   - Sent: ${messages.filter(m => m.direction !== 'incoming').length}`);
+		console.log(`   - Received: ${messages.filter(m => m.direction === 'incoming').length}`);
 		
 		res.json({
 			success: true,
@@ -2986,6 +3043,179 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 			success: false,
 			message: 'Failed to fetch chat history',
 			error: process.env.NODE_ENV === 'development' ? error.message : undefined
+		});
+	}
+});
+
+/**
+ * Debug endpoint - Check if candidate exists with mobile number
+ * GET /api/college/whatsapp/debug-candidate/:mobile
+ */
+router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
+	try {
+		const mobileString = req.params.mobile;
+		const mobileStr = mobileString.replace(/\D/g, '');
+		const mobile = parseInt(mobileStr);
+		
+		// Try with and without country code
+		const mobileWithoutCode = mobileStr.startsWith('91') ? mobileStr.substring(2) : mobileStr;
+		const mobileWithoutCodeNumber = parseInt(mobileWithoutCode);
+		
+		console.log('🔍 Debug: Searching candidate');
+		console.log('   - Input:', mobileString);
+		console.log('   - Cleaned:', mobileStr);
+		console.log('   - With country code:', mobile);
+		console.log('   - Without country code:', mobileWithoutCodeNumber);
+		
+		// Try finding with multiple formats
+		const candidate = await Candidate.findOne({
+			$or: [
+				{ mobile: mobile },                    // 918699081947
+				{ mobile: mobileWithoutCodeNumber },   // 8699081947
+				{ mobile: mobileStr },                 // "918699081947"
+				{ mobile: mobileWithoutCode },         // "8699081947"
+				{ mobile: mobileString },              // Original input
+				{ mobile: `+${mobileStr}` },          // "+918699081947"
+				{ mobile: `+91${mobileWithoutCode}` }  // "+918699081947"
+			]
+		});
+		
+		if (candidate) {
+			const now = new Date();
+			const expiresAt = candidate.whatsappSessionWindowExpiresAt;
+			const isOpen = expiresAt && new Date(expiresAt) > now;
+			
+			res.json({
+				success: true,
+				found: true,
+				searchedFormats: {
+					withCode: mobile,
+					withoutCode: mobileWithoutCodeNumber,
+					stringWithCode: mobileStr,
+					stringWithoutCode: mobileWithoutCode
+				},
+				candidate: {
+					_id: candidate._id,
+					name: candidate.name,
+					mobile: candidate.mobile,
+					mobileType: typeof candidate.mobile,
+					whatsappLastIncomingMessageAt: candidate.whatsappLastIncomingMessageAt,
+					whatsappSessionWindowExpiresAt: candidate.whatsappSessionWindowExpiresAt,
+					sessionWindowOpen: isOpen,
+					remainingTimeMs: isOpen ? new Date(expiresAt) - now : 0
+				}
+			});
+		} else {
+			res.json({
+				success: true,
+				found: false,
+				searchedFormats: {
+					withCode: mobile,
+					withoutCode: mobileWithoutCodeNumber,
+					stringWithCode: mobileStr,
+					stringWithoutCode: mobileWithoutCode
+				},
+				message: 'No candidate found with any mobile format'
+			});
+		}
+	} catch (error) {
+		res.status(500).json({ success: false, error: error.message });
+	}
+});
+
+/**
+ * Check WhatsApp 24-hour session window status
+ * GET /api/college/whatsapp/session-window/:mobile
+ * Checks directly from WhatsAppMessage collection instead of Candidate
+ */
+router.get('/session-window/:mobile', [isCollege], async (req, res) => {
+	try {
+		const mobileStr = req.params.mobile.replace(/\D/g, '');
+		
+		// Prepare mobile number formats for matching
+		const mobileWithoutCode = mobileStr.startsWith('91') ? mobileStr.substring(2) : mobileStr;
+		const mobileWithPlus91 = `+91${mobileWithoutCode}`;
+		const mobileWith91 = `91${mobileWithoutCode}`;
+		const mobilePlus = `+${mobileStr}`;
+		
+		console.log('🔍 Checking session window from WhatsAppMessage collection');
+		console.log('   - Mobile formats to search:', {
+			withPlus91: mobileWithPlus91,
+			with91: mobileWith91,
+			withPlus: mobilePlus,
+			original: mobileStr,
+			withoutCode: mobileWithoutCode
+		});
+		
+		// Find last incoming message from this mobile number (try multiple formats)
+		const lastIncomingMessage = await WhatsAppMessage.findOne({
+			direction: 'incoming',
+			$or: [
+				{ from: mobileWithPlus91 },      // "+918699081947"
+				{ from: mobileWith91 },          // "918699081947"
+				{ from: mobilePlus },             // "+918699081947"
+				{ from: mobileStr },              // "918699081947"
+				{ from: mobileWithoutCode },     // "8699081947"
+				{ from: `+${mobileStr}` }         // "+918699081947"
+			]
+		})
+		.sort({ sentAt: -1 })  // Latest message first
+		.lean();
+		
+		const now = new Date();
+		let isSessionWindowOpen = false;
+		let lastIncomingMessageAt = null;
+		let expiresAt = null;
+		let remainingTimeMs = 0;
+		
+		if (lastIncomingMessage && lastIncomingMessage.sentAt) {
+			lastIncomingMessageAt = new Date(lastIncomingMessage.sentAt);
+			expiresAt = new Date(lastIncomingMessageAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours from message
+			isSessionWindowOpen = expiresAt > now;
+			
+			if (isSessionWindowOpen) {
+				remainingTimeMs = expiresAt - now;
+			}
+			
+			console.log('📊 Session Window Check (from WhatsAppMessage):');
+			console.log('   - Last incoming message at:', lastIncomingMessageAt.toISOString());
+			console.log('   - Window expires at:', expiresAt.toISOString());
+			console.log('   - Current time:', now.toISOString());
+			console.log('   - Is window open?', isSessionWindowOpen);
+			console.log('   - Remaining time (hours):', (remainingTimeMs / (1000 * 60 * 60)).toFixed(2));
+		} else {
+			console.log('📊 Session Window Check:');
+			console.log('   - ⚠️ No incoming messages found - window closed');
+			console.log('   - User must send a message first to open 24-hour window');
+		}
+		
+		const response = {
+			success: true,
+			sessionWindow: {
+				isOpen: isSessionWindowOpen,
+				lastIncomingMessageAt: lastIncomingMessageAt,
+				expiresAt: expiresAt,
+				remainingTimeMs: remainingTimeMs
+			},
+			messaging: {
+				canSendManualMessages: isSessionWindowOpen,
+				requiresTemplate: !isSessionWindowOpen
+			}
+		};
+		
+		console.log('✅ Returning response:', {
+			isOpen: response.sessionWindow.isOpen,
+			canSendManualMessages: response.messaging.canSendManualMessages,
+			requiresTemplate: response.messaging.requiresTemplate
+		});
+		
+		res.json(response);
+	} catch (error) {
+		console.error('Error checking session window:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Failed to check session window',
+			error: error.message
 		});
 	}
 });
@@ -3143,7 +3373,93 @@ async function handleStatusUpdates(statuses) {
 }
 
 /**
- * Handle incoming messages (for future implementation)
+ * Download media from WhatsApp and upload to S3
+ */
+async function downloadAndUploadMedia(mediaId, mediaType) {
+	try {
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
+		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+		
+		// Step 1: Get media URL from WhatsApp
+		console.log(`📥 Fetching media URL for ID: ${mediaId}`);
+		const mediaResponse = await axios.get(`${WHATSAPP_API_URL}/${mediaId}`, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`
+			}
+		});
+
+		const mediaUrl = mediaResponse.data.url;
+		const mimeType = mediaResponse.data.mime_type;
+		
+		console.log(`📥 Media URL received: ${mediaUrl}`);
+		console.log(`📥 MIME type: ${mimeType}`);
+
+		// Step 2: Download media from WhatsApp
+		const downloadResponse = await axios.get(mediaUrl, {
+			headers: {
+				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`
+			},
+			responseType: 'arraybuffer'
+		});
+
+		const mediaBuffer = Buffer.from(downloadResponse.data);
+		
+		// Step 3: Determine file extension
+		const extensionMap = {
+			'image/jpeg': 'jpg',
+			'image/jpg': 'jpg',
+			'image/png': 'png',
+			'image/gif': 'gif',
+			'image/webp': 'webp',
+			'video/mp4': 'mp4',
+			'video/3gpp': '3gp',
+			'audio/aac': 'aac',
+			'audio/mp4': 'm4a',
+			'audio/mpeg': 'mp3',
+			'audio/amr': 'amr',
+			'audio/ogg': 'ogg',
+			'application/pdf': 'pdf',
+			'application/vnd.ms-powerpoint': 'ppt',
+			'application/msword': 'doc',
+			'application/vnd.ms-excel': 'xls',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+			'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx'
+		};
+
+		const fileExtension = extensionMap[mimeType] || 'bin';
+		const fileName = `whatsapp_incoming_${Date.now()}_${uuid()}.${fileExtension}`;
+		
+		// Step 4: Upload to S3
+		console.log(`📤 Uploading to S3: ${fileName}`);
+		const s3Params = {
+			Bucket: bucketName,
+			Key: `whatsapp/incoming/${fileName}`,
+			Body: mediaBuffer,
+			ContentType: mimeType,
+			ACL: 'public-read'
+		};
+
+		await s3.upload(s3Params).promise();
+		const s3Url = `https://${bucketName}.s3.${region}.amazonaws.com/whatsapp/incoming/${fileName}`;
+		
+		console.log(`✅ Media uploaded to S3: ${s3Url}`);
+		
+		return {
+			s3Url,
+			fileName,
+			mimeType,
+			mediaType
+		};
+		
+	} catch (error) {
+		console.error('❌ Error downloading/uploading media:', error.response?.data || error.message);
+		throw error;
+	}
+}
+
+/**
+ * Handle incoming messages from users
  */
 async function handleIncomingMessages(messages, metadata) {
 	try {
@@ -3155,12 +3471,262 @@ async function handleIncomingMessages(messages, metadata) {
 				messageId: message.id
 			});
 
-			// Future: Save incoming messages to database
-			// Future: Send WebSocket notification to agent dashboard
-			// Future: Auto-reply logic
+			// Normalize phone number by adding + prefix if not present
+			let from = message.from;
+			if (!from.startsWith('+')) {
+				from = '+' + from;
+				console.log(`📞 Normalized phone number: ${message.from} → ${from}`);
+			}
+			
+			const messageId = message.id;
+			const timestamp = message.timestamp;
+			const messageType = message.type;
+
+			let messageText = '';
+			let mediaUrl = null;
+			let mediaData = null;
+
+			// Extract message content based on type
+			switch (messageType) {
+				case 'text':
+					messageText = message.text?.body || '';
+					break;
+					
+				case 'image':
+					messageText = message.image?.caption || '[Image]';
+					// Download and upload image to S3
+					if (message.image?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.image.id, 'image');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process image:', error.message);
+						}
+					}
+					break;
+					
+				case 'video':
+					messageText = message.video?.caption || '[Video]';
+					if (message.video?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.video.id, 'video');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process video:', error.message);
+						}
+					}
+					break;
+					
+				case 'audio':
+					messageText = '[Audio]';
+					if (message.audio?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.audio.id, 'audio');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process audio:', error.message);
+						}
+					}
+					break;
+					
+				case 'document':
+					messageText = message.document?.filename || '[Document]';
+					if (message.document?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.document.id, 'document');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process document:', error.message);
+						}
+					}
+					break;
+					
+				case 'sticker':
+					messageText = '[Sticker]';
+					if (message.sticker?.id) {
+						try {
+							mediaData = await downloadAndUploadMedia(message.sticker.id, 'sticker');
+							mediaUrl = mediaData.s3Url;
+						} catch (error) {
+							console.error('Failed to process sticker:', error.message);
+						}
+					}
+					break;
+					
+				case 'location':
+					const lat = message.location?.latitude;
+					const lng = message.location?.longitude;
+					messageText = `[Location: ${lat}, ${lng}]`;
+					break;
+					
+				case 'contacts':
+					messageText = '[Contact Card]';
+					break;
+					
+				default:
+					messageText = `[Unsupported message type: ${messageType}]`;
+			}
+
+			// Save incoming message to database
+			try {
+				// Look up collegeId from the last message with this phone number
+				let collegeId = null;
+				try {
+					const lastMessage = await WhatsAppMessage.findOne({
+						$or: [
+							{ from: from },
+							{ to: from }
+						]
+					}).sort({ sentAt: -1 }).limit(1);
+					
+					if (lastMessage && lastMessage.collegeId) {
+						collegeId = lastMessage.collegeId;
+						console.log('✅ Found collegeId from previous conversation:', collegeId);
+					} else {
+						console.warn('⚠️ No previous message found for phone number:', from);
+						// Skip saving this message if we can't find the college
+						console.log('⚠️ Skipping message save - collegeId is required');
+						return;
+					}
+				} catch (lookupError) {
+					console.error('❌ Failed to lookup collegeId:', lookupError.message);
+					return;
+				}
+
+				const incomingMessageDoc = {
+					from: from,
+					to: metadata?.phone_number_id || 'unknown',
+					message: messageText,
+					messageType: messageType,
+					whatsappMessageId: messageId,
+					status: 'received',
+					sentAt: new Date(parseInt(timestamp) * 1000),
+					receivedAt: new Date(),
+					direction: 'incoming', // Important: Mark as incoming
+					mediaUrl: mediaUrl,
+					mediaData: mediaData,
+					collegeId: collegeId
+				};
+
+				const savedMessage = await WhatsAppMessage.create(incomingMessageDoc);
+				console.log('✅ Incoming message saved to database:', savedMessage._id);
+
+				// Update Candidate's WhatsApp 24-hour session window
+				try {
+					const phoneWithoutPlus = from.replace('+', '');
+					const phoneNumberWithCode = parseInt(phoneWithoutPlus); // e.g., 918699081947
+					const phoneWithoutCountryCode = phoneWithoutPlus.startsWith('91') 
+						? phoneWithoutPlus.substring(2) 
+						: phoneWithoutPlus; // e.g., 8699081947
+					const phoneNumberWithoutCode = parseInt(phoneWithoutCountryCode);
+					
+					const now = new Date();
+					const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+					
+					console.log('🔍 Looking for candidate with mobile formats:');
+					console.log('   - With country code (91):', phoneNumberWithCode);
+					console.log('   - Without country code:', phoneNumberWithoutCode);
+					console.log('   - String formats:', phoneWithoutPlus, phoneWithoutCountryCode);
+					
+					// Try multiple mobile number formats to match candidate
+					const updateResult = await Candidate.updateOne(
+						{
+							$or: [
+								{ mobile: phoneNumberWithCode },        // 918699081947
+								{ mobile: phoneNumberWithoutCode },     // 8699081947
+								{ mobile: phoneWithoutPlus },           // "918699081947"
+								{ mobile: phoneWithoutCountryCode },    // "8699081947"
+								{ mobile: `+${phoneWithoutPlus}` },     // "+918699081947"
+								{ mobile: from }                         // Original "+918699081947"
+							]
+						},
+						{
+							$set: {
+								whatsappLastIncomingMessageAt: now,
+								whatsappSessionWindowExpiresAt: expiresAt
+							}
+						}
+					);
+					
+					if (updateResult.matchedCount > 0) {
+						console.log('✅ Updated 24-hour session window for candidate');
+						console.log('   - Window opens at:', now.toISOString());
+						console.log('   - Window expires at:', expiresAt.toISOString());
+						console.log('   - Documents matched:', updateResult.matchedCount);
+						console.log('   - Documents modified:', updateResult.modifiedCount);
+					} else {
+						console.warn('⚠️ Candidate not found with any mobile format');
+						console.warn('   - Tried formats:', {
+							withCode: phoneNumberWithCode,
+							withoutCode: phoneNumberWithoutCode,
+							stringWithCode: phoneWithoutPlus,
+							stringWithoutCode: phoneWithoutCountryCode,
+							original: from
+						});
+						
+						// Debug: Try to find any candidate to understand the format
+						console.warn('   - Searching for any candidate with similar number...');
+						const candidate = await Candidate.findOne({
+							$or: [
+								{ mobile: phoneNumberWithCode },
+								{ mobile: phoneNumberWithoutCode },
+								{ mobile: { $regex: phoneWithoutCountryCode, $options: 'i' } }
+							]
+						});
+						if (candidate) {
+							console.log('   - Found candidate:', {
+								id: candidate._id,
+								name: candidate.name,
+								mobile: candidate.mobile,
+								mobileType: typeof candidate.mobile
+							});
+						} else {
+							console.log('   - No candidate exists with this mobile number in any format');
+						}
+					}
+				} catch (candidateUpdateError) {
+					console.error('⚠️ Failed to update candidate session window:', candidateUpdateError.message);
+				}
+
+				// Send WebSocket notification to frontend
+				if (global.io) {
+					try {
+						const now = new Date();
+						const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+						
+						global.io.emit('whatsapp_incoming_message', {
+							messageId: savedMessage._id,
+							whatsappMessageId: messageId,
+							collegeId: collegeId,
+							from: from,
+							message: messageText,
+							messageType: messageType,
+							mediaUrl: mediaUrl,
+							timestamp: timestamp,
+							sentAt: new Date(parseInt(timestamp) * 1000).toISOString(),
+							direction: 'incoming',
+							sessionWindow: {
+								isOpen: true,
+								openedAt: now.toISOString(),
+								expiresAt: expiresAt.toISOString()
+							}
+						});
+						console.log('🔔 Socket.io event emitted: whatsapp_incoming_message');
+						console.log('   - College ID:', collegeId);
+						console.log('   - From:', from);
+						console.log('   - Type:', messageType);
+						console.log('   - Message:', messageText.substring(0, 50));
+					} catch (ioError) {
+						console.error('❌ Socket.io notification failed:', ioError.message);
+					}
+				}
+			} catch (dbError) {
+				console.error('❌ Failed to save incoming message:', dbError.message);
+			}
 		}
 	} catch (error) {
 		console.error('Error handling incoming messages:', error);
+		throw error;
 	}
 }
 

@@ -916,6 +916,91 @@ const CRMDashboard = () => {
   const whatsappMessagesEndRef = useRef(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState({
+    isOpen: false,
+    openedAt: null,
+    expiresAt: null,
+    remainingTimeMs: 0
+  });
+  const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
+
+  // Handle incoming messages from users
+  const handleIncomingMessage = useCallback((data) => {
+    console.log('📬 Processing incoming message:', data);
+
+    // Check if this message is for the currently opened chat
+    if (!selectedProfile?._candidate?.mobile) {
+      console.log('⚠️ No chat currently open');
+      return;
+    }
+
+    const currentChatPhone = String(selectedProfile._candidate.mobile).replace(/\D/g, '');
+    const incomingFrom = String(data.from).replace(/\D/g, '');
+
+    if (!incomingFrom.includes(currentChatPhone) && !currentChatPhone.includes(incomingFrom)) {
+      console.log('⚠️ Message not for current chat:', { currentChatPhone, incomingFrom });
+      return;
+    }
+
+    // Add incoming message to chat
+    setWhatsappMessages((prevMessages) => {
+      // Check if message already exists
+      const exists = prevMessages.some(msg => 
+        msg.whatsappMessageId === data.whatsappMessageId || 
+        msg.dbId === data.messageId
+      );
+
+      if (exists) {
+        console.log('⚠️ Message already exists in chat');
+        return prevMessages;
+      }
+
+      const newMessage = {
+        id: data.messageId,
+        dbId: data.messageId,
+        whatsappMessageId: data.whatsappMessageId,
+        text: data.message,
+        sender: 'user', // Incoming message from user
+        time: new Date(data.sentAt).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        type: data.messageType,
+        mediaUrl: data.mediaUrl,
+        status: 'received',
+        timestamp: data.sentAt
+      };
+
+      console.log('✅ Adding incoming message to chat:', {
+        from: data.from,
+        type: data.messageType,
+        text: data.message.substring(0, 50)
+      });
+
+      return [...prevMessages, newMessage];
+    });
+
+    // Update session window state if provided
+    if (data.sessionWindow) {
+      setSessionWindow({
+        isOpen: data.sessionWindow.isOpen,
+        openedAt: data.sessionWindow.openedAt,
+        expiresAt: data.sessionWindow.expiresAt,
+        remainingTimeMs: new Date(data.sessionWindow.expiresAt) - new Date()
+      });
+      console.log('✅ 24-hour session window opened:', {
+        expiresAt: data.sessionWindow.expiresAt
+      });
+    }
+
+    // Optional: Show browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New WhatsApp Message', {
+        body: data.message.substring(0, 100),
+        icon: '/whatsapp-icon.png'
+      });
+    }
+  }, [selectedProfile]);
 
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
@@ -924,9 +1009,12 @@ const CRMDashboard = () => {
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
       const updatedMessages = prevMessages.map((msg) => {
+        // WhatsApp API sends 'id' field which is the wamid (WhatsApp message ID)
         // Try to match by database ID or wamid first (most reliable)
         const matchById = (data.messageId && msg.dbId === data.messageId) || 
-                         (data.wamid && msg.wamid === data.wamid);
+                         (data.wamid && msg.wamid === data.wamid) ||
+                         (data.id && msg.wamid === data.id) || // ← NEW: Match WhatsApp 'id' field
+                         (data.id && msg.whatsappMessageId === data.id); // ← NEW: Also check whatsappMessageId field
         
         // Fallback: Match by text/template (less reliable, but for backwards compatibility)
         const matchByText = msg.type === 'template'
@@ -938,6 +1026,8 @@ const CRMDashboard = () => {
         if (isMatchingMessage && msg.sender === 'agent') {
           console.log('✅ Updating message status:', {
             messageId: msg.id,
+            wamid: msg.wamid,
+            matchedWith: data.id,
             oldStatus: msg.status,
             newStatus: data.status
           });
@@ -945,9 +1035,9 @@ const CRMDashboard = () => {
           return {
             ...msg,
             status: data.status,
-            errorMessage: data.status === 'failed' ? data.errorMessage : msg.errorMessage,
-            deliveredAt: data.status === 'delivered' ? data.timestamp : msg.deliveredAt,
-            readAt: data.status === 'read' ? data.timestamp : msg.readAt
+            errorMessage: data.status === 'failed' ? (data.errors?.[0]?.title || data.errorMessage) : msg.errorMessage,
+            deliveredAt: data.status === 'delivered' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.deliveredAt,
+            readAt: data.status === 'read' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.readAt
           };
         }
         return msg;
@@ -956,12 +1046,20 @@ const CRMDashboard = () => {
       // Log if no message was updated
       const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
       if (!wasUpdated) {
-        console.warn('⚠️ No message found to update. Data received:', data);
-        console.log('Current messages:', prevMessages.map(m => ({ 
+        console.warn('⚠️ No message found to update');
+        console.log('📨 Received data:', {
+          id: data.id,
+          wamid: data.wamid,
+          messageId: data.messageId,
+          status: data.status,
+          recipient_id: data.recipient_id
+        });
+        console.log('💬 Current messages:', prevMessages.map(m => ({ 
           id: m.id, 
           dbId: m.dbId, 
-          wamid: m.wamid, 
-          text: m.text?.substring(0, 50),
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
           status: m.status 
         })));
       }
@@ -981,8 +1079,26 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     console.log('📩 WhatsApp message status updates:', updates);
-    handleMessageStatusUpdate(updates);
+    
+    // Process each update individually (updates is an array)
+    if (updates && updates.length > 0) {
+      updates.forEach(update => {
+        // Only process new updates (not already processed)
+        handleMessageStatusUpdate(update);
+      });
+    }
   }, [updates]);
+
+  // Handle incoming messages from users
+  useEffect(() => {
+    console.log('📬 WhatsApp incoming messages:', messages);
+    
+    if (messages && messages.length > 0) {
+      messages.forEach(message => {
+        handleIncomingMessage(message);
+      });
+    }
+  }, [messages]);
 
 
   // Fetch filter options from backend API on mount
@@ -3149,6 +3265,7 @@ const CRMDashboard = () => {
       // Use profile parameter directly instead of selectedProfile state
       if (profile?._candidate?.mobile) {
         await fetchWhatsappHistory(profile._candidate.mobile);
+        await checkSessionWindow(profile._candidate.mobile);
       } else {
         alert('Mobile number not found for this candidate');
       }
@@ -3246,24 +3363,36 @@ const CRMDashboard = () => {
       );
 
       if (response.data.success) {
+        console.log('📥 Fetched chat history from backend:', response.data.data.length, 'messages');
+        console.log('📥 Sample message from backend:', response.data.data[0]);
 
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
-          id: msg._id || msg.wamid || `msg-${index}`, // Use database ID or wamid
+          id: msg._id || msg.wamid || msg.whatsappMessageId || `msg-${index}`, // Use database ID or wamid
           dbId: msg._id, // Keep database ID separately
-          wamid: msg.wamid, // WhatsApp message ID
+          wamid: msg.wamid || msg.whatsappMessageId, // WhatsApp message ID (check both fields)
+          whatsappMessageId: msg.whatsappMessageId || msg.wamid, // Also store as whatsappMessageId for consistency
           text: msg.message,
-          sender: 'agent', // All sent messages are from agent
+          sender: msg.direction === 'incoming' ? 'user' : 'agent', // Check direction to determine sender
           time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
           }),
           type: msg.messageType, // 'text' or 'template'
           templateData: msg.templateData, // Will contain components for template messages
-          status: msg.status || 'sent',
+          mediaUrl: msg.mediaUrl, // Media URL if it's an image/video/document
+          status: msg.status || (msg.direction === 'incoming' ? 'received' : 'sent'),
           deliveredAt: msg.deliveredAt,
           readAt: msg.readAt
         }));
+
+        console.log('📤 Formatted messages for state:', formattedMessages.map(m => ({
+          id: m.id,
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
+          status: m.status
+        })));
 
         setWhatsappMessages(formattedMessages);
       }
@@ -3285,6 +3414,99 @@ const CRMDashboard = () => {
       setIsLoadingChatHistory(false);
     }
   };
+
+  // Check WhatsApp 24-hour session window status
+  const checkSessionWindow = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('❌ Phone number or token missing');
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/session-window/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const { sessionWindow: sw } = response.data;
+        setSessionWindow({
+          isOpen: sw.isOpen,
+          openedAt: sw.lastIncomingMessageAt,
+          expiresAt: sw.expiresAt,
+          remainingTimeMs: sw.remainingTimeMs
+        });
+        
+        console.log('✅ Session window status:', {
+          isOpen: sw.isOpen,
+          canSendManualMessages: response.data.messaging.canSendManualMessages,
+          requiresTemplate: response.data.messaging.requiresTemplate,
+          expiresAt: sw.expiresAt
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking session window:', error.response?.data || error.message);
+      // Set default state if error
+      setSessionWindow({
+        isOpen: false,
+        openedAt: null,
+        expiresAt: null,
+        remainingTimeMs: 0
+      });
+    }
+  };
+
+  // Auto-refresh session window when WhatsApp panel opens and messages load
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && selectedProfile?._candidate?.mobile && !isLoadingChatHistory) {
+      // Check session window after messages are loaded
+      checkSessionWindow(selectedProfile._candidate.mobile);
+    }
+  }, [showPanel, whatsappMessages.length, isLoadingChatHistory]);
+
+  // Countdown timer for session window
+  useEffect(() => {
+    if (!sessionWindow.isOpen || !sessionWindow.expiresAt) {
+      setSessionCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const expiresAt = new Date(sessionWindow.expiresAt);
+      const diff = expiresAt - now;
+
+      if (diff <= 0) {
+        setSessionCountdown('00:00:00');
+        // Session expired, refresh status
+        if (selectedProfile?._candidate?.mobile) {
+          checkSessionWindow(selectedProfile._candidate.mobile);
+        }
+        return;
+      }
+
+      // Convert to hours, minutes, seconds
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      // Format as HH:MM:SS
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setSessionCountdown(formatted);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [sessionWindow.isOpen, sessionWindow.expiresAt, selectedProfile]);
 
   // Render message status icon (WhatsApp style)
   const renderMessageStatus = (status, errorMessage = null) => {
@@ -3789,17 +4011,79 @@ const CRMDashboard = () => {
 
   const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
 
-  const handleWhatsappSendMessage = () => {
-    if (whatsappNewMessage.trim() && hasActiveSession) {
-      setWhatsappMessages([...whatsappMessages, {
-        id: whatsappMessages.length + 1,
-        text: whatsappNewMessage,
-        sender: 'agent',
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        type: 'session'
-      }]);
-      setWhatsappNewMessage('');
-      setShowWhatsappEmojiPicker(false);
+  const handleWhatsappSendMessage = async () => {
+    if (!whatsappNewMessage.trim()) return;
+    
+    if (!sessionWindow.isOpen) {
+      alert('24-hour window is closed. Please use a template message.');
+      return;
+    }
+
+    const messageText = whatsappNewMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Add message to UI immediately (optimistic update)
+    const newMessage = {
+      id: tempId,
+      text: messageText,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      status: 'sending'
+    };
+    
+    setWhatsappMessages(prev => [...prev, newMessage]);
+    setWhatsappNewMessage('');
+    setShowWhatsappEmojiPicker(false);
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/whatsapp/send-message`,
+        {
+          to: selectedProfile._candidate.mobile,
+          message: messageText,
+          candidateId: selectedProfile._candidate._id,
+          candidateName: selectedProfile._candidate.name
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // Update message with real ID and status
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                  ...msg,
+                  id: response.data.data.messageId,
+                  wamid: response.data.data.messageId,
+                  status: 'sent'
+                }
+              : msg
+          )
+        );
+        
+        console.log('✅ Message sent successfully:', response.data);
+      }
+    } catch (error) {
+      console.error('❌ Error sending message:', error);
+      
+      // Update message status to failed
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+      
+      // Show error to user
+      alert(error.response?.data?.message || 'Failed to send message. Please try again.');
     }
   };
 
@@ -4594,6 +4878,13 @@ const CRMDashboard = () => {
 
 
       if (response.data.success) {
+        console.log('✅ Template sent successfully. Backend response:', {
+          messageId: response.data.data.messageId,
+          to: response.data.data.to,
+          templateName: response.data.data.templateName,
+          status: response.data.data.status,
+          hasFilledMessage: !!response.data.data.filledMessage
+        });
 
         // Refresh templates list
 
@@ -4689,10 +4980,11 @@ const CRMDashboard = () => {
 
         // Add sent template to existing WhatsApp chat with FILLED variables
         const templateMessage = {
-          id: response.data.data._id || response.data.data.wamid || `msg-${Date.now()}`,
+          id: response.data.data.messageId || response.data.data._id || `msg-${Date.now()}`,
           dbId: response.data.data._id, // Database message ID
-          wamid: response.data.data.wamid, // WhatsApp message ID
-          text: filledMessage || `Template: ${response.data.data.templateName}`,
+          wamid: response.data.data.messageId, // WhatsApp message ID (backend sends as 'messageId')
+          whatsappMessageId: response.data.data.messageId, // Consistent field name
+          text: filledMessage || response.data.data.filledMessage || `Template: ${response.data.data.templateName}`,
           sender: 'agent',
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           type: 'template',
@@ -4701,6 +4993,14 @@ const CRMDashboard = () => {
           deliveredAt: null,
           readAt: null
         };
+
+        console.log('✅ Adding new message to state:', {
+          id: templateMessage.id,
+          wamid: templateMessage.wamid,
+          whatsappMessageId: templateMessage.whatsappMessageId,
+          text: templateMessage.text?.substring(0, 50),
+          status: templateMessage.status
+        });
 
         setWhatsappMessages([...whatsappMessages, templateMessage]);
 
@@ -5857,7 +6157,7 @@ const CRMDashboard = () => {
 
           {/* Session Status Badge - Below name */}
           <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
-            {hasActiveSession ? (
+            {sessionWindow.isOpen ? (
               <div
                 className="d-flex align-items-center px-2 py-1 rounded"
                 style={{
@@ -5876,7 +6176,8 @@ const CRMDashboard = () => {
                   }}
                 ></div>
                 <span className="fw-semibold" style={{ color: '#0A6E44' }}>
-                  Active
+                  <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+                  {sessionCountdown} remaining
                 </span>
               </div>
             ) : (
@@ -5891,28 +6192,12 @@ const CRMDashboard = () => {
               >
                 <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
                 <span className="fw-semibold" style={{ color: '#856404' }}>
-                  No Session
+                  No Active Window
                 </span>
               </div>
             )}
           </div>
 
-          {/* Info Banner */}
-          {!hasActiveSession && (
-            <div
-              className="d-flex align-items-start mt-3 p-2 rounded"
-              style={{
-                backgroundColor: '#E3F2FD',
-                border: '1px solid #2196F3'
-              }}
-            >
-              <i className="fas fa-info-circle me-2 mt-1" style={{ color: '#1976D2', fontSize: '14px' }}></i>
-              <div style={{ fontSize: '12px', color: '#1565C0' }}>
-                <p className="mb-1 fw-semibold">WhatsApp Business API Rule:</p>
-                <p className="mb-0">No active session hai. Aap sirf <strong>approved template</strong> bhej sakte hain.</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Messages Area */}
@@ -5974,11 +6259,72 @@ const CRMDashboard = () => {
                       </div>
                     </>
                   ) : (
-                    /* Regular text message */
+                    /* Regular text/media message */
                     <>
-                      <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
-                        {message.text}
-                      </p>
+                      {/* Render media if present */}
+                      {message.mediaUrl && message.type === 'image' && (
+                        <img 
+                          src={message.mediaUrl} 
+                          alt="Shared image"
+                          style={{ 
+                            maxWidth: '100%', 
+                            borderRadius: '8px', 
+                            marginBottom: message.text !== '[Image]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        />
+                      )}
+                      {message.mediaUrl && message.type === 'video' && (
+                        <video 
+                          controls 
+                          style={{ 
+                            maxWidth: '100%', 
+                            borderRadius: '8px', 
+                            marginBottom: message.text !== '[Video]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      )}
+                      {message.mediaUrl && message.type === 'audio' && (
+                        <audio 
+                          controls 
+                          style={{ 
+                            width: '100%', 
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="audio/mpeg" />
+                          Your browser does not support the audio tag.
+                        </audio>
+                      )}
+                      {message.mediaUrl && message.type === 'document' && (
+                        <a 
+                          href={message.mediaUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="d-flex align-items-center text-decoration-none"
+                          style={{ 
+                            padding: '8px', 
+                            backgroundColor: 'rgba(0,0,0,0.05)', 
+                            borderRadius: '4px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+                          <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+                        </a>
+                      )}
+                      
+                      {/* Render text if it's not a default placeholder */}
+                      {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+                        <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                          {message.text}
+                        </p>
+                      )}
+                      
                       <div
                         className="d-flex align-items-center justify-content-end"
                         style={{
@@ -6654,7 +7000,7 @@ const CRMDashboard = () => {
                   </>
                 )}
               </button>
-            ) : hasActiveSession ? (
+            ) : sessionWindow.isOpen ? (
               // Active Session - Show Input
               <>
                 <div className="position-relative flex-grow-1">
@@ -6767,12 +7113,26 @@ const CRMDashboard = () => {
                 )}
               </>
             ) : (
-              // No Session - Disabled
-              <div className="flex-grow-1 bg-light border border-2 border-dashed rounded d-flex align-items-center justify-content-center" style={{ height: '45px' }}>
-                <p className="mb-0 small text-muted">
-                  <i className="fas fa-info-circle me-2"></i>
-                  Session message sirf active session me bhej sakte hain
-                </p>
+              // No Session - Disabled Input with Tooltip
+              <div 
+                className="position-relative flex-grow-1"
+                title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+              >
+                <input
+                  type="text"
+                  className="form-control"
+                  disabled
+                  placeholder="No active window - Use templates only"
+                  style={{
+                    height: '42px',
+                    borderRadius: '24px',
+                    border: '1px solid #E9EDEF',
+                    fontSize: '15px',
+                    backgroundColor: '#F5F5F5',
+                    color: '#8696A0',
+                    cursor: 'not-allowed'
+                  }}
+                />
               </div>
             )}
           </div>
@@ -13140,9 +13500,7 @@ margin-left:15px;
         `}
       </style>
       <style>
-        {
-
-          `
+        {`
           
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
@@ -13467,14 +13825,10 @@ margin-left:15px;
               padding: 15px 9px;
               }
 }
-
-    
-            `
-        }
-
+        `}
       </style>
-      <style> {
-        ` .bg-gradient-primary {
+      <style>
+        {`.bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -16061,15 +16415,11 @@ margin-left:15px;
                   min-height: 200px;
               }
           }
-
-          `
-      }
-
+        `}
       </style>
 
       <style>
-        {
-          `
+        {`
           input[type="text"], 
 input[type="email"], 
 input[type="number"],
@@ -17587,10 +17937,7 @@ max-width: 600px;
   .pac-container {
     z-index: 10000 !important;
   }
-
- 
-          `
-        }
+        `}
       </style>
 
     </div>

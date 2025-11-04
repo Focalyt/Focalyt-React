@@ -82,6 +82,11 @@ function useWebsocket(userId) {
       setUpdates(prev => [...prev, data]);
     });
 
+    socket.on("whatsapp_incoming_message", (data) => {
+      console.log("📬 WhatsApp incoming message received:", data);
+      setMessages(prev => [...prev, data]);
+    });
+
     return () => {
       console.log("🔌 Disconnecting socket...");
       socket.disconnect();
