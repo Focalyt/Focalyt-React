@@ -194,7 +194,13 @@ app.use(compression());
 app.use(helmet());
 app.use(cors());
 app.use(flash());
-app.use(fileupload());
+// app.use(fileupload());
+app.use((req, res, next) => {
+	if (req.path.includes('/whatsapp/send-file') || req.path.includes('/whatsapp/send-audio')) {
+		return next();
+	}
+	fileupload()(req, res, next);
+});
 app.use((req, res, next) => {
 	res.locals.currentUser = req.session.user;
 	res.locals.companyUser = req.session.company;

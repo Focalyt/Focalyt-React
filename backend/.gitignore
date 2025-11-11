@@ -55,3 +55,5 @@ Thumbs.db
 /views/front/blog.ejs
 /views/front/courses copy 2.ejs
 /schedular/mmt-backup
+/controllers/routes/college/whatsapp.js
+/mmt.js
