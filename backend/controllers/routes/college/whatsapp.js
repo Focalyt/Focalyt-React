@@ -4005,7 +4005,7 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 			Key: key,
 			Body: audioFile.buffer,
 			ContentType: contentTypeMap[ext] || 'audio/mpeg',
-			// ACL: 'public-read'
+			ACL: 'public-read'
 		};
 
 		const uploadResult = await s3.upload(s3Params).promise();
@@ -4014,17 +4014,11 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 		console.log(`✅ Audio uploaded to S3: ${s3Url}`);
 
 		// Step 2: Send audio via WhatsApp API
-		// const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
-		// const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
-		// const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-		// const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
 		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
-		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
-		
-		
+		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-	
+		
 		const messageData = {
 			messaging_product: 'whatsapp',
 			to: formattedPhone,
@@ -4050,7 +4044,7 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 			collegeId: collegeId,
 			candidateId: candidateId,
 			candidateName: candidateName,
-			to: formattedPhone,
+			phone: formattedPhone,
 			messageId: response.data.messages?.[0]?.id,
 			message: '[Audio]',
 			messageType: 'audio',
@@ -4173,7 +4167,7 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 			Key: key,
 			Body: file.buffer,
 			ContentType: contentType,
-			// ACL: 'public-read'
+			ACL: 'public-read'
 		};
 
 		const uploadResult = await s3.upload(s3Params).promise();
@@ -4182,17 +4176,9 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 		console.log(`✅ File uploaded to S3: ${s3Url}`);
 
 		// Step 2: Send file via WhatsApp API
-		// const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
-		// const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
-		// const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-		// const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-		
-
-		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+		const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
 		const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
-		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
-		
-		
+		const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 		
 		const messageData = {
@@ -4232,7 +4218,6 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 			collegeId: collegeId,
 			candidateId: candidateId,
 			candidateName: candidateName,
-			to: formattedPhone,
 			phone: formattedPhone,
 			messageId: response.data.messages?.[0]?.id,
 			message: caption || `[${messageType.toUpperCase()}]`,
