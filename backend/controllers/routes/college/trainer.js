@@ -323,7 +323,7 @@ router.route("/mark-attendance").post(isTrainer, async (req, res) => {
 			remarks = '' 
 		} = req.body;
 
-		// console.log("req.body", req.body);
+		console.log("req.body", req.body);
 
 		if (!appliedCourseId || !date || !status) {
 			return res.status(400).json({
