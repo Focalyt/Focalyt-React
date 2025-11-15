@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -109,6 +109,237 @@ const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
+
+const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
+const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+
+const formatWhatsappPhoneNumber = (phoneNumber) => {
+	if (!phoneNumber && phoneNumber !== 0) {
+		return null;
+	}
+
+	let cleaned = String(phoneNumber).trim();
+	cleaned = cleaned.replace(/[\s\-()]/g, '');
+
+	if (cleaned.startsWith('+')) {
+		cleaned = cleaned.slice(1);
+	}
+
+	if (/^\d+$/.test(cleaned) === false) {
+		return null;
+	}
+
+	if (cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned)) {
+		return `+91${cleaned}`;
+	}
+
+	if (cleaned.length === 12 && cleaned.startsWith('91')) {
+		return `+${cleaned}`;
+	}
+
+	if (cleaned.length >= 8 && cleaned.length <= 15) {
+		return `+${cleaned}`;
+	}
+
+	return null;
+};
+
+const clampWhatsappBody = (body) => {
+	if (!body) return '';
+	const limit = 4000;
+	if (body.length <= limit) return body;
+	return `${body.slice(0, limit - 3)}...`;
+};
+
+const buildDailyDiaryWhatsappMessage = ({
+	candidateName,
+	trainerName,
+	batchName,
+	courseName,
+	assignmentDetail,
+	studyMaterials = [],
+	projectVideos = []
+}) => {
+	const parts = [];
+	const firstName = candidateName ? candidateName.split(' ')[0] : 'Student';
+	parts.push(`Hi ${firstName},`);
+
+	const contextSegments = [];
+	if (batchName) contextSegments.push(batchName);
+	if (courseName) contextSegments.push(courseName);
+	const contextText = contextSegments.length > 0 ? ` for ${contextSegments.join(' - ')}` : '';
+
+	if (trainerName) {
+		parts.push(`Here is today's daily diary update${contextText} from ${trainerName}.`);
+	} else {
+		parts.push(`Here is today's daily diary update${contextText}.`);
+	}
+
+	if (assignmentDetail) {
+		parts.push(`Assignment:\n${assignmentDetail}`);
+	}
+
+	const appendAttachmentList = (files, label) => {
+		if (!files || files.length === 0) return;
+		const maxItems = 5;
+		const displayFiles = files.slice(0, maxItems);
+		const rows = displayFiles.map((file, index) => {
+			const name = file?.fileName || `File ${index + 1}`;
+			const url = file?.fileUrl ? ` - ${file.fileUrl}` : '';
+			return `${index + 1}. ${name}${url}`;
+		});
+		parts.push(`${label}:\n${rows.join('\n')}`);
+		if (files.length > maxItems) {
+			parts.push(`...and ${files.length - maxItems} more ${label.toLowerCase()}.`);
+		}
+	};
+
+	appendAttachmentList(studyMaterials, 'Study Materials');
+	appendAttachmentList(projectVideos, 'Project Videos');
+
+	if (trainerName) {
+		parts.push(`Regards,\n${trainerName}`);
+	}
+
+	return clampWhatsappBody(parts.join('\n\n'));
+};
+
+const sendDailyDiaryWhatsappNotifications = async ({
+	dailyDiaryId,
+	batchId,
+	courseId,
+	sendTo,
+	selectedStudentIds = [],
+	assignmentDetail,
+	studyMaterials,
+	projectVideos,
+	trainerName,
+	collegeId
+}) => {
+	try {
+		if (!WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_ACCESS_TOKEN) {
+			console.warn('WhatsApp credentials missing. Skipping Daily Diary notifications.');
+			return;
+		}
+
+		const query = {
+			batch: batchId,
+			admissionDone: { $in: [true] },
+			dropout: { $ne: true }
+		};
+
+		if (sendTo === 'individual') {
+			const filteredIds = (selectedStudentIds || [])
+				.filter(Boolean)
+				.map((id) => (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)));
+
+			if (filteredIds.length === 0) {
+				console.warn('No students selected for individual Daily Diary WhatsApp notification.');
+				return;
+			}
+
+			query._id = { $in: filteredIds };
+		}
+
+		const [batchDoc, courseDoc, appliedCoursesDocs] = await Promise.all([
+			Batch.findById(batchId).select('name').lean(),
+			Courses.findById(courseId).select('name').lean(),
+			AppliedCourses.find(query)
+				.populate('_candidate', 'name mobile whatsapp')
+				.select('_candidate')
+				.lean()
+		]);
+
+		if (!appliedCoursesDocs || appliedCoursesDocs.length === 0) {
+			console.warn('No recipients found for Daily Diary WhatsApp notification.');
+			return;
+		}
+
+		const deliveryStatus = [];
+		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+		const headers = {
+			Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+			'Content-Type': 'application/json'
+		};
+
+		for (const appliedCourse of appliedCoursesDocs) {
+			const candidate = appliedCourse._candidate;
+			const candidateName = candidate?.name || 'Student';
+			const rawPhone = candidate?.whatsapp || candidate?.mobile;
+			const formattedPhone = formatWhatsappPhoneNumber(rawPhone);
+
+			if (!formattedPhone) {
+				console.warn(`Skipping WhatsApp notification. Invalid phone number for ${candidateName}.`);
+				deliveryStatus.push({
+					student: appliedCourse._id,
+					delivered: false
+				});
+				continue;
+			}
+
+			const body = buildDailyDiaryWhatsappMessage({
+				candidateName,
+				trainerName,
+				batchName: batchDoc?.name,
+				courseName: courseDoc?.name,
+				assignmentDetail,
+				studyMaterials,
+				projectVideos
+			});
+
+			const payload = {
+				messaging_product: 'whatsapp',
+				to: formattedPhone,
+				type: 'text',
+				text: {
+					preview_url: false,
+					body
+				}
+			};
+
+			try {
+				const response = await axios.post(url, payload, { headers });
+				const whatsappMessageId = response.data?.messages?.[0]?.id || null;
+
+				if (collegeId && WhatsAppMessage) {
+					await WhatsAppMessage.create({
+						collegeId,
+						to: formattedPhone,
+						message: body,
+						messageType: 'text',
+						status: 'sent',
+						direction: 'outgoing',
+						whatsappMessageId,
+						candidateName
+					});
+				}
+
+				deliveryStatus.push({
+					student: appliedCourse._id,
+					delivered: true
+				});
+			} catch (error) {
+				const errorMessage = error.response?.data?.error?.message || error.message;
+				console.error('Failed to send Daily Diary WhatsApp notification:', errorMessage);
+				deliveryStatus.push({
+					student: appliedCourse._id,
+					delivered: false
+				});
+			}
+		}
+
+		if (dailyDiaryId && deliveryStatus.length > 0) {
+			await DailyDiary.findByIdAndUpdate(
+				dailyDiaryId,
+				{ deliveryStatus },
+				{ new: true }
+			);
+		}
+	} catch (notificationError) {
+		console.error('Unexpected error while sending Daily Diary WhatsApp notifications:', notificationError);
+	}
+};
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -13264,6 +13495,21 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 
 		await dailyDiary.save();
 
+		const collegeId = req.college?._id || req.user?.college?._id;
+
+		sendDailyDiaryWhatsappNotifications({
+			dailyDiaryId: dailyDiary._id,
+			batchId: batch,
+			courseId: course,
+			sendTo: sendTo || 'all',
+			selectedStudentIds: sendTo === 'individual' ? selectedStudents : [],
+			assignmentDetail: assignmentDetail || '',
+			studyMaterials,
+			projectVideos,
+			trainerName: user?.name || 'Trainer',
+			collegeId
+		});
+// console.log('sendDailyDiaryWhatsappNotifications' , sendDailyDiaryWhatsappNotifications)
 		return res.status(200).json({
 			status: true,
 			message: 'Daily diary added successfully',

@@ -1,6 +1,172 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import {CheckCircle2, Clock, Eye, EyeOff, Save, AlertTriangle, lock,Award,Target,BookOpen,ChevronRight,CircleCheck, XCircle,Minus, FileText,Timer,TrendingUp,User,Calendar,Info} from 'lucide-react';
+import {CheckCircle2, Clock, Eye, EyeOff, Save, AlertTriangle, Award,Target,BookOpen,ChevronRight,CircleCheck, XCircle,Minus, FileText,Timer,TrendingUp,User,Calendar,Info} from 'lucide-react';
 import axios from 'axios';
+
+const questionNavigatorStyles = `
+  .question-navigator-card {
+    border-radius: 20px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 12px 40px rgba(26, 35, 126, 0.08);
+    background: linear-gradient(160deg, #f5f7ff 0%, #ffffff 45%, #f0f4ff 100%);
+  }
+
+  .question-navigator-header {
+    background: linear-gradient(135deg, #1f4bd8 0%, #4a78ff 100%);
+    color: #fff;
+    border-bottom: none;
+    padding: 24px 28px;
+  }
+
+  .question-navigator-header h6 {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 6px;
+  }
+
+  .question-navigator-subtitle {
+    font-size: 0.82rem;
+    opacity: 0.8;
+  }
+
+  .question-progress-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+
+  .question-navigator-body {
+    padding: 24px 8px 8px;
+  }
+
+  .question-navigator-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(25px, 1fr));
+    gap: 7px;
+  }
+
+  .question-number-btn {
+    border-radius: 14px !important;
+    height: 40px;
+    font-weight: 600;
+    font-size: 1rem;
+    border-width: 0 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .question-number-btn.btn-outline-secondary {
+    background: #edf1ff;
+    color: #264199;
+    box-shadow: inset 0 0 0 1px rgba(44, 72, 156, 0.15);
+  }
+.numBtn{
+          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+  .question-number-btn.btn-outline-secondary:hover {
+    background: #dfe6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px rgba(31, 75, 216, 0.12);
+  }
+
+  .question-number-btn.btn-success {
+    background: linear-gradient(135deg, #33d17a 0%, #1ec1a4 100%);
+    color: #fff;
+    box-shadow: 0 18px 35px rgba(30, 193, 164, 0.25);
+  }
+
+  .question-number-btn.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 22px 38px rgba(30, 193, 164, 0.3);
+  }
+
+  .question-number-btn.is-active {
+    box-shadow: 0 0 0 4px rgba(31, 75, 216, 0.25);
+    background: linear-gradient(135deg, #ffffff 0%, #f1f4ff 100%);
+  }
+
+  .question-navigator-meta {
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(38, 65, 153, 0.15);
+  }
+
+  .question-navigator-meta .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    color: #3a4e7f;
+  }
+
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .legend-dot.attempted {
+    background: linear-gradient(135deg, #33d17a 0%, #1ec1a4 100%);
+  }
+
+  .legend-dot.pending {
+    background: #d6defc;
+  }
+
+  .question-navigator-summary {
+    margin-top: 18px;
+    background: rgba(31, 75, 216, 0.08);
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 0.9rem;
+    color: #2a3f70;
+    line-height: 1.5;
+  }
+
+  .question-navigator-summary strong {
+    display: block;
+    font-size: 1.05rem;
+    margin-bottom: 4px;
+    color: #1f3a64;
+  }
+
+  .question-navigator-summary span {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .question-navigator-summary span:last-child {
+    margin-bottom: 0;
+  }
+
+  @media (min-width: 1200px) {
+    .question-navigator-card {
+      position: sticky;
+      top: 24px;
+    }
+  }
+
+  @media (max-width: 991.98px) {
+    .question-navigator-card {
+      margin-top: 24px;
+    }
+
+    .question-number-btn {
+      height: 50px;
+      font-size: 0.95rem;
+    }
+  }
+`;
 
 function Assignment({ courseId }) {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -338,9 +504,13 @@ function Assignment({ courseId }) {
 
   if (!submitted && assignment) {
     const currentQ = questions[currentQuestion];
+    const attemptedCount = Object.keys(selected).length;
+    const notAttemptedCount = Math.max(questions.length - attemptedCount, 0);
     
     return (
-      <div className="container-fluid min-vh-100 bg-light py-4">
+      <>
+        <style>{questionNavigatorStyles}</style>
+        <div className="container-fluid min-vh-100 bg-light py-4">
         <div className="container">
           <div className="row">
             <div className="col-lg-9">
@@ -348,7 +518,7 @@ function Assignment({ courseId }) {
                 <div className="card-header bg-primary bg-gradient text-white">
                   <div className="row align-items-center">
                     <div className="col-md-8">
-                      <h4 className="mb-0">{meta?.title}</h4>
+                      <h4 className="mb-0 text-capitalize">{meta?.title}</h4>
                       <div className="mt-2">
                         <span className="badge bg-light text-dark me-2">
                           <Target size={14} className="me-1" />
@@ -482,48 +652,52 @@ function Assignment({ courseId }) {
             </div>
 
             <div className="col-lg-3">
-              <div className="card shadow-sm " style={{ top: '20px' }}>
-                <div className="card-header bg-secondary text-white">
-                  <h6 className="mb-0">Question Navigator</h6>
+              <div className="question-navigator-card">
+                <div className="question-navigator-header">
+                  <div>
+                    <h6 className="mb-1">Question Navigator</h6>
+                    <div className="question-navigator-subtitle">
+                      Jump to any question instantly.
+                    </div>
+                  </div>
+                  <span className="question-progress-chip">
+                    {attemptedCount}/{questions.length}
+                  </span>
                 </div>
-                <div className="card-body">
-                  <div className="row g-2">
-                    {questions.map((q, idx) => (
-                      <div key={q.id} className="col-3">
+                <div className="question-navigator-body">
+                  <div className="question-navigator-grid">
+                    {questions.map((q, idx) => {
+                      const isAttempted = selected[q.id] !== undefined;
+                      const isActive = currentQuestion === idx;
+
+                      return (
                         <button
-                          className={`btn w-100 ${
-                            selected[q.id] !== undefined
-                              ? 'btn-success'
-                              : 'btn-outline-secondary'
-                          } ${currentQuestion === idx ? 'border-3 border-primary' : ''}`}
+                          key={q.id}
+                          className={`btn question-number-btn numBtn ${isAttempted ? 'btn-success' : 'btn-outline-secondary'} ${isActive ? 'is-active' : ''}`}
                           onClick={() => goToQuestion(idx)}
                         >
                           {idx + 1}
                         </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  
-                  <div className="mt-3 pt-3 border-top">
-                    <div className="small text-muted">
-                      <div className="d-flex align-items-center mb-1">
-                        <span className="badge bg-success me-2">&nbsp;</span>
-                        Attempted ({Object.keys(selected).length})
-                      </div>
-                      <div className="d-flex align-items-center">
-                        <span className="badge bg-secondary me-2">&nbsp;</span>
-                        Not Attempted ({questions.length - Object.keys(selected).length})
-                      </div>
+
+                  <div className="question-navigator-meta">
+                    <div className="legend-item">
+                      <span className="legend-dot attempted"></span>
+                      Attempted ({attemptedCount})
+                    </div>
+                    <div className="legend-item">
+                      <span className="legend-dot pending"></span>
+                      Not Attempted ({notAttemptedCount})
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-3 border-top">
-                    <h6 className="mb-2">Test Summary</h6>
-                    <small className="text-muted">
-                      <div>Total Questions: {questions.length}</div>
-                      <div>Total Marks: {meta?.totalMarks}</div>
-                      <div>Time Remaining: {timeLeft ? formatTime(timeLeft) : 'Unlimited'}</div>
-                    </small>
+                  <div className="question-navigator-summary">
+                    <strong>Test Summary</strong>
+                    <span>Total Questions: {questions.length}</span>
+                    <span>Total Marks: {meta?.totalMarks}</span>
+                    <span>Time Remaining: {timeLeft ? formatTime(timeLeft) : 'Unlimited'}</span>
                   </div>
                 </div>
               </div>
@@ -531,6 +705,7 @@ function Assignment({ courseId }) {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -578,6 +753,7 @@ function Assignment({ courseId }) {
         </div>
 
         <style>{`
+        
           .test-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
