@@ -12596,12 +12596,14 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		const { courseId } = req.query;
 		const user = req.user;
 		const collegeId = req.college._id;
+		const {centerId }  = req.query;
 		const trainerId = user._id;
 
 		if (courseId) {
 			const course = await Courses.findOne({
 				_id: courseId,
-				trainers: trainerId
+				trainers: trainerId,
+				centerId: centerId
 			}).populate('trainers');
 
 			if (!course) {
@@ -12630,7 +12632,8 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 
 		const courses = await Courses.find({
 			college: collegeId,
-			trainers: trainerId
+			trainers: trainerId,
+			center: centerId
 		})
 			.select('name description image trainers center centerId project')
 			.populate('center', 'name address')
@@ -13511,7 +13514,7 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		});
 // console.log('sendDailyDiaryWhatsappNotifications' , sendDailyDiaryWhatsappNotifications)
 		return res.status(200).json({
-			status: true,
+			status: true, 	
 			message: 'Daily diary added successfully',
 			data: dailyDiary
 		});

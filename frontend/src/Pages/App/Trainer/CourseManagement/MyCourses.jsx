@@ -23,6 +23,7 @@ function MyCourses() {
         setLoading(true);
         try{
             const res = await axios.get(`${backendUrl}/college/gettrainersbycourse`, {
+                params: { centerId: centerId },
                 headers: {
                     'x-auth': token
                 }
@@ -45,39 +46,20 @@ function MyCourses() {
         trainersData.forEach(trainer => {
             if(trainer.assignedCourses && trainer.assignedCourses.length > 0){
                 trainer.assignedCourses.forEach(course => {
-                    // Check if course belongs to the selected center (if centerId exists in URL)
-                    let belongsToCenter = true;
-                    if (centerId) {
-                        // Handle both array and object center structure
-                        if (Array.isArray(course.center) && course.center.length > 0) {
-                            belongsToCenter = course.center[0]._id === centerId;
-                        } else if (course.center && course.center._id) {
-                            belongsToCenter = course.center._id === centerId;
-                        } else if (Array.isArray(course.centerId) && course.centerId.length > 0) {
-                            belongsToCenter = course.centerId[0]._id === centerId || course.centerId[0] === centerId;
-                        } else if (course.centerId) {
-                            belongsToCenter = course.centerId._id === centerId || course.centerId === centerId;
-                        } else {
-                            belongsToCenter = false;
-                        }
-                    }
-
-                    // Only add course if it belongs to the selected center (or if no center filter is active)
-                    if (belongsToCenter) {
-                        allCourses.push({
-                            id: course._id,
-                            title: course.name,
-                            image: course.image || "/Assets/images/logo/logo.png",
-                            trainerName: trainer.name,
-                            trainerId: trainer._id,
-                            center: course.center // Add center information
-                        });
-                    }
+                    allCourses.push({
+                        id: course._id,
+                        title: course.name,
+                        image: course.image || "/Assets/images/logo/logo.png",
+                        trainerName: trainer.name,
+                        trainerId: trainer._id,
+                        center: course.center
+                    });
                 });
             }
         });
         return allCourses;
     };
+
 
     const courses = getCoursesFromTrainers();
 
