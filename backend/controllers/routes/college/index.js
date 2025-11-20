@@ -12630,11 +12630,21 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		}
 
 
-		const courses = await Courses.find({
+		// Build query - make centerId optional
+		const courseQuery = {
 			college: collegeId,
-			trainers: trainerId,
-			center: centerId
-		})
+			trainers: trainerId
+		};
+		
+		// Only filter by center if centerId is provided
+		if (centerId) {
+			courseQuery.$or = [
+				{ centerId: centerId },
+				{ center: centerId }
+			];
+		}
+		
+		const courses = await Courses.find(courseQuery)
 			.select('name description image trainers center centerId project')
 			.populate('center', 'name address')
 			.populate('centerId', 'name address')

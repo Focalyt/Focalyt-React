@@ -89,21 +89,31 @@ function TimeTable() {
                 headers: { 'x-auth': token }
             });
 
+            console.log('Courses API Response:', response.data);
+
             if (response.data && response.data.status && response.data.data) {
                 const allCourses = [];
                 response.data.data.forEach(trainer => {
                     if (trainer.assignedCourses && trainer.assignedCourses.length > 0) {
                         trainer.assignedCourses.forEach(course => {
-                            if (!allCourses.find(c => c._id === course._id)) {
+                            // Check if course already exists by _id
+                            const existingCourse = allCourses.find(c => c._id === course._id);
+                            if (!existingCourse) {
                                 allCourses.push(course);
                             }
                         });
                     }
                 });
+                console.log('Extracted courses:', allCourses);
                 setCourses(allCourses);
+            } else {
+                console.warn('No courses found in response:', response.data);
+                setCourses([]);
             }
         } catch (error) {
             console.error('Error fetching courses:', error);
+            console.error('Error details:', error.response?.data || error.message);
+            setCourses([]);
         } finally {
             setLoading(false);
         }
