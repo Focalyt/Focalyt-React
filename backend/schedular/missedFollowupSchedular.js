@@ -7,7 +7,7 @@ const { User, WhatsAppTemplate, AppliedCourses } = require("../controllers/model
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const MISSED_FOLLOWUP_TEMPLATE_NAME = 'missed_followup';
+const MISSED_FOLLOWUP_TEMPLATE_NAME = 'missedfollowups';
 
 // Log template name on module load
 console.log(`[Missed Followup Scheduler] Using WhatsApp template: "${MISSED_FOLLOWUP_TEMPLATE_NAME}"`);
@@ -120,7 +120,7 @@ function missedFollowupSchedular() {
         followupDate: { $lt: new Date() }
       }).populate({
         path: 'appliedCourseId',
-        model: 'AppliedCourses', // Explicitly specify the model name
+        model: 'AppliedCourses', 
         populate: [
           { path: '_candidate', select: 'name mobile email' },
           { path: '_course', select: 'name' }
@@ -169,6 +169,7 @@ function missedFollowupSchedular() {
                 continue;
               }
 
+              // Get WhatsApp number (prefer whatsapp field, fallback to mobile)
               const whatsappNumber = counselor.whatsapp || counselor.mobile;
               
               if (!whatsappNumber) {
@@ -197,7 +198,8 @@ function missedFollowupSchedular() {
 
               const missedCount = counselorFollowups.length;
 
-              const studentName = followup.appliedCourseId?._candidate?.name || 'Student';
+             
+              const studentMobileNumber = followup.appliedCourseId?._candidate?.mobile || 'N/A';
               const courseName = followup.appliedCourseId?._course?.name || 'Course';
 
               let template = await WhatsAppTemplate.findOne({
@@ -232,7 +234,12 @@ function missedFollowupSchedular() {
                   if (varName.includes('counselor') || (varName.includes('name') && varName.includes('counselor'))) {
                     variableValues[position] = counselor.name || 'Counselor';
                   } else if (varName.includes('student') || varName.includes('candidate')) {
-                    variableValues[position] = studentName;
+                    // Check if it's mobile number or name
+                    if (varName.includes('mobile') || varName.includes('phone') || varName.includes('number')) {
+                      variableValues[position] = studentMobileNumber;
+                    } else {
+                      variableValues[position] = studentName;
+                    }
                   } else if (varName.includes('course')) {
                     variableValues[position] = courseName;
                   } else if (varName.includes('count') || varName.includes('missed')) {
@@ -249,7 +256,8 @@ function missedFollowupSchedular() {
                     if (position === 0) {
                       variableValues[position] = counselor.name || 'Counselor';
                     } else if (position === 1) {
-                      variableValues[position] = studentName;
+                      // Default: Use mobile number for student (as per template requirement)
+                      variableValues[position] = studentMobileNumber;
                     } else if (position === 2) {
                       variableValues[position] = courseName;
                     } else if (position === 3) {
@@ -260,7 +268,7 @@ function missedFollowupSchedular() {
               } else {
                 if (requiredVariableCount >= 1) variableValues[0] = counselor.name || 'Counselor';
                 
-                if (requiredVariableCount >= 2) variableValues[1] = studentName;
+                if (requiredVariableCount >= 2) variableValues[1] = studentMobileNumber;
                 
                 if (requiredVariableCount >= 3) variableValues[2] = courseName;
                 
@@ -277,15 +285,15 @@ function missedFollowupSchedular() {
                 }
               }
 
-              // console.log(`[Cron] Prepared ${variableValues.length} variable values for template`);
-              // console.log(`[Cron] Variable values:`, variableValues);
+              console.log(`[Cron] Prepared ${variableValues.length} variable values for template`);
+              console.log(`[Cron] Variable values:`, variableValues);
 
               // Send WhatsApp template message
               // console.log(`\n[Cron] 📤 Sending WhatsApp Template:`);
               // console.log(`   Template Name: "${MISSED_FOLLOWUP_TEMPLATE_NAME}"`);
               // console.log(`   To Mobile Number: ${whatsappNumber}`);
               // console.log(`   Counselor: ${counselor.name || 'N/A'} (ID: ${counselorId})`);
-              // console.log(`   Student: ${studentName}`);
+              // console.log(`   Student Mobile: ${studentMobileNumber}`);
               // console.log(`   Course: ${courseName}`);
               // console.log(`   Missed Followups Count: ${missedCount}`);
               
@@ -303,6 +311,7 @@ function missedFollowupSchedular() {
               //   console.log(`   ✅ Sent to Mobile Number: ${whatsappNumber}`);
               //   console.log(`   ✅ Counselor Name: ${counselor.name || 'N/A'}`);
               //   console.log(`   ✅ Student Name: ${studentName}`);
+              //   console.log(`   ✅ Student Mobile Number: ${studentMobileNumber}`);
               //   console.log(`   ✅ Course Name: ${courseName}`);
               //   console.log(`   ✅ Missed Followups: ${missedCount}`);
               //   console.log(`   ✅ College ID: ${followup.collegeId}`);
