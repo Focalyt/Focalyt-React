@@ -25,8 +25,8 @@ function CollegeLayout({ children }) {
   const [permissions, setPermissions] = useState();
   const [user, setUser] = useState();
   const location = useLocation();
-const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-const token = userData.token;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const token = userData.token;
   useEffect(() => {
     updatedPermission()
   }, [])
@@ -42,10 +42,10 @@ const token = userData.token;
     }
   }
 
-useEffect(()=>{
-  console.log('userData', userData)
-  console.log("permissions", permissions)
-},[permissions])
+  useEffect(() => {
+    console.log('userData', userData)
+    console.log("permissions", permissions)
+  }, [permissions])
 
   useEffect(() => {
     const userFromStorage = sessionStorage.getItem('user');
@@ -362,118 +362,163 @@ useEffect(()=>{
               </li>
 
               {/* Sales (B2C) */}
-              {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
+              {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
 
-              <li className={`nav-item has-sub ${openSubmenu.sales ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('sales')}>
-                  <FontAwesomeIcon icon={faShoppingCart} />
-                  <span className="menu-title">Sales (B2C)</span>
-                  <span className="dropdown-arrow">
-                    <FontAwesomeIcon
-                      icon={faCaretDown}
-                      className={`chevron-icon ${openSubmenu.sales ? 'rotate-90' : ''}`}
-                    />
-                  </span>
-                </a>
-                <ul
-                  ref={menuRefs.sales}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.sales,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
-                    <Link to="/institute/dashboard" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faChartLine} />
-                      <span className="menu-title">Dashboard</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
-                    <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faUserFriends} />
-                      <span className="menu-title">Admission Cycle Pre</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
-                    <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faUserCheck} />
-                      <span className="menu-title">Admission Cycle Post</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
-                    <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faCalendarAlt} />
-                      <span className="menu-title">Candidate Visit Calender</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
-                    <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faBell} />
-                      <span className="menu-title">Follow up</span>
-                    </Link>
-                  </li>
-                  {/* <li className={`nav-item ${location.pathname === '/institute/re-enquire' ? 'active' : ''}`}>
+                <li className={`nav-item has-sub ${openSubmenu.sales ? 'open' : ''}`}>
+                  <a href="#" onClick={() => toggleSubmenu('sales')}>
+                    <FontAwesomeIcon icon={faShoppingCart} />
+                    <span className="menu-title">Sales (B2C)</span>
+                    <span className="dropdown-arrow">
+                      <FontAwesomeIcon
+                        icon={faCaretDown}
+                        className={`chevron-icon ${openSubmenu.sales ? 'rotate-90' : ''}`}
+                      />
+                    </span>
+                  </a>
+                  <ul
+                    ref={menuRefs.sales}
+                    className="menu-content"
+                    style={{
+                      maxHeight: submenuMaxHeight.sales,
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease-in-out'
+                    }}
+                  >
+                    <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
+                      <Link to="/institute/dashboard" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faChartLine} />
+                        <span className="menu-title">Dashboard</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
+                      <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faUserFriends} />
+                        <span className="menu-title">Admission Cycle Pre</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
+                      <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faUserCheck} />
+                        <span className="menu-title">Admission Cycle Post</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
+                      <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faCalendarAlt} />
+                        <span className="menu-title">Candidate Visit Calender</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
+                      <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faBell} />
+                        <span className="menu-title">Follow up</span>
+                      </Link>
+                    </li>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/re-enquire' ? 'active' : ''}`}>
                     <Link to="/institute/re-enquire" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faBell} />
                       <span className="menu-title">Re-enquire</span>
                     </Link>
                   </li> */}
-                </ul>
-              </li>
-            )}
-
-              {/* Sales (B2B) */}
-              {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
-              <li className={`nav-item has-sub ${openSubmenu.salesb2b ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
-                  <FontAwesomeIcon icon={faHandshake} />
-                  <span className="menu-title">Sales (B2B)</span>
-                  <span className="dropdown-arrow">
-                    <FontAwesomeIcon
-                      icon={faCaretDown}
-                      className={`chevron-icon ${openSubmenu.salesb2b ? 'rotate-90' : ''}`}
-                    />
-                  </span>
-                </a>
-                <ul
-                  ref={menuRefs.salesb2b}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.salesb2b,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
-                    <Link to="/institute/dashboardb2b" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faChartLine} />
-                      <span className="menu-title">Dashboard</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
-                    <a href="/institute/sales" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faTasks} />
-                      <span className="menu-title">Sales (B2B)</span>
-                    </a>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
-                    <Link to="/institute/myfollowupb2b" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faBell} />
-                      <span className="menu-title">Follow up</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
-                    <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faCalendarAlt} />
-                      <span className="menu-title">Calendar Follow-up</span>
-                    </Link>
-                  </li>
                   </ul>
                 </li>
               )}
 
+              {/* Sales (B2B) */}
+              {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
+                <li className={`nav-item has-sub ${openSubmenu.salesb2b ? 'open' : ''}`}>
+                  <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
+                    <FontAwesomeIcon icon={faHandshake} />
+                    <span className="menu-title">Sales (B2B)</span>
+                    <span className="dropdown-arrow">
+                      <FontAwesomeIcon
+                        icon={faCaretDown}
+                        className={`chevron-icon ${openSubmenu.salesb2b ? 'rotate-90' : ''}`}
+                      />
+                    </span>
+                  </a>
+                  <ul
+                    ref={menuRefs.salesb2b}
+                    className="menu-content"
+                    style={{
+                      maxHeight: submenuMaxHeight.salesb2b,
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease-in-out'
+                    }}
+                  >
+                    <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
+                      <Link to="/institute/dashboardb2b" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faChartLine} />
+                        <span className="menu-title">Dashboard</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
+                      <a href="/institute/sales" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faTasks} />
+                        <span className="menu-title">Sales (B2B)</span>
+                      </a>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
+                      <Link to="/institute/myfollowupb2b" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faBell} />
+                        <span className="menu-title">Follow up</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
+                      <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faCalendarAlt} />
+                        <span className="menu-title">Calendar Follow-up</span>
+                      </Link>
+                    </li>
+                  </ul>
+                </li>
+              )}
+              <li className={`nav-item has-sub ${openSubmenu.placements ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('placements')}>
+                  <FontAwesomeIcon icon={faHandshake} />
+                  <span className="menu-title">Placements</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.placements ? 'rotate-90' : ''}`}
+                    />
+                  </span>
+                </a>
+                <ul
+                  ref={menuRefs.placements}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.placements,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/institute/dashboardplacements' ? 'active' : ''}`}>
+                    <Link to="/institute/dashboardplacements" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faChartLine} />
+                      <span className="menu-title">Dashboard</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/placements' ? 'active' : ''}`}>
+                    <a href="/institute/placements" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faTasks} />
+                      <span className="menu-title">Placements</span>
+                    </a>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/placementfollowup' ? 'active' : ''}`}>
+                    <Link to="/institute/placementfollowup" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBell} />
+                      <span className="menu-title">Follow up</span>
+                    </Link>
+                  </li>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
+                    <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faCalendarAlt} />
+                      <span className="menu-title">Calendar Follow-up</span>
+                    </Link>
+                  </li> */}
+                </ul>
+              </li>
               {/* Training management */}
               <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
                 <a href="/institute/candidatemanagment" onClick={() => handleSidebarClose()}>
@@ -591,6 +636,12 @@ useEffect(()=>{
                       <span className="menu-title">Status Design (B2C)</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
+                    <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faProjectDiagram} />
+                      <span className="menu-title">Status Design (Placements)</span>
+                    </Link>
+                  </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
                     <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWhatsapp} />
@@ -654,7 +705,7 @@ useEffect(()=>{
                     <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>
                       {/* <FontAwesomeIcon icon={} /> */}
                       {/* <FontAwesomeIcon icon={faDrip} /> */}
-                      <FontAwesomeIcon icon={faBullhorn} /> 
+                      <FontAwesomeIcon icon={faBullhorn} />
                       <span className="menu-title">Drip Marketing</span>
                     </Link>
                   </li>

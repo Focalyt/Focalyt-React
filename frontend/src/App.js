@@ -63,7 +63,10 @@ import CollegeRegister from './Pages/App/College/Register/CollegeRegister';
 import Dashboard from './Pages/App/College/Dashboard/Dashboard';
 import DashboardB2B from './Pages/App/College/B2B/DashboardB2B';
 import B2BFollowUp from './Pages/App/College/B2B/B2BFollowUp';
-
+import DashboardPlacements from './Pages/App/College/Placements/DashboardPlacements';
+import Placements from './Pages/App/College/Placements/Placements';
+import PlacementFollowUp from './Pages/App/College/Placements/PlacementFollowUp';
+import StatusPlacements from './Pages/App/College/Status/Placements';
 import Profile from './Pages/App/College/Profile/Profile';
 import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandidates';
 import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates';
@@ -236,8 +239,12 @@ const Layout = () => {
         {/* CollegeLayout will wrap only protected pages */}
         <Route path="/institute" element={<CollegeLayout  />}>
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboardplacements" element={<DashboardPlacements />} />
           <Route path="dashboardb2b" element={<DashboardB2B />} />
           <Route path="b2bfollowup" element={<B2BFollowUp />} />
+          <Route path="placements" element={<Placements />} />
+          <Route path="placementfollowup" element={<PlacementFollowUp />} />
+          <Route path="statusplacements" element={<StatusPlacements />} />
           <Route path="myprofile" element={<Profile/>}/>
           <Route path="uploadCandidates" element={<UploadCandidates/>}/>
           <Route path="uploadTemplates" element={<UploadTemplates/>}/>
