@@ -200,6 +200,7 @@ function missedFollowupSchedular() {
 
              
               const studentMobileNumber = followup.appliedCourseId?._candidate?.mobile || 'N/A';
+              const studentName = followup.appliedCourseId?._candidate?.name || 'Student';
               const courseName = followup.appliedCourseId?._course?.name || 'Course';
 
               let template = await WhatsAppTemplate.findOne({
@@ -324,14 +325,6 @@ function missedFollowupSchedular() {
               //   console.log(`   ❌ Mobile Number: ${whatsappNumber}`);
               //   console.log(`─────────────────────────────────────────────────\n`);
               // }
-
-              // console.log(`\n[Cron] ✅ SUCCESS: WhatsApp template sent!`);
-              // console.log(`   ✅ Template: "${MISSED_FOLLOWUP_TEMPLATE_NAME}"`);
-              // console.log(`   ✅ Sent to Mobile Number: ${whatsappNumber}`);
-              // console.log(`   ✅ Counselor Name: ${counselor.name || 'N/A'}`);
-              // console.log(`   ✅ Missed Followups: ${missedCount}`);
-              // console.log(`   ✅ College ID: ${followup.collegeId}`);
-              console.log(`─────────────────────────────────────────────────\n`);
             } catch (error) {
               console.error(`[Cron] Error sending WhatsApp to counselor ${counselorId}:`, error.message);
             
