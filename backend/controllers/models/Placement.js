@@ -1,74 +1,83 @@
-// models/Placement.js
 const mongoose = require('mongoose');
+const { ObjectId } = mongoose.Schema.Types;
 
-// Substatus Schema
-const SubstatusSchema = new mongoose.Schema({
-  title: {
+// Placement Schema based on form fields
+const PlacementSchema = new mongoose.Schema({
+  companyName: {
     type: String,
     required: true,
     trim: true
   },
-  description: {
+  employerName: {
     type: String,
+    required: true,
     trim: true
   },
-  hasRemarks: {
-    type: Boolean,
-    default: false
+  contactNumber: {
+    type: String,
+    required: true,
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return /^[6-9]\d{9}$/.test(v.replace(/\D/g, ''));
+      },
+      message: 'Please enter a valid 10-digit contact number'
+    }
   },
-  hasFollowup: {
-    type: Boolean,
-    default: false
-  },
-  hasAttachment: {
-    type: Boolean,
-    default: false
-  },
-  createdAt: {
+  dateOfJoining: {
     type: Date,
-    default: Date.now
-  }
-});
-
-// Status Schema
-const PlacementStatusSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  milestone: {
-    type: String,
-    trim: true
-  },
-  index: {
-    type: Number,
     required: true
   },
-  substatuses: [SubstatusSchema],
+  location: {
+    type: String,
+    required: true,
+    trim: true
+  },
   college: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'College',
     required: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  addedBy: {
+    type: ObjectId,
+    ref: 'User'
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  status: {
+    type: ObjectId,
+    ref: 'placementStatus'
+  },
+  subStatus: {
+    type: ObjectId
+  },
+  remark: {
+    type: String,
+    trim: true
+  },
+  logs: [
+    {
+      user: {
+        type: ObjectId,
+        ref: "User"
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now
+      },
+      action: {
+        type: String,
+        required: true
+      },
+      remarks: {
+        type: String
+      }
+    }
+  ],
+  updatedBy: {
+    type: ObjectId,
+    ref: 'User'
   }
+}, {
+  timestamps: true
 });
 
-// Update the 'updatedAt' field on save
-PlacementStatusSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-module.exports = mongoose.model('PlacementStatus', PlacementStatusSchema);
+module.exports = mongoose.model('Placement', PlacementSchema);

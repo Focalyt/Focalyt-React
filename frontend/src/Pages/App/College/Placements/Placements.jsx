@@ -386,22 +386,11 @@ const Placements = () => {
 
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
-    leadCategory: '',
-    typeOfB2B: '',
-    businessName: '',
-    businessAddress: '',
-    concernPersonName: '',
-    address: '',
-    city: '',
-    state: '',
-    latitude: '',
-    longitude: '',
-    designation: '',
-    email: '',
-    mobile: '',
-    whatsapp: '',
-    leadOwner: '',
-    remark: ''
+    companyName: '',
+    employerName: '',
+    contactNumber: '',
+    dateOfJoining: null,
+    location: ''
   });
 
   // Form validation state
@@ -888,11 +877,11 @@ const Placements = () => {
   const handleLeadMobileChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === 'mobile') {
+    if (name === 'contactNumber') {
       if (value.length > 10) {
         setFormErrors(prev => ({
           ...prev,
-          mobile: 'Mobile number should be 10 digits'
+          contactNumber: 'Contact number should be 10 digits'
         }));
       }
     }
@@ -912,10 +901,6 @@ const Placements = () => {
         [name]: ''
       }));
     }
-
-    // Extract numbers
-    const extracted = extractMobileNumbers(cleanValue);
-    setExtractedNumbers(extracted);
   };
 
   // Validate lead form
@@ -923,36 +908,15 @@ const Placements = () => {
     const errors = {};
 
     // Required field validation
-    if (!leadFormData.leadCategory) errors.leadCategory = 'Lead category is required';
-    if (!leadFormData.typeOfB2B) errors.typeOfB2B = 'B2B type is required';
-    if (!leadFormData.businessName) errors.businessName = 'Business name is required';
-    if (!leadFormData.concernPersonName) errors.concernPersonName = 'Concern person name is required';
-    // if (!leadFormData.landlineNumber) errors.landlineNumber = 'Landline number is required';
-    // Email validation
-    // if (!leadFormData.email) {
-    //   errors.email = 'Email is required';
-    // } else if (!validateEmail(leadFormData.email)) {
-    //   errors.email = 'Please enter a valid email address';
-    // }
-
-    // Mobile validation
-    if (!leadFormData.mobile) {
-      errors.mobile = 'Mobile number is required';
-    } else if (!validateMobileNumber(leadFormData.mobile)) {
-      errors.mobile = 'Please enter a valid 10-digit mobile number';
+    if (!leadFormData.companyName) errors.companyName = 'Company name is required';
+    if (!leadFormData.employerName) errors.employerName = 'Employer name is required';
+    if (!leadFormData.contactNumber) {
+      errors.contactNumber = 'Contact number is required';
+    } else if (!validateMobileNumber(leadFormData.contactNumber)) {
+      errors.contactNumber = 'Please enter a valid 10-digit contact number';
     }
-
-    // WhatsApp validation (optional but validate if provided)
-    if (leadFormData.whatsapp && !validateMobileNumber(leadFormData.whatsapp)) {
-      errors.whatsapp = 'Please enter a valid 10-digit WhatsApp number';
-    }
-
-    // Landline number validation
-    // if (!leadFormData.landlineNumber) {
-    //   errors.landlineNumber = 'Landline number is required';
-    // } else if (!validateMobileNumber(leadFormData.landlineNumber)) {
-    //   errors.landlineNumber = 'Please enter a valid 10-digit landline number';
-    // }
+    if (!leadFormData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
+    if (!leadFormData.location) errors.location = 'Location is required';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -966,6 +930,8 @@ const Placements = () => {
   // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
+  const [placedCount, setPlacedCount] = useState(0);
+  const [unplacedCount, setUnplacedCount] = useState(0);
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
 
   // Filter states
@@ -1063,21 +1029,21 @@ const Placements = () => {
         params.placementEndDate = filters.placementDateRange.end;
       }
 
-      const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+      const response = await axios.get(`${backendUrl}/college/placementStatus/candidates`, {
         headers: { 'x-auth': token },
         params: params
       });
 
       if (response.data.status) {
-        setLeads(response.data.data.leads || []);
+        setLeads(response.data.data.placements || []);
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
-          setPageSize(response.data.data.pagination.totalLeads || 0);
+          setPageSize(response.data.data.pagination.totalPlacements || 0);
         }
       } else {
-        console.error('Failed to fetch leads:', response.data.message);
+        console.error('Failed to fetch placements:', response.data.message);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -1098,6 +1064,8 @@ const Placements = () => {
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
         setTotalLeads(response.data.data.totalLeads || 0);
+        setPlacedCount(response.data.data.placedCount || 0);
+        setUnplacedCount(response.data.data.unplacedCount || 0);
       } else {
         console.error('Failed to fetch status counts:', response.data.message);
       }
@@ -1154,38 +1122,15 @@ const Placements = () => {
 
     setLoading(true);
     try {
-      // Prepare data according to backend schema
       const leadData = {
-        leadCategory: leadFormData.leadCategory,
-        typeOfB2B: leadFormData.typeOfB2B,
-        businessName: leadFormData.businessName,
-        address: leadFormData.address,
-        city: leadFormData.city,
-        state: leadFormData.state,
-        concernPersonName: leadFormData.concernPersonName,
-        designation: leadFormData.designation,
-        email: leadFormData.email,
-        mobile: leadFormData.mobile,
-        whatsapp: leadFormData.whatsapp,
-        landlineNumber: leadFormData.landlineNumber,
-        leadOwner: leadFormData.leadOwner,
-        remark: leadFormData.remark
+        companyName: leadFormData.companyName,
+        employerName: leadFormData.employerName,
+        contactNumber: leadFormData.contactNumber,
+        dateOfJoining: leadFormData.dateOfJoining ? moment(leadFormData.dateOfJoining).format('YYYY-MM-DD') : null,
+        location: leadFormData.location
       };
-      // Add coordinates if location is selected
-      if (selectedLocation) {
-        leadData.coordinates = {
-          type: "Point",
-          coordinates: [selectedLocation.lng, selectedLocation.lat] // [longitude, latitude]
-        };
-      } else if (leadFormData.longitude && leadFormData.latitude) {
-        leadData.coordinates = {
-          type: "Point",
-          coordinates: [leadFormData.longitude, leadFormData.latitude] // [longitude, latitude]
-        };
-      }
 
-      // Send data to backend API
-      const response = await axios.post(`${backendUrl}/college/b2b/add-lead`, leadData, {
+      const response = await axios.post(`${backendUrl}/college/placementStatus/add-candidate`, leadData, {
         headers: {
           'x-auth': token,
           'Content-Type': 'application/json',
@@ -1194,7 +1139,7 @@ const Placements = () => {
 
       if (response.data.status) {
         // Show success message
-        alert('Lead added successfully!');
+        alert('Candidate added successfully!');
 
         // Refresh the leads list and status counts
         fetchLeads(null, 1);
@@ -1202,39 +1147,26 @@ const Placements = () => {
 
         // Reset form
         setLeadFormData({
-          leadCategory: '',
-          typeOfB2B: '',
-          businessName: '',
-          businessAddress: '',
-          concernPersonName: '',
-          address: '',
-          city: '',
-          state: '',
-          designation: '',
-          email: '',
-          mobile: '',
-          whatsapp: '',
-          landlineNumber: '',
-          leadOwner: '',
-          remark: ''
+          companyName: '',
+          employerName: '',
+          contactNumber: '',
+          dateOfJoining: null,
+          location: ''
         });
         setFormErrors({});
-        setExtractedNumbers([]);
-        setSelectedLocation(null);
-        setShowMap(false);
 
         // Close modal
         setShowAddLeadModal(false);
       } else {
-        alert(response.data.message || 'Failed to add lead');
+        alert(response.data.message || 'Failed to add candidate');
       }
 
     } catch (error) {
-      console.error('Error submitting lead:', error);
+      console.error('Error submitting candidate:', error);
       if (error.response?.data?.message) {
-        alert(`Failed to add lead: ${error.response.data.message}`);
+        alert(`Failed to add candidate: ${error.response.data.message}`);
       } else {
-        alert('Failed to add lead. Please try again.');
+        alert('Failed to add candidate. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -1245,26 +1177,13 @@ const Placements = () => {
   const handleCloseLeadModal = () => {
     setShowAddLeadModal(false);
     setLeadFormData({
-      leadCategory: '',
-      typeOfB2B: '',
-      businessName: '',
-      businessAddress: '',
-      concernPersonName: '',
-      address: '',
-      city: '',
-      state: '',
-      designation: '',
-      email: '',
-      mobile: '',
-      whatsapp: '',
-      landlineNumber: '',
-      leadOwner: '',
-      remark: ''
+      companyName: '',
+      employerName: '',
+      contactNumber: '',
+      dateOfJoining: null,
+      location: ''
     });
     setFormErrors({});
-    setExtractedNumbers([]);
-    setSelectedLocation(null);
-    setShowMap(false);
   };
 
   // Open lead modal and initialize autocomplete
@@ -2492,6 +2411,9 @@ const Placements = () => {
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
                     )}   */}
+                    <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleOpenLeadModal}>
+                        <i className="fas fa-plus me-1"></i> Add Candidate
+                      </button>
                     </div>
                   </div>
 
@@ -2524,11 +2446,11 @@ const Placements = () => {
                               border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
                             }}
                             onClick={handleTotalCardClick}
-                            title="Click to view all leads"
+                            title="Click to view all placements"
                           >
                             <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                               <div className="d-flex align-items-center">
-                                <i className="fas fa-chart-line me-1" style={{ color: '#007bff', fontSize: '12px' }}></i>
+                                <i className="fas fa-chart-line me-1" style={{ color: '#ffffff', fontSize: '12px' }}></i>
                                 <div>
                                   <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
                                   <small style={{ color: '#ffffff', fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
@@ -2537,35 +2459,112 @@ const Placements = () => {
                             </div>
                           </div>
 
-                          {/* Status Count Cards */}
-                          {statusCounts.map((status, index) => {
-                            const isSelected = selectedStatusFilter === status.statusId;
+                          {/* Placed Count Card */}
+                          {(() => {
+                            const placedStatus = statusCounts.find(s => s.statusName.toLowerCase() === 'placed');
+                            const isPlacedSelected = placedStatus && selectedStatusFilter === placedStatus.statusId;
                             return (
                               <div
-                                key={status.statusId || index}
-                                className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
+                                className={`card border-0 shadow-sm status-count-card status ${isPlacedSelected ? 'selected' : ''}`}
                                 style={{
                                   minWidth: '110px',
                                   height: '45px',
                                   cursor: 'pointer',
-                                  border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                  backgroundColor: isSelected ? '#f8f9ff' : 'white'
+                                  border: isPlacedSelected ? '2px solid #28a745' : '1px solid transparent',
+                                  backgroundColor: isPlacedSelected ? '#f0f9f0' : 'white'
                                 }}
-                                onClick={() => handleStatusCardClick(status.statusId)}
-                                title={`Click to view ${status.statusName} leads`}
+                                onClick={() => {
+                                  if (placedStatus) {
+                                    handleStatusCardClick(placedStatus.statusId);
+                                  }
+                                }}
+                                title="Click to view Placed placements"
                               >
                                 <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                                   <div className="d-flex align-items-center">
-                                    <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
+                                    <i className="fas fa-check-circle me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
                                     <div>
-                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>Placed</h6>
+                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{placedCount} leads</small>
                                     </div>
                                   </div>
                                 </div>
                               </div>
                             );
-                          })}
+                          })()}
+
+                          {/* UnPlaced Count Card */}
+                          {(() => {
+                            const unplacedStatus = statusCounts.find(s => s.statusName.toLowerCase() === 'unplaced');
+                            const isUnplacedSelected = (unplacedStatus && selectedStatusFilter === unplacedStatus.statusId) || 
+                                                      (!unplacedStatus && selectedStatusFilter === null);
+                            return (
+                              <div
+                                className={`card border-0 shadow-sm status-count-card status ${isUnplacedSelected ? 'selected' : ''}`}
+                                style={{
+                                  minWidth: '110px',
+                                  height: '45px',
+                                  cursor: 'pointer',
+                                  border: isUnplacedSelected ? '2px solid #dc3545' : '1px solid transparent',
+                                  backgroundColor: isUnplacedSelected ? '#fff5f5' : 'white'
+                                }}
+                                onClick={() => {
+                                  if (unplacedStatus) {
+                                    handleStatusCardClick(unplacedStatus.statusId);
+                                  } else {
+                                    // If no UnPlaced status, show null status
+                                    handleStatusCardClick(null);
+                                  }
+                                }}
+                                title="Click to view UnPlaced placements"
+                              >
+                                <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                                  <div className="d-flex align-items-center">
+                                    <i className="fas fa-times-circle me-1" style={{ color: '#dc3545', fontSize: '12px' }}></i>
+                                    <div>
+                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>UnPlaced</h6>
+                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{unplacedCount} leads</small>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Other Status Count Cards */}
+                          {statusCounts
+                            .filter(status => {
+                              const statusNameLower = status.statusName.toLowerCase();
+                              return statusNameLower !== 'placed' && statusNameLower !== 'unplaced';
+                            })
+                            .map((status, index) => {
+                              const isSelected = selectedStatusFilter === status.statusId;
+                              return (
+                                <div
+                                  key={status.statusId || index}
+                                  className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
+                                  style={{
+                                    minWidth: '110px',
+                                    height: '45px',
+                                    cursor: 'pointer',
+                                    border: isSelected ? '2px solid #007bff' : '1px solid transparent',
+                                    backgroundColor: isSelected ? '#f8f9ff' : 'white'
+                                  }}
+                                  onClick={() => handleStatusCardClick(status.statusId)}
+                                  title={`Click to view ${status.statusName} placements`}
+                                >
+                                  <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                                    <div className="d-flex align-items-center">
+                                      <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
+                                      <div>
+                                        <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
+                                        <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                         </>
                       )}
 
@@ -2599,67 +2598,49 @@ const Placements = () => {
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
                   <h5 className="mt-3 text-muted">
-                    {selectedStatusFilter ? 'No leads found for selected status' : 'No Placements Found'}
+                    {selectedStatusFilter ? 'No placements found for selected status' : 'No Placements Found'}
                   </h5>
                   <p className="text-muted">
-                    {selectedStatusFilter ? 'Try selecting a different status or add new leads.' : 'Start by adding your first Placement using the "Add Placement" button.'}
+                    {selectedStatusFilter ? 'Try selecting a different status or add new placements.' : 'Start by adding your first Placement using the "Add Candidate" button.'}
                   </p>
                 </div>
               ) : (
                 <div className="row g-2">
-                  {leads.map((lead, leadIndex) => (
-                    <div key={lead._id || leadIndex} className="col-12">
+                  {leads.map((placement, placementIndex) => (
+                    <div key={placement._id || placementIndex} className="col-12">
                       <div className="lead-card">
                         {/* Card Header */}
                         <div className="lead-header">
                           <div className="lead-title-section">
                             <h5 className="lead-business-name">
-                              {lead.businessName || 'Business Name Not Available'}
+                              {placement.companyName || 'Company Name Not Available'}
                             </h5>
                             <p className="lead-contact-person">
-                              <i className="fas fa-user me-2"></i>
-                              {lead.concernPersonName || 'Contact Person Not Available'}
+                              <i className="fas fa-user-tie me-2"></i>
+                              {placement.employerName || 'Employer Name Not Available'}
                             </p>
 
                             {/* Compact Contact Info */}
                             <div className="lead-contact-info">
-                              {lead.email && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-envelope"></i>
-                                  <span>{lead.email}</span>
-                                </div>
-                              )}
-                              {lead.designation && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-id-badge"></i>
-                                  <span>{lead.designation}</span>
-                                </div>
-                              )}
-                              {lead.mobile && (
+                              {placement.contactNumber && (
                                 <div className="lead-contact-item">
                                   <i className="fas fa-phone"></i>
-                                  <span>{lead.mobile}</span>
+                                  <span>{placement.contactNumber}</span>
                                 </div>
                               )}
-                              {lead.whatsapp && (
+                              {placement.dateOfJoining && (
                                 <div className="lead-contact-item">
-                                  <i className="fab fa-whatsapp"></i>
-                                  <span>{lead.whatsapp}</span>
+                                  <i className="fas fa-calendar"></i>
+                                  <span>{moment(placement.dateOfJoining).format('DD/MM/YYYY')}</span>
+                                </div>
+                              )}
+                              {placement.location && (
+                                <div className="lead-contact-item">
+                                  <i className="fas fa-map-marker-alt"></i>
+                                  <span>{placement.location}</span>
                                 </div>
                               )}
                             </div>
-                          </div>
-                          <div className="lead-badges">
-                            {lead.leadCategory?.name && (
-                              <span className="lead-badge category">
-                                {lead.leadCategory.name}
-                              </span>
-                            )}
-                            {lead.typeOfB2B?.name && (
-                              <span className="lead-badge type">
-                                {lead.typeOfB2B.name}
-                              </span>
-                            )}
                           </div>
                         </div>
 
@@ -2672,20 +2653,12 @@ const Placements = () => {
                                 <i className="fas fa-tag text-primary me-2"></i>
                                 <span className="fw-bold text-dark">Status:</span>
                                 <span className="ms-2 badge bg-primary">
-                                  {lead.status?.title || lead.status?.name || 'No Status'}
+                                  {placement.status?.title || 'No Status'}
                                 </span>
-                                {lead.subStatus && (
-                                  <span className="ms-2 badge bg-secondary">
-                                    {(() => {
-                                      const substatus = lead.status?.substatuses?.find(sub => sub._id === lead.subStatus);
-                                      return substatus?.title || 'No Sub-Status';
-                                    })()}
-                                  </span>
-                                )}
                               </div>
                               <button
                                 className="btn btn-sm btn-outline-primary"
-                                onClick={() => openEditPanel(lead, 'StatusChange')}
+                                onClick={() => openEditPanel(placement, 'StatusChange')}
                                 title="Change Status"
                               >
                                 <i className="fas fa-edit me-1"></i>
@@ -2697,32 +2670,32 @@ const Placements = () => {
                           {/* Compact Additional Info */}
                           <div className="compact-info-section">
                             <div className="compact-info-grid">
-                              {lead.address && (
+                              {placement.location && (
                                 <div className="compact-info-item">
                                   <i className="fas fa-map-marker-alt text-danger"></i>
-                                  <span className="compact-info-label">Address:</span>
-                                  <span className="compact-info-value">{lead.address}</span>
+                                  <span className="compact-info-label">Location:</span>
+                                  <span className="compact-info-value">{placement.location}</span>
                                 </div>
                               )}
-                              {lead.leadOwner?.name && (
+                              {placement.dateOfJoining && (
                                 <div className="compact-info-item">
-                                  <i className="fas fa-user-tie text-warning"></i>
-                                  <span className="compact-info-label">Owner:</span>
-                                  <span className="compact-info-value">{lead.leadOwner.name}</span>
+                                  <i className="fas fa-calendar text-info"></i>
+                                  <span className="compact-info-label">Date of Joining:</span>
+                                  <span className="compact-info-value">{moment(placement.dateOfJoining).format('DD/MM/YYYY')}</span>
                                 </div>
                               )}
-                              {lead.leadAddedBy?.name && (
+                              {placement.addedBy?.name && (
                                 <div className="compact-info-item">
-                                  <i className="fas fa-user-plus text-info"></i>
-                                  <span className="compact-info-label">Added:</span>
-                                  <span className="compact-info-value">{lead.leadAddedBy.name}</span>
+                                  <i className="fas fa-user-plus text-success"></i>
+                                  <span className="compact-info-label">Added By:</span>
+                                  <span className="compact-info-value">{placement.addedBy.name}</span>
                                 </div>
                               )}
-                              {lead.remark && (
+                              {placement.remark && (
                                 <div className="compact-info-item">
-                                  <i className="fas fa-comment text-success"></i>
+                                  <i className="fas fa-comment text-warning"></i>
                                   <span className="compact-info-label">Remarks:</span>
-                                  <span className="compact-info-value">{lead.remark}</span>
+                                  <span className="compact-info-value">{placement.remark}</span>
                                 </div>
                               )}
                             </div>
@@ -2732,26 +2705,10 @@ const Placements = () => {
                         {/* Action Buttons */}
                         <div className="lead-actions">
                           <div className="action-group primary">
-                            {/* <button
-                              className="action-btn view"
-                              onClick={() => togglePopup(leadIndex)}
-                              title="View Details"
-                            >
-                              <i className="fas fa-eye"></i>
-                              <span>View</span>
-                            </button> */}
-                            <button
-                              className="action-btn refer"
-                              onClick={() => openRefferPanel(lead, 'Reffer')}
-                              title="Refer Lead"
-                            >
-                              <i className="fas fa-share"></i>
-                              <span>Refer</span>
-                            </button>
                             <button
                               className="action-btn history"
-                              onClick={() => openleadHistoryPanel(lead)}
-                              title="Lead History"
+                              onClick={() => openleadHistoryPanel(placement)}
+                              title="Placement History"
                             >
                               <i className="fas fa-history"></i>
                               <span>History</span>
@@ -2760,14 +2717,14 @@ const Placements = () => {
                           <div className="action-group secondary">
                             <button
                               className="action-btn status"
-                              onClick={() => openEditPanel(lead, 'StatusChange')}
+                              onClick={() => openEditPanel(placement, 'StatusChange')}
                               title="Change Status"
                             >
                               <i className="fas fa-edit"></i>
                             </button>
                             <button
                               className="action-btn followup"
-                              onClick={() => openEditPanel(lead, 'SetFollowup')}
+                              onClick={() => openEditPanel(placement, 'SetFollowup')}
                               title="Set Follow-up"
                             >
                               <i className="fas fa-calendar-plus"></i>
@@ -3136,7 +3093,7 @@ const Placements = () => {
                 <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
                   <h5 className="modal-title d-flex align-items-center">
                     <i className="fas fa-user-plus me-2"></i>
-                    Add New B2B Lead
+                    Add Candidate
                   </h5>
                   <button
                     type="button"
@@ -3148,300 +3105,120 @@ const Placements = () => {
                 {/* Modal Body */}
                 <div className="modal-body p-4 " style={{ maxHeight: '100vh', overflowY: 'auto' }}>
                   <div className="row g-3">
-                    {/* Lead Category */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-tag text-primary me-1"></i>
-                        Lead Category <span className="text-danger">*</span>
-                      </label>
-                      <select
-                        className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
-                        name="leadCategory"
-                        value={leadFormData.leadCategory}
-                        onChange={handleLeadInputChange}
-                      >
-                        <option value="">Select Lead Category</option>
-                        {leadCategoryOptions.map(category => (
-                          <option key={category.value} value={category.value}>
-                            {category.label}
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.leadCategory && (
-                        <div className="invalid-feedback">
-                          {formErrors.leadCategory}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Type of B2B */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-building text-primary me-1"></i>
-                        Type of B2B <span className="text-danger">*</span>
-                      </label>
-                      <select
-                        className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
-                        name="typeOfB2B"
-                        value={leadFormData.typeOfB2B}
-                        onChange={handleLeadInputChange}
-                      >
-                        <option value="">Select B2B Type</option>
-                        {typeOfB2BOptions.map(type => (
-                          <option key={type.value} value={type.value}>
-                            {type.label}
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.typeOfB2B && (
-                        <div className="invalid-feedback">
-                          {formErrors.typeOfB2B}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Business Name */}
+                    {/* Company Name */}
                     <div className="col-12">
                       <label className="form-label fw-bold">
-                        <i className="fas fa-briefcase text-primary me-1"></i>
-                        Business Name <span className="text-danger">*</span>
+                        <i className="fas fa-building text-primary me-1"></i>
+                        Company Name <span className="text-danger">*</span>
                       </label>
                       <input
                         type="text"
-                        ref={businessNameInputRef}
-                        className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
-                        name="businessName"
-                        value={leadFormData.businessName}
+                        className={`form-control ${formErrors.companyName ? 'is-invalid' : ''}`}
+                        name="companyName"
+                        value={leadFormData.companyName}
                         onChange={handleLeadInputChange}
-                        placeholder="Enter business/company name"
+                        placeholder="Enter company name"
                       />
-
-                      {formErrors.businessName && (
+                      {formErrors.companyName && (
                         <div className="invalid-feedback">
-                          {formErrors.businessName}
+                          {formErrors.companyName}
                         </div>
                       )}
                     </div>
 
-                    {/* Business Address with Google Maps */}
+                    {/* Employer Name */}
+                    <div className="col-12">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-user-tie text-primary me-1"></i>
+                        Employer Name <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className={`form-control ${formErrors.employerName ? 'is-invalid' : ''}`}
+                        name="employerName"
+                        value={leadFormData.employerName}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter employer name"
+                      />
+                      {formErrors.employerName && (
+                        <div className="invalid-feedback">
+                          {formErrors.employerName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contact Number */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-phone text-primary me-1"></i>
+                        Contact Number <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        className={`form-control ${formErrors.contactNumber ? 'is-invalid' : ''}`}
+                        name="contactNumber"
+                        value={leadFormData.contactNumber}
+                        onChange={handleLeadMobileChange}
+                        placeholder="Enter contact number"
+                      />
+                      {formErrors.contactNumber && (
+                        <div className="invalid-feedback">
+                          {formErrors.contactNumber}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Date of Joining */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-calendar text-primary me-1"></i>
+                        Date of Joining <span className="text-danger">*</span>
+                      </label>
+                      <DatePicker
+                        onChange={(date) => {
+                          setLeadFormData(prev => ({
+                            ...prev,
+                            dateOfJoining: date
+                          }));
+                          if (formErrors.dateOfJoining) {
+                            setFormErrors(prev => ({
+                              ...prev,
+                              dateOfJoining: ''
+                            }));
+                          }
+                        }}
+                        value={leadFormData.dateOfJoining}
+                        format="dd/MM/yyyy"
+                        className={`form-control ${formErrors.dateOfJoining ? 'is-invalid' : ''}`}
+                      />
+                      {formErrors.dateOfJoining && (
+                        <div className="invalid-feedback d-block">
+                          {formErrors.dateOfJoining}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location */}
                     <div className="col-12">
                       <label className="form-label fw-bold">
                         <i className="fas fa-map-marker-alt text-primary me-1"></i>
-                        Business Address
+                        Location <span className="text-danger">*</span>
                       </label>
                       <input
                         type="text"
-                        className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
-                        name="address"
-                        value={leadFormData.address}
+                        className={`form-control ${formErrors.location ? 'is-invalid' : ''}`}
+                        name="location"
+                        value={leadFormData.location}
                         onChange={handleLeadInputChange}
-                        placeholder="Enter business address"
+                        placeholder="Enter location"
                       />
-
-                      {formErrors.businessAddress && (
-                        <div className="invalid-feedback d-block">
-                          {formErrors.businessAddress}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Manual Location Fields */}
-                    <div className="col-md-4">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-city text-primary me-1"></i>
-                        City
-                      </label>
-                      <input
-                        ref={cityInputRef}
-                        type="text"
-                        className="form-control"
-                        name="city"
-                        value={leadFormData.city}
-                        onChange={handleLeadInputChange}
-                        placeholder="Start typing city name..."
-                      />
-                    </div>
-
-                    <div className="col-md-4">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-map text-primary me-1"></i>
-                        State
-                      </label>
-                      <input
-                        ref={stateInputRef}
-                        type="text"
-                        className="form-control"
-                        name="state"
-                        value={leadFormData.state}
-                        onChange={handleLeadInputChange}
-                        placeholder="Start typing state name..."
-                      />
-                    </div>
-
-
-
-                    {/* Concern Person Name */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-user text-primary me-1"></i>
-                        Concern Person Name <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
-                        name="concernPersonName"
-                        value={leadFormData.concernPersonName}
-                        onChange={handleLeadInputChange}
-                        placeholder="Enter contact person name"
-                      />
-                      {formErrors.concernPersonName && (
+                      {formErrors.location && (
                         <div className="invalid-feedback">
-                          {formErrors.concernPersonName}
+                          {formErrors.location}
                         </div>
                       )}
                     </div>
-
-                    {/* Designation */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-id-badge text-primary me-1"></i>
-                        Designation
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="designation"
-                        value={leadFormData.designation}
-                        onChange={handleLeadInputChange}
-                        placeholder="e.g., HR Manager, CEO, Director"
-                      />
-                    </div>
-
-                    {/* Email */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-envelope text-primary me-1"></i>
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
-                        name="email"
-                        value={leadFormData.email}
-                        onChange={handleLeadInputChange}
-                        placeholder="Enter email address"
-                      />
-                      {formErrors.email && (
-                        <div className="invalid-feedback">
-                          {formErrors.email}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Mobile */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-phone text-primary me-1"></i>
-                        Mobile <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
-                        name="mobile"
-                        value={leadFormData.mobile}
-                        onChange={handleLeadMobileChange}
-                        placeholder="Enter mobile number"
-                      />
-                      {formErrors.mobile && (
-                        <div className="invalid-feedback">
-                          {formErrors.mobile}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* WhatsApp */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fab fa-whatsapp text-success me-1"></i>
-                        WhatsApp
-                      </label>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
-                        name="whatsapp"
-                        value={leadFormData.whatsapp}
-                        onChange={handleLeadMobileChange}
-                        placeholder="WhatsApp number"
-                      />
-                      {formErrors.whatsapp && (
-                        <div className="invalid-feedback">
-                          {formErrors.whatsapp}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Landline Number */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-phone text-primary me-1"></i>
-                        Landline Number
-                      </label>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        className={`form-control ${formErrors.landlineNumber ? 'is-invalid' : ''}`}
-                        name="landlineNumber"
-                        value={leadFormData.landlineNumber}
-                        onChange={handleLeadMobileChange}
-                        placeholder="Landline number"
-                      />
-                      {formErrors.landlineNumber && (
-                        <div className="invalid-feedback">
-                          {formErrors.landlineNumber}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Lead Owner */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-user-tie text-primary me-1"></i>
-                        Lead Owner
-                      </label>
-                      <select
-                        className="form-select"
-                        name="leadOwner"
-                        value={leadFormData.leadOwner}
-                        onChange={handleLeadInputChange}
-                      >
-                        <option value="">Select Lead Owner</option>
-                        {users?.map(user => (
-                          <option key={user?._id} value={user?._id}>
-                            {user?.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Remark */}
-                    <div className="col-12">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-comment text-primary me-1"></i>
-                        Remark
-                      </label>
-                      <textarea
-                        className="form-control"
-                        name="remark"
-                        value={leadFormData.remark}
-                        onChange={handleLeadInputChange}
-                        placeholder="Enter remark"
-                      />
-                    </div>
-
-
-
 
                   </div>
 
@@ -3461,10 +3238,10 @@ const Placements = () => {
                           type="button"
                           className="btn px-4"
                           style={{ backgroundColor: '#fc2b5a', color: 'white' }}
-                         
+                          onClick={handleLeadSubmit}
                         >
                           <i className="fas fa-save me-1"></i>
-                          Add Lead
+                          Add Candidate
                         </button>
                       </div>
                     </div>

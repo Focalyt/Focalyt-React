@@ -3,8 +3,9 @@ const express = require("express");
 const mongoose = require('mongoose');
 const router = express.Router();
 const { isCollege, auth1, authenti } = require("../../../helpers");
-// PlacementStatus Model
-const PlacementStatus = require('../../models/Placement');
+
+const PlacementStatus = require('../../models/PlacementStatus');
+const Placement = require('../../models/Placement');
 
 router.get('/', isCollege, async (req, res) => {
   try {
@@ -23,33 +24,22 @@ router.get('/', isCollege, async (req, res) => {
 
 router.get('/status-count', isCollege, async (req, res) => {
   try {
-    const { getAllTeamMembers } = require("../../../helpers");
-    const Lead = require('../../models/b2b/lead');
-    
-    let teamMembers = await getAllTeamMembers(req.user._id);
+    const college = req.user.college;
 
-    // Ownership Conditions for team members
-    const ownershipConditions = teamMembers.map(member => ({
-      $or: [{ leadAddedBy: member }, { leadOwner: member }]
-    }));
-
-    // Base query with ownership conditions
     const baseQuery = {
-      $and: [
-        ...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
-      ]
+      college: college._id
     };
 
     // Get all PlacementStatus statuses for the college
-    const statuses = await PlacementStatus.find({ college: req.user.college._id }).sort({ index: 1 });
+    const statuses = await PlacementStatus.find({ college: college._id }).sort({ index: 1 });
 
     // Get total count
-    const totalLeads = await Lead.countDocuments(baseQuery);
+    const totalPlacements = await Placement.countDocuments(baseQuery);
 
     // Get count by status
     const statusCounts = await Promise.all(
       statuses.map(async (status) => {
-        const count = await Lead.countDocuments({
+        const count = await Placement.countDocuments({
           ...baseQuery,
           status: status._id
         });
@@ -61,13 +51,12 @@ router.get('/status-count', isCollege, async (req, res) => {
       })
     );
 
-    // Get count for leads without status (null status)
-    const nullStatusCount = await Lead.countDocuments({
+    // Get count for placements without status (null status)
+    const nullStatusCount = await Placement.countDocuments({
       ...baseQuery,
       status: null
     });
 
-    // Add null status to the results if there are leads without status
     if (nullStatusCount > 0) {
       statusCounts.push({
         statusId: null,
@@ -80,8 +69,8 @@ router.get('/status-count', isCollege, async (req, res) => {
       status: true,
       data: {
         statusCounts,
-        totalLeads,
-        collegeId: req.user.college._id
+        totalLeads: totalPlacements,
+        collegeId: college._id
       },
       message: 'Placement status counts retrieved successfully'
     });
@@ -382,6 +371,132 @@ router.delete('/deleteSubStatus/:statusId/substatus/:substatusId', isCollege, as
   } catch (err) {
     console.error('Error deleting sub-status:', err.message);
     res.status(500).json({ success: false, message: 'Server Error', error: err.message });
+  }
+});
+
+
+router.get('/candidates', isCollege, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, search } = req.query;
+    const college = req.user.college;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const query = {
+      college: college._id
+    };
+
+    if (status) {
+      query.status = status;
+    }
+    if (search) {
+      query.$or = [
+        { companyName: { $regex: search, $options: 'i' } },
+        { employerName: { $regex: search, $options: 'i' } },
+        { contactNumber: { $regex: search, $options: 'i' } },
+        { location: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const placements = await Placement.find(query)
+      .populate('status', 'title')
+      .populate('addedBy', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalPlacements = await Placement.countDocuments(query);
+    const totalPages = Math.ceil(totalPlacements / parseInt(limit));
+
+    return res.status(200).json({
+      status: true,
+      message: 'Placements fetched successfully',
+      data: {
+        placements,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalPlacements,
+          limit: parseInt(limit)
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching placements:', err.message);
+    res.status(500).json({
+      status: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+router.post('/add-candidate', isCollege, async (req, res) => {
+  try {
+    const { companyName, employerName, contactNumber, dateOfJoining, location } = req.body;
+    const college = req.user.college;
+    const userId = req.user._id;
+
+    const missingFields = [];
+    if (!companyName) missingFields.push('companyName');
+    if (!employerName) missingFields.push('employerName');
+    if (!contactNumber) missingFields.push('contactNumber');
+    if (!dateOfJoining) missingFields.push('dateOfJoining');
+    if (!location) missingFields.push('location');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: false,
+        message: `Required fields missing: ${missingFields.join(', ')}`
+      });
+    }
+
+    const cleanContactNumber = contactNumber.replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(cleanContactNumber)) {
+      return res.status(400).json({
+        status: false,
+        message: 'Please enter a valid 10-digit contact number'
+      });
+    }
+
+    const newPlacement = new Placement({
+      companyName: companyName.trim(),
+      employerName: employerName.trim(),
+      contactNumber: cleanContactNumber,
+      dateOfJoining: new Date(dateOfJoining),
+      location: location.trim(),
+      college: college._id,
+      addedBy: userId,
+      logs: [{
+        user: userId,
+        action: 'Candidate added',
+        remarks: `New candidate added: ${employerName} at ${companyName}`
+      }]
+    });
+
+    const savedPlacement = await newPlacement.save();
+
+    return res.status(201).json({
+      status: true,
+      message: 'Candidate added successfully',
+      data: savedPlacement
+    });
+  } catch (err) {
+    console.error('Error adding candidate:', err.message);
+    
+
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({
+        status: false,
+        message: errors.join(', ')
+      });
+    }
+
+    res.status(500).json({
+      status: false,
+      message: 'Server Error',
+      error: err.message
+    });
   }
 });
 
