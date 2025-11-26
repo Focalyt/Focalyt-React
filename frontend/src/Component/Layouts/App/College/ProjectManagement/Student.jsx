@@ -862,7 +862,7 @@ const Student = ({
         );
 
         if (updateResponse.data.success || updateResponse.data.status) {
-          alert('Student moved to placements successfully with placement details!');
+          alert('Student moved to placements successfully');
           setShowPlacementModal(false);
           setStudentForPlacement(null);
           setPlacementFormData({
@@ -7380,8 +7380,8 @@ const Student = ({
       {/* Placement Details Modal */}
       {showPlacementModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered mx-auto">
+            <div className="modal-content p-0 mx-auto" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
               {/* Modal Header */}
               <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
                 <h5 className="modal-title d-flex align-items-center">
