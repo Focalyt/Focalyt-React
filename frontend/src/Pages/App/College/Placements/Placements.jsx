@@ -9,7 +9,6 @@ import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 
-// Google Maps API styles
 const mapStyles = `
 
   .map-container {
@@ -108,7 +107,6 @@ const MultiSelectCheckbox = ({
 
         {isOpen && (
           <div className="multi-select-options-new">
-            {/* Search functionality (optional) */}
             <div className="options-search">
               <div className="input-group input-group-sm">
                 <span className="input-group-text" style={{ height: '40px' }}>
@@ -274,6 +272,288 @@ const useMainWidth = (dependencies = []) => {// Default fallback
 
   return { widthRef, width };
 };
+// DocumentModal Component
+const DocumentModal = memo(({
+  showDocumentModal,
+  selectedDocument,
+  closeDocumentModal,
+  updateDocumentStatus,
+  getFileType
+}) => {
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [documentZoom, setDocumentZoom] = useState(1);
+  const [documentRotation, setDocumentRotation] = useState(0);
+  
+  const getStatusBadgeClass = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'text-dark';
+      case 'verified': return 'text-success';
+      case 'rejected': return 'text-danger';
+      default: return 'text-secondary';
+    }
+  };
+  
+  const latestUpload = useMemo(() => {
+    if (!selectedDocument) return null;
+    return selectedDocument.uploads && selectedDocument.uploads.length > 0
+      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+  }, [selectedDocument]);
+
+  const handleZoomIn = useCallback(() => {
+    setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+  }, []);
+
+  const handleRotate = useCallback(() => {
+    setDocumentRotation(prev => (prev + 90) % 360);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setDocumentZoom(1);
+    setDocumentRotation(0);
+  }, []);
+
+  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+  const handleRejectClick = useCallback(() => {
+    setShowRejectionForm(true);
+  }, []);
+
+  const handleCancelRejection = useCallback(() => {
+    setShowRejectionForm(false);
+    setRejectionReason('');
+  }, []);
+
+  const handleConfirmRejection = useCallback(() => {
+    if (rejectionReason.trim()) {
+      updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+      handleCancelRejection();
+    }
+  }, [latestUpload, selectedDocument, rejectionReason, updateDocumentStatus, handleCancelRejection]);
+
+  if (!showDocumentModal || !selectedDocument) return null;
+
+  return (
+    <div className="document-modal-overlay" onClick={closeDocumentModal} style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div className="document-modal-content" onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        maxWidth: '90vw',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+      }}>
+        <div className="modal-header" style={{
+          padding: '20px',
+          borderBottom: '1px solid #e9ecef',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h3 style={{ margin: 0 }}>{selectedDocument.Name} Verification</h3>
+          <button className="close-btn" onClick={closeDocumentModal} style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '28px',
+            cursor: 'pointer',
+            color: '#6c757d'
+          }}>&times;</button>
+        </div>
+
+        <div className="modal-body" style={{ padding: '20px' }}>
+          <div className="document-preview-section">
+            <div className="document-preview-container" style={{ height: 'auto', marginBottom: '20px' }}>
+              {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
+                <>
+                  {(() => {
+                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                    const fileType = getFileType(fileUrl);
+
+                    if (fileType === 'image') {
+                      return (
+                        <img
+                          src={fileUrl}
+                          alt="Document Preview"
+                          style={{
+                            transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                            transition: 'transform 0.3s ease',
+                            maxWidth: '100%',
+                            objectFit: 'contain'
+                          }}
+                        />
+                      );
+                    } else if (fileType === 'pdf') {
+                      return (
+                        <div className="pdf-viewer" style={{ width: '100%', height: '600px' }}>
+                          <iframe
+                            src={fileUrl + '#navpanes=0&toolbar=0'}
+                            width="100%"
+                            height="100%"
+                            style={{
+                              border: 'none',
+                              transform: `scale(${documentZoom})`,
+                              transformOrigin: 'top left',
+                              transition: 'transform 0.3s ease'
+                            }}
+                            title="PDF Document"
+                          />
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                          <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+                          <h4>Document Preview</h4>
+                          <a
+                            href={fileUrl}
+                            download
+                            className="btn btn-primary"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <i className="fas fa-download me-2"></i>
+                            Download & View
+                          </a>
+                        </div>
+                      );
+                    }
+                  })()}
+                  {fileUrl && (
+                    <div className="preview-controls" style={{
+                      display: 'flex',
+                      gap: '10px',
+                      marginTop: '15px',
+                      justifyContent: 'center'
+                    }}>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={handleZoomIn}>
+                        <i className="fas fa-search-plus"></i>
+                      </button>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={handleZoomOut}>
+                        <i className="fas fa-search-minus"></i>
+                      </button>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={handleRotate}>
+                        <i className="fas fa-redo"></i>
+                      </button>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={handleReset}>
+                        <i className="fas fa-compress"></i>
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="no-document" style={{ textAlign: 'center', padding: '40px' }}>
+                  <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+                  <p>No document uploaded</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="document-info-section">
+            <div className="info-card" style={{
+              padding: '15px',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px',
+              marginBottom: '15px'
+            }}>
+              <h4 style={{ marginBottom: '15px' }}>Document Information</h4>
+              <div className="info-row" style={{ marginBottom: '10px' }}>
+                <strong>Document Name:</strong> {selectedDocument.Name}
+              </div>
+              <div className="info-row" style={{ marginBottom: '10px' }}>
+                <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+                  new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  }) : 'N/A'}
+              </div>
+              <div className="info-row">
+                <strong>Status:</strong>
+                <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+                  {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {!showRejectionForm && (
+            <div className="document-actions" style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end',
+              marginTop: '20px'
+            }}>
+              <button
+                className="btn btn-success"
+                onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified', '')}
+                disabled={latestUpload?.status === 'Verified' || selectedDocument?.status === 'Verified'}
+              >
+                <i className="fas fa-check me-2"></i>
+                Verify
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleRejectClick}
+                disabled={latestUpload?.status === 'Rejected' || selectedDocument?.status === 'Rejected'}
+              >
+                <i className="fas fa-times me-2"></i>
+                Reject
+              </button>
+            </div>
+          )}
+
+          {showRejectionForm && (
+            <div className="rejection-form" style={{
+              marginTop: '20px',
+              padding: '15px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px'
+            }}>
+              <label className="form-label">
+                <strong>Rejection Reason:</strong>
+              </label>
+              <textarea
+                className="form-control"
+                rows="3"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason for rejection..."
+              />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button className="btn btn-primary" onClick={handleConfirmRejection}>
+                  Confirm Rejection
+                </button>
+                <button className="btn btn-secondary" onClick={handleCancelRejection}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -362,6 +642,10 @@ const Placements = () => {
   const [leadLogsLoading, setLeadLogsLoading] = useState(false);
   const [leadLogs, setLeadLogs] = useState([]);
 
+  // Job History and Course History state
+  const [jobHistory, setJobHistory] = useState([]);
+  const [courseHistory, setCourseHistory] = useState([]);
+
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -406,81 +690,61 @@ const Placements = () => {
 
   const [selectedProfiles, setSelectedProfiles] = useState([]);
 
-  // Users state for Lead Owner dropdown
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  const handleCheckboxChange = (placement, checked) => {
+    if (checked) {
+      setSelectedProfiles(prev => [...(Array.isArray(prev) ? prev : []), placement._id]);
+    } else {
+      setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== placement._id));
+    }
+  };
 
-  //side pannel stats
+  const handleTabClick = (placementIndex, tabIndex, placement) => {
+    setSelectedProfile(placement);
+    setActiveTab(prevTabs => ({
+      ...prevTabs,
+      [placementIndex]: tabIndex
+    }));
+    
+
+    const candidateId = placement._candidate?._id || placement._candidate || placement._student?._id || placement._student;
+    if (tabIndex === 2 && candidateId) {
+   
+      fetchJobHistory(candidateId);
+    } else if (tabIndex === 3 && candidateId) {
+    
+      fetchCourseHistory(candidateId);
+    }
+    
+    if (isMobile) {
+      setTimeout(() => {
+        const tabButton = document.querySelector(`.nav-pills .nav-link:nth-child(${tabIndex + 1})`);
+        if (tabButton) {
+          tabButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }
+      }, 100);
+    }
+  };
+
+  const toggleLeadDetails = (placementId) => {
+    setShowPopup(prev => prev === placementId ? null : placementId);
+  };
+
   const [showPanel, setShowPanel] = useState('')
 
-  // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
 
 
   // B2B Dropdown Options
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
-  const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
-
-  // Google Maps API
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState(null);
-  const [showMap, setShowMap] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const businessNameInputRef = useRef(null);
-  const cityInputRef = useRef(null);
-  const stateInputRef = useRef(null);
-  const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
-  const handleGoogleLogin = async () => {
-    try {
-      setIsgoogleLoginLoading(true);
-
-      const result = await getGoogleAuthCode({
-        scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
-        user: userData
-      });
-
-
-      const refreshToken = await getGoogleRefreshToken({
-        code: result,
-        user: userData
-      });
-
-
-      const user = {
-        ...userData,
-        googleAuthToken: refreshToken.data
-      }
-      sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
-
-      setUserData(user);
-
-
-    } catch (error) {
-      console.error('❌ Login failed:', error);
-
-      // Handle specific popup errors
-      if (error.message.includes('Popup blocked')) {
-        console.error('Please allow popups for this site and try again.');
-      } else if (error.message.includes('closed by user')) {
-        console.error('Login cancelled by user.');
-      } else {
-        console.error('Login failed: ' + error.message);
-      }
-
-    } finally {
-      setIsgoogleLoginLoading(false);
-      setShowPanel('followUp');
-
-    }
-    // initiateGoogleAuth();
-  };
-
-  // Simple function to add follow-up to Google Calendar
-  // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
     setFollowupFormData({
       followupDate: '',
@@ -499,243 +763,101 @@ const Placements = () => {
     e.preventDefault();
 
     try {
-      // Check if user has Google token
-      if (!userData.googleAuthToken?.accessToken) {
-        alert('Please login with Google first');
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('No placement selected');
         return;
       }
 
-      // Handle status change first
-      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
-        const statusData = {
-          status: seletectedStatus,
-          subStatus: seletectedSubStatus?._id || null,
-          remarks: followupFormData.remarks || 'Status updated via B2B panel'
-        };
-        await updateLeadStatus(selectedProfile._id, statusData);
+      if (!followupFormData.followupDate || !followupFormData.followupTime) {
+        alert('Followup date and time are mandatory. Please select both date and time.');
+        return;
       }
 
-      // Check if followup is required (either from followup panel or status change with followup)
-      const hasFollowup = (showPanel === 'followUp') ||
-        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+      if (!followupFormData.remarks || followupFormData.remarks.trim() === '') {
+        alert('Remarks are mandatory for followup. Please add remarks.');
+        return;
+      }
 
-      if (hasFollowup && followupFormData.followupDate && followupFormData.followupTime) {
-        // Get data from followupFormData
-        const scheduledDateTime = new Date(followupFormData.followupDate);
-        const [hours, minutes] = followupFormData.followupTime.split(':');
-        scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      const year = followupFormData.followupDate.getFullYear();
+      const month = String(followupFormData.followupDate.getMonth() + 1).padStart(2, "0");
+      const day = String(followupFormData.followupDate.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+      const followupDateTime = new Date(`${dateStr}T${followupFormData.followupTime}`);
 
-        // Create calendar event data
-        const event = {
-          summary: `B2B Follow-up: ${selectedProfile?.businessName || 'Unknown'}`,
-          description: `Follow-up with ${selectedProfile?.concernPersonName || 'Unknown'} (${selectedProfile?.designation || 'N/A'})\n\nBusiness: ${selectedProfile?.businessName || 'Unknown'}\nContact: ${selectedProfile?.mobile || 'N/A'}\nEmail: ${selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
-          start: {
-            dateTime: scheduledDateTime.toISOString(),
-            timeZone: 'Asia/Kolkata',
-          },
-          end: {
-            dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
-            timeZone: 'Asia/Kolkata',
-          },
-          reminders: {
-            useDefault: false,
-            overrides: [
-              { method: 'email', minutes: 24 * 60 }, // 1 day before
-              { method: 'popup', minutes: 60 }, // 1 hour before
-            ],
-          },
-        };
+      if (isNaN(followupDateTime.getTime())) {
+        alert('Invalid date/time combination');
+        return;
+      }
 
-        // Call backend API to create calendar event
-        const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-          user: userData,
-          event: event
+      const data = {
+        status: seletectedStatus || selectedProfile.status?._id || null,
+        subStatus: seletectedSubStatus?._id || selectedProfile.subStatus?._id || null,
+        followup: followupDateTime.toISOString(),
+        remarks: followupFormData.remarks || ''
+      };
+
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      const response = await axios.put(
+        `${backendUrl}/college/placementStatus/update-status/${selectedProfile._id}`,
+        data,
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        alert('Follow-up set successfully!');
+
+        setFollowupFormData({
+          followupDate: null,
+          followupTime: '',
+          remarks: ''
         });
 
-        if (response.data.success) {
-          alert('✅ Follow-up added to Google Calendar!');
-        } else {
-          alert('❌ Failed to add to Google Calendar');
-          console.error('❌ Failed to add to Google Calendar:', response.data.message);
-        }
-      } else if (showPanel === 'editPanel') {
-        // Status change without followup
-        alert('✅ Status updated successfully!');
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        closePanel();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to set follow-up');
       }
 
     } catch (error) {
-      console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
-      alert('❌ Error processing request');
-    }
-    finally {
-      closePanel();
+      console.error('Error setting follow-up:', error);
+      alert(error.response?.data?.message || 'Failed to set follow-up. Please try again.');
     }
   };
 
-  const initializeBusinessNameAutocomplete = () => {
-
-    // Check if Google Maps is available
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      return;
-    }
-
-    // Get input element using ref
-    const input = businessNameInputRef.current;
-    if (!input) {
-      return;
-    }
-
-
-    // Remove any existing autocomplete to prevent duplicates
-    if (input.autocomplete) {
-      window.google.maps.event.clearInstanceListeners(input);
-    }
-
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ['establishment'],
-      componentRestrictions: { country: 'in' },
-    });
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (!place || !place.geometry || !place.geometry.location) return;
-
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-
-      const placeNameOnly = place.name || input.value;
-
-      setLeadFormData(prev => ({
-        ...prev,
-        businessName: placeNameOnly
-      }));
-
-      let city = '', state = '';
-      place.address_components?.forEach((component) => {
-        const types = component.types.join(',');
-        if (types.includes("locality")) city = component.long_name;
-        if (types.includes("administrative_area_level_1")) state = component.long_name;
-        if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-      });
-
-      setLeadFormData(prev => ({
-        ...prev,
-        city: city,
-        state: state,
-        latitude: lat,
-        longitude: lng
-      }));
-
-      setLeadFormData(prev => ({
-        ...prev,
-        address: place.formatted_address || ''
-      }));
-    });
-
-    // Store reference to autocomplete
-    input.autocomplete = autocomplete;
-  };
 
   const initializeCityAutocomplete = () => {
-    // Check if Google Maps is available
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      return;
-    }
-
-    // Get input element using ref
-    const input = cityInputRef.current;
-    if (!input) {
-      return;
-    }
-
-    // Remove any existing autocomplete to prevent duplicates
-    if (input.autocomplete) {
-      window.google.maps.event.clearInstanceListeners(input);
-    }
-
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ['(cities)'],
-      componentRestrictions: { country: 'in' },
-    });
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (!place) return;
-
-      let city = '';
-      place.address_components?.forEach((component) => {
-        const types = component.types.join(',');
-        if (types.includes("locality")) city = component.long_name;
-        if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-      });
-
-      setLeadFormData(prev => ({
-        ...prev,
-        city: city || place.name || input.value
-      }));
-    });
-
-    // Store reference to autocomplete
-    input.autocomplete = autocomplete;
+    return;
   };
 
   const initializeStateAutocomplete = () => {
-    // Check if Google Maps is available
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      return;
-    }
-
-    // Get input element using ref
-    const input = stateInputRef.current;
-    if (!input) {
-      return;
-    }
-
-    // Remove any existing autocomplete to prevent duplicates
-    if (input.autocomplete) {
-      window.google.maps.event.clearInstanceListeners(input);
-    }
-
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ['administrative_area_level_1'],
-      componentRestrictions: { country: 'in' },
-    });
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (!place) return;
-
-      let state = '';
-      place.address_components?.forEach((component) => {
-        const types = component.types.join(',');
-        if (types.includes("administrative_area_level_1")) state = component.long_name;
-      });
-
-      setLeadFormData(prev => ({
-        ...prev,
-        state: state || place.name || input.value
-      }));
-    });
-
-    // Store reference to autocomplete
-    input.autocomplete = autocomplete;
+    return;
   };
 
-  // Fetch filter options from backend API on mount
 
   useEffect(() => {
-    // fetchB2BDropdownOptions();
     // fetchUsers(); 
-    fetchStatusCounts(); // Fetch status counts
+    fetchStatusCounts();
   }, []);
 
-
-  // Initialize autocomplete when modal is opened
   useEffect(() => {
     if (showAddLeadModal) {
-      // Small delay to ensure modal is fully rendered and Google Maps is loaded
       const timer = setTimeout(() => {
-        initializeBusinessNameAutocomplete();
         initializeCityAutocomplete();
         initializeStateAutocomplete();
       }, 300);
@@ -744,112 +866,36 @@ const Placements = () => {
     }
   }, [showAddLeadModal]);
 
-  // Fetch B2B dropdown options - Commented for placements filter
-  // const fetchB2BDropdownOptions = async () => {
-  //   try {
-  //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  //     const token = userData.token;
-  //     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-  //     // Fetch Lead Categories
-  //     const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories`, {
-  //       headers: { 'x-auth': token }
-  //     });
-  //     if (leadCategoriesRes.data.status) {
-  //       setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
-  //         value: cat._id,
-  //         label: cat.name || cat.title
-  //       })));
-  //     }
-
-  //     // Fetch Type of B2B
-  //     const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b`, {
-  //       headers: { 'x-auth': token }
-  //     });
-  //     if (typeOfB2BRes.data.status) {
-  //       setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({
-  //         value: type._id,
-  //         label: type.name
-  //       })));
-  //     }
-  //   } catch (err) {
-  //     console.error('Failed to fetch B2B dropdown options:', err);
-  //   }
-  // };
-
-
-
-  // Fetch users for Lead Owner dropdown - Commented for placements filter
-  // const fetchUsers = async () => {
-  //   try {
-  //     setLoadingUsers(true);
-  //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  //     const token = userData.token;
-  //     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-  //     const response = await axios.get(`${backendUrl}/college/users/b2b-users`, {
-  //       headers: { 'x-auth': token }
-  //     });
-
-  //     if (response.data.success) {
-  //       // Update users state with detailed access summary
-  //       setUsers(response.data.data);
-  //     } else {
-  //       console.error('Failed to fetch users:', response.data.message);
-  //     }
-  //   } catch (error) {
-  //     console.error('Error fetching users:', error);
-  //   } finally {
-  //     setLoadingUsers(false);
-  //   }
-  // };
-
-
-
-
-
-
-  // Email validation function
+  
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
-  // Mobile/WhatsApp number validation function
   const validateMobileNumber = (number) => {
-    // Remove all non-digit characters
     const cleanNumber = number.replace(/\D/g, '');
-    // Check if it's a valid Indian mobile number (10 digits starting with 6-9)
     const mobileRegex = /^[6-9]\d{9}$/;
     return mobileRegex.test(cleanNumber);
   };
 
-  // Extract mobile/WhatsApp numbers from text
   const extractMobileNumbers = (text) => {
     if (!text) return [];
-
-    // Regex to match various mobile number formats
     const mobileRegex = /(?:\+91[\s-]?)?[6-9]\d{9}|(?:\+91[\s-]?)?[0-9]{10}/g;
     const matches = text.match(mobileRegex) || [];
 
-    // Clean and validate numbers
     const validNumbers = matches
       .map(num => num.replace(/\D/g, ''))
       .filter(num => {
-        // Remove +91 prefix if present and validate
         const cleanNum = num.startsWith('91') && num.length === 12 ? num.slice(2) : num;
         return validateMobileNumber(cleanNum);
       })
       .map(num => {
-        // Remove +91 prefix if present
         return num.startsWith('91') && num.length === 12 ? num.slice(2) : num;
       });
 
-    // Return unique numbers (max 10)
     return [...new Set(validNumbers)].slice(0, 10);
   };
 
-  // Handle lead form input changes
   const handleLeadInputChange = (e) => {
     const { name, value } = e.target;
 
@@ -858,22 +904,18 @@ const Placements = () => {
       [name]: value
     }));
 
-    // Clear error for this field
     if (formErrors[name]) {
       setFormErrors(prev => ({
         ...prev,
         [name]: ''
       }));
     }
-
-    // Extract numbers from mobile and whatsapp fields
     if (name === 'mobile' || name === 'whatsapp') {
       const extracted = extractMobileNumbers(value);
       setExtractedNumbers(extracted);
     }
   };
 
-  // Handle mobile number input with validation
   const handleLeadMobileChange = (e) => {
     const { name, value } = e.target;
 
@@ -885,8 +927,6 @@ const Placements = () => {
         }));
       }
     }
-
-    // Only allow digits, spaces, hyphens, and plus sign
     const cleanValue = value.replace(/[^\d\s\-+]/g, '');
 
     setLeadFormData(prev => ({
@@ -894,7 +934,6 @@ const Placements = () => {
       [name]: cleanValue
     }));
 
-    // Clear error for this field
     if (formErrors[name]) {
       setFormErrors(prev => ({
         ...prev,
@@ -902,12 +941,9 @@ const Placements = () => {
       }));
     }
   };
-
-  // Validate lead form
   const validateLeadForm = () => {
     const errors = {};
 
-    // Required field validation
     if (!leadFormData.companyName) errors.companyName = 'Company name is required';
     if (!leadFormData.employerName) errors.employerName = 'Employer name is required';
     if (!leadFormData.contactNumber) {
@@ -922,19 +958,15 @@ const Placements = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Add state for leads data
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
 
-  // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
-  const [placedCount, setPlacedCount] = useState(0);
-  const [unplacedCount, setUnplacedCount] = useState(0);
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
 
-  // Filter states
+
   const [filters, setFilters] = useState({
     search: '',
     placementStatus: '', 
@@ -949,21 +981,18 @@ const Placements = () => {
     fetchLeads(null, 1);
   }, []);
 
-  // Handle status card click
   const handleStatusCardClick = (statusId) => {
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
     fetchLeads(statusId, 1);
   };
 
-  // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
     setSelectedStatusFilter(null);
     setCurrentPage(1);
     fetchLeads(null, 1);
   };
 
-  // Filter handlers
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
@@ -1004,7 +1033,6 @@ const Placements = () => {
       closePanel();
       setLoadingLeads(true);
 
-      // Build query parameters
       const params = {
         page: page,
         // limit: 10,           
@@ -1014,11 +1042,9 @@ const Placements = () => {
         params.status = statusFilter;
       }
 
-      // Add filter parameters
       if (filters.search) {
         params.search = filters.search;
       }
-      // Placement specific filters
       if (filters.placementStatus) {
         params.placementStatus = filters.placementStatus;
       }
@@ -1036,7 +1062,6 @@ const Placements = () => {
 
       if (response.data.status) {
         setLeads(response.data.data.placements || []);
-        // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
@@ -1052,7 +1077,6 @@ const Placements = () => {
     }
   };
 
-  // Fetch status counts
   const fetchStatusCounts = async () => {
     try {
       setLoadingStatusCounts(true);
@@ -1062,10 +1086,9 @@ const Placements = () => {
 
 
       if (response.data.status) {
-        setStatusCounts(response.data.data.statusCounts || []);
+        const statusCountsData = response.data.data.statusCounts || [];
+        setStatusCounts(statusCountsData);
         setTotalLeads(response.data.data.totalLeads || 0);
-        setPlacedCount(response.data.data.placedCount || 0);
-        setUnplacedCount(response.data.data.unplacedCount || 0);
       } else {
         console.error('Failed to fetch status counts:', response.data.message);
       }
@@ -1076,51 +1099,130 @@ const Placements = () => {
     }
   };
 
+  const handleUpdateStatus = async (e) => {
+    e.preventDefault();
 
-
-
-  // Update lead status
-  const updateLeadStatus = async (leadId, statusData) => {
     try {
-      // Get current status information for logging
-      const currentStatus = selectedProfile?.status?.name || 'Unknown';
-      const currentSubStatus = selectedProfile?.subStatus?.title || 'No Sub-Status';
-      const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
-      const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
+      if (showPanel === 'editPanel') {
+        if (!selectedProfile || !selectedProfile._id) {
+          alert('No placement selected');
+          return;
+        }
 
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+        const hasRemarksRequired = seletectedSubStatus && seletectedSubStatus.hasRemarks;
+        const hasFollowupRequired = seletectedSubStatus && seletectedSubStatus.hasFollowup;
 
+        if (hasRemarksRequired && (!followupFormData.remarks || followupFormData.remarks.trim() === '')) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
 
-      const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
-        headers: { 'x-auth': token }
-      });
+        if (hasFollowupRequired && (!followupFormData.followupDate || !followupFormData.followupTime)) {
+          alert('Followup date and time are mandatory for this status. Please select followup date and time.');
+          return;
+        }
+        let followupDateTime = null;
+        if (followupFormData.followupDate && followupFormData.followupTime) {
+          const year = followupFormData.followupDate.getFullYear();
+          const month = String(followupFormData.followupDate.getMonth() + 1).padStart(2, "0");
+          const day = String(followupFormData.followupDate.getDate()).padStart(2, "0");
 
-      if (response.data.status) {
-        alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
+          const dateStr = `${year}-${month}-${day}`;
+          followupDateTime = new Date(`${dateStr}T${followupFormData.followupTime}`);
 
-        // Refresh the leads list
-        fetchLeads(selectedStatusFilter, currentPage);
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
 
-        // Refresh status counts
-        fetchStatusCounts();
+        const data = {
+          status: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+          subStatus: seletectedSubStatus?._id || null,
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: followupFormData.remarks || ''
+        };
 
-        // Close the panel
-        closePanel();
-      } else {
-        alert(response.data.message || 'Failed to update lead status');
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+        const response = await axios.put(
+          `${backendUrl}/college/placementStatus/update-status/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.data.success) {
+          alert('Status updated successfully!');
+
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupFormData({
+            followupDate: null,
+            followupTime: '',
+            remarks: ''
+          });
+
+          
+          const profileId = selectedProfile._id;
+          const statusId = typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus;
+          
+          const selectedCrmFilter = crmFilters.find(f => f._id === statusId);
+          const milestone = selectedCrmFilter?.milestone;
+          
+          
+          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchStatusCounts();
+          
+         
+          if (profileId && milestone) {
+            const placementId = profileId;
+            
+            if (milestone.toLowerCase() === 'documents') {
+              setActiveTab(prevTabs => ({
+                ...prevTabs,
+                [placementId]: 1 
+              }));
+              
+              
+              if (leadDetailsVisible !== placementId) {
+                setLeadDetailsVisible(placementId);
+              }
+            }
+          }
+          
+          closePanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
       }
     } catch (error) {
-      console.error('Error updating lead status:', error);
-      alert('Failed to update lead status. Please try again.');
+      console.error('Error updating status:', error);
+      alert(error.response?.data?.message || 'Failed to update status. Please try again.');
     }
   };
 
-  // Handle lead form submission
   const handleLeadSubmit = async () => {
     if (!validateLeadForm()) {
       return;
     }
 
-    setLoading(true);
     try {
       const leadData = {
         companyName: leadFormData.companyName,
@@ -1138,14 +1240,10 @@ const Placements = () => {
       });
 
       if (response.data.status) {
-        // Show success message
         alert('Candidate added successfully!');
-
-        // Refresh the leads list and status counts
         fetchLeads(null, 1);
         fetchStatusCounts();
 
-        // Reset form
         setLeadFormData({
           companyName: '',
           employerName: '',
@@ -1155,12 +1253,10 @@ const Placements = () => {
         });
         setFormErrors({});
 
-        // Close modal
         setShowAddLeadModal(false);
       } else {
         alert(response.data.message || 'Failed to add candidate');
       }
-
     } catch (error) {
       console.error('Error submitting candidate:', error);
       if (error.response?.data?.message) {
@@ -1168,12 +1264,8 @@ const Placements = () => {
       } else {
         alert('Failed to add candidate. Please try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
-
-  // Close lead modal
   const handleCloseLeadModal = () => {
     setShowAddLeadModal(false);
     setLeadFormData({
@@ -1186,7 +1278,6 @@ const Placements = () => {
     setFormErrors({});
   };
 
-  // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
     setShowAddLeadModal(true);
   };
@@ -1218,6 +1309,245 @@ const Placements = () => {
   useEffect(() => {
     getPaginationPages()
   }, [totalPages])
+
+  useEffect(() => {
+    const containers = document.querySelectorAll('.circular-progress-container');
+    containers.forEach(container => {
+      const percent = container.getAttribute('data-percent');
+      const circle = container.querySelector('circle.circle-progress');
+      const progressText = container.querySelector('.progress-text');
+
+      if (circle && progressText) {
+        if (percent === 'NA' || percent === null || percent === undefined) {
+        
+          circle.style.strokeDasharray = 0;
+          circle.style.strokeDashoffset = 0;
+          progressText.innerText = 'NA';
+        } else {
+          const radius = 16;
+          const circumference = 2 * Math.PI * radius;
+          const offset = circumference - (percent / 100) * circumference;
+
+          circle.style.strokeDasharray = circumference;
+          circle.style.strokeDashoffset = offset;
+          progressText.innerText = percent + '%';
+        }
+      }
+    });
+  }, [leads]);
+
+  const scrollLeft = () => {
+    const container = document.querySelector('.scrollable-content');
+    if (container) {
+      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
+      container.scrollBy({ left: -cardWidth, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    const container = document.querySelector('.scrollable-content');
+    if (container) {
+      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
+      container.scrollBy({ left: cardWidth, behavior: 'smooth' });
+    }
+  };
+
+  const getFileType = (fileUrl) => {
+    if (!fileUrl) return 'unknown';
+    const extension = fileUrl.split('.').pop().toLowerCase();
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+      return 'image';
+    } else if (extension === 'pdf') {
+      return 'pdf';
+    } else if (['doc', 'docx'].includes(extension)) {
+      return 'document';
+    } else if (['xls', 'xlsx'].includes(extension)) {
+      return 'spreadsheet';
+    }
+    return 'unknown';
+  };
+
+  const filterDocuments = (documents = []) => {
+    if (!Array.isArray(documents)) return [];
+    if (statusFilter === 'all') return documents;
+
+    return documents.filter(doc => {
+      if (!doc.uploads || doc.uploads.length === 0) return statusFilter === 'none';
+
+      const lastUpload = doc.uploads[doc.uploads.length - 1];
+      if (!lastUpload || !lastUpload.status) return false;
+
+      return lastUpload.status.toLowerCase() === statusFilter;
+    });
+  };
+
+  const openDocumentModal = (document) => {
+    const isSameDocument = selectedDocument && selectedDocument._id === document._id;
+
+    setSelectedDocument(document);
+    setShowDocumentModal(true);
+
+    if (!isSameDocument) {
+      setDocumentZoom(1);
+      setDocumentRotation(0);
+    }
+  };
+
+  const closeDocumentModal = useCallback(() => {
+    setShowDocumentModal(false);
+    setSelectedDocument(null);
+    setDocumentZoom(1);
+    setDocumentRotation(0);
+  }, []);
+
+  const updateDocumentStatus = useCallback((uploadId, status, reason) => {
+    if (status === 'Rejected' && !reason?.trim()) {
+      alert('Please provide a rejection reason');
+      return;
+    }
+    alert(`Document ${status} successfully!`);
+    closeDocumentModal();
+    // Refresh placement data
+    fetchLeads(selectedStatusFilter, currentPage);
+  }, [closeDocumentModal, selectedStatusFilter, currentPage]);
+
+  const openUploadModal = (document) => {
+    setSelectedDocumentForUpload(document);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    // Open modal using Bootstrap
+    const modalElement = document.getElementById('staticBackdrop');
+    if (modalElement) {
+      const modal = new window.bootstrap.Modal(modalElement);
+      modal.show();
+    }
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    setSelectedDocumentForUpload(null);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    // Close modal using Bootstrap
+    const modalElement = document.getElementById('staticBackdrop');
+    if (modalElement) {
+      const modal = window.bootstrap.Modal.getInstance(modalElement);
+      if (modal) {
+        modal.hide();
+      }
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type (images and PDFs)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid file (JPG, PNG, GIF, or PDF)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size should be less than 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setUploadPreview(null);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !selectedDocumentForUpload || !selectedProfile) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 10) {
+        setUploadProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('doc', selectedDocumentForUpload._id);
+
+      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+
+      if (response.data.status) {
+        fetchLeads(selectedStatusFilter, currentPage);
+        alert('Document uploaded successfully! Status: Pending Review');
+
+        // Close modal
+        const closeButton = document.querySelector('#staticBackdrop .btn-close');
+        if (closeButton) {
+          closeButton.click();
+        }
+      } else {
+        alert('Failed to upload file');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const getDocumentCounts = (documents = []) => {
+    if (!Array.isArray(documents)) return {
+      totalRequired: 0,
+      uploadedCount: 0,
+      pendingVerificationCount: 0,
+      verifiedCount: 0,
+      RejectedCount: 0
+    };
+
+    const totalRequired = documents.length;
+    const uploadedCount = documents.filter(doc => doc.uploads && doc.uploads.length > 0).length;
+    const pendingVerificationCount = documents.filter(doc =>
+      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Pending'
+    ).length;
+    const verifiedCount = documents.filter(doc =>
+      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified'
+    ).length;
+    const RejectedCount = documents.filter(doc =>
+      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected'
+    ).length;
+
+    return {
+      totalRequired,
+      uploadedCount,
+      pendingVerificationCount,
+      verifiedCount,
+      RejectedCount
+    };
+  };
 
 
 
@@ -1266,7 +1596,10 @@ const Placements = () => {
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
   const tabs = [
-    'Lead Details', ,
+    'Lead Details',
+    'Profile',
+    'Job History',
+    'Course History',
     'Documents'
   ];
 
@@ -1354,13 +1687,14 @@ const Placements = () => {
         setCrmFilters([allFilter, ...status.map(r => ({
           _id: r._id,
           name: r.title,
-          milestone: r.milestone,  // agar backend me count nahi hai to 0
+          milestone: r.milestone,  
         }))]);
 
         setStatuses(status.map(r => ({
           _id: r._id,
           name: r.title,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
+          count: r.count || 0,  
+          substatuses: r.substatuses || [] 
         })));
 
 
@@ -1575,26 +1909,8 @@ const Placements = () => {
     }
   };
 
-  const toggleLeadDetails = (profileIndex) => {
-    setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
-  };
-
-
-
-  const scrollLeft = () => {
-    const container = document.querySelector('.scrollable-content');
-    if (container) {
-      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
-      container.scrollBy({ left: -cardWidth, behavior: 'smooth' });
-    }
-  };
-
-  const scrollRight = () => {
-    const container = document.querySelector('.scrollable-content');
-    if (container) {
-      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
-      container.scrollBy({ left: cardWidth, behavior: 'smooth' });
-    }
+  const toggleLeadDetailsExpand = (placementId) => {
+    setLeadDetailsVisible(prev => prev === placementId ? null : placementId);
   };
 
   // Render Status Change Panel
@@ -1616,145 +1932,127 @@ const Placements = () => {
         </div>
 
         <div className="card-body">
-          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
-            <form onSubmit={addFollowUpToGoogleCalendar}>
-              {/* Status Selection */}
-              <div className="mb-3">
-                <label htmlFor="status" className="form-label small fw-medium text-dark">
-                  Status<span className="text-danger">*</span>
-                </label>
-                <select
-                  className="form-select border-0 bgcolor"
-                  id="status"
-                  value={seletectedStatus}
-                  style={{
-                    height: '42px',
-                    paddingTop: '8px',
-                    paddingInline: '10px',
-                    width: '100%',
-                    backgroundColor: '#f1f2f6'
-                  }}
-                  onChange={handleStatusChange}
-                >
-                  <option value="">Select Status</option>
-                  {statuses.map((status, index) => (
-                    <option key={status._id} value={status._id}>{status.name}</option>
-                  ))}
-                </select>
-              </div>
+          <form onSubmit={handleUpdateStatus}>
+            {/* Status Selection */}
+            <div className="mb-3">
+              <label htmlFor="status" className="form-label small fw-medium text-dark">
+                Status<span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="status"
+                value={seletectedStatus}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  paddingInline: '10px',
+                  width: '100%',
+                  backgroundColor: '#f1f2f6'
+                }}
+                onChange={handleStatusChange}
+              >
+                <option value="">Select Status</option>
+                {statuses.map((status, index) => (
+                  <option key={status._id} value={status._id}>{status.name}</option>
+                ))}
+              </select>
+            </div>
 
-              {/* Sub-Status Selection */}
-              <div className="mb-3">
-                <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                  Sub-Status
-                </label>
-                <select
-                  className="form-select border-0 bgcolor"
-                  id="subStatus"
-                  value={seletectedSubStatus?._id || ''}
-                  style={{
-                    height: '42px',
-                    paddingTop: '8px',
-                    backgroundColor: '#f1f2f6',
-                    paddingInline: '10px',
-                    width: '100%'
-                  }}
-                  onChange={handleSubStatusChange}
-                >
-                  <option value="">Select Sub-Status</option>
-                  {subStatuses.map((subStatus, index) => (
-                    <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Sub-Status Selection */}
+            <div className="mb-3">
+              <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
+                Sub-Status
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="subStatus"
+                value={seletectedSubStatus?._id || ''}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  backgroundColor: '#f1f2f6',
+                  paddingInline: '10px',
+                  width: '100%'
+                }}
+                onChange={handleSubStatusChange}
+              >
+                <option value="">Select Sub-Status</option>
+                {subStatuses.map((subStatus, index) => (
+                  <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
+                ))}
+              </select>
+            </div>
 
-              {/* Follow-up Section (if substatus has followup) */}
-              {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
-                <div className="mb-3">
-                  <h6 className="text-dark mb-2">Follow-up Details</h6>
-                  <div className="row">
-                    <div className="col-6">
-                      <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                        Next Action Date <span className="text-danger">*</span>
-                      </label>
-                      <DatePicker
-                        className="form-control border-0 bgcolor"
-                        onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
-                        value={followupFormData.followupDate}
-                        format="dd/MM/yyyy"
-                        minDate={today}
-                      />
-                    </div>
-                    <div className="col-6">
-                      <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                        Time <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        className="form-control border-0 bgcolor"
-                        id="actionTime"
-                        onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
-                        value={followupFormData.followupTime}
-                        style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                      />
-                    </div>
+            {/* Follow-up Section (if substatus has followup) */}
+            {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
+              <div className="mb-3">
+                <h6 className="text-dark mb-2">Follow-up Details</h6>
+                <div className="row">
+                  <div className="col-6">
+                    <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                      Next Action Date <span className="text-danger">*</span>
+                    </label>
+                    <DatePicker
+                      className="form-control border-0 bgcolor"
+                      onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
+                      value={followupFormData.followupDate}
+                      format="dd/MM/yyyy"
+                      minDate={today}
+                    />
+                  </div>
+                  <div className="col-6">
+                    <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                      Time <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      className="form-control border-0 bgcolor"
+                      id="actionTime"
+                      onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
+                      value={followupFormData.followupTime}
+                      style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                    />
                   </div>
                 </div>
-              )}
-
-              {/* Remarks Section - Only show if substatus has hasRemarks: true */}
-              {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
-                <div className="mb-3">
-                  <label htmlFor="remarks" className="form-label small fw-medium text-dark">
-                    Remarks <span className="text-danger">*</span>
-                  </label>
-                  <textarea
-                    className="form-control border-0 bgcolor"
-                    id="remarks"
-                    rows="4"
-                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                    value={followupFormData.remarks}
-                    placeholder="Enter remarks about this status change..."
-                    style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-                    required
-                  />
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closePanel}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                >
-                  Update Status
-                </button>
               </div>
-            </form>
-          ) : !isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>
-                  Login with Google to Update Status
-                </button>
+            )}
+
+            {/* Remarks Section - Only show if substatus has hasRemarks: true */}
+            {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
+              <div className="mb-3">
+                <label htmlFor="remarks" className="form-label small fw-medium text-dark">
+                  Remarks <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  className="form-control border-0 bgcolor"
+                  id="remarks"
+                  rows="4"
+                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                  value={followupFormData.remarks}
+                  placeholder="Enter remarks about this status change..."
+                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                  required
+                />
               </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={closePanel}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+              >
+                Update Status
+              </button>
             </div>
-          )}
-
-          {isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
-            </div>
-          )}
+          </form>
         </div>
       </div>
     );
@@ -1823,8 +2121,7 @@ const Placements = () => {
         </div>
 
         <div className="card-body" style={{ padding: '24px' }}>
-          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
-            <form onSubmit={addFollowUpToGoogleCalendar}>
+          <form onSubmit={addFollowUpToGoogleCalendar}>
               {/* Follow-up Date and Time */}
               <div className="row mb-4">
                 <div className="col-6">
@@ -1931,23 +2228,6 @@ const Placements = () => {
                 </button>
               </div>
             </form>
-          ) : !isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>
-                  Login with Google to Set Follow-up
-                </button>
-              </div>
-            </div>
-          )}
-
-          {isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -2086,11 +2366,11 @@ const Placements = () => {
   const fetchLeadLogs = async (leadId) => {
     try {
       setLeadLogsLoading(true);
-      const response = await axios.get(`${backendUrl}/college/b2b/leads/${leadId}/logs`, {
+      const response = await axios.get(`${backendUrl}/college/placementStatus/${leadId}/logs`, {
         headers: { 'x-auth': token }
       });
-      if (response.data.status) {
-        // console.log(response.data.data, 'response.data.data')
+      if (response.data.success) {
+        console.log(response.data.data, 'response.data.data')
         setLeadLogs(response.data.data);
       }
     } catch (error) {
@@ -2098,7 +2378,49 @@ const Placements = () => {
     } finally {
       setLeadLogsLoading(false);
     }
-  }
+  };
+
+  // Fetch Job History
+  const fetchJobHistory = async (candidateId) => {
+    try {
+      if (!candidateId) {
+        setJobHistory([]);
+        return;
+      }
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${candidateId}`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      } else {
+        setJobHistory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching job history:', error);
+      setJobHistory([]);
+    }
+  };
+
+  // Fetch Course History
+  const fetchCourseHistory = async (candidateId) => {
+    try {
+      if (!candidateId) {
+        setCourseHistory([]);
+        return;
+      }
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${candidateId}`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      } else {
+        setCourseHistory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching course history:', error);
+      setCourseHistory([]);
+    }
+  };
 
   useEffect(() => {
     if (showPanel === 'leadHistory') {
@@ -2138,15 +2460,15 @@ const Placements = () => {
                   minHeight: '200px'
                 }}
               >
-                {leadLogs && leadLogs.logs && leadLogs.logs.length > 0 ? (
+                {leadLogs && Array.isArray(leadLogs) && leadLogs.length > 0 ? (
                   <div className="timeline">
-                    {leadLogs.logs.map((log, index) => (
+                    {leadLogs.map((log, index) => (
                       <div key={index} className="timeline-item mb-4">
                         <div className="timeline-marker">
                           <div className="timeline-marker-icon">
                             <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                           </div>
-                          {index !== leadLogs.logs.length - 1 && (
+                          {index !== leadLogs.length - 1 && (
                             <div className="timeline-line"></div>
                           )}
                         </div>
@@ -2166,9 +2488,54 @@ const Placements = () => {
                                 </span>
                                 <small className="text-muted">
                                   <i className="fas fa-user me-1"></i>
-                                  Modified By: {log.user || 'Unknown User'}
+                                  Modified By: {log.user?.name || log.user?.email || 'Unknown User'}
                                 </small>
                               </div>
+
+                              {(log.statusChange || log.subStatusChange || log.currentStatus || log.currentSubStatus) && (
+                                <div className="mb-2 p-2 bg-light rounded">
+                                  {log.statusChange && (
+                                    <div className="mb-1">
+                                      <strong className="text-dark d-block mb-1">
+                                        <i className="fas fa-flag me-1 text-primary"></i>Status:
+                                      </strong>
+                                      <span className="text-muted small">
+                                        {log.statusChange.from} → <strong className="text-primary">{log.statusChange.to}</strong>
+                                      </span>
+                                    </div>
+                                  )}
+                                  {log.subStatusChange && (
+                                    <div className="mb-1">
+                                      <strong className="text-dark d-block mb-1">
+                                        <i className="fas fa-tag me-1 text-info"></i>Sub-Status:
+                                      </strong>
+                                      <span className="text-muted small">
+                                        {log.subStatusChange.from} → <strong className="text-info">{log.subStatusChange.to}</strong>
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!log.statusChange && !log.subStatusChange && (
+                                    <>
+                                      {log.currentStatus && log.currentStatus !== 'No Status' && (
+                                        <div className="mb-1">
+                                          <strong className="text-dark d-block mb-1">
+                                            <i className="fas fa-flag me-1 text-primary"></i>Status:
+                                          </strong>
+                                          <span className="text-primary small">{log.currentStatus}</span>
+                                        </div>
+                                      )}
+                                      {log.currentSubStatus && log.currentSubStatus !== 'No Sub-Status' && (
+                                        <div className="mb-1">
+                                          <strong className="text-dark d-block mb-1">
+                                            <i className="fas fa-tag me-1 text-info"></i>Sub-Status:
+                                          </strong>
+                                          <span className="text-info small">{log.currentSubStatus}</span>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )}
 
                               <div className="mb-2">
                                 <strong className="text-dark d-block mb-1">Action:</strong>
@@ -2461,9 +2828,9 @@ const Placements = () => {
 
                           {/* Placed Count Card */}
                           {(() => {
-                            const placedStatus = statusCounts.find(s => s.statusName.toLowerCase() === 'placed');
+                            const placedStatus = statusCounts.find(s => s.statusName && s.statusName.toLowerCase() === 'placed');
                             const isPlacedSelected = placedStatus && selectedStatusFilter === placedStatus.statusId;
-                            return (
+                            return placedStatus ? (
                               <div
                                 className={`card border-0 shadow-sm status-count-card status ${isPlacedSelected ? 'selected' : ''}`}
                                 style={{
@@ -2474,9 +2841,7 @@ const Placements = () => {
                                   backgroundColor: isPlacedSelected ? '#f0f9f0' : 'white'
                                 }}
                                 onClick={() => {
-                                  if (placedStatus) {
-                                    handleStatusCardClick(placedStatus.statusId);
-                                  }
+                                  handleStatusCardClick(placedStatus.statusId);
                                 }}
                                 title="Click to view Placed placements"
                               >
@@ -2485,20 +2850,20 @@ const Placements = () => {
                                     <i className="fas fa-check-circle me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
                                     <div>
                                       <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>Placed</h6>
-                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{placedCount} leads</small>
+                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{placedStatus.count || 0} leads</small>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            );
+                            ) : null;
                           })()}
 
                           {/* UnPlaced Count Card */}
                           {(() => {
-                            const unplacedStatus = statusCounts.find(s => s.statusName.toLowerCase() === 'unplaced');
+                            const unplacedStatus = statusCounts.find(s => s.statusName && s.statusName.toLowerCase() === 'unplaced');
                             const isUnplacedSelected = (unplacedStatus && selectedStatusFilter === unplacedStatus.statusId) || 
                                                       (!unplacedStatus && selectedStatusFilter === null);
-                            return (
+                            return unplacedStatus ? (
                               <div
                                 className={`card border-0 shadow-sm status-count-card status ${isUnplacedSelected ? 'selected' : ''}`}
                                 style={{
@@ -2509,12 +2874,7 @@ const Placements = () => {
                                   backgroundColor: isUnplacedSelected ? '#fff5f5' : 'white'
                                 }}
                                 onClick={() => {
-                                  if (unplacedStatus) {
-                                    handleStatusCardClick(unplacedStatus.statusId);
-                                  } else {
-                                    // If no UnPlaced status, show null status
-                                    handleStatusCardClick(null);
-                                  }
+                                  handleStatusCardClick(unplacedStatus.statusId);
                                 }}
                                 title="Click to view UnPlaced placements"
                               >
@@ -2523,12 +2883,12 @@ const Placements = () => {
                                     <i className="fas fa-times-circle me-1" style={{ color: '#dc3545', fontSize: '12px' }}></i>
                                     <div>
                                       <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>UnPlaced</h6>
-                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{unplacedCount} leads</small>
+                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{unplacedStatus.count || 0} leads</small>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            );
+                            ) : null;
                           })()}
 
                           {/* Other Status Count Cards */}
@@ -2605,135 +2965,1669 @@ const Placements = () => {
                   </p>
                 </div>
               ) : (
-                <div className="row g-2">
-                  {leads.map((placement, placementIndex) => (
-                    <div key={placement._id || placementIndex} className="col-12">
-                      <div className="lead-card">
-                        {/* Card Header */}
-                        <div className="lead-header">
-                          <div className="lead-title-section">
-                            <h5 className="lead-business-name">
-                              {placement.companyName || 'Company Name Not Available'}
-                            </h5>
-                            <p className="lead-contact-person">
-                              <i className="fas fa-user-tie me-2"></i>
-                              {placement.employerName || 'Employer Name Not Available'}
-                            </p>
+                <div className="row">
+                  <div>
+                    <div className="col-12 rounded equal-height-2 coloumn-2">
+                      <div className="card px-3">
+                        <div className="row" id="crm-main-row">
+                          {/* Profiles List */}
+                          {leads && leads.map((placement, placementIndex) => (
+                            <div className={`card-content transition-col mb-2`} key={placement._id || placementIndex}>
 
-                            {/* Compact Contact Info */}
-                            <div className="lead-contact-info">
-                              {placement.contactNumber && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-phone"></i>
-                                  <span>{placement.contactNumber}</span>
-                                </div>
-                              )}
-                              {placement.dateOfJoining && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-calendar"></i>
-                                  <span>{moment(placement.dateOfJoining).format('DD/MM/YYYY')}</span>
-                                </div>
-                              )}
-                              {placement.location && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-map-marker-alt"></i>
-                                  <span>{placement.location}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                              {/* Profile Header Card */}
+                              <div className="card border-0 shadow-sm mb-0 mt-2">
+                                <div className="card-body px-1 py-0 my-2">
+                                  <div className="row align-items-center justify-content-around">
+                                    <div className="col-md-7">
+                                      <div className="d-flex align-items-center">
+                                        <div className="form-check me-md-3 me-sm-1 me-1">
+                                          <input 
+                                            onChange={(e) => handleCheckboxChange(placement, e.target.checked)} 
+                                            className="form-check-input" 
+                                            type="checkbox" 
+                                          />
+                                        </div>
+                                        <div className="me-md-3 me-sm-1 me-1">
+                                          {/* Placeholder for circular progress - can be customized for placements */}
+                                          <div className="circular-progress-container" data-percent="NA">
+                                            <svg width="40" height="40">
+                                              <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                              <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                            </svg>
+                                            <div className="progress-text"></div>
+                                          </div>
+                                        </div>
+                                        <div className="d-flex flex-column">
+                                          <h6 className="mb-0 fw-bold">{placement._candidate?.name || placement._student?.name || placement.studentName || 'Student Name'}</h6>
+                                          <small className="text-muted">{placement._candidate?.email || placement._student?.email || placement.studentEmail || 'Email'}</small>
+                                          <small className="text-muted">{placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || 'Mobile Number'}</small>
+                                        </div>
+                                        <div className='whatsappbutton'>
+                                          <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                            <a href={`tel:${placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || placement.contactNumber}`} target="_blank" rel="noopener noreferrer">
+                                              <i className="fas fa-phone"></i>
+                                            </a>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
 
-                        {/* Card Content */}
-                        <div className="lead-content">
-                          {/* Status Section */}
-                          <div className="status-section mb-2">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center">
-                                <i className="fas fa-tag text-primary me-2"></i>
-                                <span className="fw-bold text-dark">Status:</span>
-                                <span className="ms-2 badge bg-primary">
-                                  {placement.status?.title || 'No Status'}
-                                </span>
+                                    <div className="col-md-3 mt-3">
+                                      <div className="d-flex gap-2">
+                                        <div className="flex-grow-1">
+                                          <input
+                                            type="text"
+                                            className="form-control form-control-sm m-0"
+                                            style={{
+                                              cursor: 'pointer',
+                                              border: '1px solid #ddd',
+                                              borderRadius: '0px',
+                                              borderTopRightRadius: '5px',
+                                              borderTopLeftRadius: '5px',
+                                              width: '145px',
+                                              height: '20px',
+                                              fontSize: '10px'
+                                            }}
+                                            value={placement.status?.title || 'No Status'}
+                                            readOnly
+                                            onClick={() => {
+                                              openEditPanel(placement, 'StatusChange');
+                                            }}
+                                          />
+                                          <input
+                                            type="text"
+                                            className="form-control form-control-sm m-0"
+                                            value={(() => {
+                                             
+                                              if (placement.subStatus && placement.status) {
+                                               
+                                                if (placement.status.substatuses && Array.isArray(placement.status.substatuses)) {
+                                                  const subStatus = placement.status.substatuses.find(
+                                                    s => s._id.toString() === placement.subStatus.toString()
+                                                  );
+                                                  if (subStatus) return subStatus.title;
+                                                }
+                                               
+                                                if (statuses && statuses.length > 0) {
+                                                  const statusId = placement.status._id || placement.status;
+                                                  const statusObj = statuses.find(s => s._id === statusId);
+                                                  if (statusObj && statusObj.substatuses && Array.isArray(statusObj.substatuses)) {
+                                                    const subStatus = statusObj.substatuses.find(
+                                                      s => s._id.toString() === placement.subStatus.toString()
+                                                    );
+                                                    if (subStatus) return subStatus.title;
+                                                  }
+                                                }
+                                               
+                                                if (typeof placement.subStatus === 'object' && placement.subStatus.title) {
+                                                  return placement.subStatus.title;
+                                                }
+                                              }
+                                              return '';
+                                            })()}
+                                            style={{
+                                              cursor: 'pointer',
+                                              border: '1px solid #ddd',
+                                              borderRadius: '0px',
+                                              borderBottomRightRadius: '5px',
+                                              borderBottomLeftRadius: '5px',
+                                              width: '145px',
+                                              height: '20px',
+                                              fontSize: '10px'
+                                            }}
+                                            readOnly
+                                            onClick={() => {
+                                              openEditPanel(placement, 'StatusChange');
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                      <div className="btn-group">
+                                        {/* Three-dot button for mobile - Opens Modal */}
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          onClick={() => toggleLeadDetails(placement._id || placementIndex)}
+                                          aria-label="Options"
+                                        >
+                                          <i className="fas fa-ellipsis-v"></i>
+                                        </button>
+
+                                        {/* Expand/Collapse button */}
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          onClick={() => toggleLeadDetailsExpand(placement._id || placementIndex)}
+                                        >
+                                          {leadDetailsVisible === (placement._id || placementIndex) ? (
+                                            <i className="fas fa-chevron-up"></i>
+                                          ) : (
+                                            <i className="fas fa-chevron-down"></i>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                      <div className="btn-group">
+
+                                        <div style={{ position: "relative", display: "inline-block" }}>
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => toggleLeadDetails(placement._id || placementIndex)}
+                                            aria-label="Options"
+                                          >
+                                            <i className="fas fa-ellipsis-v"></i>
+                                          </button>
+
+                                          {/* Overlay for click outside */}
+                                          {showPopup === (placement._id || placementIndex) && (
+                                            <div
+                                              onClick={() => setShowPopup(null)}
+                                              style={{
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100vw",
+                                                height: "100vh",
+                                                backgroundColor: "transparent",
+                                                zIndex: 8,
+                                              }}
+                                            ></div>
+                                          )}
+
+                                          <div
+                                            style={{
+                                              position: "absolute",
+                                              top: "28px",
+                                              right: "-100px",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                              borderRadius: "4px",
+                                              padding: "8px 0",
+                                              zIndex: 9,
+                                              transform: showPopup === (placement._id || placementIndex) ? "translateX(-70px)" : "translateX(100%)",
+                                              transition: "transform 0.3s ease-in-out",
+                                              pointerEvents: showPopup === (placement._id || placementIndex) ? "auto" : "none",
+                                              display: showPopup === (placement._id || placementIndex) ? "block" : "none"
+                                            }}
+                                          >
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openEditPanel(placement, 'SetFollowup');
+                                                setShowPopup(null);
+                                              }}
+                                            >
+                                              Set Followup
+                                            </button>
+
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openleadHistoryPanel(placement);
+                                                setShowPopup(null);
+                                              }}
+                                            >
+                                              History List
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          onClick={() => toggleLeadDetailsExpand(placement._id || placementIndex)}
+                                        >
+                                          {leadDetailsVisible === (placement._id || placementIndex) ? (
+                                            <i className="fas fa-chevron-up"></i>
+                                          ) : (
+                                            <i className="fas fa-chevron-down"></i>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                              <button
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => openEditPanel(placement, 'StatusChange')}
-                                title="Change Status"
-                              >
-                                <i className="fas fa-edit me-1"></i>
-                                Change Status
-                              </button>
-                            </div>
-                          </div>
 
-                          {/* Compact Additional Info */}
-                          <div className="compact-info-section">
-                            <div className="compact-info-grid">
-                              {placement.location && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-map-marker-alt text-danger"></i>
-                                  <span className="compact-info-label">Location:</span>
-                                  <span className="compact-info-value">{placement.location}</span>
+                              {/* Tab Navigation and Content Card */}
+                              <div className="card border-0 shadow-sm mb-4">
+                                <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                                  <ul 
+                                    className="nav nav-pills nav-pills-sm"
+                                    style={{
+                                      display: 'flex',
+                                      flexWrap: isMobile ? 'nowrap' : 'wrap',
+                                      overflowX: isMobile ? 'auto' : 'visible',
+                                      overflowY: 'hidden',
+                                      WebkitOverflowScrolling: 'touch',
+                                      scrollbarWidth: 'none',
+                                      msOverflowStyle: 'none',
+                                      gap: '8px',
+                                      paddingBottom: isMobile ? '8px' : '0'
+                                    }}
+                                  >
+                                    {tabs.map((tab, tabIndex) => (
+                                      <li 
+                                        className="nav-item" 
+                                        key={tabIndex}
+                                        style={{
+                                          flexShrink: isMobile ? 0 : 1,
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        <button
+                                          className={`nav-link ${(activeTab[placement._id || placementIndex] || 0) === tabIndex ? 'active' : ''}`}
+                                          onClick={() => handleTabClick(placement._id || placementIndex, tabIndex, placement)}
+                                          style={{
+                                            minWidth: isMobile ? 'auto' : 'unset',
+                                            padding: isMobile ? '8px 16px' : '0.5rem 1rem',
+                                            fontSize: isMobile ? '13px' : '14px',
+                                            borderRadius: '8px',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                        >
+                                          {tab}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </div>
-                              )}
-                              {placement.dateOfJoining && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-calendar text-info"></i>
-                                  <span className="compact-info-label">Date of Joining:</span>
-                                  <span className="compact-info-value">{moment(placement.dateOfJoining).format('DD/MM/YYYY')}</span>
-                                </div>
-                              )}
-                              {placement.addedBy?.name && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-user-plus text-success"></i>
-                                  <span className="compact-info-label">Added By:</span>
-                                  <span className="compact-info-value">{placement.addedBy.name}</span>
-                                </div>
-                              )}
-                              {placement.remark && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-comment text-warning"></i>
-                                  <span className="compact-info-label">Remarks:</span>
-                                  <span className="compact-info-value">{placement.remark}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                                {leadDetailsVisible === (placement._id || placementIndex) && (
+                                  <div className="tab-content">
 
-                        {/* Action Buttons */}
-                        <div className="lead-actions">
-                          <div className="action-group primary">
-                            <button
-                              className="action-btn history"
-                              onClick={() => openleadHistoryPanel(placement)}
-                              title="Placement History"
-                            >
-                              <i className="fas fa-history"></i>
-                              <span>History</span>
-                            </button>
-                          </div>
-                          <div className="action-group secondary">
-                            <button
-                              className="action-btn status"
-                              onClick={() => openEditPanel(placement, 'StatusChange')}
-                              title="Change Status"
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="action-btn followup"
-                              onClick={() => openEditPanel(placement, 'SetFollowup')}
-                              title="Set Follow-up"
-                            >
-                              <i className="fas fa-calendar-plus"></i>
-                            </button>
-                          </div>
+                                    {/* Lead Details Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 0 && (
+                                      <div className="tab-pane active" id="lead-details">
+                                       
+                                        {/* Your lead details content here */}
+                                        <div className="scrollable-container mobile-scrollable">
+                                          <div className="scrollable-content">
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD AGE</div>
+                                                <div className="info-value">{placement.createdAt ?
+                                                  Math.floor((new Date() - new Date(placement.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                  : 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">PROJECT</div>
+                                                <div className="info-value">{placement.projectName || placement.project?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">NEXT ACTION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.followup?.followupDate ? (() => {
+                                                    const dateObj = new Date(placement.followup?.followupDate);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION BY</div>
+                                                <div className="info-value">{placement.logs?.length ? placement.logs[placement.logs.length - 1]?.user?.name || placement.updatedBy?.name || 'N/A' : placement.updatedBy?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">STATE</div>
+                                                <div className="info-value">{placement.state || (placement.location ? placement.location.split(',')[placement.location.split(',').length - 1]?.trim() : null) || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Sector</div>
+                                                <div className="info-value">{placement.sector || placement._course?.sectors || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.createdAt ? (() => {
+                                                    const dateObj = new Date(placement.createdAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Counsellor Name</div>
+                                                <div className="info-value">{placement.leadAssignment && placement.leadAssignment.length > 0 ? placement.leadAssignment[placement.leadAssignment.length - 1]?.counsellorName || placement.counsellor?.name || 'N/A' : placement.counsellor?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">CITY</div>
+                                                <div className="info-value">{placement.city || (placement.location ? placement.location.split(',')[0]?.trim() : null) || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{placement.jobName || placement.courseName || placement._course?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.updatedAt ? (() => {
+                                                    const dateObj = new Date(placement.updatedAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD OWNER</div>
+                                                <div className="info-value">{placement.leadOwner?.join ? placement.leadOwner.join(', ') : (placement.leadOwner || placement.addedBy?.name || 'N/A')}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{placement.typeOfProject || placement._course?.typeOfProject || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BRANCH NAME</div>
+                                                <div className="info-value">{placement.branch?.name || placement.center?.name || placement._center?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Remarks</div>
+                                                <div className="info-value">{placement.remark || placement.remarks || 'N/A'}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+                                        <div className="desktop-view">
+                                          <div className="row">
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD AGE</div>
+                                                <div className="info-value">{placement.createdAt ?
+                                                  Math.floor((new Date() - new Date(placement.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                  : 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">STATE</div>
+                                                <div className="info-value">{placement.state || (placement.location ? placement.location.split(',')[placement.location.split(',').length - 1]?.trim() : null) || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">CITY</div>
+                                                <div className="info-value">{placement.city || (placement.location ? placement.location.split(',')[0]?.trim() : null) || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{placement.typeOfProject || placement._course?.typeOfProject || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">PROJECT</div>
+                                                <div className="info-value">{placement.projectName || placement.project?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">Sector</div>
+                                                <div className="info-value">{placement.sector || placement._course?.sectors || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{placement.jobName || placement.courseName || placement._course?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">BRANCH NAME</div>
+                                                <div className="info-value">{placement.branch?.name || placement.center?.name || placement._center?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">NEXT ACTION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.followup?.followupDate ? (() => {
+                                                    const dateObj = new Date(placement.followup?.followupDate);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.createdAt ? (() => {
+                                                    const dateObj = new Date(placement.createdAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">
+                                                  {placement.updatedAt ? (() => {
+                                                    const dateObj = new Date(placement.updatedAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">Remarks</div>
+                                                <div className="info-value">{placement.remark || placement.remarks || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION BY</div>
+                                                <div className="info-value">{placement.logs?.length ? placement.logs[placement.logs.length - 1]?.user?.name || placement.updatedBy?.name || placement.addedBy?.name || 'N/A' : placement.updatedBy?.name || placement.addedBy?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">Counsellor Name</div>
+                                                <div className="info-value">{placement.leadAssignment && placement.leadAssignment.length > 0 ? placement.leadAssignment[placement.leadAssignment.length - 1]?.counsellorName || placement.counsellor?.name || 'N/A' : placement.counsellor?.name || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD OWNER</div>
+                                                <div className="info-value">{placement.leadOwner?.join ? placement.leadOwner.join(', ') : (placement.leadOwner || placement.addedBy?.name || 'N/A')}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">COMPANY NAME</div>
+                                                <div className="info-value">{placement.companyName || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">EMPLOYER NAME</div>
+                                                <div className="info-value">{placement.employerName || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">CONTACT NUMBER</div>
+                                                <div className="info-value">{placement.contactNumber || 'N/A'}</div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">DATE OF JOINING</div>
+                                                <div className="info-value">
+                                                  {placement.dateOfJoining ? (() => {
+                                                    const dateObj = new Date(placement.dateOfJoining);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    return datePart;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="col-xl-3 col-3">
+                                              <div className="info-group">
+                                                <div className="info-label">LOCATION</div>
+                                                <div className="info-value">{placement.location || 'N/A'}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Profile Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 1 && (
+                                      <div className="tab-pane active" id="profile">
+                                        <div className="resume-preview-body">
+                                          <div id="resume-download" className="resume-document">
+                                            <div className="resume-document-header">
+                                              <div className="resume-profile-section">
+                                                {(placement._candidate?.personalInfo?.image || placement._student?.personalInfo?.image) ? (
+                                                  <img
+                                                    src={placement._candidate?.personalInfo?.image || placement._student?.personalInfo?.image}
+                                                    alt="Profile"
+                                                    className="resume-profile-image"
+                                                  />
+                                                ) : (
+                                                  <div className="resume-profile-placeholder">
+                                                    <i className="bi bi-person-circle"></i>
+                                                  </div>
+                                                )}
+
+                                                <div className="resume-header-content">
+                                                  <h1 className="resume-name">
+                                                    {placement._candidate?.name || placement._student?.name || placement.studentName || 'Your Name'}
+                                                  </h1>
+                                                  <p className="resume-title">
+                                                    {placement._candidate?.personalInfo?.professionalTitle || placement._student?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                  </p>
+                                                  <p className="resume-title">
+                                                    {placement._candidate?.sex || placement._student?.sex || 'Sex'}
+                                                  </p>
+
+                                                  <div className="resume-contact-details">
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-telephone-fill"></i>
+                                                      <span>{placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || 'N/A'}</span>
+                                                    </div>
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-envelope-fill"></i>
+                                                      <span>{placement._candidate?.email || placement._student?.email || placement.studentEmail || 'N/A'}</span>
+                                                    </div>
+                                                    {(placement._candidate?.dob || placement._student?.dob) && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-calendar-heart-fill"></i>
+                                                        {new Date(placement._candidate?.dob || placement._student?.dob).toLocaleDateString('en-IN', {
+                                                          day: '2-digit',
+                                                          month: 'long',
+                                                          year: 'numeric'
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                    {(placement._candidate?.personalInfo?.currentAddress?.city || placement._student?.personalInfo?.currentAddress?.city) && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-geo-alt-fill"></i>
+                                                        <span>Current: {placement._candidate?.personalInfo?.currentAddress?.fullAddress || placement._student?.personalInfo?.currentAddress?.fullAddress}</span>
+                                                      </div>
+                                                    )}
+                                                    {(placement._candidate?.personalInfo?.permanentAddress?.city || placement._student?.personalInfo?.permanentAddress?.city) && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-house-fill"></i>
+                                                        <span>Permanent: {placement._candidate?.personalInfo?.permanentAddress?.fullAddress || placement._student?.personalInfo?.permanentAddress?.fullAddress}</span>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              <div className="resume-summary">
+                                                <h2 className="resume-section-title">Professional Summary</h2>
+                                                <p>{placement._candidate?.personalInfo?.summary || placement._student?.personalInfo?.summary || 'No summary provided'}</p>
+                                              </div>
+                                            </div>
+
+                                            <div className="resume-document-body">
+                                              <div className="resume-column resume-left-column">
+                                                {(placement._candidate?.isExperienced === false || placement._student?.isExperienced === false) ? (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Work Experience</h2>
+                                                    <div className="resume-experience-item">
+                                                      <div className="resume-item-header">
+                                                        <h3 className="resume-item-title">Fresher</h3>
+                                                      </div>
+                                                      <div className="resume-item-content">
+                                                        <p>Looking for opportunities to start my career</p>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ) : (
+                                                  (placement._candidate?.experiences?.length > 0 || placement._student?.experiences?.length > 0) && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                      {(placement._candidate?.experiences || placement._student?.experiences || []).map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'End Date'}
+                                                              </p>
+                                                            )}
+                                                          </div>
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )
+                                                )}
+
+                                                {(placement._candidate?.qualifications?.length > 0 || placement._student?.qualifications?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Education</h2>
+                                                    {(placement._candidate?.qualifications || placement._student?.qualifications || []).map((edu, index) => (
+                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          {edu.education && (
+                                                            <h3 className="resume-item-title">{edu.education}</h3>
+                                                          )}
+                                                          {edu.course && (
+                                                            <h3 className="resume-item-title">{edu.course}</h3>
+                                                          )}
+                                                          {edu.universityName && (
+                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                          )}
+                                                          {edu.schoolName && (
+                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                          )}
+                                                          {edu.collegeName && (
+                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                          )}
+                                                          {edu.passingYear && (
+                                                            <p className="resume-item-period">{edu.passingYear}</p>
+                                                          )}
+                                                        </div>
+                                                        <div className="resume-item-content">
+                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              <div className="resume-column resume-right-column">
+                                                {(placement._candidate?.personalInfo?.skills?.length > 0 || placement._student?.personalInfo?.skills?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Skills</h2>
+                                                    <div className="resume-skills-list">
+                                                      {(placement._candidate?.personalInfo?.skills || placement._student?.personalInfo?.skills || []).map((skill, index) => (
+                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
+                                                          {skill?.skillPercent && (
+                                                            <div className="resume-skill-bar-container">
+                                                              <div
+                                                                className="resume-skill-bar"
+                                                                style={{ width: `${skill?.skillPercent || 0}%` }}
+                                                              ></div>
+                                                              <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {(placement._candidate?.personalInfo?.languages?.length > 0 || placement._student?.personalInfo?.languages?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Languages</h2>
+                                                    <div className="resume-languages-list">
+                                                      {(placement._candidate?.personalInfo?.languages || placement._student?.personalInfo?.languages || []).map((lang, index) => (
+                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                          <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
+                                                          {lang.level && (
+                                                            <div className="resume-language-level">
+                                                              {[1, 2, 3, 4, 5].map(dot => (
+                                                                <span
+                                                                  key={`resume-lang-dot-${index}-${dot}`}
+                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                ></span>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {(placement._candidate?.personalInfo?.certifications?.length > 0 || placement._student?.personalInfo?.certifications?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Certifications</h2>
+                                                    <ul className="resume-certifications-list">
+                                                      {(placement._candidate?.personalInfo?.certifications || placement._student?.personalInfo?.certifications || []).map((cert, index) => (
+                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                          <strong>{cert.certificateName || cert.name}</strong>
+                                                          {cert.orgName && (
+                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                          )}
+                                                          {(cert.month || cert.year) && (
+                                                            <span className="resume-cert-date">
+                                                              {cert.month && cert.year ?
+                                                                ` (${cert.month}/${cert.year})` :
+                                                                cert.month ?
+                                                                  ` (${cert.month})` :
+                                                                  cert.year ?
+                                                                    ` (${cert.year})` :
+                                                                    ''}
+                                                            </span>
+                                                          )}
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )}
+
+                                                {(placement._candidate?.personalInfo?.projects?.length > 0 || placement._student?.personalInfo?.projects?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Projects</h2>
+                                                    {(placement._candidate?.personalInfo?.projects || placement._student?.personalInfo?.projects || []).map((proj, index) => (
+                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          <h3 className="resume-project-title">
+                                                            {proj.projectName || 'Project'}
+                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                          </h3>
+                                                        </div>
+                                                        {proj.description && (
+                                                          <div className="resume-item-content">
+                                                            <p>{proj.description}</p>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+
+                                                {(placement._candidate?.personalInfo?.interest?.length > 0 || placement._student?.personalInfo?.interest?.length > 0) && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Interests</h2>
+                                                    <div className="resume-interests-tags">
+                                                      {(placement._candidate?.personalInfo?.interest || placement._student?.personalInfo?.interest || []).map((interest, index) => (
+                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                          {interest}
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            {(placement._candidate?.personalInfo?.declaration?.text || placement._student?.personalInfo?.declaration?.text) && (
+                                              <div className="resume-declaration">
+                                                <h2 className="resume-section-title">Declaration</h2>
+                                                <p>{placement._candidate?.personalInfo?.declaration?.text || placement._student?.personalInfo?.declaration?.text}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Job History Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 2 && (
+                                      <div className="tab-pane active" id="job-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered job-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Company Name</th>
+                                                  <th>Position</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {jobHistory?.length > 0 ? (
+                                                  jobHistory?.map((job, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{job._job?.displayCompanyName || 'N/A'}</td>
+                                                      <td>{job._job?.title || 'N/A'}</td>
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={3} className="text-center">No job history available</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Course History Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 3 && (
+                                      <div className="tab-pane active" id="course-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered course-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Applied Date</th>
+                                                  <th>Course Name</th>
+                                                  <th>Lead Added By</th>
+                                                  <th>Counsellor</th>
+                                                  <th>Status</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {courseHistory?.length > 0 ? (
+                                                  courseHistory?.map((course, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                      <td>{course._course?.name || 'N/A'}</td>
+                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                      <td>{course.month || ''} {course.year || ''}</td>
+                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No course history available</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Documents Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 4 && (
+                                      <div className="tab-pane active" id="documents">
+                                        {(() => {
+                                          const documentsToDisplay = placement.uploadedDocs || [];
+                                          const docCounts = getDocumentCounts(documentsToDisplay);
+                                          const totalRequired = docCounts.totalRequired || 0;
+
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Documents Required</h5>
+                                                  <p>This placement does not require any document verification.</p>
+                                                </div>
+                                              </div>
+                                            );
+                                          }
+
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid" style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                                gap: '15px',
+                                                marginBottom: '20px'
+                                              }}>
+                                                <div className="stat-card total-docs" style={{
+                                                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                  color: 'white',
+                                                  padding: '20px',
+                                                  borderRadius: '12px',
+                                                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}>
+                                                  <div className="stat-icon d-md-block d-sm-none d-none">
+                                                    <i className="fas fa-file-alt"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{docCounts.totalRequired || 0}</h4>
+                                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Total Required</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card uploaded-docs" style={{
+                                                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                                  color: 'white',
+                                                  padding: '20px',
+                                                  borderRadius: '12px',
+                                                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}>
+                                                  <div className="stat-icon d-md-block d-sm-none d-none">
+                                                    <i className="fas fa-cloud-upload-alt"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{docCounts.uploadedCount || 0}</h4>
+                                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Uploaded</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card pending-docs" style={{
+                                                  background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                                                  color: '#333',
+                                                  padding: '20px',
+                                                  borderRadius: '12px',
+                                                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}>
+                                                  <div className="stat-icon d-md-block d-sm-none d-none">
+                                                    <i className="fas fa-clock"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{docCounts.pendingVerificationCount || 0}</h4>
+                                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Pending Review</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card verified-docs" style={{
+                                                  background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                                                  color: '#333',
+                                                  padding: '20px',
+                                                  borderRadius: '12px',
+                                                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}>
+                                                  <div className="stat-icon d-md-block d-sm-none d-none">
+                                                    <i className="fas fa-check-circle"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{docCounts.verifiedCount || 0}</h4>
+                                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Approved</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card rejected-docs" style={{
+                                                  background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                                                  color: '#333',
+                                                  padding: '20px',
+                                                  borderRadius: '12px',
+                                                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}>
+                                                  <div className="stat-icon d-md-block d-sm-none d-none">
+                                                    <i className="fas fa-times-circle"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>{docCounts.RejectedCount || 0}</h4>
+                                                    <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Rejected</p>
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced" style={{ marginBottom: '20px' }}>
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title" style={{ marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs" style={{
+                                                    display: 'flex',
+                                                    gap: '10px',
+                                                    flexWrap: 'wrap'
+                                                  }}>
+                                                    <button
+                                                      className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                      onClick={() => setStatusFilter('all')}
+                                                      style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: statusFilter === 'all' ? '#007bff' : 'white',
+                                                        color: statusFilter === 'all' ? 'white' : '#333',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-list-ul"></i>
+                                                      All Documents
+                                                      <span className="badge" style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: statusFilter === 'all' ? 'rgba(255,255,255,0.3)' : '#007bff',
+                                                        color: statusFilter === 'all' ? 'white' : 'white'
+                                                      }}>{docCounts.totalRequired || 0}</span>
+                                                    </button>
+                                                    <button
+                                                      className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                      onClick={() => setStatusFilter('pending')}
+                                                      style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: statusFilter === 'pending' ? '#ffc107' : 'white',
+                                                        color: statusFilter === 'pending' ? 'white' : '#333',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-clock"></i>
+                                                      Pending
+                                                      <span className="badge" style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: statusFilter === 'pending' ? 'rgba(255,255,255,0.3)' : '#ffc107',
+                                                        color: 'white'
+                                                      }}>{docCounts.pendingVerificationCount || 0}</span>
+                                                    </button>
+                                                    <button
+                                                      className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                      onClick={() => setStatusFilter('verified')}
+                                                      style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: statusFilter === 'verified' ? '#28a745' : 'white',
+                                                        color: statusFilter === 'verified' ? 'white' : '#333',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-check-circle"></i>
+                                                      Verified
+                                                      <span className="badge" style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: statusFilter === 'verified' ? 'rgba(255,255,255,0.3)' : '#28a745',
+                                                        color: 'white'
+                                                      }}>{docCounts.verifiedCount || 0}</span>
+                                                    </button>
+                                                    <button
+                                                      className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                      onClick={() => setStatusFilter('rejected')}
+                                                      style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '8px',
+                                                        backgroundColor: statusFilter === 'rejected' ? '#dc3545' : 'white',
+                                                        color: statusFilter === 'rejected' ? 'white' : '#333',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-times-circle"></i>
+                                                      Rejected
+                                                      <span className="badge" style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: statusFilter === 'rejected' ? 'rgba(255,255,255,0.3)' : '#dc3545',
+                                                        color: 'white'
+                                                      }}>{docCounts.RejectedCount || 0}</span>
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced" style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                                                gap: '20px'
+                                              }}>
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    // Check if this is a document with upload data or just uploaded file info
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                      ? doc.uploads[doc.uploads.length - 1]
+                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced" style={{
+                                                        border: '1px solid #e9ecef',
+                                                        borderRadius: '12px',
+                                                        overflow: 'hidden',
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                        transition: 'transform 0.2s ease'
+                                                      }}>
+                                                        <div className="document-image-container" style={{ position: 'relative' }}>
+                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            <>
+                                                              {(() => {
+                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                const fileType = getFileType(fileUrl);
+
+                                                                if (fileType === 'image') {
+                                                                  return (
+                                                                    <img
+                                                                      src={fileUrl}
+                                                                      alt="Document Preview"
+                                                                      className="document-image"
+                                                                      style={{
+                                                                        width: '100%',
+                                                                        height: '200px',
+                                                                        objectFit: 'cover'
+                                                                      }}
+                                                                    />
+                                                                  );
+                                                                } else if (fileType === 'pdf') {
+                                                                  return (
+                                                                    <div className="document-preview-icon" style={{
+                                                                      display: 'flex',
+                                                                      flexDirection: 'column',
+                                                                      alignItems: 'center',
+                                                                      justifyContent: 'center',
+                                                                      height: '200px',
+                                                                      backgroundColor: '#f8f9fa'
+                                                                    }}>
+                                                                      <i className="fa-solid fa-file" style={{ fontSize: '60px', color: '#dc3545' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                    </div>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <div className="document-preview-icon" style={{
+                                                                      display: 'flex',
+                                                                      flexDirection: 'column',
+                                                                      alignItems: 'center',
+                                                                      justifyContent: 'center',
+                                                                      height: '200px',
+                                                                      backgroundColor: '#f8f9fa'
+                                                                    }}>
+                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                        {fileType === 'document' ? 'Document' :
+                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                      </p>
+                                                                    </div>
+                                                                  );
+                                                                }
+                                                              })()}
+                                                              <div className="image-overlay" style={{
+                                                                position: 'absolute',
+                                                                top: 0,
+                                                                left: 0,
+                                                                right: 0,
+                                                                bottom: 0,
+                                                                backgroundColor: 'rgba(0,0,0,0.5)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                opacity: 0,
+                                                                transition: 'opacity 0.3s ease'
+                                                              }}
+                                                              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                                              onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                                                              >
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => {
+                                                                    setSelectedProfile(placement);
+                                                                    openDocumentModal(doc);
+                                                                  }}
+                                                                  style={{
+                                                                    padding: '8px 16px',
+                                                                    backgroundColor: 'white',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    color: '#007bff',
+                                                                    fontWeight: '600'
+                                                                  }}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder" style={{
+                                                              display: 'flex',
+                                                              flexDirection: 'column',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              height: '200px',
+                                                              backgroundColor: '#f8f9fa',
+                                                              color: '#6c757d'
+                                                            }}>
+                                                              <i className="fas fa-file-upload" style={{ fontSize: '40px', marginBottom: '10px' }}></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay" style={{
+                                                            position: 'absolute',
+                                                            top: '10px',
+                                                            right: '10px'
+                                                          }}>
+                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                              <span className="status-badge-new pending" style={{
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#ffc107',
+                                                                color: 'white',
+                                                                fontSize: '11px',
+                                                                fontWeight: '600'
+                                                              }}>
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                              <span className="status-badge-new verified" style={{
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#28a745',
+                                                                color: 'white',
+                                                                fontSize: '11px',
+                                                                fontWeight: '600'
+                                                              }}>
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                              <span className="status-badge-new rejected" style={{
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#dc3545',
+                                                                color: 'white',
+                                                                fontSize: '11px',
+                                                                fontWeight: '600'
+                                                              }}>
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                              <span className="status-badge-new not-uploaded" style={{
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#6c757d',
+                                                                color: 'white',
+                                                                fontSize: '11px',
+                                                                fontWeight: '600'
+                                                              }}>
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="document-info-section" style={{ padding: '15px' }}>
+                                                          <div className="document-header" style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            marginBottom: '10px'
+                                                          }}>
+                                                            <h4 className="document-title" style={{
+                                                              margin: 0,
+                                                              fontSize: '16px',
+                                                              fontWeight: '600'
+                                                            }}>{doc.Name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {(!latestUpload) ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                  setSelectedProfile(placement);
+                                                                  openUploadModal(doc);
+                                                                }} style={{
+                                                                  padding: '6px 12px',
+                                                                  backgroundColor: '#007bff',
+                                                                  color: 'white',
+                                                                  border: 'none',
+                                                                  borderRadius: '6px',
+                                                                  cursor: 'pointer',
+                                                                  fontSize: '12px'
+                                                                }}>
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => {
+                                                                    setSelectedProfile(placement);
+                                                                    openDocumentModal(doc);
+                                                                  }}
+                                                                  title="Verify Document"
+                                                                  style={{
+                                                                    padding: '6px 12px',
+                                                                    backgroundColor: '#28a745',
+                                                                    color: 'white',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '12px'
+                                                                  }}
+                                                                >
+                                                                  <i className="fas fa-search"></i>
+                                                                  PREVIEW
+                                                                </button>
+                                                              )}
+                                                            </div>
+                                                          </div>
+
+                                                          <div className="document-meta" style={{
+                                                            display: 'flex',
+                                                            gap: '15px',
+                                                            fontSize: '12px',
+                                                            color: '#6c757d'
+                                                          }}>
+                                                            <div className="meta-item">
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
+                                                              <span className="meta-text">
+                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
+                                                              </span>
+                                                            </div>
+
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
+
+                                              {/* DocumentModal */}
+                                              {showDocumentModal && selectedProfile && selectedProfile._id === placement._id && (
+                                                <DocumentModal
+                                                  showDocumentModal={showDocumentModal}
+                                                  selectedDocument={selectedDocument}
+                                                  closeDocumentModal={closeDocumentModal}
+                                                  updateDocumentStatus={updateDocumentStatus}
+                                                  getFileType={getFileType}
+                                                />
+                                              )}
+
+                                              {/* Upload Modal */}
+                                              <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabIndex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                                <div className="modal-dialog d-flex justify-content-center mx-auto w-100">
+                                                  <div className="modal-content p-0 w-100">
+                                                    <div className="modal-header">
+                                                      <h3>
+                                                        <i className="fas fa-cloud-upload-alt me-2"></i>
+                                                        Upload {selectedDocumentForUpload?.Name || 'Document'}
+                                                      </h3>
+                                                      <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
+                                                    </div>
+                                                    <div className="modal-body">
+                                                      <div className="upload-section">
+                                                        {!selectedFile ? (
+                                                          <div className="file-drop-zone" style={{
+                                                            border: '2px dashed #ddd',
+                                                            borderRadius: '8px',
+                                                            padding: '40px',
+                                                            textAlign: 'center',
+                                                            cursor: 'pointer'
+                                                          }}>
+                                                            <div className="drop-zone-content">
+                                                              <i className="fas fa-cloud-upload-alt upload-icon" style={{ fontSize: '48px', color: '#007bff', marginBottom: '15px' }}></i>
+                                                              <h4>Choose a file to upload</h4>
+                                                              <p>Drag and drop a file here, or click to select</p>
+                                                              <div className="file-types" style={{ marginTop: '15px', fontSize: '12px', color: '#6c757d' }}>
+                                                                <span>Supported: JPG, PNG, GIF, PDF</span>
+                                                                <span style={{ marginLeft: '10px' }}>Max size: 10MB</span>
+                                                              </div>
+                                                              <input
+                                                                type="file"
+                                                                id="file-input"
+                                                                accept=".jpg,.jpeg,.png,.gif,.pdf"
+                                                                onChange={handleFileSelect}
+                                                                style={{ display: 'none' }}
+                                                              />
+                                                              <button
+                                                                className="btn btn-primary"
+                                                                onClick={() => document.getElementById('file-input').click()}
+                                                                style={{ marginTop: '15px' }}
+                                                              >
+                                                                <i className="fas fa-folder-open me-2"></i>
+                                                                Choose File
+                                                              </button>
+                                                            </div>
+                                                          </div>
+                                                        ) : (
+                                                          <div className="file-preview-section">
+                                                            <div className="selected-file-info" style={{ marginBottom: '20px' }}>
+                                                              <h4>Selected File:</h4>
+                                                              <div className="file-details" style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '15px',
+                                                                padding: '15px',
+                                                                backgroundColor: '#f8f9fa',
+                                                                borderRadius: '8px'
+                                                              }}>
+                                                                <div className="file-icon" style={{ fontSize: '32px' }}>
+                                                                  <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                                </div>
+                                                                <div className="file-info" style={{ flex: 1 }}>
+                                                                  <p className="file-name" style={{ margin: 0, fontWeight: '600' }}>{selectedFile.name}</p>
+                                                                  <p className="file-size" style={{ margin: '5px 0 0 0', color: '#6c757d', fontSize: '12px' }}>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                </div>
+                                                                <button
+                                                                  className="btn btn-sm btn-outline-secondary"
+                                                                  onClick={() => {
+                                                                    setSelectedFile(null);
+                                                                    setUploadPreview(null);
+                                                                  }}
+                                                                >
+                                                                  <i className="fas fa-trash"></i>
+                                                                </button>
+                                                              </div>
+                                                            </div>
+
+                                                            {uploadPreview && (
+                                                              <div className="upload-preview" style={{ marginBottom: '20px' }}>
+                                                                <h5>Preview:</h5>
+                                                                <img src={uploadPreview} alt="Upload Preview" className="preview-image" style={{
+                                                                  maxWidth: '100%',
+                                                                  borderRadius: '8px',
+                                                                  border: '1px solid #ddd'
+                                                                }} />
+                                                              </div>
+                                                            )}
+
+                                                            {isUploading && (
+                                                              <div className="upload-progress-section" style={{ marginBottom: '20px' }}>
+                                                                <h5>Uploading...</h5>
+                                                                <div className="progress-bar-container" style={{
+                                                                  width: '100%',
+                                                                  height: '20px',
+                                                                  backgroundColor: '#e9ecef',
+                                                                  borderRadius: '10px',
+                                                                  overflow: 'hidden'
+                                                                }}>
+                                                                  <div
+                                                                    className="progress-bar"
+                                                                    style={{
+                                                                      width: `${uploadProgress}%`,
+                                                                      height: '100%',
+                                                                      backgroundColor: '#007bff',
+                                                                      transition: 'width 0.3s ease'
+                                                                    }}
+                                                                  ></div>
+                                                                </div>
+                                                                <p style={{ marginTop: '10px' }}>{uploadProgress}% Complete</p>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <div className="modal-footer">
+                                                      <button
+                                                        className="btn btn-secondary"
+                                                        onClick={closeUploadModal}
+                                                        disabled={isUploading}
+                                                      >
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        className="btn btn-primary"
+                                                        onClick={handleFileUpload}
+                                                        disabled={!selectedFile || isUploading}
+                                                      >
+                                                        {isUploading ? (
+                                                          <>
+                                                            <i className="fas fa-spinner fa-spin me-2"></i>
+                                                            Uploading...
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            <i className="fas fa-upload me-2"></i>
+                                                            Upload Document
+                                                          </>
+                                                        )}
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
 
@@ -3367,36 +5261,49 @@ const Placements = () => {
   }
 
   .compact-info-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
   }
 
   .compact-info-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
-    font-size: 0.75rem;
-    padding: 0.25rem 0;
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
   }
 
   .compact-info-item i {
-    font-size: 0.7rem;
-    width: 12px;
+    font-size: 0.875rem;
+    width: 16px;
     flex-shrink: 0;
+    margin-top: 2px;
   }
 
   .compact-info-label {
     font-weight: 600;
     color: #6c757d;
-    min-width: 50px;
-    flex-shrink: 0;
+    font-size: 0.75rem;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
   .compact-info-value {
     color: #212529;
-    flex: 1;
+    font-size: 0.875rem;
+    font-weight: 500;
     word-break: break-word;
+  }
+
+  @media (max-width: 768px) {
+    .compact-info-grid {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
   }
 
   .lead-badges {
@@ -3760,6 +5667,309 @@ const Placements = () => {
     color: #007bff !important;
   }
 
+  /* Job History and Course History Table Styles */
+  .job-history-table,
+  .course-history-table {
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .job-history-table th,
+  .course-history-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+  }
+
+  .job-history-table td,
+  .course-history-table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .job-history-table tbody tr:hover,
+  .course-history-table tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+
+  /* Resume/Profile Styles */
+  .resume-preview-body {
+    padding: 20px;
+  }
+
+  .resume-document {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    border-radius: 8px;
+  }
+
+  .resume-document-header {
+    margin-bottom: 30px;
+  }
+
+  .resume-profile-section {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .resume-profile-placeholder {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20px;
+    font-size: 40px;
+    color: #999;
+  }
+
+  .resume-profile-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 20px;
+  }
+
+  .resume-header-content {
+    flex: 1;
+  }
+
+  .resume-name {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  .resume-title {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 10px;
+  }
+
+  .resume-contact-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .resume-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .resume-summary {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+  }
+
+  .resume-section-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+  }
+
+  .resume-document-body {
+    display: flex;
+    gap: 30px;
+  }
+
+  .resume-column {
+    flex: 1;
+  }
+
+  .resume-section {
+    margin-bottom: 25px;
+  }
+
+  .resume-experience-item,
+  .resume-education-item,
+  .resume-project-item {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .resume-item-header {
+    margin-bottom: 10px;
+  }
+
+  .resume-item-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+  }
+
+  .resume-item-subtitle {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 3px;
+  }
+
+  .resume-item-period {
+    font-size: 13px;
+    color: #888;
+    font-style: italic;
+  }
+
+  .resume-item-content {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  .resume-skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .resume-skill-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .resume-skill-name {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+  }
+
+  .resume-skill-bar-container {
+    flex: 2;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .resume-skill-bar {
+    height: 100%;
+    background: #007bff;
+    border-radius: 4px;
+  }
+
+  .resume-skill-percent {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: #333;
+  }
+
+  .resume-languages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .resume-language-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .resume-language-name {
+    font-size: 14px;
+    color: #333;
+  }
+
+  .resume-language-level {
+    display: flex;
+    gap: 3px;
+  }
+
+  .resume-level-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e0e0e0;
+  }
+
+  .resume-level-dot.filled {
+    background: #007bff;
+  }
+
+  .resume-certifications-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .resume-certification-item {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #333;
+  }
+
+  .resume-cert-org {
+    color: #666;
+  }
+
+  .resume-cert-date {
+    color: #888;
+    font-style: italic;
+  }
+
+  .resume-project-year {
+    color: #888;
+    font-size: 14px;
+  }
+
+  .resume-interests-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .resume-interest-tag {
+    background: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    color: #333;
+  }
+
+  .resume-declaration {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+  }
+
+  @media (max-width: 768px) {
+    .resume-document-body {
+      flex-direction: column;
+    }
+    
+    .resume-profile-section {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .resume-contact-details {
+      justify-content: center;
+    }
+  }
+
   .text-success {
     color: #28a745 !important;
   }
@@ -3779,6 +5989,281 @@ const Placements = () => {
   /* Override card margin-bottom to reduce spacing */
   .card {
     margin-bottom: 0.5rem !important;
+  }
+
+  /* Card Content Styles - Matching Registrations */
+  .card-content {
+    transition: all 0.3s ease;
+  }
+
+  .card-content.transition-col {
+    transition: background-color 0.2s ease;
+  }
+
+  /* Circular Progress Styles */
+  .circular-progress-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+  }
+
+  .circular-progress-container svg {
+    transform: rotate(-90deg);
+  }
+
+  .circle-bg {
+    fill: none;
+    stroke: #e0e0e0;
+    stroke-width: 3;
+  }
+
+  .circle-progress {
+    fill: none;
+    stroke: #007bff;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 100.48;
+    stroke-dashoffset: 100.48;
+    transition: stroke-dashoffset 0.5s ease;
+  }
+
+  .circular-progress-container .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10px;
+    font-weight: 600;
+    color: #007bff;
+  }
+
+  /* Nav Pills Styles */
+  .nav-pills-sm .nav-link {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .nav-pills .nav-link {
+    color: #6c757d;
+    background-color: transparent;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .nav-pills .nav-link:hover {
+    color: #007bff;
+    background-color: #f8f9ff;
+    border-color: #e3f2fd;
+  }
+
+  .nav-pills .nav-link.active {
+    color: white;
+    background-color: #fd2b5a;
+    border-color: #fd2b5a;
+    font-weight: 600;
+  }
+
+  /* Info Card Styles */
+  .info-card {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .info-group {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .info-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .info-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+
+  .info-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #212529;
+    word-break: break-word;
+  }
+
+  /* Scrollable Container Styles */
+  .scrollable-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding: 10px 0;
+    display: none;
+  }
+
+  .scrollable-content {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    gap: 15px;
+  }
+
+  .scrollable-content .info-card {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-width: 250px;
+    max-width: 300px;
+  }
+
+  .scrollable-content::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .scrollable-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  .scrollable-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+  }
+
+  .scrollable-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  /* WhatsApp Button Styles */
+  .whatsappbutton {
+    display: flex;
+    gap: 5px;
+    margin-left: auto;
+  }
+
+  /* Scroll Arrow Styles */
+  .scroll-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    font-size: 18px;
+    font-weight: bold;
+  }
+
+  .scroll-arrow.scroll-left {
+    left: 10px;
+  }
+
+  .scroll-arrow.scroll-right {
+    right: 10px;
+  }
+
+  .scroll-arrow:hover {
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .scrollable-container.mobile-scrollable {
+      display: block !important;
+    }
+
+    .desktop-view {
+      display: none !important;
+    }
+
+    .scrollable-content {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    .scrollable-content .info-card {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      margin-right: 15px;
+      padding: 15px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e9ecef;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      min-width: 200px;
+      max-width: 250px;
+    }
+  }
+
+  @media (min-width: 769px) {
+    .scrollable-container.mobile-scrollable {
+      display: none !important;
+    }
+
+    .desktop-view {
+      display: block !important;
+    }
+    
+    .desktop-view .scrollable-container {
+      display: block !important;
+    }
+
+    /* Desktop view info-group styling - remove borders and adjust spacing */
+    .desktop-view .info-group {
+      margin-bottom: 12px;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .desktop-view .info-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .desktop-view .info-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .desktop-view .info-value {
+      font-size: 14px;
+      font-weight: 500;
+      color: #212529;
+      word-break: break-word;
+    }
+
+    .desktop-view .row {
+      margin: 0;
+    }
+
+    .desktop-view .col-xl-3,
+    .desktop-view .col-3 {
+      padding-left: 15px;
+      padding-right: 15px;
+      margin-bottom: 15px;
+    }
   }
 `}</style>
 

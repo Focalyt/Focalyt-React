@@ -51,7 +51,7 @@ router.get('/status-count', isCollege, async (req, res) => {
       })
     );
 
-    // Get count for placements without status (null status)
+
     const nullStatusCount = await Placement.countDocuments({
       ...baseQuery,
       status: null
@@ -398,7 +398,10 @@ router.get('/candidates', isCollege, async (req, res) => {
     }
 
     const placements = await Placement.find(query)
-      .populate('status', 'title')
+      .populate({
+        path: 'status',
+        select: 'title substatuses'
+      })
       .populate('addedBy', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -496,6 +499,203 @@ router.post('/add-candidate', isCollege, async (req, res) => {
       status: false,
       message: 'Server Error',
       error: err.message
+    });
+  }
+});
+
+router.put('/update-status/:id', isCollege, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      status,
+      subStatus,
+      remarks,
+      followup
+    } = req.body;
+
+    const userId = req.user._id;
+    const collegeId = req.user.college._id;
+
+    const placement = await Placement.findById(id);
+    if (!placement) {
+      return res.status(404).json({ success: false, message: 'Placement not found' });
+    }
+
+    if (placement.college.toString() !== collegeId.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+    }
+
+    let actionParts = [];
+
+    const oldStatusDoc = placement.status ? await PlacementStatus.findById(placement.status).lean() : null;
+    const oldStatusTitle = oldStatusDoc ? oldStatusDoc.title : 'No Status';
+    let oldSubStatusTitle = 'No Sub-Status';
+    if (oldStatusDoc && placement.subStatus) {
+      const oldSubStatus = oldStatusDoc.substatuses?.find(s => s._id.toString() === placement.subStatus.toString());
+      oldSubStatusTitle = oldSubStatus ? oldSubStatus.title : 'No Sub-Status';
+    }
+
+    let newStatusTitle = 'No Status';
+    let newSubStatusTitle = 'No Sub-Status';
+    if (status) {
+      const newStatusDoc = await PlacementStatus.findById(status).lean();
+      newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
+      if (newStatusDoc && subStatus) {
+        const newSubStatus = newStatusDoc.substatuses?.find(s => s._id.toString() === subStatus);
+        newSubStatusTitle = newSubStatus ? newSubStatus.title : 'No Sub-Status';
+      }
+    }
+
+    if (status && (!placement.status || placement.status.toString() !== status)) {
+      actionParts.push(`Status changed from "${oldStatusTitle}" to "${newStatusTitle}"`);
+      placement.status = status;
+    }
+
+    if (subStatus && (!placement.subStatus || placement.subStatus.toString() !== subStatus)) {
+      actionParts.push(`Sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
+      placement.subStatus = subStatus;
+    }
+
+    if (remarks !== undefined && placement.remark !== remarks) {
+      if (placement.remark && remarks) {
+        actionParts.push(`Remarks updated`);
+      } else if (remarks) {
+        actionParts.push(`Remarks added`);
+      }
+      placement.remark = remarks;
+    }
+
+    if (actionParts.length === 0) {
+      actionParts.push('No changes made to status');
+    }
+
+    const newLogEntry = {
+      user: userId,
+      action: actionParts.join('; '),
+      remarks: remarks || '',
+      timestamp: new Date()
+    };
+
+    if (!placement.logs) {
+      placement.logs = [];
+    }
+    placement.logs.push(newLogEntry);
+
+    placement.updatedBy = userId;
+
+    const updatedPlacement = await placement.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Placement status updated successfully',
+      data: updatedPlacement
+    });
+  } catch (err) {
+    console.error('Error updating placement status:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+router.get('/:id/logs', isCollege, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collegeId = req.user.college._id;
+    const placement = await Placement.findById(id)
+      .select('logs status subStatus')
+      .populate({
+        path: 'logs.user',
+        select: 'name email role'
+      })
+      .populate({
+        path: 'status',
+        select: 'title'
+      })
+      .lean();
+
+    if (!placement) {
+      return res.status(404).json({ success: false, message: 'Placement not found' });
+    }
+
+    const fullPlacement = await Placement.findById(id).lean();
+    if (fullPlacement.college.toString() !== collegeId.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+    }
+    let currentStatusTitle = 'No Status';
+    let currentSubStatusTitle = 'No Sub-Status';
+    
+    if (placement.status) {
+      currentStatusTitle = placement.status.title || 'Unknown';
+      
+      if (placement.subStatus) {
+        const statusDoc = await PlacementStatus.findById(placement.status._id).lean();
+        if (statusDoc && statusDoc.substatuses) {
+          const subStatus = statusDoc.substatuses.find(s => s._id.toString() === placement.subStatus.toString());
+          if (subStatus) {
+            currentSubStatusTitle = subStatus.title || 'Unknown';
+          }
+        }
+      }
+    }
+
+    const logsWithStatus = placement.logs.map(log => {
+      let logStatus = null;
+      let logSubStatus = null;
+      
+      if (log.action && typeof log.action === 'string') {
+        const statusMatch = log.action.match(/Status changed from "([^"]+)" to "([^"]+)"/);
+        const subStatusMatch = log.action.match(/Sub-status changed from "([^"]+)" to "([^"]+)"/);
+        
+        if (statusMatch) {
+          logStatus = {
+            from: statusMatch[1],
+            to: statusMatch[2]
+          };
+        }
+        
+        if (subStatusMatch) {
+          logSubStatus = {
+            from: subStatusMatch[1],
+            to: subStatusMatch[2]
+          };
+        }
+      }
+
+      return {
+        _id: log._id,
+        action: log.action,
+        remarks: log.remarks,
+        timestamp: log.timestamp,
+        user: log.user,
+        currentStatus: currentStatusTitle,
+        currentSubStatus: currentSubStatusTitle,
+        statusChange: logStatus,
+        subStatusChange: logSubStatus
+      };
+    });
+
+    logsWithStatus.sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      data: logsWithStatus,
+      currentStatus: currentStatusTitle,
+      currentSubStatus: currentSubStatusTitle
+    });
+
+  } catch (err) {
+    console.error('Error fetching placement logs:', err.message);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server Error', 
+      error: err.message 
     });
   }
 });
