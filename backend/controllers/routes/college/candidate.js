@@ -1704,6 +1704,29 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 
 			});
 		}
+		else if (status === 'Move to Placements') {
+			if (appliedCourse.movetoplacementstatus) {
+				return res.status(400).json({
+					status: false,
+					message: 'Student is already moved to placements'
+				});
+			}
+
+			// Move student to placements
+			appliedCourse.movetoplacementstatus = true;
+
+			await appliedCourse.save();
+
+			const newStatusLogs = await statusLogHelper(appliedCourseId, {
+				movedToPlacement: true
+			});
+
+			return res.status(200).json({
+				status: true,
+				message: 'Student moved to placements successfully',
+
+			});
+		}
 
 	} catch (error) {
 		console.error('Error moving student:', error);

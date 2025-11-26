@@ -96,6 +96,7 @@ const appliedCoursesSchema = new Schema(
     dropoutDate: { type: Date },
     dropoutReason: { type: String },
     dropoutBy: { type: ObjectId, ref: "User" },
+    movetoplacementstatus: { type: Boolean, default: false },
     
     // Attendance Tracking
     attendance: {

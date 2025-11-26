@@ -718,7 +718,8 @@ const Student = ({
   const handleMoveCandidate = async (profile, e) => {
     console.log('e', e);
     let body = { status: e }
-    const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
+    // const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
+    const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : e === 'Move to Placements' ? 'Placements' : 'Dropout'}`)
     let dropoutReason = '';
     if (e === 'Dropout') {
       dropoutReason = window.prompt('Enter the remarks for dropout');
@@ -5188,7 +5189,28 @@ const Student = ({
                                                     >
                                                       Dropout
                                                     </button>)}
-
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "10px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        fontSize: "14px",
+                                                        fontWeight: "500",
+                                                        transition: "background-color 0.2s ease",
+                                                        cursor: "pointer",
+                                                        color: "black"
+                                                      }}
+                                                      onClick={(e) => {
+                                                        setShowPopup(null);
+                                                        setSelectedStudent(profile);
+                                                        handleMoveCandidate(profile, e.target.innerText);
+                                                      }}
+                                                    >
+                                                      Move to Placements
+                                                    </button>
                                                 </div>
                                               )}
 

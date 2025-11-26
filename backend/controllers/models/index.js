@@ -109,4 +109,4 @@ module.exports.FollowUp = require("./b2b/followUp");
 module.exports.Lead = require("./b2b/lead");
 module.exports.Source = require("./source");
 module.exports.PlacementStatus = require("./PlacementStatus");
-// module.exports.Placement = require("./")
+module.exports.Placement = require("./Placement");
