@@ -252,6 +252,16 @@ const Student = ({
     timeIn: "",
     documents: null,
   });
+  const [showPlacementModal, setShowPlacementModal] = useState(false);
+  const [placementFormData, setPlacementFormData] = useState({
+    companyName: '',
+    employerName: '',
+    contactNumber: '',
+    dateOfJoining: null,
+    location: ''
+  });
+  const [placementFormErrors, setPlacementFormErrors] = useState({});
+  const [studentForPlacement, setStudentForPlacement] = useState(null);
   const [attendanceView, setAttendanceView] = useState("daily");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -717,9 +727,25 @@ const Student = ({
 
   const handleMoveCandidate = async (profile, e) => {
     console.log('e', e);
+    
+    // If moving to placements, show placement form modal
+    if (e === 'Move to Placements') {
+      setStudentForPlacement(profile);
+      setShowPlacementModal(true);
+      // Reset form
+      setPlacementFormData({
+        companyName: '',
+        employerName: '',
+        contactNumber: '',
+        dateOfJoining: null,
+        location: ''
+      });
+      setPlacementFormErrors({});
+      return;
+    }
+
     let body = { status: e }
-    // const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
-    const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : e === 'Move to Placements' ? 'Placements' : 'Dropout'}`)
+    const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
     let dropoutReason = '';
     if (e === 'Dropout') {
       dropoutReason = window.prompt('Enter the remarks for dropout');
@@ -732,8 +758,6 @@ const Student = ({
 
     if (confirmed) {
       try {
-
-
         const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, body, {
           headers: {
             "x-auth": token,
@@ -747,6 +771,116 @@ const Student = ({
         console.error("Error moving student:", error);
         window.alert(error.response.data.message);
       }
+    }
+  };
+
+  const validatePlacementForm = () => {
+    const errors = {};
+    if (!placementFormData.companyName) errors.companyName = 'Company name is required';
+    if (!placementFormData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
+    if (!placementFormData.location) errors.location = 'Location is required';
+    
+    // Validate contact number only if provided
+    if (placementFormData.contactNumber && placementFormData.contactNumber.trim() !== '') {
+      const cleanNumber = placementFormData.contactNumber.replace(/\D/g, '');
+      if (!/^[6-9]\d{9}$/.test(cleanNumber)) {
+        errors.contactNumber = 'Please enter a valid 10-digit contact number';
+      }
+    }
+
+    setPlacementFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handlePlacementFormChange = (e) => {
+    const { name, value } = e.target;
+    setPlacementFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (placementFormErrors[name]) {
+      setPlacementFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const handlePlacementSubmit = async () => {
+    if (!validatePlacementForm()) {
+      return;
+    }
+
+    if (!studentForPlacement) {
+      alert('Student information is missing');
+      return;
+    }
+
+    try {
+      // First move student to placements
+      const moveResponse = await axios.post(
+        `${backendUrl}/college/candidate/move-candidate-status/${studentForPlacement._id}`,
+        { status: 'Move to Placements' },
+        {
+          headers: {
+            "x-auth": token,
+          },
+        }
+      );
+
+      if (moveResponse.status === 200) {
+        // Then create/update placement record with details
+        const placementData = {
+          companyName: placementFormData.companyName,
+          employerName: placementFormData.employerName || '',
+          contactNumber: placementFormData.contactNumber || '',
+          dateOfJoining: placementFormData.dateOfJoining ? moment(placementFormData.dateOfJoining).format('YYYY-MM-DD') : null,
+          location: placementFormData.location,
+          appliedCourseId: studentForPlacement._id
+        };
+
+        // Update placement status with details
+        const updateResponse = await axios.put(
+          `${backendUrl}/college/placementStatus/update-status/${studentForPlacement._id}`,
+          {
+            status: null, // Will be set later
+            subStatus: null,
+            remarks: '',
+            companyName: placementData.companyName,
+            employerName: placementData.employerName,
+            contactNumber: placementData.contactNumber,
+            dateOfJoining: placementData.dateOfJoining,
+            location: placementData.location
+          },
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (updateResponse.data.success || updateResponse.data.status) {
+          alert('Student moved to placements successfully with placement details!');
+          setShowPlacementModal(false);
+          setStudentForPlacement(null);
+          setPlacementFormData({
+            companyName: '',
+            employerName: '',
+            contactNumber: '',
+            dateOfJoining: null,
+            location: ''
+          });
+          setPlacementFormErrors({});
+          await fetchProfileData();
+        } else {
+          alert('Student moved to placements but failed to save placement details');
+        }
+      }
+    } catch (error) {
+      console.error("Error moving student to placements:", error);
+      alert(error.response?.data?.message || 'Failed to move student to placements. Please try again.');
     }
   };
 
@@ -7237,6 +7371,209 @@ const Student = ({
 
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Placement Details Modal */}
+      {showPlacementModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              {/* Modal Header */}
+              <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-briefcase me-2"></i>
+                  Move to Placements - Fill Placement Details
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => {
+                    setShowPlacementModal(false);
+                    setStudentForPlacement(null);
+                    setPlacementFormData({
+                      companyName: '',
+                      employerName: '',
+                      contactNumber: '',
+                      dateOfJoining: null,
+                      location: ''
+                    });
+                    setPlacementFormErrors({});
+                  }}
+                ></button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="modal-body p-4">
+                {studentForPlacement && (
+                  <div className="alert alert-info mb-3">
+                    <strong>Student:</strong> {studentForPlacement._candidate?.name || 'N/A'}
+                  </div>
+                )}
+                
+                <div className="row g-3">
+                  {/* Company Name */}
+                  <div className="col-12">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-building text-primary me-1"></i>
+                      Company Name <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={`form-control ${placementFormErrors.companyName ? 'is-invalid' : ''}`}
+                      name="companyName"
+                      value={placementFormData.companyName}
+                      onChange={handlePlacementFormChange}
+                      placeholder="Enter company name"
+                    />
+                    {placementFormErrors.companyName && (
+                      <div className="invalid-feedback">
+                        {placementFormErrors.companyName}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* HR Name */}
+                  <div className="col-12">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-tie text-primary me-1"></i>
+                      HR Name
+                    </label>
+                    <input
+                      type="text"
+                      className={`form-control ${placementFormErrors.employerName ? 'is-invalid' : ''}`}
+                      name="employerName"
+                      value={placementFormData.employerName}
+                      onChange={handlePlacementFormChange}
+                      placeholder="Enter HR name"
+                    />
+                    {placementFormErrors.employerName && (
+                      <div className="invalid-feedback">
+                        {placementFormErrors.employerName}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact Number */}
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-phone text-primary me-1"></i>
+                      Contact Number
+                    </label>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      className={`form-control ${placementFormErrors.contactNumber ? 'is-invalid' : ''}`}
+                      name="contactNumber"
+                      value={placementFormData.contactNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setPlacementFormData(prev => ({
+                          ...prev,
+                          contactNumber: value
+                        }));
+                        if (placementFormErrors.contactNumber) {
+                          setPlacementFormErrors(prev => ({
+                            ...prev,
+                            contactNumber: ''
+                          }));
+                        }
+                      }}
+                      placeholder="Enter contact number"
+                    />
+                    {placementFormErrors.contactNumber && (
+                      <div className="invalid-feedback">
+                        {placementFormErrors.contactNumber}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Date of Joining */}
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-calendar text-primary me-1"></i>
+                      Date of Joining <span className="text-danger">*</span>
+                    </label>
+                    <DatePicker
+                      onChange={(date) => {
+                        setPlacementFormData(prev => ({
+                          ...prev,
+                          dateOfJoining: date
+                        }));
+                        if (placementFormErrors.dateOfJoining) {
+                          setPlacementFormErrors(prev => ({
+                            ...prev,
+                            dateOfJoining: ''
+                          }));
+                        }
+                      }}
+                      value={placementFormData.dateOfJoining}
+                      format="dd/MM/yyyy"
+                      className={`form-control ${placementFormErrors.dateOfJoining ? 'is-invalid' : ''}`}
+                    />
+                    {placementFormErrors.dateOfJoining && (
+                      <div className="invalid-feedback d-block">
+                        {placementFormErrors.dateOfJoining}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location */}
+                  <div className="col-12">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-map-marker-alt text-primary me-1"></i>
+                      Location <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={`form-control ${placementFormErrors.location ? 'is-invalid' : ''}`}
+                      name="location"
+                      value={placementFormData.location}
+                      onChange={handlePlacementFormChange}
+                      placeholder="Enter location"
+                    />
+                    {placementFormErrors.location && (
+                      <div className="invalid-feedback">
+                        {placementFormErrors.location}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowPlacementModal(false);
+                    setStudentForPlacement(null);
+                    setPlacementFormData({
+                      companyName: '',
+                      employerName: '',
+                      contactNumber: '',
+                      dateOfJoining: null,
+                      location: ''
+                    });
+                    setPlacementFormErrors({});
+                  }}
+                >
+                  <i className="fas fa-times me-1"></i>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ backgroundColor: '#fc2b5a', color: 'white' }}
+                  onClick={handlePlacementSubmit}
+                >
+                  <i className="fas fa-check me-1"></i>
+                  Move to Placements
+                </button>
               </div>
             </div>
           </div>

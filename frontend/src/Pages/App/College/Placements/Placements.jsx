@@ -999,10 +999,9 @@ const Placements = () => {
     const errors = {};
 
     if (!leadFormData.companyName) errors.companyName = 'Company name is required';
-    if (!leadFormData.employerName) errors.employerName = 'Employer name is required';
-    if (!leadFormData.contactNumber) {
-      errors.contactNumber = 'Contact number is required';
-    } else if (!validateMobileNumber(leadFormData.contactNumber)) {
+    // HR Name (employerName) is optional - no validation needed
+    // Contact Number is optional but if provided, should be valid
+    if (leadFormData.contactNumber && leadFormData.contactNumber.trim() !== '' && !validateMobileNumber(leadFormData.contactNumber)) {
       errors.contactNumber = 'Please enter a valid 10-digit contact number';
     }
     if (!leadFormData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
@@ -2902,9 +2901,7 @@ const Placements = () => {
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
                     )}   */}
-                    <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleOpenLeadModal}>
-                        <i className="fas fa-plus me-1"></i> Add Candidate
-                      </button>
+                    
                     </div>
                   </div>
 
@@ -3677,7 +3674,7 @@ const Placements = () => {
 
                                             <div className="col-xl-3 col-3">
                                               <div className="info-group">
-                                                <div className="info-label">EMPLOYER NAME</div>
+                                                <div className="info-label">HR NAME</div>
                                                 <div className="info-value">{placement.employerName || 'N/A'}</div>
                                               </div>
                                             </div>
@@ -5139,11 +5136,11 @@ const Placements = () => {
                       )}
                     </div>
 
-                    {/* Employer Name */}
+                    {/* HR Name */}
                     <div className="col-12">
                       <label className="form-label fw-bold">
                         <i className="fas fa-user-tie text-primary me-1"></i>
-                        Employer Name <span className="text-danger">*</span>
+                        HR Name
                       </label>
                       <input
                         type="text"
@@ -5151,7 +5148,7 @@ const Placements = () => {
                         name="employerName"
                         value={leadFormData.employerName}
                         onChange={handleLeadInputChange}
-                        placeholder="Enter employer name"
+                        placeholder="Enter HR name"
                       />
                       {formErrors.employerName && (
                         <div className="invalid-feedback">
@@ -5164,7 +5161,7 @@ const Placements = () => {
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
                         <i className="fas fa-phone text-primary me-1"></i>
-                        Contact Number <span className="text-danger">*</span>
+                        Contact Number
                       </label>
                       <input
                         type="tel"

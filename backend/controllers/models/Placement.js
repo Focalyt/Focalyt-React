@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Schema.Types;
 
-// Placement Schema based on form fields
+// 
 const PlacementSchema = new mongoose.Schema({
   companyName: {
     type: String,
@@ -10,15 +10,14 @@ const PlacementSchema = new mongoose.Schema({
   },
   employerName: {
     type: String,
-    required: true,
     trim: true
   },
   contactNumber: {
     type: String,
-    required: true,
     trim: true,
     validate: {
       validator: function(v) {
+        if (!v || v.trim() === '') return true; 
         return /^[6-9]\d{9}$/.test(v.replace(/\D/g, ''));
       },
       message: 'Please enter a valid 10-digit contact number'
@@ -37,6 +36,10 @@ const PlacementSchema = new mongoose.Schema({
     type: ObjectId,
     ref: 'College',
     required: true
+  },
+  appliedCourse: {
+    type: ObjectId,
+    ref: 'AppliedCourses'
   },
   addedBy: {
     type: ObjectId,

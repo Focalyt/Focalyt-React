@@ -6,6 +6,7 @@ const { isCollege, auth1, authenti } = require("../../../helpers");
 
 const PlacementStatus = require('../../models/PlacementStatus');
 const Placement = require('../../models/Placement');
+const AppliedCourses = require('../../models/appliedCourses');
 
 router.get('/', isCollege, async (req, res) => {
   try {
@@ -26,23 +27,91 @@ router.get('/status-count', isCollege, async (req, res) => {
   try {
     const college = req.user.college;
 
-    const baseQuery = {
-      college: college._id
-    };
-
     // Get all PlacementStatus statuses for the college
     const statuses = await PlacementStatus.find({ college: college._id }).sort({ index: 1 });
 
-    // Get total count
-    const totalPlacements = await Placement.countDocuments(baseQuery);
+    // Get total count from AppliedCourses where movetoplacementstatus is true
+    const totalPlacementsPipeline = [
+      {
+        $match: {
+          movetoplacementstatus: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course'
+        }
+      },
+      {
+        $unwind: {
+          path: '$_course',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $match: {
+          '_course.college': new mongoose.Types.ObjectId(college._id)
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ];
 
-    // Get count by status
+    const totalResult = await AppliedCourses.aggregate(totalPlacementsPipeline);
+    const totalPlacements = totalResult[0]?.total || 0;
+
     const statusCounts = await Promise.all(
       statuses.map(async (status) => {
-        const count = await Placement.countDocuments({
-          ...baseQuery,
-          status: status._id
-        });
+        const countPipeline = [
+          {
+            $match: {
+              movetoplacementstatus: true
+            }
+          },
+          {
+            $lookup: {
+              from: 'courses',
+              localField: '_course',
+              foreignField: '_id',
+              as: '_course'
+            }
+          },
+          {
+            $unwind: {
+              path: '$_course',
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $match: {
+              '_course.college': new mongoose.Types.ObjectId(college._id)
+            }
+          },
+          {
+            $lookup: {
+              from: 'placements',
+              localField: '_id',
+              foreignField: 'appliedCourse',
+              as: 'placementRecord'
+            }
+          },
+          {
+            $match: {
+              'placementRecord.status': new mongoose.Types.ObjectId(status._id)
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ];
+
+        const result = await AppliedCourses.aggregate(countPipeline);
+        const count = result[0]?.total || 0;
+
         return {
           statusId: status._id,
           statusName: status.title,
@@ -51,11 +120,55 @@ router.get('/status-count', isCollege, async (req, res) => {
       })
     );
 
+    // Count AppliedCourses without a Placement record or with null status (No Status)
+    const nullStatusPipeline = [
+      {
+        $match: {
+          movetoplacementstatus: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course'
+        }
+      },
+      {
+        $unwind: {
+          path: '$_course',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $match: {
+          '_course.college': new mongoose.Types.ObjectId(college._id)
+        }
+      },
+      {
+        $lookup: {
+          from: 'placements',
+          localField: '_id',
+          foreignField: 'appliedCourse',
+          as: 'placementRecord'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { 'placementRecord.0': { $exists: false } },
+            { 'placementRecord.status': null }
+          ]
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ];
 
-    const nullStatusCount = await Placement.countDocuments({
-      ...baseQuery,
-      status: null
-    });
+    const nullStatusResult = await AppliedCourses.aggregate(nullStatusPipeline);
+    const nullStatusCount = nullStatusResult[0]?.total || 0;
 
     if (nullStatusCount > 0) {
       statusCounts.push({
@@ -377,38 +490,298 @@ router.delete('/deleteSubStatus/:statusId/substatus/:substatusId', isCollege, as
 
 router.get('/candidates', isCollege, async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
+    const { page = 1, limit = 10, status, search, placementStatus, placementStartDate, placementEndDate } = req.query;
     const college = req.user.college;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const query = {
-      college: college._id
+    // Build query for AppliedCourses where movetoplacementstatus is true
+    const appliedCoursesQuery = {
+      movetoplacementstatus: true
     };
 
-    if (status) {
-      query.status = status;
-    }
+    // Filter by college through course
+    const aggregationPipeline = [
+      {
+        $match: {
+          movetoplacementstatus: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course',
+          pipeline: [
+            {
+              $lookup: {
+                from: 'coursesectors',
+                localField: 'sectors',
+                foreignField: '_id',
+                as: 'sectors'
+              }
+            },
+            {
+              $lookup: {
+                from: 'projects',
+                localField: 'project',
+                foreignField: '_id',
+                as: 'project'
+              }
+            },
+            {
+              $unwind: {
+                path: '$project',
+                preserveNullAndEmptyArrays: true
+              }
+            }
+          ]
+        }
+      },
+      {
+        $unwind: {
+          path: '$_course',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $match: {
+          '_course.college': new mongoose.Types.ObjectId(college._id)
+        }
+      }
+    ];
+
+    // Add search filter
     if (search) {
-      query.$or = [
-        { companyName: { $regex: search, $options: 'i' } },
-        { employerName: { $regex: search, $options: 'i' } },
-        { contactNumber: { $regex: search, $options: 'i' } },
-        { location: { $regex: search, $options: 'i' } }
-      ];
+      aggregationPipeline.push({
+        $lookup: {
+          from: 'candidateprofiles',
+          localField: '_candidate',
+          foreignField: '_id',
+          as: '_candidate'
+        }
+      });
+      aggregationPipeline.push({
+        $unwind: {
+          path: '$_candidate',
+          preserveNullAndEmptyArrays: true
+        }
+      });
+      const searchRegex = new RegExp(search, 'i');
+      aggregationPipeline.push({
+        $match: {
+          $or: [
+            { '_candidate.name': searchRegex },
+            { '_candidate.email': searchRegex },
+            { '_candidate.mobile': searchRegex }
+          ]
+        }
+      });
+    } else {
+      // Always populate candidate for response
+      aggregationPipeline.push({
+        $lookup: {
+          from: 'candidateprofiles',
+          localField: '_candidate',
+          foreignField: '_id',
+          as: '_candidate'
+        }
+      });
+      aggregationPipeline.push({
+        $unwind: {
+          path: '$_candidate',
+          preserveNullAndEmptyArrays: true
+        }
+      });
     }
 
-    const placements = await Placement.find(query)
-      .populate({
-        path: 'status',
-        select: 'title substatuses'
-      })
-      .populate('addedBy', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Lookup Center details
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'centers',
+        localField: '_center',
+        foreignField: '_id',
+        as: '_center'
+      }
+    });
+    aggregationPipeline.push({
+      $unwind: {
+        path: '$_center',
+        preserveNullAndEmptyArrays: true
+      }
+    });
 
-    const totalPlacements = await Placement.countDocuments(query);
+    // Lookup Counsellor details
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'counsellor',
+        foreignField: '_id',
+        as: 'counsellor'
+      }
+    });
+    aggregationPipeline.push({
+      $unwind: {
+        path: '$counsellor',
+        preserveNullAndEmptyArrays: true
+      }
+    });
+
+    // Lookup Registered By
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'registeredBy',
+        foreignField: '_id',
+        as: 'registeredBy'
+      }
+    });
+    aggregationPipeline.push({
+      $unwind: {
+        path: '$registeredBy',
+        preserveNullAndEmptyArrays: true
+      }
+    });
+
+    // Lookup Placement records linked to AppliedCourses
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'placements',
+        localField: '_id',
+        foreignField: 'appliedCourse',
+        as: 'placementRecord'
+      }
+    });
+
+    // Populate status in Placement records
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'placementstatuses',
+        localField: 'placementRecord.status',
+        foreignField: '_id',
+        as: 'placementStatuses'
+      }
+    });
+
+    // Filter by placement status if provided
+    if (placementStatus) {
+      aggregationPipeline.push({
+        $match: {
+          'placementRecord.status': new mongoose.Types.ObjectId(placementStatus)
+        }
+      });
+    }
+
+    // Filter by date range if provided
+    if (placementStartDate || placementEndDate) {
+      const dateMatch = {};
+      if (placementStartDate) {
+        dateMatch.$gte = new Date(placementStartDate);
+      }
+      if (placementEndDate) {
+        dateMatch.$lte = new Date(placementEndDate);
+      }
+      aggregationPipeline.push({
+        $match: {
+          'placementRecord.createdAt': dateMatch
+        }
+      });
+    }
+
+    // Get total count before pagination
+    const countPipeline = [...aggregationPipeline, { $count: 'total' }];
+    const countResult = await AppliedCourses.aggregate(countPipeline);
+    const totalPlacements = countResult[0]?.total || 0;
     const totalPages = Math.ceil(totalPlacements / parseInt(limit));
+
+    // Add pagination
+    aggregationPipeline.push(
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) }
+    );
+
+    // Execute aggregation
+    const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
+
+    // Transform data to match frontend expectations
+    const placements = appliedCourses.map(appliedCourse => {
+      const placementRecord = appliedCourse.placementRecord?.[0] || null;
+      const statusDoc = placementRecord && appliedCourse.placementStatuses?.find(
+        s => s._id.toString() === placementRecord.status?.toString()
+      );
+
+      return {
+        _id: placementRecord?._id || appliedCourse._id, 
+        _candidate: appliedCourse._candidate ? {
+          _id: appliedCourse._candidate._id,
+          name: appliedCourse._candidate.name,
+          email: appliedCourse._candidate.email,
+          mobile: appliedCourse._candidate.mobile,
+          personalInfo: appliedCourse._candidate.personalInfo || {},
+          sex: appliedCourse._candidate.sex,
+          dob: appliedCourse._candidate.dob
+        } : null,
+        _student: appliedCourse._candidate ? {
+          _id: appliedCourse._candidate._id,
+          name: appliedCourse._candidate.name,
+          email: appliedCourse._candidate.email,
+          mobile: appliedCourse._candidate.mobile,
+          personalInfo: appliedCourse._candidate.personalInfo || {},
+          sex: appliedCourse._candidate.sex,
+          dob: appliedCourse._candidate.dob
+        } : null,
+        status: statusDoc ? {
+          _id: statusDoc._id,
+          title: statusDoc.title,
+          substatuses: statusDoc.substatuses || []
+        } : null,
+        subStatus: placementRecord?.subStatus || null,
+        appliedCourseId: appliedCourse._id,
+        placementId: placementRecord?._id || null,
+        
+        companyName: placementRecord?.companyName || null,
+        employerName: placementRecord?.employerName || null,
+        contactNumber: placementRecord?.contactNumber || null,
+        dateOfJoining: placementRecord?.dateOfJoining || null,
+        location: placementRecord?.location || null,
+        remark: placementRecord?.remark || appliedCourse.remarks || null,
+        remarks: placementRecord?.remark || appliedCourse.remarks || null,
+        // AppliedCourse fields for lead details
+        _course: appliedCourse._course ? {
+          _id: appliedCourse._course._id,
+          name: appliedCourse._course.name,
+          sectors: appliedCourse._course.sectors ? appliedCourse._course.sectors.map(s => s.name || s).join(', ') : null,
+          project: appliedCourse._course.project ? {
+            _id: appliedCourse._course.project._id,
+            name: appliedCourse._course.project.name
+          } : null
+        } : null,
+        sector: appliedCourse._course?.sectors && Array.isArray(appliedCourse._course.sectors) && appliedCourse._course.sectors.length > 0
+          ? appliedCourse._course.sectors.map(s => {
+              if (s && typeof s === 'object' && s.name) {
+                return s.name;
+              } else if (typeof s === 'string') {
+                return s;
+              } else {
+                return null;
+              }
+            }).filter(Boolean).join(', ') || null
+          : null,
+        projectName: appliedCourse._course?.project?.name || null,
+        _center: appliedCourse._center || null,
+        counsellor: appliedCourse.counsellor || null,
+        leadAssignment: appliedCourse.leadAssignment || [],
+        followup: appliedCourse.followupDate ? { followupDate: appliedCourse.followupDate } : null,
+        followupDate: appliedCourse.followupDate || null,
+        registeredBy: appliedCourse.registeredBy || null,
+        addedBy: placementRecord?.addedBy || appliedCourse.registeredBy || null,
+        updatedBy: placementRecord?.updatedBy || null,
+        logs: placementRecord?.logs || appliedCourse.logs || [],
+        createdAt: appliedCourse.createdAt,
+        updatedAt: appliedCourse.updatedAt || placementRecord?.updatedAt
+      };
+    });
 
     return res.status(200).json({
       status: true,
@@ -441,8 +814,6 @@ router.post('/add-candidate', isCollege, async (req, res) => {
 
     const missingFields = [];
     if (!companyName) missingFields.push('companyName');
-    if (!employerName) missingFields.push('employerName');
-    if (!contactNumber) missingFields.push('contactNumber');
     if (!dateOfJoining) missingFields.push('dateOfJoining');
     if (!location) missingFields.push('location');
 
@@ -453,18 +824,22 @@ router.post('/add-candidate', isCollege, async (req, res) => {
       });
     }
 
-    const cleanContactNumber = contactNumber.replace(/\D/g, '');
+    // Validate contact number only if provided
+    let cleanContactNumber = '';
+    if (contactNumber && contactNumber.trim() !== '') {
+      cleanContactNumber = contactNumber.replace(/\D/g, '');
     if (!/^[6-9]\d{9}$/.test(cleanContactNumber)) {
       return res.status(400).json({
         status: false,
         message: 'Please enter a valid 10-digit contact number'
       });
+      }
     }
 
     const newPlacement = new Placement({
       companyName: companyName.trim(),
-      employerName: employerName.trim(),
-      contactNumber: cleanContactNumber,
+      employerName: employerName ? employerName.trim() : '',
+      contactNumber: cleanContactNumber || '',
       dateOfJoining: new Date(dateOfJoining),
       location: location.trim(),
       college: college._id,
@@ -472,7 +847,7 @@ router.post('/add-candidate', isCollege, async (req, res) => {
       logs: [{
         user: userId,
         action: 'Candidate added',
-        remarks: `New candidate added: ${employerName} at ${companyName}`
+        remarks: `New candidate added: ${employerName || 'N/A'} at ${companyName}`
       }]
     });
 
@@ -510,19 +885,114 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
       status,
       subStatus,
       remarks,
-      followup
+      followup,
+      companyName,
+      employerName,
+      contactNumber,
+      dateOfJoining,
+      location,
+      appliedCourseId
     } = req.body;
 
     const userId = req.user._id;
     const collegeId = req.user.college._id;
 
-    const placement = await Placement.findById(id);
-    if (!placement) {
-      return res.status(404).json({ success: false, message: 'Placement not found' });
-    }
+    
+    let placement = null;
+    let appliedCourse = null;
 
+    placement = await Placement.findById(id);
+    
+    if (placement) {
+      // This is a Placement ID, get the AppliedCourse ID from it
+      appliedCourseId = placement.appliedCourse;
+      
+      // Verify placement belongs to college
     if (placement.college.toString() !== collegeId.toString()) {
       return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+      }
+      
+      // Get AppliedCourse for verification
+      appliedCourse = await AppliedCourses.findById(appliedCourseId)
+        .populate({
+          path: '_course',
+          select: 'college'
+        });
+    } else {
+      // This is an AppliedCourse ID (first time status update)
+      appliedCourse = await AppliedCourses.findById(id)
+        .populate({
+          path: '_course',
+          select: 'college'
+        });
+
+      if (!appliedCourse) {
+        return res.status(404).json({ success: false, message: 'Applied course not found' });
+      }
+
+      // Verify college access through course
+      if (appliedCourse._course && appliedCourse._course.college.toString() !== collegeId.toString()) {
+        return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+      }
+
+      // Find existing Placement record linked to this AppliedCourse
+      placement = await Placement.findOne({ appliedCourse: id });
+    }
+
+    if (!placement) {
+      const CandidateProfile = mongoose.model('CandidateProfile');
+      const candidate = await CandidateProfile.findById(appliedCourse._candidate).select('name mobile').lean();
+
+   
+      const placementCompanyName = companyName ? String(companyName).trim() : (candidate?.name || 'Not Set');
+      const placementEmployerName = employerName ? String(employerName).trim() : (candidate?.name || '');
+      let placementContactNumber = contactNumber ? String(contactNumber) : (candidate?.mobile ? String(candidate.mobile) : '');
+      
+
+      if (placementContactNumber && placementContactNumber.trim() !== '') {
+        placementContactNumber = placementContactNumber.replace(/\D/g, '');
+        if (!/^[6-9]\d{9}$/.test(placementContactNumber)) {
+          placementContactNumber = '';
+        }
+      } else {
+        placementContactNumber = '';
+      }
+
+      placement = new Placement({
+        companyName: placementCompanyName,
+        employerName: placementEmployerName,
+        contactNumber: placementContactNumber,
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
+        location: location || 'Not Set',
+        college: collegeId,
+        appliedCourse: appliedCourseId,
+        addedBy: userId,
+        logs: [{
+          user: userId,
+          action: 'Placement record created from AppliedCourse',
+          remarks: `Placement record created for student: ${candidate?.name || 'Unknown'}`
+        }]
+      });
+    } else {
+      // Update existing placement with provided details
+      if (companyName) placement.companyName = String(companyName).trim();
+      if (employerName !== undefined) {
+        placement.employerName = employerName ? String(employerName).trim() : '';
+      }
+      if (contactNumber !== undefined) {
+        if (contactNumber && String(contactNumber).trim() !== '') {
+          const cleanNumber = String(contactNumber).replace(/\D/g, '');
+          if (/^[6-9]\d{9}$/.test(cleanNumber)) {
+            placement.contactNumber = cleanNumber;
+          } else {
+            placement.contactNumber = '';
+          }
+        } else {
+          placement.contactNumber = '';
+        }
+      }
+      if (dateOfJoining) placement.dateOfJoining = new Date(dateOfJoining);
+      if (location) placement.location = String(location).trim();
     }
 
     let actionParts = [];
