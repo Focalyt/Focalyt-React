@@ -728,23 +728,29 @@ const Student = ({
   const handleMoveCandidate = async (profile, e) => {
     console.log('e', e);
     
-    // If moving to placements, show placement form modal
+    let body = { status: e }
+    
     if (e === 'Move to Placements') {
-      setStudentForPlacement(profile);
-      setShowPlacementModal(true);
-      // Reset form
-      setPlacementFormData({
-        companyName: '',
-        employerName: '',
-        contactNumber: '',
-        dateOfJoining: null,
-        location: ''
-      });
-      setPlacementFormErrors({});
+      const confirmed = window.confirm('Are you sure you want to move this student to Placements?');
+      if (!confirmed) return;
+      
+      try {
+        const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, body, {
+          headers: {
+            "x-auth": token,
+          },
+        });
+        if (response.status === 200) {
+          window.alert(response.data.message || 'Student moved to placements successfully');
+          await fetchProfileData();
+        }
+      } catch (error) {
+        console.error("Error moving student to placements:", error);
+        window.alert(error.response?.data?.message || 'Failed to move student to placements. Please try again.');
+      }
       return;
     }
 
-    let body = { status: e }
     const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
     let dropoutReason = '';
     if (e === 'Dropout') {
@@ -7377,208 +7383,6 @@ const Student = ({
         </div>
       )}
 
-      {/* Placement Details Modal */}
-      {showPlacementModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered mx-auto">
-            <div className="modal-content p-0 mx-auto" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-              {/* Modal Header */}
-              <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
-                <h5 className="modal-title d-flex align-items-center">
-                  <i className="fas fa-briefcase me-2"></i>
-                  Move to Placements - Fill Placement Details
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => {
-                    setShowPlacementModal(false);
-                    setStudentForPlacement(null);
-                    setPlacementFormData({
-                      companyName: '',
-                      employerName: '',
-                      contactNumber: '',
-                      dateOfJoining: null,
-                      location: ''
-                    });
-                    setPlacementFormErrors({});
-                  }}
-                ></button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="modal-body p-4">
-                {studentForPlacement && (
-                  <div className="alert alert-info mb-3">
-                    <strong>Student:</strong> {studentForPlacement._candidate?.name || 'N/A'}
-                  </div>
-                )}
-                
-                <div className="row g-3">
-                  {/* Company Name */}
-                  <div className="col-12">
-                    <label className="form-label fw-bold">
-                      <i className="fas fa-building text-primary me-1"></i>
-                      Company Name <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className={`form-control ${placementFormErrors.companyName ? 'is-invalid' : ''}`}
-                      name="companyName"
-                      value={placementFormData.companyName}
-                      onChange={handlePlacementFormChange}
-                      placeholder="Enter company name"
-                    />
-                    {placementFormErrors.companyName && (
-                      <div className="invalid-feedback">
-                        {placementFormErrors.companyName}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* HR Name */}
-                  <div className="col-12">
-                    <label className="form-label fw-bold">
-                      <i className="fas fa-user-tie text-primary me-1"></i>
-                      HR Name
-                    </label>
-                    <input
-                      type="text"
-                      className={`form-control ${placementFormErrors.employerName ? 'is-invalid' : ''}`}
-                      name="employerName"
-                      value={placementFormData.employerName}
-                      onChange={handlePlacementFormChange}
-                      placeholder="Enter HR name"
-                    />
-                    {placementFormErrors.employerName && (
-                      <div className="invalid-feedback">
-                        {placementFormErrors.employerName}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Contact Number */}
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold">
-                      <i className="fas fa-phone text-primary me-1"></i>
-                      Contact Number
-                    </label>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      className={`form-control ${placementFormErrors.contactNumber ? 'is-invalid' : ''}`}
-                      name="contactNumber"
-                      value={placementFormData.contactNumber}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setPlacementFormData(prev => ({
-                          ...prev,
-                          contactNumber: value
-                        }));
-                        if (placementFormErrors.contactNumber) {
-                          setPlacementFormErrors(prev => ({
-                            ...prev,
-                            contactNumber: ''
-                          }));
-                        }
-                      }}
-                      placeholder="Enter contact number"
-                    />
-                    {placementFormErrors.contactNumber && (
-                      <div className="invalid-feedback">
-                        {placementFormErrors.contactNumber}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Date of Joining */}
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold">
-                      <i className="fas fa-calendar text-primary me-1"></i>
-                      Date of Joining <span className="text-danger">*</span>
-                    </label>
-                    <DatePicker
-                      onChange={(date) => {
-                        setPlacementFormData(prev => ({
-                          ...prev,
-                          dateOfJoining: date
-                        }));
-                        if (placementFormErrors.dateOfJoining) {
-                          setPlacementFormErrors(prev => ({
-                            ...prev,
-                            dateOfJoining: ''
-                          }));
-                        }
-                      }}
-                      value={placementFormData.dateOfJoining}
-                      format="dd/MM/yyyy"
-                      className={`form-control ${placementFormErrors.dateOfJoining ? 'is-invalid' : ''}`}
-                    />
-                    {placementFormErrors.dateOfJoining && (
-                      <div className="invalid-feedback d-block">
-                        {placementFormErrors.dateOfJoining}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Location */}
-                  <div className="col-12">
-                    <label className="form-label fw-bold">
-                      <i className="fas fa-map-marker-alt text-primary me-1"></i>
-                      Location <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className={`form-control ${placementFormErrors.location ? 'is-invalid' : ''}`}
-                      name="location"
-                      value={placementFormData.location}
-                      onChange={handlePlacementFormChange}
-                      placeholder="Enter location"
-                    />
-                    {placementFormErrors.location && (
-                      <div className="invalid-feedback">
-                        {placementFormErrors.location}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowPlacementModal(false);
-                    setStudentForPlacement(null);
-                    setPlacementFormData({
-                      companyName: '',
-                      employerName: '',
-                      contactNumber: '',
-                      dateOfJoining: null,
-                      location: ''
-                    });
-                    setPlacementFormErrors({});
-                  }}
-                >
-                  <i className="fas fa-times me-1"></i>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ backgroundColor: '#fc2b5a', color: 'white' }}
-                  onClick={handlePlacementSubmit}
-                >
-                  <i className="fas fa-check me-1"></i>
-                  Move to Placements
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Enhanced CSS for styling */}
       <style jsx>
