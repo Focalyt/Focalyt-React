@@ -54,7 +54,7 @@ import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
 import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCourses';
 import Curriculums from './Pages/App/Candidate/EnrolledCourses/Curriculums';
 import Assignments from './Pages/App/Candidate/Assignment/Assignment';
-
+import JobOffer from './Pages/App/Candidate/JobOffer/jobOffer';
 
 import Registration from './Pages/Front/StudentRegistration/Registration';
 import CollegeLayout from './Component/Layouts/App/College';
@@ -225,6 +225,7 @@ const Layout = () => {
           <Route path='enrolledCourses' element={<EnrolledCourses/>}/>
           <Route path='enrolledCourses/:courseId' element={<Curriculums/>}/>
           <Route path='assignments' element={<Assignments/>}/>
+          <Route path='jobOffer' element={<JobOffer/>}/>
         </Route>
       
 

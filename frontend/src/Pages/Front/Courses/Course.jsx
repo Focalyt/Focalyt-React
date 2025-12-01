@@ -388,7 +388,7 @@ function Course() {
                   </div>
 
                   {/* Course Cards */}
-                  <div className="row">
+                  <div className="row mx-auto">
                     {filteredCourses.length > 0 ? (
                       filteredCourses.map((course) => (
                         <div key={course._id} className="col-lg-4 col-md-6 col-sm-12 col-12 pb-4 card-padd">

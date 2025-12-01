@@ -300,7 +300,7 @@ const DocumentModal = memo(({
   const [rejectionReason, setRejectionReason] = useState('');
   const [documentZoom, setDocumentZoom] = useState(1);
   const [documentRotation, setDocumentRotation] = useState(0);
-  
+
   const getStatusBadgeClass = (status) => {
     switch (status?.toLowerCase()) {
       case 'pending': return 'text-dark';
@@ -309,7 +309,7 @@ const DocumentModal = memo(({
       default: return 'text-secondary';
     }
   };
-  
+
   const latestUpload = useMemo(() => {
     if (!selectedDocument) return null;
     return selectedDocument.uploads && selectedDocument.uploads.length > 0
@@ -662,6 +662,68 @@ const Placements = () => {
   const [jobHistory, setJobHistory] = useState([]);
   const [courseHistory, setCourseHistory] = useState([]);
 
+  // Company Jobs state
+  const [companyJobs, setCompanyJobs] = useState([]);
+  const [loadingCompanyJobs, setLoadingCompanyJobs] = useState(false);
+  const [jobVideoSrc, setJobVideoSrc] = useState("");
+
+  // Job Creation state
+  const [showCreateJobModal, setShowCreateJobModal] = useState(false);
+  const [jobFormData, setJobFormData] = useState({
+    title: '',
+    companyName: '',
+    displayCompanyName: '',
+    _qualification: '',
+    _industry: '',
+    _course: '',
+    city: '',
+    state: '',
+    validity: '',
+    jobDescription: '',
+    requirement: '',
+    noOfPosition: 1,
+    _jobCategory: ''
+  });
+  const [jobFormErrors, setJobFormErrors] = useState({});
+  const [qualifications, setQualifications] = useState([]);
+  const [industries, setIndustries] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [states, setStates] = useState([]);
+  const [jobCategories, setJobCategories] = useState([]);
+  const [creatingJob, setCreatingJob] = useState(false);
+  const [jobOfferCandidates, setJobOfferCandidates] = useState([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [selectedJobOfferId, setSelectedJobOfferId] = useState(null);
+  const [showCandidatesModal, setShowCandidatesModal] = useState(false);
+
+  // Job Offer state
+  const [showOfferJobModal, setShowOfferJobModal] = useState(false);
+  const [selectedPlacementForJob, setSelectedPlacementForJob] = useState(null);
+  const [selectedJobForOffer, setSelectedJobForOffer] = useState(null);
+  const [offerJobData, setOfferJobData] = useState({
+    dateOfJoining: '',
+    remarks: ''
+  });
+  const [offeringJob, setOfferingJob] = useState(false);
+
+  // WhatsApp Panel states
+  const [showPanel, setShowPanel] = useState('');
+  const [whatsappMessages, setWhatsappMessages] = useState([]);
+  const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
+  const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
+  const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
+  const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
+  const whatsappMessagesEndRef = useRef(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState({
+    isOpen: false,
+    openedAt: null,
+    expiresAt: null,
+    remainingTimeMs: 0
+  });
+  const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
+
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -761,17 +823,17 @@ const Placements = () => {
       ...prevTabs,
       [placementIndex]: tabIndex
     }));
-    
+
 
     const candidateId = placement._candidate?._id || placement._candidate || placement._student?._id || placement._student;
     if (tabIndex === 2 && candidateId) {
-   
       fetchJobHistory(candidateId);
     } else if (tabIndex === 3 && candidateId) {
-    
       fetchCourseHistory(candidateId);
+    } else if (tabIndex === 5) {
+      fetchCompanyJobs();
     }
-    
+
     if (isMobile) {
       setTimeout(() => {
         const tabButton = document.querySelector(`.nav-pills .nav-link:nth-child(${tabIndex + 1})`);
@@ -790,7 +852,6 @@ const Placements = () => {
     setShowPopup(prev => prev === placementId ? null : placementId);
   };
 
-  const [showPanel, setShowPanel] = useState('')
 
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
 
@@ -905,7 +966,6 @@ const Placements = () => {
 
 
   useEffect(() => {
-    // fetchUsers(); 
     fetchStatusCounts();
   }, []);
 
@@ -920,7 +980,7 @@ const Placements = () => {
     }
   }, [showAddLeadModal]);
 
-  
+
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -1022,7 +1082,7 @@ const Placements = () => {
 
   const [filters, setFilters] = useState({
     search: '',
-    placementStatus: '', 
+    placementStatus: '',
     placementDateRange: {
       start: null,
       end: null
@@ -1301,34 +1361,34 @@ const Placements = () => {
             remarks: ''
           });
 
-          
+
           const profileId = selectedProfile._id;
           const statusId = typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus;
-          
+
           const selectedCrmFilter = crmFilters.find(f => f._id === statusId);
           const milestone = selectedCrmFilter?.milestone;
-          
-          
+
+
           await fetchLeads(selectedStatusFilter, currentPage);
           await fetchStatusCounts();
-          
-         
+
+
           if (profileId && milestone) {
             const placementId = profileId;
-            
+
             if (milestone.toLowerCase() === 'documents') {
               setActiveTab(prevTabs => ({
                 ...prevTabs,
-                [placementId]: 1 
+                [placementId]: 1
               }));
-              
-              
+
+
               if (leadDetailsVisible !== placementId) {
                 setLeadDetailsVisible(placementId);
               }
             }
           }
-          
+
           closePanel();
         } else {
           console.error('API returned error:', response.data);
@@ -1442,7 +1502,7 @@ const Placements = () => {
 
       if (circle && progressText) {
         if (percent === 'NA' || percent === null || percent === undefined) {
-        
+
           circle.style.strokeDasharray = 0;
           circle.style.strokeDashoffset = 0;
           progressText.innerText = 'NA';
@@ -1723,7 +1783,8 @@ const Placements = () => {
     'Profile',
     'Job History',
     'Course History',
-    'Documents'
+    'Documents',
+    'Company Jobs'
   ];
 
   // Check if device is mobile
@@ -1810,14 +1871,14 @@ const Placements = () => {
         setCrmFilters([allFilter, ...status.map(r => ({
           _id: r._id,
           name: r.title,
-          milestone: r.milestone,  
+          milestone: r.milestone,
         }))]);
 
         setStatuses(status.map(r => ({
           _id: r._id,
           name: r.title,
-          count: r.count || 0,  
-          substatuses: r.substatuses || [] 
+          count: r.count || 0,
+          substatuses: r.substatuses || []
         })));
 
 
@@ -1928,6 +1989,247 @@ const Placements = () => {
       setMainContentClass('col-12');
     }
   };
+
+
+  const openWhatsappPanel = async (placement) => {
+    if (placement) {
+      setSelectedProfile(placement);
+    }
+    setShowPopup(null);
+    setShowPanel('Whatsapp');
+
+    const mobileNumber = placement?._candidate?.mobile || placement?._student?.mobile || placement?.studentMobile || placement?.contactNumber;
+    
+    if (mobileNumber) {
+      await fetchWhatsappHistory(mobileNumber);
+      await checkSessionWindow(mobileNumber);
+    } else {
+      alert('Mobile number not found for this candidate');
+    }
+
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+
+  // Fetch WhatsApp chat history
+  const fetchWhatsappHistory = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('❌ Phone number or token missing:', { phoneNumber, hasToken: !!token });
+        return;
+      }
+
+      setIsLoadingChatHistory(true);
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const formattedMessages = response.data.data.map((msg, index) => ({
+          id: msg._id || msg.wamid || msg.whatsappMessageId || `msg-${index}`,
+          dbId: msg._id,
+          wamid: msg.wamid || msg.whatsappMessageId,
+          whatsappMessageId: msg.whatsappMessageId || msg.wamid,
+          text: msg.message,
+          sender: msg.direction === 'incoming' ? 'user' : 'agent',
+          time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          type: msg.messageType,
+          templateData: msg.templateData,
+          mediaUrl: msg.mediaUrl,
+          status: msg.status || (msg.direction === 'incoming' ? 'received' : 'sent'),
+          deliveredAt: msg.deliveredAt,
+          readAt: msg.readAt
+        }));
+
+        setWhatsappMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching chat history:', error.response?.data || error.message);
+      setWhatsappMessages([]);
+    } finally {
+      setIsLoadingChatHistory(false);
+    }
+  };
+
+  // Check WhatsApp 24-hour session window status
+  const checkSessionWindow = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('❌ Phone number or token missing');
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/session-window/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const { sessionWindow: sw } = response.data;
+        setSessionWindow({
+          isOpen: sw.isOpen,
+          openedAt: sw.lastIncomingMessageAt,
+          expiresAt: sw.expiresAt,
+          remainingTimeMs: sw.remainingTimeMs
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking session window:', error.response?.data || error.message);
+      setSessionWindow({
+        isOpen: false,
+        openedAt: null,
+        expiresAt: null,
+        remainingTimeMs: 0
+      });
+    }
+  };
+
+  // Send WhatsApp message
+  const sendWhatsappMessage = async () => {
+    const mobileNumber = selectedProfile?._candidate?.mobile || selectedProfile?._student?.mobile || selectedProfile?.studentMobile || selectedProfile?.contactNumber;
+    
+    if (!mobileNumber) {
+      alert('Mobile number not found');
+      return;
+    }
+
+    if (!whatsappNewMessage.trim() && !selectedWhatsappTemplate) {
+      alert('Please enter a message or select a template');
+      return;
+    }
+
+    try {
+      setIsSendingWhatsapp(true);
+
+      let response;
+      if (selectedWhatsappTemplate) {
+        // Send template message
+        response = await axios.post(
+          `${backendUrl}/college/whatsapp/send-template`,
+          {
+            to: mobileNumber,
+            templateId: selectedWhatsappTemplate._id || selectedWhatsappTemplate.id,
+            templateName: selectedWhatsappTemplate.name,
+            language: selectedWhatsappTemplate.language || 'en'
+          },
+          { headers: { 'x-auth': token } }
+        );
+      } else {
+        // Send text message
+        response = await axios.post(
+          `${backendUrl}/college/whatsapp/send-message`,
+          {
+            to: mobileNumber,
+            message: whatsappNewMessage
+          },
+          { headers: { 'x-auth': token } }
+        );
+      }
+
+      if (response.data.success) {
+        // Add message to local state
+        const newMessage = {
+          id: response.data.messageId || response.data.wamid || Date.now().toString(),
+          text: whatsappNewMessage || selectedWhatsappTemplate?.name || 'Template message',
+          sender: 'agent',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          type: selectedWhatsappTemplate ? 'template' : 'text',
+          templateData: selectedWhatsappTemplate ? { components: selectedWhatsappTemplate.components } : null,
+          status: 'sent'
+        };
+
+        setWhatsappMessages(prev => [...prev, newMessage]);
+        setWhatsappNewMessage('');
+        setSelectedWhatsappTemplate(null);
+        
+        // Refresh chat history
+        await fetchWhatsappHistory(mobileNumber);
+        // Refresh session window
+        await checkSessionWindow(mobileNumber);
+      } else {
+        alert(response.data.message || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending WhatsApp message:', error);
+      alert(error.response?.data?.message || 'Error sending message');
+    } finally {
+      setIsSendingWhatsapp(false);
+    }
+  };
+
+  // Fetch WhatsApp templates
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (showPanel === 'Whatsapp' && token) {
+        try {
+          const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+            headers: { 'x-auth': token }
+          });
+          if (response.data.success) {
+            setWhatsappTemplates(response.data.templates || []);
+          }
+        } catch (error) {
+          console.error('Error fetching templates:', error);
+        }
+      }
+    };
+    fetchTemplates();
+  }, [showPanel, token]);
+
+  // Session countdown timer
+  useEffect(() => {
+    if (!sessionWindow.isOpen || !sessionWindow.expiresAt) {
+      setSessionCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const expiresAt = new Date(sessionWindow.expiresAt);
+      const diff = expiresAt - now;
+
+      if (diff <= 0) {
+        setSessionCountdown('00:00:00');
+        const mobileNumber = selectedProfile?._candidate?.mobile || selectedProfile?._student?.mobile || selectedProfile?.studentMobile || selectedProfile?.contactNumber;
+        if (mobileNumber) {
+          checkSessionWindow(mobileNumber);
+        }
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setSessionCountdown(formatted);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [sessionWindow.isOpen, sessionWindow.expiresAt, selectedProfile]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (whatsappMessagesEndRef.current) {
+      whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [whatsappMessages]);
 
 
 
@@ -2245,112 +2547,112 @@ const Placements = () => {
 
         <div className="card-body" style={{ padding: '24px' }}>
           <form onSubmit={addFollowUpToGoogleCalendar}>
-              {/* Follow-up Date and Time */}
-              <div className="row mb-4">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                    Follow-up Date <span className="text-danger">*</span>
-                  </label>
-                  <DatePicker
-                    className="form-control border-0 bgcolor"
-                    onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
-                    value={followupFormData.followupDate}
-                    format="dd/MM/yyyy"
-                    minDate={today}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1.5px solid #ced4da',
-                      borderRadius: '8px',
-                      height: '42px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                </div>
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="time"
-                    className="form-control border-0 bgcolor"
-                    id="actionTime"
-                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
-                    value={followupFormData.followupTime}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1.5px solid #ced4da',
-                      borderRadius: '8px',
-                      height: '42px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Remarks */}
-              <div className="mb-4">
-                <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                  Follow-up Notes
+            {/* Follow-up Date and Time */}
+            <div className="row mb-4">
+              <div className="col-6">
+                <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  Follow-up Date <span className="text-danger">*</span>
                 </label>
-                <textarea
+                <DatePicker
                   className="form-control border-0 bgcolor"
-                  id="followupRemarks"
-                  rows="4"
-                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                  value={followupFormData.remarks}
-                  placeholder="Enter follow-up notes..."
+                  onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
+                  value={followupFormData.followupDate}
+                  format="dd/MM/yyyy"
+                  minDate={today}
                   style={{
-                    resize: 'none',
                     backgroundColor: '#ffffff',
                     border: '1.5px solid #ced4da',
                     borderRadius: '8px',
-                    padding: '12px',
+                    height: '42px',
+                    padding: '8px 12px',
                     fontSize: '14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    minHeight: '100px'
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                   }}
                 />
               </div>
-
-              {/* Action Buttons */}
-              <div className="d-flex justify-content-end gap-3 mt-4">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closePanel}
+              <div className="col-6">
+                <label htmlFor="actionTime" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  Time <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="time"
+                  className="form-control border-0 bgcolor"
+                  id="actionTime"
+                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
+                  value={followupFormData.followupTime}
                   style={{
-                    padding: '10px 20px',
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid #ced4da',
                     borderRadius: '8px',
+                    height: '42px',
+                    padding: '8px 12px',
                     fontSize: '14px',
-                    fontWeight: '500',
-                    borderWidth: '1.5px',
-                    minWidth: '100px'
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                   }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-success"
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    backgroundColor: '#28a745',
-                    borderColor: '#28a745',
-                    minWidth: '120px',
-                    boxShadow: '0 2px 4px rgba(40, 167, 69, 0.2)'
-                  }}
-                >
-                  Set Follow-up
-                </button>
+                />
               </div>
-            </form>
+            </div>
+
+            {/* Remarks */}
+            <div className="mb-4">
+              <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                Follow-up Notes
+              </label>
+              <textarea
+                className="form-control border-0 bgcolor"
+                id="followupRemarks"
+                rows="4"
+                onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                value={followupFormData.remarks}
+                placeholder="Enter follow-up notes..."
+                style={{
+                  resize: 'none',
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #ced4da',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  fontSize: '14px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  minHeight: '100px'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="d-flex justify-content-end gap-3 mt-4">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={closePanel}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  borderWidth: '1.5px',
+                  minWidth: '100px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-success"
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#28a745',
+                  borderColor: '#28a745',
+                  minWidth: '120px',
+                  boxShadow: '0 2px 4px rgba(40, 167, 69, 0.2)'
+                }}
+              >
+                Set Follow-up
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     );
@@ -2486,6 +2788,553 @@ const Placements = () => {
     ) : null;
   };
 
+  // Render message status icon (WhatsApp style)
+  const renderMessageStatus = (status, errorMessage = null) => {
+    switch (status) {
+      case 'sending':
+        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sending..."></i>;
+      case 'sent':
+        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sent"></i>;
+      case 'delivered':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Delivered">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'read':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Read">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'failed':
+        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px', cursor: 'pointer' }} title={errorMessage || 'Message failed to send'}></i>;
+      default:
+        return null;
+    }
+  };
+
+  // Render WhatsApp Panel
+  const renderWhatsAppPanel = () => {
+    if (showPanel !== 'Whatsapp') return null;
+
+    const mobileNumber = selectedProfile?._candidate?.mobile || selectedProfile?._student?.mobile || selectedProfile?.studentMobile || selectedProfile?.contactNumber;
+    const candidateName = selectedProfile?._candidate?.name || selectedProfile?._student?.name || 'Unknown';
+
+    const panelContent = (
+      <div className="d-flex flex-column" style={{ height: '100%', width: '100%', backgroundColor: '#f0f2f5' }}>
+        {/* WhatsApp Header */}
+        <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px' }}>
+          <div className="d-flex align-items-center mb-2">
+            <div
+              className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+              style={{
+                width: '48px',
+                height: '48px',
+                fontSize: '20px',
+                fontWeight: '600',
+                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                flexShrink: 0
+              }}
+            >
+              {candidateName.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-grow-1">
+              <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+                {candidateName}
+              </h6>
+              <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+                {mobileNumber || 'N/A'}
+              </p>
+            </div>
+            <button
+              className="btn-close"
+              onClick={closePanel}
+              style={{ marginLeft: '8px' }}
+            ></button>
+          </div>
+
+          {/* Session Status Badge */}
+          <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+            {sessionWindow.isOpen ? (
+              <div
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{
+                  backgroundColor: '#D1F4E0',
+                  border: '1px solid #25D366',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <div
+                  className="rounded-circle me-1"
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#25D366'
+                  }}
+                ></div>
+                <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+                  <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+                  {sessionCountdown} remaining
+                </span>
+              </div>
+            ) : (
+              <div
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{
+                  backgroundColor: '#FFF3CD',
+                  border: '1px solid #FFA500',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+                <span className="fw-semibold" style={{ color: '#856404' }}>
+                  No Active Window
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <div
+          className="flex-grow-1 overflow-auto p-3"
+          style={{
+            backgroundColor: '#ECE5DD',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+            maxHeight: '55vh',
+            minHeight: '300px'
+          }}
+        >
+          {isLoadingChatHistory ? (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {whatsappMessages.map(message => (
+                <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+                  <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+                    <div
+                      style={{
+                        backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+                        color: message.sender === 'agent' ? '#000' : '#000',
+                        borderRadius: '8px',
+                        borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+                        borderBottomLeftRadius: message.sender === 'user' ? '2px' : '8px',
+                        boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                        padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Render template message */}
+                      {message.type === 'template' && message.templateData ? (
+                        <>
+                          <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                            {message.templateData.body || message.text}
+                          </div>
+                          <div
+                            className="d-flex align-items-center justify-content-end"
+                            style={{
+                              fontSize: '11px',
+                              color: '#667781',
+                              marginTop: '4px'
+                            }}
+                          >
+                            <span>{message.time}</span>
+                            {message.sender === 'agent' && renderMessageStatus(message.status)}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Render media if present */}
+                          {message.mediaUrl && message.type === 'image' && (
+                            <img 
+                              src={message.mediaUrl} 
+                              alt="Shared image"
+                              style={{ 
+                                maxWidth: '100%', 
+                                borderRadius: '8px', 
+                                marginBottom: message.text !== '[Image]' ? '8px' : '0',
+                                display: 'block'
+                              }}
+                            />
+                          )}
+                          {message.mediaUrl && message.type === 'video' && (
+                            <video 
+                              controls 
+                              style={{ 
+                                maxWidth: '100%', 
+                                borderRadius: '8px', 
+                                marginBottom: message.text !== '[Video]' ? '8px' : '0',
+                                display: 'block'
+                              }}
+                            >
+                              <source src={message.mediaUrl} type="video/mp4" />
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                          {message.mediaUrl && message.type === 'document' && (
+                            <a 
+                              href={message.mediaUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="d-flex align-items-center text-decoration-none"
+                              style={{ 
+                                padding: '8px', 
+                                backgroundColor: 'rgba(0,0,0,0.05)', 
+                                borderRadius: '4px',
+                                marginBottom: '4px'
+                              }}
+                            >
+                              <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+                              <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+                            </a>
+                          )}
+                          
+                          {/* Render text if it's not a default placeholder */}
+                          {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+                            <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                              {message.text}
+                            </p>
+                          )}
+                          
+                          <div
+                            className="d-flex align-items-center justify-content-end"
+                            style={{
+                              fontSize: '11px',
+                              color: '#667781',
+                              marginTop: '4px'
+                            }}
+                          >
+                            <span>{message.time}</span>
+                            {message.sender === 'agent' && renderMessageStatus(message.status)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {message.sender === 'agent' && message.type === 'template' && (
+                      <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                        <i className="fas fa-file-alt me-1"></i>Template Message
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={whatsappMessagesEndRef} />
+            </>
+          )}
+        </div>
+
+        {/* Input Area */}
+        <div className="bg-white border-top p-3">
+          {/* Selected Template Preview */}
+          {selectedWhatsappTemplate && (
+            <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+              <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+                <div
+                  className="rounded-3 overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    position: 'relative'
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between p-3" style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    <div className="d-flex align-items-center">
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2"
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          backgroundColor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+                      </div>
+                      <div>
+                        <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          WhatsApp Template
+                        </p>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                          {selectedWhatsappTemplate.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-sm p-0"
+                      onClick={() => setSelectedWhatsappTemplate(null)}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        borderRadius: '50%',
+                        color: '#fff',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      title="Remove Template"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="d-flex align-items-center gap-2">
+            {/* Template Button */}
+            <div className="position-relative">
+              <button
+                className="btn"
+                onClick={() => {
+                  setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+                }}
+                title="Templates"
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  backgroundColor: '#0B66E4',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+              </button>
+
+              {/* Template Dropdown */}
+              {showWhatsappTemplateMenu && (
+                <div className="position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                  <div className="p-3 border-bottom bg-light">
+                    <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+                    <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+                  </div>
+
+                  {whatsappTemplates.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mb-0 small text-muted">Loading templates...</p>
+                    </div>
+                  ) : (
+                    whatsappTemplates.map(template => (
+                      <div
+                        key={template._id || template.id}
+                        className="p-3 border-bottom"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          setSelectedWhatsappTemplate(template);
+                          setShowWhatsappTemplateMenu(false);
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <h6 className="mb-0 fw-semibold">{template.name}</h6>
+                          <div className="d-flex gap-1">
+                            <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+                            {template.language && (
+                              <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Message Input or Template Send Button */}
+            {selectedWhatsappTemplate ? (
+              <button
+                className="btn flex-grow-1"
+                onClick={sendWhatsappMessage}
+                disabled={isSendingWhatsapp}
+                style={{
+                  height: '42px',
+                  backgroundColor: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '24px',
+                  fontWeight: '500',
+                  fontSize: '15px'
+                }}
+              >
+                {isSendingWhatsapp ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane me-2"></i>
+                    Send Template to {candidateName.split(' ')[0] || 'User'}
+                  </>
+                )}
+              </button>
+            ) : sessionWindow.isOpen ? (
+              <>
+                <div className="position-relative flex-grow-1">
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={whatsappNewMessage}
+                    onChange={(e) => setWhatsappNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendWhatsappMessage()}
+                    placeholder={`Message ${candidateName.split(' ')[0] || 'User'}...`}
+                    style={{
+                      height: '42px',
+                      borderRadius: '24px',
+                      border: '1px solid #E9EDEF',
+                      fontSize: '15px',
+                      backgroundColor: '#F0F2F5'
+                    }}
+                  />
+                </div>
+
+                {/* Send Button */}
+                {whatsappNewMessage.trim() ? (
+                  <button
+                    onClick={sendWhatsappMessage}
+                    disabled={isSendingWhatsapp}
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    {isSendingWhatsapp ? (
+                      <div className="spinner-border spinner-border-sm text-white" role="status">
+                        <span className="visually-hidden">Sending...</span>
+                      </div>
+                    ) : (
+                      <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                    title="Voice Message"
+                  >
+                    <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div 
+                className="position-relative flex-grow-1"
+                title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+              >
+                <input
+                  type="text"
+                  className="form-control"
+                  disabled
+                  placeholder="No active window - Use templates only"
+                  style={{
+                    height: '42px',
+                    borderRadius: '24px',
+                    border: '1px solid #E9EDEF',
+                    fontSize: '15px',
+                    backgroundColor: '#F5F5F5',
+                    color: '#8696A0',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '100%', height: '100%', margin: 0 }}>
+            <div className="modal-content" style={{ height: '100%', borderRadius: 0 }}>
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className="col-11 transition-col" 
+        id="whatsappPanel"
+        style={{
+          width: '100%',
+          height: 'calc(100vh - 150px)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0
+        }}
+      >
+        {panelContent}
+      </div>
+    );
+  };
+
   const fetchLeadLogs = async (leadId) => {
     try {
       setLeadLogsLoading(true);
@@ -2545,11 +3394,218 @@ const Placements = () => {
     }
   };
 
+  // Fetch candidates for a job offer
+  const fetchJobOfferCandidates = async (jobOfferId) => {
+    try {
+      setLoadingCandidates(true);
+      const response = await axios.get(
+        `${backendUrl}/college/placementStatus/job-offer-candidates/${jobOfferId}`,
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (response.data && response.data.success) {
+        setJobOfferCandidates(response.data.data || []);
+      } else {
+        setJobOfferCandidates([]);
+      }
+    } catch (error) {
+      console.error('Error fetching job offer candidates:', error);
+      setJobOfferCandidates([]);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  // Fetch JobOffers for Company Jobs tab
+  const fetchCompanyJobs = async () => {
+    try {
+      setLoadingCompanyJobs(true);
+      setCompanyJobs([]);
+
+      const response = await axios.get(
+        `${backendUrl}/college/placementStatus/job-offers`,
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (response.data && response.data.success) {
+        setCompanyJobs(response.data.data || []);
+      } else {
+        setCompanyJobs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching company jobs:', error);
+      setCompanyJobs([]);
+    } finally {
+      setLoadingCompanyJobs(false);
+    }
+  };
+
+  // Fetch dropdown options for job creation
+  const fetchJobFormOptions = async (stateId = null) => {
+    try {
+      const params = {};
+      if (stateId) {
+        params.stateId = stateId;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/placementStatus/job-form-options`,
+        {
+          headers: { 'x-auth': token },
+          params: params
+        }
+      );
+
+      if (response.data && response.data.success) {
+        setQualifications(response.data.qualifications || []);
+        setIndustries(response.data.industries || []);
+        setCities(response.data.cities || []);
+        setStates(response.data.states || []);
+        setJobCategories(response.data.categories || []);
+      }
+    } catch (error) {
+      console.error('Error fetching job form options:', error);
+    }
+  };
+
+  // Open create job modal
+  const handleOpenCreateJobModal = (placement = null) => {
+    if (placement) {
+      setSelectedPlacementForJob(placement);
+    }
+    setShowCreateJobModal(true);
+    fetchJobFormOptions();
+  };
+
+
+  const handleCreateJob = async () => {
+    try {
+      setCreatingJob(true);
+      setJobFormErrors({});
+
+      if (!jobFormData.title || !jobFormData.companyName || !jobFormData._course) {
+        setJobFormErrors({ general: 'Title, Company Name, and Course are required' });
+        setCreatingJob(false);
+        return;
+      }
+
+      const response = await axios.post(
+        `${backendUrl}/college/placementStatus/create-job-offer`,
+        {
+          ...jobFormData
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data && response.data.success) {
+        const createdJobOffer = response.data;
+        alert('Job offer created successfully!');
+        setShowCreateJobModal(false);
+        // Refresh company jobs list
+        fetchCompanyJobs();
+        setJobFormData({
+          title: '',
+          companyName: '',
+          displayCompanyName: '',
+          _qualification: '',
+          _industry: '',
+          _course: '',
+          city: '',
+          state: '',
+          jobDescription: '',
+          requirement: '',
+          noOfPosition: 1,
+          _jobCategory: ''
+        });
+      } else {
+        alert(response.data.message || 'Failed to create job offer');
+      }
+    } catch (error) {
+      console.error('Error creating job offer:', error);
+      alert(error.response?.data?.message || 'Error creating job offer');
+    } finally {
+      setCreatingJob(false);
+    }
+  };
+
+
+  // Open offer job modal
+  const handleOpenOfferJobModal = (placement, job) => {
+    setSelectedPlacementForJob(placement);
+    setSelectedJobForOffer(job);
+    setOfferJobData({
+      dateOfJoining: placement.dateOfJoining ? moment(placement.dateOfJoining).format('YYYY-MM-DD') : '',
+      remarks: ''
+    });
+    setShowOfferJobModal(true);
+  };
+
+  // Offer job to candidate
+  const handleOfferJob = async () => {
+    try {
+      if (!selectedPlacementForJob || !selectedJobForOffer) {
+        alert('Please select placement and job');
+        return;
+      }
+
+      setOfferingJob(true);
+
+      const response = await axios.post(
+        `${backendUrl}/college/placementStatus/offer-job`,
+        {
+          placementId: selectedPlacementForJob._id,
+          jobId: selectedJobForOffer._id,
+          dateOfJoining: offerJobData.dateOfJoining,
+          remarks: offerJobData.remarks
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data && response.data.success) {
+        alert('Job offered successfully and candidate marked as placed!');
+        setShowOfferJobModal(false);
+        setSelectedPlacementForJob(null);
+        setSelectedJobForOffer(null);
+        setOfferJobData({ dateOfJoining: '', remarks: '' });
+        // Refresh placements
+        fetchLeads();
+      } else {
+        alert(response.data.message || 'Failed to offer job');
+      }
+    } catch (error) {
+      console.error('Error offering job:', error);
+      alert(error.response?.data?.message || 'Error offering job');
+    } finally {
+      setOfferingJob(false);
+    }
+  };
+
+
+
   useEffect(() => {
     if (showPanel === 'leadHistory') {
       fetchLeadLogs(selectedProfile._id);
     }
   }, [showPanel]);
+
+  // Video modal cleanup
+  useEffect(() => {
+    const videoModal = document.getElementById("jobVideoModal");
+    if (videoModal) {
+      videoModal.addEventListener("hidden.bs.modal", () => {
+        setJobVideoSrc(""); // Reset video when modal is fully closed
+      });
+    }
+    return () => {
+      if (videoModal) {
+        videoModal.removeEventListener("hidden.bs.modal", () => setJobVideoSrc(""));
+      }
+    };
+  }, []);
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderLeadHistoryPanel = () => {
@@ -2901,7 +3957,7 @@ const Placements = () => {
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
                     )}   */}
-                    
+
                     </div>
                   </div>
 
@@ -2982,8 +4038,8 @@ const Placements = () => {
                           {/* UnPlaced Count Card */}
                           {(() => {
                             const unplacedStatus = statusCounts.find(s => s.statusName && s.statusName.toLowerCase() === 'unplaced');
-                            const isUnplacedSelected = (unplacedStatus && selectedStatusFilter === unplacedStatus.statusId) || 
-                                                      (!unplacedStatus && selectedStatusFilter === null);
+                            const isUnplacedSelected = (unplacedStatus && selectedStatusFilter === unplacedStatus.statusId) ||
+                              (!unplacedStatus && selectedStatusFilter === null);
                             return unplacedStatus ? (
                               <div
                                 className={`card border-0 shadow-sm status-count-card status ${isUnplacedSelected ? 'selected' : ''}`}
@@ -3066,6 +4122,24 @@ const Placements = () => {
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
+              {/* Desktop Layout */}
+              <div className="d-none d-md-flex justify-content-end gap-2 mb-3">
+                <button
+                  onClick={() => handleOpenCreateJobModal()}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <i className="fas fa-plus"></i> Create Job
+                </button>
+              </div>
+
 
               {/* Loading State */}
               {loadingLeads ? (
@@ -3102,10 +4176,10 @@ const Placements = () => {
                                     <div className="col-md-7">
                                       <div className="d-flex align-items-center">
                                         <div className="form-check me-md-3 me-sm-1 me-1">
-                                          <input 
-                                            onChange={(e) => handleCheckboxChange(placement, e.target.checked)} 
-                                            className="form-check-input" 
-                                            type="checkbox" 
+                                          <input
+                                            onChange={(e) => handleCheckboxChange(placement, e.target.checked)}
+                                            className="form-check-input"
+                                            type="checkbox"
                                           />
                                         </div>
                                         <div className="me-md-3 me-sm-1 me-1">
@@ -3129,6 +4203,14 @@ const Placements = () => {
                                               <i className="fas fa-phone"></i>
                                             </a>
                                           </button>
+                                          <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openWhatsappPanel(placement)}
+                                          style={{ fontSize: '20px', cursor: 'pointer' }}
+                                          title="WhatsApp"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </a>
                                         </div>
                                       </div>
                                     </div>
@@ -3159,16 +4241,16 @@ const Placements = () => {
                                             type="text"
                                             className="form-control form-control-sm m-0"
                                             value={(() => {
-                                             
+
                                               if (placement.subStatus && placement.status) {
-                                               
+
                                                 if (placement.status.substatuses && Array.isArray(placement.status.substatuses)) {
                                                   const subStatus = placement.status.substatuses.find(
                                                     s => s._id.toString() === placement.subStatus.toString()
                                                   );
                                                   if (subStatus) return subStatus.title;
                                                 }
-                                               
+
                                                 if (statuses && statuses.length > 0) {
                                                   const statusId = placement.status._id || placement.status;
                                                   const statusObj = statuses.find(s => s._id === statusId);
@@ -3179,7 +4261,7 @@ const Placements = () => {
                                                     if (subStatus) return subStatus.title;
                                                   }
                                                 }
-                                               
+
                                                 if (typeof placement.subStatus === 'object' && placement.subStatus.title) {
                                                   return placement.subStatus.title;
                                                 }
@@ -3337,7 +4419,7 @@ const Placements = () => {
                               {/* Tab Navigation and Content Card */}
                               <div className="card border-0 shadow-sm mb-4">
                                 <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                  <ul 
+                                  <ul
                                     className="nav nav-pills nav-pills-sm"
                                     style={{
                                       display: 'flex',
@@ -3352,8 +4434,8 @@ const Placements = () => {
                                     }}
                                   >
                                     {tabs.map((tab, tabIndex) => (
-                                      <li 
-                                        className="nav-item" 
+                                      <li
+                                        className="nav-item"
                                         key={tabIndex}
                                         style={{
                                           flexShrink: isMobile ? 0 : 1,
@@ -3383,7 +4465,7 @@ const Placements = () => {
                                     {/* Lead Details Tab */}
                                     {(activeTab[placement._id || placementIndex] || 0) === 0 && (
                                       <div className="tab-pane active" id="lead-details">
-                                       
+
                                         {/* Your lead details content here */}
                                         <div className="scrollable-container mobile-scrollable">
                                           <div className="scrollable-content">
@@ -4067,6 +5149,88 @@ const Placements = () => {
                                       </div>
                                     )}
 
+                                    {/* Company Jobs Tab */}
+                                    {(activeTab[placement._id || placementIndex] || 0) === 5 && (
+                                      <div className="tab-pane active" id="company-jobs">
+                                        <div className="section-card">
+                                          <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 className="mb-0">Company Jobs</h5>
+
+                                          </div>
+                                          {loadingCompanyJobs ? (
+                                            <div className="text-center py-5">
+                                              <div className="spinner-border text-primary" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                              </div>
+                                              <p className="mt-3 text-muted">Loading company jobs...</p>
+                                            </div>
+                                          ) : companyJobs?.length > 0 ? (
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered company-jobs-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Company Name</th>
+                                                    <th>Designation</th>
+                                                    <th>Qualification</th>
+                                                    <th>Industry</th>
+                                                    <th>State</th>
+                                                    <th>City</th>
+                                                    <th>Actions</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {companyJobs.map((job, index) => (
+                                                    <tr key={job._id || index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>
+                                                        <div className="fw-medium">
+                                                          {job.displayCompanyName ||
+                                                            job.companyName ||
+                                                            job._company?.displayCompanyName ||
+                                                            job._company?.name ||
+                                                            'N/A'}
+                                                        </div>
+                                                      </td>
+                                                      <td>
+                                                        <div className="fw-medium text-capitalize">
+                                                          {job.title || job._job?.title || 'N/A'}
+                                                        </div>
+                                                      </td>
+                                                      <td>{job._qualification?.name || 'N/A'}</td>
+                                                      <td>{job._industry?.name || 'N/A'}</td>
+                                                      <td>{job.state?.name || 'N/A'}</td>
+                                                      <td>{job.city?.name || 'N/A'}</td>
+                                                      <td>
+                                                        <div className="d-flex gap-2">
+                                                          <button
+                                                            className="btn btn-sm btn-primary"
+                                                            title="Apply Now"
+                                                            disabled
+                                                          >
+                                                            <i className="fas fa-paper-plane me-1"></i> Apply
+                                                          </button>
+                                                          
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          ) : (
+                                            <div className="text-center py-5">
+                                              <div className="text-muted">
+                                                <i className="fas fa-briefcase fa-3x mb-3" style={{ opacity: 0.3 }}></i>
+                                                <h5>No Jobs Found</h5>
+                                                <p>No jobs available at the moment. Please check back later.</p>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
                                     {/* Documents Tab */}
                                     {(activeTab[placement._id || placementIndex] || 0) === 4 && (
                                       <div className="tab-pane active" id="documents">
@@ -4387,8 +5551,8 @@ const Placements = () => {
                                                                 opacity: 0,
                                                                 transition: 'opacity 0.3s ease'
                                                               }}
-                                                              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                                              onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                                                                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                                                onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                                                               >
                                                                 <button
                                                                   className="preview-btn"
@@ -4834,6 +5998,7 @@ const Placements = () => {
               {renderStatusChangePanel()}
               {renderFollowupPanel()}
               {renderRefferPanel()}
+              {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
 
             </div>
@@ -5262,6 +6427,290 @@ const Placements = () => {
           </div>
         )
       }
+      {/* Job Video Modal */}
+      <div className="modal fade" id="jobVideoModal" tabIndex="-1" aria-labelledby="jobVideoModalTitle" aria-hidden="true"
+        onClick={() => setJobVideoSrc("")}
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content">
+            <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close" style={{
+              zIndex: 9,
+              background: '#fff',
+              border: '2px solid #FC2B5A !important',
+              fontSize: '19px',
+              borderRadius: '100px',
+              height: '38px',
+              opacity: 1,
+              padding: 0,
+              position: 'absolute',
+              right: '0px',
+              top: '0px',
+              width: '38px',
+              fontWeight: 900,
+              color: '#000'
+            }}>
+              <span style={{ fontSize: '30px', lineHeight: '30px', color: '#FC2B5A', fontWeight: 400 }}>&times;</span>
+            </button>
+            <div className="modal-body p-0 text-center embed-responsive">
+              <video key={jobVideoSrc} id="jobVideo" controls className="video-fluid text-center" style={{ width: '100%', height: 'auto', borderRadius: '6px' }}>
+                <source src={jobVideoSrc} type="video/mp4" className="img-fluid video-fluid" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Job Modal */}
+      {showCreateJobModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  <i className="fas fa-briefcase me-2"></i>Create New Job
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowCreateJobModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {jobFormErrors.general && (
+                  <div className="alert alert-danger">{jobFormErrors.general}</div>
+                )}
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Job Title *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={jobFormData.title}
+                      onChange={(e) => setJobFormData({ ...jobFormData, title: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Company Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={jobFormData.companyName}
+                      onChange={(e) => setJobFormData({ ...jobFormData, companyName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Qualification</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData._qualification}
+                      onChange={(e) => setJobFormData({ ...jobFormData, _qualification: e.target.value })}
+                    >
+                      <option value="">Select Qualification</option>
+                      {qualifications.map(q => (
+                        <option key={q._id} value={q._id}>{q.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Industry</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData._industry}
+                      onChange={(e) => setJobFormData({ ...jobFormData, _industry: e.target.value })}
+                    >
+                      <option value="">Select Industry</option>
+                      {industries.map(i => (
+                        <option key={i._id} value={i._id}>{i.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Course *</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData._course}
+                      onChange={(e) => setJobFormData({ ...jobFormData, _course: e.target.value })}
+                      required
+                    >
+                      <option value="">Select Course</option>
+                      {courseOptions.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">State</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData.state}
+                      onChange={async (e) => {
+                        const selectedStateId = e.target.value;
+                        setJobFormData({ ...jobFormData, state: selectedStateId, city: '' });
+
+                        if (selectedStateId) {
+                          await fetchJobFormOptions(selectedStateId);
+                        } else {
+                          await fetchJobFormOptions();
+                        }
+                      }}
+                    >
+                      <option value="">Select State</option>
+                      {states.map(s => (
+                        <option key={s._id} value={s._id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">City</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData.city}
+                      onChange={(e) => setJobFormData({ ...jobFormData, city: e.target.value })}
+                      disabled={!jobFormData.state}
+                    >
+                      <option value="">{jobFormData.state ? 'Select City' : 'Select State First'}</option>
+                      {cities.map(c => (
+                        <option key={c._id} value={c._id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Number of Positions</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={jobFormData.noOfPosition}
+                      onChange={(e) => setJobFormData({ ...jobFormData, noOfPosition: parseInt(e.target.value) || 1 })}
+                      min="1"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Validity Date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={jobFormData.validity}
+                      onChange={(e) => setJobFormData({ ...jobFormData, validity: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Job Category</label>
+                    <select
+                      className="form-select"
+                      value={jobFormData._jobCategory}
+                      onChange={(e) => setJobFormData({ ...jobFormData, _jobCategory: e.target.value })}
+                    >
+                      <option value="">Select Job Category</option>
+                      {jobCategories.map(cat => (
+                        <option key={cat._id} value={cat._id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-12 mb-3">
+                    <label className="form-label">Job Description</label>
+                    <textarea
+                      className="form-control"
+                      rows="4"
+                      value={jobFormData.jobDescription}
+                      onChange={(e) => setJobFormData({ ...jobFormData, jobDescription: e.target.value })}
+                      placeholder="Enter detailed job description..."
+                    />
+                  </div>
+                  <div className="col-12 mb-3">
+                    <label className="form-label">Requirements</label>
+                    <textarea
+                      className="form-control"
+                      rows="4"
+                      value={jobFormData.requirement}
+                      onChange={(e) => setJobFormData({ ...jobFormData, requirement: e.target.value })}
+                      placeholder="Enter job requirements (e.g., skills, experience, etc.)..."
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowCreateJobModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCreateJob}
+                  disabled={creatingJob}
+                >
+                  {creatingJob ? 'Creating...' : 'Create Job'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offer Job Modal */}
+      {showOfferJobModal && selectedPlacementForJob && selectedJobForOffer && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-success text-white">
+                <h5 className="modal-title">
+                  <i className="fas fa-hand-holding-usd me-2"></i>Offer Job to Candidate
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowOfferJobModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label fw-bold">Job Title</label>
+                  <div className="form-control bg-light" style={{ border: 'none' }}>
+                    {selectedJobForOffer.title || 'N/A'}
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label fw-bold">Date of Joining <span className="text-danger">*</span></label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={offerJobData.dateOfJoining}
+                    onChange={(e) => setOfferJobData({ ...offerJobData, dateOfJoining: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label fw-bold">Remarks</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={offerJobData.remarks}
+                    onChange={(e) => setOfferJobData({ ...offerJobData, remarks: e.target.value })}
+                    placeholder="Add any remarks or notes..."
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowOfferJobModal(false)}
+                >
+                  Cancel
+                </button>
+                
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
       <style>{`
@@ -5785,13 +7234,15 @@ const Placements = () => {
 
   /* Job History and Course History Table Styles */
   .job-history-table,
-  .course-history-table {
+  .course-history-table,
+  .company-jobs-table {
     width: 100%;
     margin-top: 10px;
   }
 
   .job-history-table th,
-  .course-history-table th {
+  .course-history-table th,
+  .company-jobs-table th {
     background-color: #f8f9fa;
     font-weight: 600;
     padding: 12px;
@@ -5800,13 +7251,15 @@ const Placements = () => {
   }
 
   .job-history-table td,
-  .course-history-table td {
+  .course-history-table td,
+  .company-jobs-table td {
     padding: 12px;
     border-bottom: 1px solid #dee2e6;
   }
 
   .job-history-table tbody tr:hover,
-  .course-history-table tbody tr:hover {
+  .course-history-table tbody tr:hover,
+  .company-jobs-table tbody tr:hover {
     background-color: #f8f9fa;
   }
 
@@ -6666,6 +8119,146 @@ const Placements = () => {
     
     .select-all-btn,
     .clear-all-btn {
+      width: 100%;
+    }
+  }
+
+  /* Company Jobs Card Styles - Matching Jobs.jsx */
+  .courseCard {
+    border-radius: 12px !important;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    transition: transform 0.3s ease;
+    height: 100%;
+  }
+
+  .courseCard:hover {
+    transform: translateY(-5px);
+  }
+
+  .bg-img {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bg-img img.digi {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
+
+  .group1 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 75px !important;
+    height: auto;
+    opacity: 0.8;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .bg-img:hover .group1 {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+
+  .ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .courses_features {
+    font-size: 0.85rem;
+  }
+
+  .courses_features p {
+    line-height: normal;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .color-yellow {
+    color: #FFD542;
+  }
+
+  .btn.cta-callnow {
+    background: #fff;
+    color: #FC2B5A;
+    font-family: inter;
+    border-radius: 50px;
+    font-weight: 500;
+    padding: 10px 4px;
+    width: 100%;
+    font-size: 12px;
+    letter-spacing: 1px;
+    transition: .3s;
+  }
+
+  .btn.cta-callnow:hover {
+    transition: .5s;
+    background: #FC2B5A;
+    color: #fff;
+  }
+
+  .btn.cta-callnow.btn-bg-color {
+    background-color: #FC2B5A;
+    color: white;
+    border: none;
+  }
+
+  .btn.cta-callnow.btn-bg-color:hover {
+    background-color: #db2777;
+    color: white;
+  }
+
+  .course_card_footer {
+    background: #FC2B5A;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+  }
+
+  .course_card_footer img {
+    width: 20px;
+  }
+
+  .learnn {
+    padding: 10px 14px;
+  }
+
+  .new_img {
+    width: 20px !important;
+  }
+
+  .apply_date {
+    font-size: 16px;
+  }
+
+  .companyname {
+    font-size: 12px;
+  }
+
+  .right_obj {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #FC2B5A;
+    color: white;
+    padding: 5px 10px;
+    font-weight: bold;
+  }
+
+  .shr--width {
+    width: 100%;
+  }
+
+  @media (max-width: 768px) {
+    .courseCard {
       width: 100%;
     }
   }

@@ -61,7 +61,8 @@ const {
   CandidateProfile,
   ReEnquire, Curriculum,
   AssignmentQuestions,
-  AssignmentSubmission
+  AssignmentSubmission,
+  JobOffer
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -4942,6 +4943,77 @@ router.post('/assignment/:id/submit', isCandidate, async (req, res) => {
     return res.status(500).json({ 
       status: false, 
       message: err.message || 'Failed to submit assignment',
+      error: err.message
+    });
+  }
+});
+
+
+router.get("/job-offers", [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      console.log(error);
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid candidate data" 
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: "Candidate not found"
+      });
+    }
+
+    const appliedCourses = await AppliedCourses.find({
+      _candidate: candidate._id,
+      movetoplacementstatus: true
+    }).select('_course').lean();
+
+    const courseIds = appliedCourses.map(ac => ac._course).filter(Boolean);
+
+    if (courseIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No job offers available',
+        data: []
+      });
+    }
+
+    const jobOffers = await JobOffer.find({
+      _course: { $in: courseIds },
+      isActive: true
+    })
+      .populate([
+        { path: '_qualification', select: 'name' },
+        { path: '_industry', select: 'name' },
+        { path: '_jobCategory', select: 'name' },
+        { path: 'state', select: 'name' },
+        { path: 'city', select: 'name' },
+        { path: '_course', select: 'name' }
+      ])
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job offers fetched successfully',
+      data: jobOffers
+    });
+  } catch (err) {
+    console.error('Error fetching job offers:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
       error: err.message
     });
   }

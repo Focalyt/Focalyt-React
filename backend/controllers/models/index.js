@@ -110,3 +110,4 @@ module.exports.Lead = require("./b2b/lead");
 module.exports.Source = require("./source");
 module.exports.PlacementStatus = require("./PlacementStatus");
 module.exports.Placement = require("./Placement");
+module.exports.JobOffer = require("./jobOffer");

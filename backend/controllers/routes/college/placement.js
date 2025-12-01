@@ -1,12 +1,14 @@
 // routes/college/placementStatus.js
 const express = require("express");
 const mongoose = require('mongoose');
+const moment = require('moment');
 const router = express.Router();
 const { isCollege, auth1, authenti } = require("../../../helpers");
 
 const PlacementStatus = require('../../models/PlacementStatus');
 const Placement = require('../../models/Placement');
 const AppliedCourses = require('../../models/appliedCourses');
+const { Vacancy, Company, City, State, Qualification, Industry, Skill, JobCategory, JobOffer } = require('../../models');
 
 router.get('/', isCollege, async (req, res) => {
   try {
@@ -626,8 +628,7 @@ router.get('/candidates', isCollege, async (req, res) => {
         preserveNullAndEmptyArrays: true
       }
     });
-
-    // Lookup Registered By
+  
     aggregationPipeline.push({
       $lookup: {
         from: 'users',
@@ -643,7 +644,6 @@ router.get('/candidates', isCollege, async (req, res) => {
       }
     });
 
-    // Lookup Placement records linked to AppliedCourses
     aggregationPipeline.push({
       $lookup: {
         from: 'placements',
@@ -653,7 +653,6 @@ router.get('/candidates', isCollege, async (req, res) => {
       }
     });
 
-    // Populate status in Placement records
     aggregationPipeline.push({
       $lookup: {
         from: 'placementstatuses',
@@ -663,7 +662,6 @@ router.get('/candidates', isCollege, async (req, res) => {
       }
     });
 
-    // Filter by placement status if provided
     if (placementStatus) {
       aggregationPipeline.push({
         $match: {
@@ -672,7 +670,6 @@ router.get('/candidates', isCollege, async (req, res) => {
       });
     }
 
-    // Filter by date range if provided
     if (placementStartDate || placementEndDate) {
       const dateMatch = {};
       if (placementStartDate) {
@@ -688,23 +685,19 @@ router.get('/candidates', isCollege, async (req, res) => {
       });
     }
 
-    // Get total count before pagination
     const countPipeline = [...aggregationPipeline, { $count: 'total' }];
     const countResult = await AppliedCourses.aggregate(countPipeline);
     const totalPlacements = countResult[0]?.total || 0;
     const totalPages = Math.ceil(totalPlacements / parseInt(limit));
 
-    // Add pagination
     aggregationPipeline.push(
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: parseInt(limit) }
     );
 
-    // Execute aggregation
     const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
 
-    // Transform data to match frontend expectations
     const placements = appliedCourses.map(appliedCourse => {
       const placementRecord = appliedCourse.placementRecord?.[0] || null;
       const statusDoc = placementRecord && appliedCourse.placementStatuses?.find(
@@ -747,7 +740,6 @@ router.get('/candidates', isCollege, async (req, res) => {
         location: placementRecord?.location || null,
         remark: placementRecord?.remark || appliedCourse.remarks || null,
         remarks: placementRecord?.remark || appliedCourse.remarks || null,
-        // AppliedCourse fields for lead details
         _course: appliedCourse._course ? {
           _id: appliedCourse._course._id,
           name: appliedCourse._course.name,
@@ -824,7 +816,6 @@ router.post('/add-candidate', isCollege, async (req, res) => {
       });
     }
 
-    // Validate contact number only if provided
     let cleanContactNumber = '';
     if (contactNumber && contactNumber.trim() !== '') {
       cleanContactNumber = contactNumber.replace(/\D/g, '');
@@ -904,22 +895,18 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
     placement = await Placement.findById(id);
     
     if (placement) {
-      // This is a Placement ID, get the AppliedCourse ID from it
       appliedCourseId = placement.appliedCourse;
       
-      // Verify placement belongs to college
     if (placement.college.toString() !== collegeId.toString()) {
       return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
       }
       
-      // Get AppliedCourse for verification
       appliedCourse = await AppliedCourses.findById(appliedCourseId)
         .populate({
           path: '_course',
           select: 'college'
         });
     } else {
-      // This is an AppliedCourse ID (first time status update)
       appliedCourse = await AppliedCourses.findById(id)
         .populate({
           path: '_course',
@@ -930,12 +917,10 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
         return res.status(404).json({ success: false, message: 'Applied course not found' });
       }
 
-      // Verify college access through course
       if (appliedCourse._course && appliedCourse._course.college.toString() !== collegeId.toString()) {
         return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
       }
 
-      // Find existing Placement record linked to this AppliedCourse
       placement = await Placement.findOne({ appliedCourse: id });
     }
 
@@ -974,7 +959,6 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
         }]
       });
     } else {
-      // Update existing placement with provided details
       if (companyName) placement.companyName = String(companyName).trim();
       if (employerName !== undefined) {
         placement.employerName = employerName ? String(employerName).trim() : '';
@@ -1062,6 +1046,117 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating placement status:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+router.get('/company-jobs', isCollege, async (req, res) => {
+  try {
+    const { companyName } = req.query;
+    const college = req.user.college;
+    
+    const populate = [
+      {
+        path: '_company',
+        select: "name logo stateId cityId displayCompanyName"
+      },
+      {
+        path: "_industry",
+        select: "name",
+      },
+      {
+        path: "_jobCategory",
+        select: "name",
+      },
+      {
+        path: "_courses",
+        select: "name"
+      },
+      {
+        path: "_qualification",
+        select: ["name"],
+      },
+      {
+        path: "state"
+      },
+      {
+        path: "city",
+        select: "name",
+      }
+    ];
+
+    let filter = { 
+      status: true, 
+      _company: { $ne: null },
+      validity: { $gte: moment().utcOffset('+05:30') },
+      verified: true
+    };
+
+    if (companyName && companyName.trim() !== '') {
+      const searchName = companyName.trim();
+      console.log('Searching for company:', searchName);
+
+      let company = await Company.findOne({
+        $or: [
+          { name: { $regex: new RegExp(`^${searchName}$`, 'i') } },
+          { displayCompanyName: { $regex: new RegExp(`^${searchName}$`, 'i') } },
+          { name: { $regex: new RegExp(searchName, 'i') } },
+          { displayCompanyName: { $regex: new RegExp(searchName, 'i') } }
+        ],
+        isDeleted: false,
+        status: true
+      });
+
+      if (!company) {
+        company = await Company.findOne({
+          $or: [
+            { name: { $regex: new RegExp(searchName.replace(/\s+/g, '.*'), 'i') } },
+            { displayCompanyName: { $regex: new RegExp(searchName.replace(/\s+/g, '.*'), 'i') } }
+          ],
+          isDeleted: false,
+          status: true
+        });
+      }
+
+      if (company) {
+        console.log('Company found:', company.name, company._id);
+        filter._company = company._id;
+      } else {
+        console.log('No company found for:', searchName, '- showing all jobs');
+      }
+    } else {
+      console.log('No company name provided - showing all jobs');
+    }
+
+    const jobs = await Vacancy.find(filter)
+      .populate(populate)
+      .sort({ sequence: 1, createdAt: -1 })
+      .lean();
+
+    console.log('Total active jobs found:', jobs.length);
+    const jobsData = jobs.map(job => {
+      const jobData = {
+        ...job,
+        displayCompanyName: job.displayCompanyName || job._company?.displayCompanyName || job._company?.name || 'N/A'
+      };
+      return jobData;
+    });
+
+    console.log('Jobs data prepared:', jobsData.length);
+    console.log('Sample job data:', jobsData.length > 0 ? JSON.stringify(jobsData[0], null, 2) : 'No jobs');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Company jobs fetched successfully',
+      jobs: jobsData
+    });
+  } catch (err) {
+    console.error('Error fetching company jobs:', err.message);
+    console.error('Stack:', err.stack);
     res.status(500).json({
       success: false,
       message: 'Server Error',
@@ -1166,6 +1261,396 @@ router.get('/:id/logs', isCollege, async (req, res) => {
       success: false, 
       message: 'Server Error', 
       error: err.message 
+    });
+  }
+});
+
+
+router.get('/job-form-options', isCollege, async (req, res) => {
+  try {
+    const { stateId } = req.query;
+    
+    let cityQuery = { status: true };
+    if (stateId) {
+      const state = await State.findById(stateId);
+      if (state && state.stateId) {
+        // Match cities by stateId string
+        cityQuery.stateId = state.stateId;
+      }
+    }
+    
+    const [qualifications, industries, cities, states, jobCategories] = await Promise.all([
+      Qualification.find({ status: true }).select('name').sort({ name: 1 }),
+      Industry.find({ status: true }).select('name').sort({ name: 1 }),
+      City.find(cityQuery).select('name stateId').sort({ name: 1 }),
+      State.find({ status: true }).select('name stateId').sort({ name: 1 }),
+      JobCategory.find({ status: true }).select('name').sort({ name: 1 })
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      qualifications,
+      industries,
+      cities,
+      states,
+      categories: jobCategories
+    });
+  } catch (err) {
+    console.error('Error fetching job form options:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+
+router.get('/job-offers', isCollege, async (req, res) => {
+  try {
+    const college = req.user.college;
+
+    const filter = {
+      college: college._id,
+      isActive: true
+    };
+
+    const offers = await JobOffer.find(filter)
+      .populate([
+        { path: '_company', select: 'name displayCompanyName' },
+        { path: '_job', select: 'title' },
+        { path: '_qualification', select: 'name' },
+        { path: '_industry', select: 'name' },
+        { path: '_jobCategory', select: 'name' },
+        { path: 'state', select: 'name' },
+        { path: 'city', select: 'name' }
+      ])
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job offers fetched successfully',
+      data: offers
+    });
+  } catch (err) {
+    console.error('Error fetching job offers:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+
+router.get('/job-offer-candidates/:jobOfferId', isCollege, async (req, res) => {
+  try {
+    const college = req.user.college;
+    const { jobOfferId } = req.params;
+
+    const jobOffer = await JobOffer.findById(jobOfferId).lean();
+    
+    if (!jobOffer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job offer not found'
+      });
+    }
+
+    if (jobOffer.college.toString() !== college._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized access'
+      });
+    }
+
+    if (!jobOffer._course) {
+      return res.status(400).json({
+        success: false,
+        message: 'Job offer does not have a course assigned'
+      });
+    }
+
+    const candidates = await AppliedCourses.aggregate([
+      {
+        $match: {
+          movetoplacementstatus: true,
+          _course: new mongoose.Types.ObjectId(jobOffer._course)
+        }
+      },
+      {
+        $lookup: {
+          from: 'candidateprofiles',
+          localField: '_candidate',
+          foreignField: '_id',
+          as: '_candidate'
+        }
+      },
+      {
+        $unwind: {
+          path: '$_candidate',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course'
+        }
+      },
+      {
+        $unwind: {
+          path: '$_course',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $match: {
+          '_course.college': new mongoose.Types.ObjectId(college._id)
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          candidate: {
+            _id: '$_candidate._id',
+            name: '$_candidate.name',
+            email: '$_candidate.email',
+            mobile: '$_candidate.mobile'
+          },
+          course: {
+            _id: '$_course._id',
+            name: '$_course.name'
+          }
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Candidates fetched successfully',
+      data: candidates
+    });
+  } catch (err) {
+    console.error('Error fetching job offer candidates:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+router.post('/create-job-offer', isCollege, async (req, res) => {
+  try {
+    const college = req.user.college;
+    const userId = req.user._id;
+    const {
+      title,
+      companyName,
+      displayCompanyName,
+      _qualification,
+      _industry,
+      _course,
+      state,
+      city,
+      validity,
+      jobDescription,
+      requirement,
+      noOfPosition,
+      _jobCategory,
+      placement,
+      _candidate,
+      _job,
+      _company,
+      remarks
+    } = req.body;
+
+    if (!title || !companyName || !_course) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, Company Name, and Course are required'
+      });
+    }
+
+    const jobOfferPayload = {
+      college: college._id,
+      createdBy: userId,
+      title: String(title).trim(),
+      companyName: String(companyName).trim(),
+      displayCompanyName: displayCompanyName ? String(displayCompanyName).trim() : undefined,
+      _qualification: _qualification || undefined,
+      _industry: _industry || undefined,
+      _course: _course || undefined,
+      state: state || undefined,
+      city: city || undefined,
+      validity: validity ? new Date(validity) : undefined,
+      jobDescription: jobDescription || undefined,
+      requirement: requirement || undefined,
+      noOfPosition: noOfPosition ? Number(noOfPosition) : 1,
+      _jobCategory: _jobCategory || undefined,
+      placement: placement || undefined,
+      _candidate: _candidate || undefined,
+      _job: _job || undefined,
+      _company: _company || undefined,
+      remarks: remarks || undefined,
+      logs: [{
+        user: userId,
+        action: 'Created',
+        remarks: 'Job offer created from Create Job modal'
+      }]
+    };
+
+    const jobOffer = await JobOffer.create(jobOfferPayload);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Job offer created successfully',
+      data: jobOffer
+    });
+  } catch (err) {
+    console.error('Error creating job offer:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+
+router.post('/offer-job', isCollege, async (req, res) => {
+  try {
+    const college = req.user.college;
+    const userId = req.user._id;
+    const {
+      placementId,
+      jobId,
+      dateOfJoining,
+      remarks
+    } = req.body;
+
+    if (!placementId || !jobId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Placement ID and Job ID are required'
+      });
+    }
+
+    const placement = await Placement.findById(placementId)
+      .populate('appliedCourse');
+
+    if (!placement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Placement not found'
+      });
+    }
+
+    if (placement.college.toString() !== college._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized access'
+      });
+    }
+
+    const job = await Vacancy.findById(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    placement.dateOfJoining = dateOfJoining ? new Date(dateOfJoining) : placement.dateOfJoining;
+    if (remarks) placement.remark = remarks;
+
+    placement.logs.push({
+      user: userId,
+      action: 'Job Offered',
+      remarks: `Job "${job.title}" offered to candidate. ${remarks || ''}`
+    });
+
+    const placedStatus = await PlacementStatus.findOne({
+      college: college._id,
+      title: { $regex: /placed/i }
+    });
+
+    if (placedStatus) {
+      placement.status = placedStatus._id;
+    }
+
+    await placement.save();
+
+    let candidateId = null;
+    if (placement.appliedCourse && placement.appliedCourse._candidate) {
+      candidateId = placement.appliedCourse._candidate;
+    }
+
+    if (candidateId) {
+      const AppliedJobs = mongoose.model('AppliedJobs');
+      const existingApplication = await AppliedJobs.findOne({
+        _candidate: candidateId,
+        _job: jobId
+      });
+
+      if (!existingApplication) {
+        await AppliedJobs.create({
+          _candidate: candidateId,
+          _job: jobId,
+          _company: job._company,
+          status: 'offered'
+        });
+      }
+    }
+    const jobOfferData = {
+      placement: placementId,
+      _job: jobId,
+      _company: job._company,
+      college: college._id,
+      offeredBy: userId,
+      status: 'offered',
+      isActive: true
+    };
+
+    if (candidateId) {
+      jobOfferData._candidate = candidateId;
+    }
+
+    if (dateOfJoining) {
+      jobOfferData.dateOfJoining = new Date(dateOfJoining);
+    }
+
+    if (remarks) {
+      jobOfferData.remarks = remarks;
+    }
+
+    jobOfferData.logs = [{
+      user: userId,
+      timestamp: new Date(),
+      action: 'Offered',
+      remarks: `Job "${job.title}" offered to candidate. ${remarks || ''}`
+    }];
+
+    const jobOffer = await JobOffer.create(jobOfferData);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job offered successfully and candidate marked as placed',
+      data: {
+        placement: placement,
+        jobOffer: jobOffer
+      }
+    });
+  } catch (err) {
+    console.error('Error offering job:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
     });
   }
 });
