@@ -831,7 +831,7 @@ const Placements = () => {
     } else if (tabIndex === 3 && candidateId) {
       fetchCourseHistory(candidateId);
     } else if (tabIndex === 5) {
-      fetchCompanyJobs();
+      fetchCompanyJobs(placement);
     }
 
     if (isMobile) {
@@ -3418,21 +3418,34 @@ const Placements = () => {
     }
   };
 
-  // Fetch JobOffers for Company Jobs tab
-  const fetchCompanyJobs = async () => {
+  // Fetch Published Jobs for Company Jobs tab (using /company-jobs API)
+  const fetchCompanyJobs = async (placement = null) => {
     try {
       setLoadingCompanyJobs(true);
       setCompanyJobs([]);
 
+      // Get company name from placement if provided
+      const companyName = placement?.companyName || null;
+
+      // Build API params for company-jobs endpoint (published jobs)
+      const params = {};
+      if (companyName) {
+        params.companyName = companyName;
+      }
+
+      // Use /company-jobs API which fetches published jobs from Vacancy model
       const response = await axios.get(
-        `${backendUrl}/college/placementStatus/job-offers`,
+        `${backendUrl}/college/placementStatus/company-jobs`,
         {
-          headers: { 'x-auth': token }
+          headers: { 'x-auth': token },
+          params: params
         }
       );
 
       if (response.data && response.data.success) {
-        setCompanyJobs(response.data.data || []);
+        // Response structure: { success: true, jobs: [...] }
+        const jobs = response.data.jobs || response.data.data || [];
+        setCompanyJobs(jobs);
       } else {
         setCompanyJobs([]);
       }
@@ -3505,8 +3518,8 @@ const Placements = () => {
         const createdJobOffer = response.data;
         alert('Job offer created successfully!');
         setShowCreateJobModal(false);
-        // Refresh company jobs list
-        fetchCompanyJobs();
+        // Refresh company jobs list - use selectedProfile if available to maintain filter
+        fetchCompanyJobs(selectedProfile || null);
         setJobFormData({
           title: '',
           companyName: '',
@@ -4123,7 +4136,7 @@ const Placements = () => {
           }}>
             <section className="list-view">
               {/* Desktop Layout */}
-              <div className="d-none d-md-flex justify-content-end gap-2 mb-3">
+              {/* <div className="d-none d-md-flex justify-content-end gap-2 mb-3">
                 <button
                   onClick={() => handleOpenCreateJobModal()}
                   className="btn btn-primary btn-sm"
@@ -4138,7 +4151,7 @@ const Placements = () => {
                 >
                   <i className="fas fa-plus"></i> Create Job
                 </button>
-              </div>
+              </div> */}
 
 
               {/* Loading State */}
@@ -5154,7 +5167,9 @@ const Placements = () => {
                                       <div className="tab-pane active" id="company-jobs">
                                         <div className="section-card">
                                           <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0">Company Jobs</h5>
+                                            <h5 className="mb-0">
+                                              Company Jobs
+                                            </h5>
 
                                           </div>
                                           {loadingCompanyJobs ? (

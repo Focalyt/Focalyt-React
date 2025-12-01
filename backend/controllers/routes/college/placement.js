@@ -1309,11 +1309,50 @@ router.get('/job-form-options', isCollege, async (req, res) => {
 router.get('/job-offers', isCollege, async (req, res) => {
   try {
     const college = req.user.college;
+    const { companyName } = req.query;
 
     const filter = {
       college: college._id,
       isActive: true
     };
+
+    if (companyName && companyName.trim() !== '') {
+      const searchName = companyName.trim();
+      console.log('Searching for company in job offers:', searchName);
+
+      let company = await Company.findOne({
+        $or: [
+          { name: { $regex: new RegExp(`^${searchName}$`, 'i') } },
+          { displayCompanyName: { $regex: new RegExp(`^${searchName}$`, 'i') } },
+          { name: { $regex: new RegExp(searchName, 'i') } },
+          { displayCompanyName: { $regex: new RegExp(searchName, 'i') } }
+        ],
+        isDeleted: false,
+        status: true
+      });
+
+      if (!company) {
+        company = await Company.findOne({
+          $or: [
+            { name: { $regex: new RegExp(searchName.replace(/\s+/g, '.*'), 'i') } },
+            { displayCompanyName: { $regex: new RegExp(searchName.replace(/\s+/g, '.*'), 'i') } }
+          ],
+          isDeleted: false,
+          status: true
+        });
+      }
+
+      if (company) {
+        console.log('Company found for job offers:', company.name, company._id);
+        filter._company = company._id;
+      } else {
+        filter.$or = [
+          { companyName: { $regex: new RegExp(searchName, 'i') } },
+          { displayCompanyName: { $regex: new RegExp(searchName, 'i') } }
+        ];
+        console.log('Company not found, filtering by companyName field:', searchName);
+      }
+    }
 
     const offers = await JobOffer.find(filter)
       .populate([
@@ -1328,10 +1367,19 @@ router.get('/job-offers', isCollege, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+
+    const offersData = offers.map(offer => ({
+      ...offer,
+      displayCompanyName: offer.displayCompanyName || offer._company?.displayCompanyName || offer._company?.name || offer.companyName || 'N/A',
+      companyName: offer.companyName || offer._company?.name || offer.displayCompanyName || 'N/A'
+    }));
+
+    // console.log('Total job offers found:', offersData.length);
+
     return res.status(200).json({
       success: true,
       message: 'Job offers fetched successfully',
-      data: offers
+      data: offersData
     });
   } catch (err) {
     console.error('Error fetching job offers:', err.message);
