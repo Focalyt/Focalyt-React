@@ -707,7 +707,7 @@ const CRMDashboard = () => {
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
   const { messages, updates } = useWebsocket(userData._id || userData._id);
- 
+
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -724,13 +724,13 @@ const CRMDashboard = () => {
 
     if (candidateRef.current) {
       candidateRef.current.fetchProfile(id);
-    } 
+    }
   };
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
-        
+
         const res = await axios.get(`${backendUrl}/college/filters-data`, {
           headers: { 'x-auth': token }
         });
@@ -925,6 +925,21 @@ const CRMDashboard = () => {
   });
   const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
 
+ 
+  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [selectedSenderId, setSelectedSenderId] = useState('');
+  const [countStatus, setCountStatus] = useState({
+    monthlyBusinessInitiated: { used: 0, available: 50000, total: 50000 },
+    dailyBusinessInitiated: { used: 0, available: 1000, total: 1000 },
+    monthlySessionMessages: { used: 0, available: 100000, total: 100000 },
+    dailySessionMessages: { used: 0, available: 1000, total: 1000 }
+  });
+  const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
+  const [responseRecipient, setResponseRecipient] = useState('sender');
+  const [selectedWhatsappTemplateModal, setSelectedWhatsappTemplateModal] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [isSendingBulkWhatsapp, setIsSendingBulkWhatsapp] = useState(false);
+
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
     console.log('📬 Processing incoming message:', data);
@@ -946,8 +961,8 @@ const CRMDashboard = () => {
     // Add incoming message to chat
     setWhatsappMessages((prevMessages) => {
       // Check if message already exists
-      const exists = prevMessages.some(msg => 
-        msg.whatsappMessageId === data.whatsappMessageId || 
+      const exists = prevMessages.some(msg =>
+        msg.whatsappMessageId === data.whatsappMessageId ||
         msg.dbId === data.messageId
       );
 
@@ -1012,11 +1027,11 @@ const CRMDashboard = () => {
       const updatedMessages = prevMessages.map((msg) => {
         // WhatsApp API sends 'id' field which is the wamid (WhatsApp message ID)
         // Try to match by database ID or wamid first (most reliable)
-        const matchById = (data.messageId && msg.dbId === data.messageId) || 
-                         (data.wamid && msg.wamid === data.wamid) ||
-                         (data.id && msg.wamid === data.id) || // ← NEW: Match WhatsApp 'id' field
-                         (data.id && msg.whatsappMessageId === data.id); // ← NEW: Also check whatsappMessageId field
-        
+        const matchById = (data.messageId && msg.dbId === data.messageId) ||
+          (data.wamid && msg.wamid === data.wamid) ||
+          (data.id && msg.wamid === data.id) || // ← NEW: Match WhatsApp 'id' field
+          (data.id && msg.whatsappMessageId === data.id); // ← NEW: Also check whatsappMessageId field
+
         // Fallback: Match by text/template (less reliable, but for backwards compatibility)
         const matchByText = msg.type === 'template'
           ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
@@ -1032,7 +1047,7 @@ const CRMDashboard = () => {
             oldStatus: msg.status,
             newStatus: data.status
           });
-          
+
           return {
             ...msg,
             status: data.status,
@@ -1055,13 +1070,13 @@ const CRMDashboard = () => {
           status: data.status,
           recipient_id: data.recipient_id
         });
-        console.log('💬 Current messages:', prevMessages.map(m => ({ 
-          id: m.id, 
-          dbId: m.dbId, 
+        console.log('💬 Current messages:', prevMessages.map(m => ({
+          id: m.id,
+          dbId: m.dbId,
           wamid: m.wamid,
           whatsappMessageId: m.whatsappMessageId,
           text: m.text?.substring(0, 30),
-          status: m.status 
+          status: m.status
         })));
       }
 
@@ -1080,7 +1095,7 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     console.log('📩 WhatsApp message status updates:', updates);
-    
+
     // Process each update individually (updates is an array)
     if (updates && updates.length > 0) {
       updates.forEach(update => {
@@ -1093,7 +1108,7 @@ const CRMDashboard = () => {
   // Handle incoming messages from users
   useEffect(() => {
     console.log('📬 WhatsApp incoming messages:', messages);
-    
+
     if (messages && messages.length > 0) {
       messages.forEach(message => {
         handleIncomingMessage(message);
@@ -1865,10 +1880,10 @@ const CRMDashboard = () => {
   useEffect(() => {
     fetchCourseHistory();
     fetchJobHistory();
-    console.log('selectedProfile',selectedProfile);
+    console.log('selectedProfile', selectedProfile);
   }, [selectedProfile]);
 
- 
+
 
   const fetchCourseHistory = async () => {
     try {
@@ -3005,10 +3020,10 @@ const CRMDashboard = () => {
   const fetchLeadDetails = async () => {
     try {
       setIsLoadingProfilesData(true);
-      
+
       let leadId;
       let updateTarget;
-      
+
       if (showPanel === 'Whatsapp' && selectedProfile) {
         // WhatsApp panel ke liye selectedProfile ki full detail fetch karo
         leadId = selectedProfile._id;
@@ -3017,12 +3032,12 @@ const CRMDashboard = () => {
         // Lead details panel ke liye
         leadId = allProfiles[leadDetailsVisible]._id || selectedProfile?._id;
         updateTarget = 'leadDetails';
-       
+
       } else {
         return;
       }
-      
-  
+
+
       const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
         headers: { 'x-auth': token }
       });
@@ -3109,7 +3124,7 @@ const CRMDashboard = () => {
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
-    
+
     // Auto-scroll tab into view on mobile
     if (isMobile) {
       setTimeout(() => {
@@ -3441,7 +3456,7 @@ const CRMDashboard = () => {
           expiresAt: sw.expiresAt,
           remainingTimeMs: sw.remainingTimeMs
         });
-        
+
         console.log('✅ Session window status:', {
           isOpen: sw.isOpen,
           canSendManualMessages: response.data.messaging.canSendManualMessages,
@@ -3820,11 +3835,11 @@ const CRMDashboard = () => {
                   if (useSavedExamples && bodyComponent.example && bodyComponent.example.body_text && Array.isArray(bodyComponent.example.body_text[0])) {
                     const exampleValues = bodyComponent.example.body_text[0];
                     let text = bodyComponent.text || '';
-                    
+
                     // Replace each numbered variable with its saved example value
                     const variableRegex = /\{\{(\d+)\}\}/g;
                     const matches = [...text.matchAll(variableRegex)];
-                    
+
                     matches.forEach((match, index) => {
                       if (index < exampleValues.length && exampleValues[index]) {
                         const position = match[1];
@@ -3832,10 +3847,10 @@ const CRMDashboard = () => {
                         text = text.replace(replaceRegex, exampleValues[index]);
                       }
                     });
-                    
+
                     return text;
                   }
-                  
+
                   // For preview mode, get candidate data for variable replacement
                   const candidate = selectedProfile?._candidate;
                   const registration = selectedProfile;
@@ -4014,7 +4029,7 @@ const CRMDashboard = () => {
 
   const handleWhatsappSendMessage = async () => {
     if (!whatsappNewMessage.trim()) return;
-    
+
     if (!sessionWindow.isOpen) {
       alert('24-hour window is closed. Please use a template message.');
       return;
@@ -4022,7 +4037,7 @@ const CRMDashboard = () => {
 
     const messageText = whatsappNewMessage.trim();
     const tempId = `temp-${Date.now()}`;
-    
+
     // Add message to UI immediately (optimistic update)
     const newMessage = {
       id: tempId,
@@ -4032,7 +4047,7 @@ const CRMDashboard = () => {
       type: 'text',
       status: 'sending'
     };
-    
+
     setWhatsappMessages(prev => [...prev, newMessage]);
     setWhatsappNewMessage('');
     setShowWhatsappEmojiPicker(false);
@@ -4060,20 +4075,20 @@ const CRMDashboard = () => {
           prev.map(msg =>
             msg.id === tempId
               ? {
-                  ...msg,
-                  id: response.data.data.messageId,
-                  wamid: response.data.data.messageId,
-                  status: 'sent'
-                }
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent'
+              }
               : msg
           )
         );
-        
+
         console.log('✅ Message sent successfully:', response.data);
       }
     } catch (error) {
       console.error('❌ Error sending message:', error);
-      
+
       // Update message status to failed
       setWhatsappMessages(prev =>
         prev.map(msg =>
@@ -4082,7 +4097,7 @@ const CRMDashboard = () => {
             : msg
         )
       );
-      
+
       // Show error to user
       alert(error.response?.data?.message || 'Failed to send message. Please try again.');
     }
@@ -4102,7 +4117,7 @@ const CRMDashboard = () => {
 
     // Validate that a chat is selected
     console.log('📋 Selected Profile:', selectedProfile);
-    
+
     if (!selectedProfile) {
       alert('Please select a candidate to send the file to.');
       event.target.value = '';
@@ -4110,11 +4125,11 @@ const CRMDashboard = () => {
     }
 
     console.log('🔍 Selected Profile:', selectedProfile);
-    
+
 
     // Handle different profile structures
     const candidate = selectedProfile._candidate || selectedProfile.candidate || selectedProfile;
-    
+
     if (!candidate || !candidate.mobile) {
       alert('Candidate mobile number not found. Please select a valid candidate.');
       console.error('❌ Invalid candidate structure:', { selectedProfile, candidate });
@@ -4131,7 +4146,7 @@ const CRMDashboard = () => {
     }
 
     const tempId = `temp-${Date.now()}`;
-    
+
     // Add file message to UI immediately (optimistic update)
     const newMessage = {
       id: tempId,
@@ -4143,23 +4158,23 @@ const CRMDashboard = () => {
       mediaUrl: URL.createObjectURL(file),
       fileName: file.name
     };
-    
+
     setWhatsappMessages(prev => [...prev, newMessage]);
 
     try {
       // Prepare form data
       const formData = new FormData();
-      
+
       if (fileType === 'audio') {
         formData.append('audio', file);
       } else {
         formData.append('file', file);
       }
-      
+
       const phoneNumber = candidate.mobile || candidate.phone;
       const candidateId = candidate._id || candidate.id;
       const candidateName = candidate.name;
-      
+
       formData.append('to', phoneNumber);
       formData.append('candidateId', candidateId);
       formData.append('candidateName', candidateName);
@@ -4170,7 +4185,7 @@ const CRMDashboard = () => {
       console.log('  - file exists:', !!file);
       console.log('  - file name:', file.name);
       console.log('  - file size:', file.size);
-      
+
       console.log('📤 Sending file:', {
         fileType,
         fileName: file.name,
@@ -4179,7 +4194,7 @@ const CRMDashboard = () => {
         candidateId: candidateId,
         candidateName: candidateName
       });
-      
+
       // Debug: Log FormData contents
       console.log('📋 FormData contents:');
       for (let pair of formData.entries()) {
@@ -4187,7 +4202,7 @@ const CRMDashboard = () => {
       }
 
       // Determine endpoint based on file type
-      const endpoint = fileType === 'audio' 
+      const endpoint = fileType === 'audio'
         ? `${backendUrl}/college/whatsapp/send-audio`
         : `${backendUrl}/college/whatsapp/send-file`;
 
@@ -4204,22 +4219,22 @@ const CRMDashboard = () => {
           prev.map(msg =>
             msg.id === tempId
               ? {
-                  ...msg,
-                  id: response.data.data.messageId,
-                  wamid: response.data.data.messageId,
-                  status: 'sent',
-                  mediaUrl: response.data.data.s3Url
-                }
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent',
+                mediaUrl: response.data.data.s3Url
+              }
               : msg
           )
         );
-        
+
         console.log(`✅ ${fileType} sent successfully:`, response.data);
       }
     } catch (error) {
       console.error(`❌ Error sending ${fileType}:`, error);
       console.error('Error response:', error.response?.data);
-      
+
       // Update message status to failed
       setWhatsappMessages(prev =>
         prev.map(msg =>
@@ -4228,12 +4243,12 @@ const CRMDashboard = () => {
             : msg
         )
       );
-      
+
       // Show detailed error to user with debug info
-      const debugInfo = error.response?.data?.debug 
+      const debugInfo = error.response?.data?.debug
         ? `\n\nDebug Info:\n${JSON.stringify(error.response.data.debug, null, 2)}`
         : '';
-      
+
       alert(error.response?.data?.message || `Failed to send ${fileType}. Please try again.` + debugInfo);
     }
 
@@ -4943,7 +4958,7 @@ const CRMDashboard = () => {
       const getVariableValue = (variableName) => {
         const candidate = selectedProfile?._candidate;
         const registration = selectedProfile;
-        
+
         switch (variableName) {
           case 'name':
             return candidate?.name || registration?.name || 'User';
@@ -4973,22 +4988,22 @@ const CRMDashboard = () => {
       // Extract template variables and get their values
       const templateBody = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
       const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
-      
+
       // Extract numbered variables ({{1}}, {{2}}, etc.) from template
       const variableRegex = /\{\{(\d+)\}\}/g;
       const matches = [...templateBody.matchAll(variableRegex)];
-      
+
       // Create array of actual values in order
       const variableValues = matches.map(match => {
         const position = parseInt(match[1]);
-        
+
         if (variableMappings && variableMappings.length > 0) {
           const mapping = variableMappings.find(m => m.position === position);
           if (mapping) {
             return getVariableValue(mapping.variableName);
           }
         }
-        
+
         // Fallback to hardcoded mapping if no mappings found
         switch (position) {
           case 1: return getVariableValue('name');
@@ -5015,7 +5030,7 @@ const CRMDashboard = () => {
         variableValues: variableValues  // ✅ Send actual values from frontend (same as preview)
       }
 
-    
+
 
       // Make API call to send template
       const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
@@ -5260,6 +5275,233 @@ const CRMDashboard = () => {
     }
   };
 
+
+  const handleBulkWhatsappSend = async () => {
+    // Validation
+    if (selectedWhatsappNumbers.length === 0) {
+      alert('Please select at least one WhatsApp number to send');
+      return;
+    }
+
+    if (!selectedWhatsappTemplateModal && !whatsappMessage.trim()) {
+      alert('Please select a template or enter a message');
+      return;
+    }
+
+    if (!token) {
+      alert('No token found in session storage.');
+      return;
+    }
+
+    setIsSendingBulkWhatsapp(true);
+
+    try {
+      const profilesToSend = allProfiles.length > 0 ? allProfiles : [];
+      
+      if (profilesToSend.length === 0) {
+        alert('No profiles found to send messages');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      const recipients = [];
+      
+      profilesToSend.forEach(profile => {
+        const candidate = profile._candidate || profile.candidate || {};
+        
+        selectedWhatsappNumbers.forEach(numberType => {
+          let phoneNumber = null;
+          
+          switch(numberType) {
+            case 'Primary Mobile':
+              phoneNumber = candidate.mobile || profile.mobile;
+              break;
+            case 'Father\'s Mobile':
+              phoneNumber = candidate.fatherMobile || candidate.father_mobile || profile.fatherMobile;
+              break;
+            case 'Mother\'s Mobile':
+              phoneNumber = candidate.motherMobile || candidate.mother_mobile || profile.motherMobile;
+              break;
+            case 'Whatsapp Number':
+              phoneNumber = candidate.whatsappNumber || candidate.whatsapp_number || candidate.mobile || profile.mobile;
+              break;
+            default:
+              phoneNumber = candidate.mobile || profile.mobile;
+          }
+          
+          if (phoneNumber) {
+            const exists = recipients.find(r => r.phone === phoneNumber && r.profileId === profile._id);
+            if (!exists) {
+              recipients.push({
+                phone: phoneNumber,
+                profileId: profile._id,
+                candidateId: candidate._id || candidate.id,
+                candidateName: candidate.name || profile.name,
+                registrationId: profile._id,
+                numberType: numberType
+              });
+            }
+          }
+        });
+      });
+
+      if (recipients.length === 0) {
+        alert('No valid phone numbers found for selected number types');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+      const confirmMessage = `Are you sure you want to send ${selectedWhatsappTemplateModal ? 'template' : 'message'} to ${recipients.length} recipient(s)?`;
+      if (!window.confirm(confirmMessage)) {
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+        
+        try {
+          if (selectedWhatsappTemplateModal) {
+            const template = whatsappTemplates.find(t => 
+              (t.id === selectedWhatsappTemplateModal) || (t.name === selectedWhatsappTemplateModal)
+            );
+            
+            if (!template) {
+              errors.push(`${recipient.phone}: Template not found`);
+              failCount++;
+              continue;
+            }
+
+            const getVariableValue = (variableName) => {
+              const candidate = profilesToSend.find(p => p._id === recipient.profileId)?._candidate || {};
+              const registration = profilesToSend.find(p => p._id === recipient.profileId) || {};
+              
+              switch (variableName) {
+                case 'name':
+                  return candidate.name || registration.name || 'User';
+                case 'gender':
+                  return candidate.gender || 'Male';
+                case 'mobile':
+                  return candidate.mobile || registration.mobile || 'Mobile';
+                case 'email':
+                  return candidate.email || registration.email || 'Email';
+                case 'course_name':
+                  return registration._course?.name || candidate.appliedCourses?.[0]?.courseName || 'Course Name';
+                case 'counselor_name':
+                  return registration.counsellor?.name || registration.leadAssignment?.[registration.leadAssignment?.length - 1]?.counsellorName || 'Counselor';
+                case 'job_name':
+                  return registration._job?.title || 'Job Title';
+                case 'project_name':
+                  return registration._project?.name || registration.project?.name || 'Project Name';
+                case 'batch_name':
+                  return registration._batch?.name || registration.batch?.name || 'Batch Not Assigned';
+                case 'lead_owner_name':
+                  return registration.registeredBy?.name || 'Self Registered';
+                default:
+                  return candidate[variableName] || registration[variableName] || `[${variableName}]`;
+              }
+            };
+            const templateBody = template.components?.find(c => c.type === 'BODY')?.text || '';
+            const variableMappings = template?.variableMappings || [];
+            const variableRegex = /\{\{(\d+)\}\}/g;
+            const matches = [...templateBody.matchAll(variableRegex)];
+            
+            const variableValues = matches.map(match => {
+              const position = parseInt(match[1]);
+              if (variableMappings && variableMappings.length > 0) {
+                const mapping = variableMappings.find(m => m.position === position);
+                if (mapping) {
+                  return getVariableValue(mapping.variableName);
+                }
+              }
+              switch (position) {
+                case 1: return getVariableValue('name');
+                case 2: return getVariableValue('gender');
+                case 3: return getVariableValue('mobile');
+                case 4: return getVariableValue('email');
+                case 5: return getVariableValue('course_name');
+                case 6: return getVariableValue('counselor_name');
+                case 7: return getVariableValue('job_name');
+                case 8: return getVariableValue('project_name');
+                case 9: return getVariableValue('batch_name');
+                case 10: return getVariableValue('lead_owner_name');
+                default: return '[Variable]';
+              }
+            });
+
+            const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, {
+              templateName: template.name,
+              to: recipient.phone,
+              candidateId: recipient.candidateId,
+              registrationId: recipient.registrationId,
+              collegeId: userData.college || userData.collegeId,
+              variableValues: variableValues
+            }, {
+              headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+              successCount++;
+            } else {
+              failCount++;
+              errors.push(`${recipient.phone}: ${response.data.message || 'Failed'}`);
+            }
+          } else {
+            const response = await axios.post(`${backendUrl}/college/whatsapp/send-message`, {
+              to: recipient.phone,
+              message: whatsappMessage,
+              candidateId: recipient.candidateId,
+              candidateName: recipient.candidateName
+            }, {
+              headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+              successCount++;
+            } else {
+              failCount++;
+              errors.push(`${recipient.phone}: ${response.data.message || 'Failed'}`);
+            }
+          }
+          if (i < recipients.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          failCount++;
+          errors.push(`${recipient.phone}: ${error.response?.data?.message || error.message || 'Failed'}`);
+          console.error(`Error sending to ${recipient.phone}:`, error);
+        }
+      }
+
+      let resultMessage = `Messages sent: ${successCount} successful, ${failCount} failed`;
+      if (errors.length > 0 && errors.length <= 10) {
+        resultMessage += `\n\nErrors:\n${errors.join('\n')}`;
+      } else if (errors.length > 10) {
+        resultMessage += `\n\nFirst 10 errors:\n${errors.slice(0, 10).join('\n')}`;
+      }
+      
+      alert(resultMessage);
+
+      if (failCount === 0 || successCount > 0) {
+        setShowWhatsappModal(false);
+        setSelectedSenderId('');
+        setSelectedWhatsappNumbers([]);
+        setResponseRecipient('sender');
+        setSelectedWhatsappTemplateModal('');
+        setWhatsappMessage('');
+      }
+
+    } catch (error) {
+      console.error('Bulk WhatsApp send error:', error);
+      alert(`Error sending bulk messages: ${error.response?.data?.message || error.message || 'Unknown error'}`);
+    } finally {
+      setIsSendingBulkWhatsapp(false);
+    }
+  };
+
   // Click outside to close WhatsApp dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -5303,6 +5545,12 @@ const CRMDashboard = () => {
       fetchWhatsappTemplates();
     }
   }, [showPanel]);
+
+  useEffect(() => {
+    if (showWhatsappModal) {
+      fetchWhatsappTemplates();
+    }
+  }, [showWhatsappModal]);
 
   // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
   useEffect(() => {
@@ -5712,7 +5960,7 @@ const CRMDashboard = () => {
         style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
         onClick={() => setShowPopup(null)}
       >
-        <div 
+        <div
           className="modal-dialog modal-dialog-bottom"
           style={{
             position: 'fixed',
@@ -5728,9 +5976,9 @@ const CRMDashboard = () => {
           <div className="modal-content" style={{ borderRadius: '20px 20px 0 0' }}>
             <div className="modal-header border-0 pb-0">
               <h6 className="modal-title fw-semibold">Lead Actions</h6>
-              <button 
-                type="button" 
-                className="btn-close" 
+              <button
+                type="button"
+                className="btn-close"
                 onClick={() => setShowPopup(null)}
               ></button>
             </div>
@@ -6385,8 +6633,8 @@ const CRMDashboard = () => {
               <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
                 <div
                   className={`${message.sender === 'agent'
-                      ? 'text-white'
-                      : 'bg-white text-dark'
+                    ? 'text-white'
+                    : 'bg-white text-dark'
                     }`}
                   style={{
                     backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
@@ -6420,23 +6668,23 @@ const CRMDashboard = () => {
                     <>
                       {/* Render media if present */}
                       {message.mediaUrl && message.type === 'image' && (
-                        <img 
-                          src={message.mediaUrl} 
+                        <img
+                          src={message.mediaUrl}
                           alt="Shared image"
-                          style={{ 
-                            maxWidth: '100%', 
-                            borderRadius: '8px', 
+                          style={{
+                            maxWidth: '100%',
+                            borderRadius: '8px',
                             marginBottom: message.text !== '[Image]' ? '8px' : '0',
                             display: 'block'
                           }}
                         />
                       )}
                       {message.mediaUrl && message.type === 'video' && (
-                        <video 
-                          controls 
-                          style={{ 
-                            maxWidth: '100%', 
-                            borderRadius: '8px', 
+                        <video
+                          controls
+                          style={{
+                            maxWidth: '100%',
+                            borderRadius: '8px',
                             marginBottom: message.text !== '[Video]' ? '8px' : '0',
                             display: 'block'
                           }}
@@ -6446,10 +6694,10 @@ const CRMDashboard = () => {
                         </video>
                       )}
                       {message.mediaUrl && message.type === 'audio' && (
-                        <audio 
-                          controls 
-                          style={{ 
-                            width: '100%', 
+                        <audio
+                          controls
+                          style={{
+                            width: '100%',
                             marginBottom: '4px'
                           }}
                         >
@@ -6458,14 +6706,14 @@ const CRMDashboard = () => {
                         </audio>
                       )}
                       {message.mediaUrl && message.type === 'document' && (
-                        <a 
-                          href={message.mediaUrl} 
-                          target="_blank" 
+                        <a
+                          href={message.mediaUrl}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="d-flex align-items-center text-decoration-none"
-                          style={{ 
-                            padding: '8px', 
-                            backgroundColor: 'rgba(0,0,0,0.05)', 
+                          style={{
+                            padding: '8px',
+                            backgroundColor: 'rgba(0,0,0,0.05)',
                             borderRadius: '4px',
                             marginBottom: '4px'
                           }}
@@ -6474,14 +6722,14 @@ const CRMDashboard = () => {
                           <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
                         </a>
                       )}
-                      
+
                       {/* Render text if it's not a default placeholder */}
                       {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
                         <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
                           {message.text}
                         </p>
                       )}
-                      
+
                       <div
                         className="d-flex align-items-center justify-content-end"
                         style={{
@@ -6917,7 +7165,7 @@ const CRMDashboard = () => {
 
                                       // Replace the numbered variable with actual value
                                       text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
-                                     
+
                                     });
                                   } else {
                                     // Fallback: Use default mapping if no stored mappings
@@ -7368,7 +7616,7 @@ const CRMDashboard = () => {
               </>
             ) : (
               // No Session - Disabled Input with Tooltip
-              <div 
+              <div
                 className="position-relative flex-grow-1"
                 title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
               >
@@ -8493,6 +8741,19 @@ const CRMDashboard = () => {
                     <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
                     Download Leads
                   </button>
+                  <button className="btn btn-sm btn-outline-primary" style={{
+                    padding: "6px 12px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  onClick={() => setShowWhatsappModal(true)}
+                  >
+                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
+                    Bulk Messages
+                  </button>
                   {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                     <>
                       <button className="btn btn-sm btn-outline-primary" style={{
@@ -8968,7 +9229,7 @@ const CRMDashboard = () => {
                             {/* Tab Navigation and Content Card */}
                             <div className="card border-0 shadow-sm mb-4">
                               <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul 
+                                <ul
                                   className="nav nav-pills nav-pills-sm"
                                   style={{
                                     display: 'flex',
@@ -8983,8 +9244,8 @@ const CRMDashboard = () => {
                                   }}
                                 >
                                   {tabs.map((tab, tabIndex) => (
-                                    <li 
-                                      className="nav-item" 
+                                    <li
+                                      className="nav-item"
                                       key={tabIndex}
                                       style={{
                                         flexShrink: isMobile ? 0 : 1,
@@ -10331,6 +10592,236 @@ const CRMDashboard = () => {
                                   </div>
                                 </div>
                               </div>
+                            )}
+
+                            {showWhatsappModal && (
+                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+                                <div className="modal-content">
+                                  <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Whatsapp Chat</h1>
+                                    <button type="button" className="btn-close" onClick={() => {
+                                      setShowWhatsappModal(false);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}></button>
+                                  </div>
+                                  <div className="modal-body" style={{ padding: '20px' }}>
+                                    
+                                    <div className="mb-4">
+                                      <label htmlFor="senderId" className="form-label fw-bold mb-2">Select sender's ID</label>
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="senderId"
+                                          value={selectedSenderId}
+                                          onChange={(e) => setSelectedSenderId(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+                                          }}
+                                        >
+                                          <option value="">Select Sender Id</option>
+                                          <option value="B2C - 918699011108">B2C - 918699011108</option>
+                                        </select>
+                                      </div>
+                                    </div>
+
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Count Status</h5>
+                                      <div className="table-responsive">
+                                        <table className="table table-bordered" style={{ fontSize: '14px' }}>
+                                          <thead>
+                                            <tr style={{ backgroundColor: '#ff6b35', color: 'white' }}>
+                                              <th style={{ padding: '10px' }}></th>
+                                              <th style={{ padding: '10px' }}>Used</th>
+                                              <th style={{ padding: '10px' }}>Available</th>
+                                              <th style={{ padding: '10px' }}>Total</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr>
+                                              <td style={{ padding: '10px', fontWeight: '500' }}>Monthly Business Initiated Messages...</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.used}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.available}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.total}</td>
+                                            </tr>
+                                            <tr>
+                                              <td style={{ padding: '10px', fontWeight: '500' }}>Daily Business Initiated Messages(B...</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.used}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.available}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.total}</td>
+                                            </tr>
+                                            <tr>
+                                              <td style={{ padding: '10px', fontWeight: '500' }}>Monthly Session Messages</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.used}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.available}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.total}</td>
+                                            </tr>
+                                            <tr>
+                                              <td style={{ padding: '10px', fontWeight: '500' }}>Daily Session Messages</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.used}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.available}</td>
+                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.total}</td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select the whatsapp number to send</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        {['Primary Mobile', 'Father\'s Mobile', 'Mother\'s Mobile', 'Whatsapp Number'].map((numberType) => (
+                                          <div key={numberType} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`whatsappNumber-${numberType}`}
+                                              checked={selectedWhatsappNumbers.includes(numberType)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                                } else {
+                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                                                }
+                                              }}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                              {numberType}
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select a user to receive students response</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        <div className="form-check">
+                                          <input
+                                            className="form-check-input"
+                                            type="radio"
+                                            name="responseRecipient"
+                                            id="responseRecipientSender"
+                                            value="sender"
+                                            checked={responseRecipient === 'sender'}
+                                            onChange={(e) => setResponseRecipient(e.target.value)}
+                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
+                                          />
+                                          <label className="form-check-label" htmlFor="responseRecipientSender" style={{ cursor: 'pointer' }}>
+                                            Sender
+                                          </label>
+                                        </div>
+                                        <div className="form-check">
+                                          <input
+                                            className="form-check-input"
+                                            type="radio"
+                                            name="responseRecipient"
+                                            id="responseRecipientLeadOwner"
+                                            value="leadOwner"
+                                            checked={responseRecipient === 'leadOwner'}
+                                            onChange={(e) => setResponseRecipient(e.target.value)}
+                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
+                                          />
+                                          <label className="form-check-label" htmlFor="responseRecipientLeadOwner" style={{ cursor: 'pointer' }}>
+                                            Lead Owner
+                                          </label>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Select WhatsApp Template Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select WhatsApp Template</label>
+                                      <select
+                                        className="form-select border-0 shadow-sm"
+                                        id="whatsappTemplate"
+                                        value={selectedWhatsappTemplateModal}
+                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                                        disabled={whatsappTemplates.length === 0}
+                                        style={{
+                                          height: '48px',
+                                          padding: '12px 16px',
+                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <option value="">
+                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                                        </option>
+                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                                          <option key={template.id || index} value={template.id || template.name}>
+                                            {template.name || template.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {whatsappTemplates.length === 0 && (
+                                        <small className="text-muted d-block mt-1">
+                                          <i className="fas fa-spinner fa-spin me-1"></i>
+                                          Fetching templates...
+                                        </small>
+                                      )}
+                                    </div>
+
+                                    {/* Message Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappMessage" className="form-label fw-bold mb-2">Message</label>
+                                      <textarea
+                                        className="form-control border-0 shadow-sm"
+                                        id="whatsappMessage"
+                                        rows="6"
+                                        value={whatsappMessage}
+                                        onChange={(e) => setWhatsappMessage(e.target.value)}
+                                        placeholder="Message"
+                                        style={{
+                                          padding: '12px 16px',
+                                          backgroundColor: '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          resize: 'vertical'
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => {
+                                      setShowWhatsappModal(false);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}>Close</button>
+                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                                      {isSendingBulkWhatsapp ? (
+                                        <>
+                                          <span className="spinner-border spinner-border-sm me-2"></span>
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        'Send Message'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                             )}
 
                             <style>
