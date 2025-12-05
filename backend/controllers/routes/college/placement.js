@@ -662,6 +662,16 @@ router.get('/candidates', isCollege, async (req, res) => {
       }
     });
 
+
+    aggregationPipeline.push({
+      $lookup: {
+        from: 'joboffers',
+        localField: 'placementRecord._id',
+        foreignField: 'placement',
+        as: 'jobOffers'
+      }
+    });
+
     if (placementStatus) {
       aggregationPipeline.push({
         $match: {
@@ -771,7 +781,16 @@ router.get('/candidates', isCollege, async (req, res) => {
         updatedBy: placementRecord?.updatedBy || null,
         logs: placementRecord?.logs || appliedCourse.logs || [],
         createdAt: appliedCourse.createdAt,
-        updatedAt: appliedCourse.updatedAt || placementRecord?.updatedAt
+        updatedAt: appliedCourse.updatedAt || placementRecord?.updatedAt,
+        // Job offers with candidate response
+        jobOffers: appliedCourse.jobOffers ? appliedCourse.jobOffers.map(offer => ({
+          _id: offer._id,
+          _job: offer._job,
+          title: offer.title,
+          candidateResponse: offer.candidateResponse,
+          respondedAt: offer.respondedAt,
+          status: offer.status
+        })) : []
       };
     });
 
@@ -1098,7 +1117,7 @@ router.get('/company-jobs', isCollege, async (req, res) => {
 
     if (companyName && companyName.trim() !== '') {
       const searchName = companyName.trim();
-      console.log('Searching for company:', searchName);
+      // console.log('Searching for company:', searchName);
 
       let company = await Company.findOne({
         $or: [
@@ -1123,7 +1142,7 @@ router.get('/company-jobs', isCollege, async (req, res) => {
       }
 
       if (company) {
-        console.log('Company found:', company.name, company._id);
+        // console.log('Company found:', company.name, company._id);
         filter._company = company._id;
       } else {
         console.log('No company found for:', searchName, '- showing all jobs');
@@ -1137,7 +1156,7 @@ router.get('/company-jobs', isCollege, async (req, res) => {
       .sort({ sequence: 1, createdAt: -1 })
       .lean();
 
-    console.log('Total active jobs found:', jobs.length);
+    // console.log('Total active jobs found:', jobs.length);
     const jobsData = jobs.map(job => {
       const jobData = {
         ...job,
@@ -1146,8 +1165,8 @@ router.get('/company-jobs', isCollege, async (req, res) => {
       return jobData;
     });
 
-    console.log('Jobs data prepared:', jobsData.length);
-    console.log('Sample job data:', jobsData.length > 0 ? JSON.stringify(jobsData[0], null, 2) : 'No jobs');
+    // console.log('Jobs data prepared:', jobsData.length);
+    // console.log('job data:', jobsData.length > 0 ? JSON.stringify(jobsData[0], null, 2) : 'No jobs');
 
     return res.status(200).json({
       success: true,
@@ -1318,7 +1337,7 @@ router.get('/job-offers', isCollege, async (req, res) => {
 
     if (companyName && companyName.trim() !== '') {
       const searchName = companyName.trim();
-      console.log('Searching for company in job offers:', searchName);
+      // console.log('Searching for company in job offers:', searchName);
 
       let company = await Company.findOne({
         $or: [
@@ -1343,7 +1362,7 @@ router.get('/job-offers', isCollege, async (req, res) => {
       }
 
       if (company) {
-        console.log('Company found for job offers:', company.name, company._id);
+        // console.log('Company found for job offers:', company.name, company._id);
         filter._company = company._id;
       } else {
         filter.$or = [
@@ -1589,7 +1608,13 @@ router.post('/offer-job', isCollege, async (req, res) => {
     }
 
     const placement = await Placement.findById(placementId)
-      .populate('appliedCourse');
+      .populate({
+        path: 'appliedCourse',
+        populate: {
+          path: '_candidate',
+          select: '_id name mobile'
+        }
+      });
 
     if (!placement) {
       return res.status(404).json({
@@ -1605,7 +1630,13 @@ router.post('/offer-job', isCollege, async (req, res) => {
       });
     }
 
-    const job = await Vacancy.findById(jobId);
+    const job = await Vacancy.findById(jobId)
+      .populate('_company')
+      .populate('_qualification')
+      .populate('_industry')
+      .populate('state')
+      .populate('city');
+    
     if (!job) {
       return res.status(404).json({
         success: false,
@@ -1634,8 +1665,47 @@ router.post('/offer-job', isCollege, async (req, res) => {
     await placement.save();
 
     let candidateId = null;
-    if (placement.appliedCourse && placement.appliedCourse._candidate) {
-      candidateId = placement.appliedCourse._candidate;
+    if (placement.appliedCourse) {
+      // Check if _candidate is already populated
+      if (placement.appliedCourse._candidate) {
+        candidateId = placement.appliedCourse._candidate;
+      } else {
+        // If appliedCourse exists but _candidate not populated, fetch it from AppliedCourses
+        const appliedCourseId = typeof placement.appliedCourse === 'object' 
+          ? (placement.appliedCourse._id || placement.appliedCourse)
+          : placement.appliedCourse;
+        
+        if (appliedCourseId) {
+          const appliedCourseDoc = await AppliedCourses.findById(appliedCourseId);
+          if (appliedCourseDoc && appliedCourseDoc._candidate) {
+            candidateId = appliedCourseDoc._candidate;
+          }
+        }
+      }
+    }
+
+    // console.log('=== Creating Job Offer ===');
+    // console.log('Placement ID:', placementId);
+    // console.log('Job ID:', jobId);
+    // console.log('Candidate ID:', candidateId);
+    // console.log('Placement appliedCourse:', placement.appliedCourse ? 'exists' : 'null');
+    // console.log('Placement appliedCourse type:', typeof placement.appliedCourse);
+
+    // Get course from placement if available
+    let courseId = null;
+    if (placement.appliedCourse) {
+      if (typeof placement.appliedCourse === 'object' && placement.appliedCourse._course) {
+        courseId = placement.appliedCourse._course;
+      } else {
+        // Fetch from AppliedCourses if not populated
+        const appliedCourseId = typeof placement.appliedCourse === 'object' 
+          ? placement.appliedCourse._id 
+          : placement.appliedCourse;
+        const appliedCourseDoc = await AppliedCourses.findById(appliedCourseId);
+        if (appliedCourseDoc && appliedCourseDoc._course) {
+          courseId = appliedCourseDoc._course;
+        }
+      }
     }
 
     if (candidateId) {
@@ -1654,18 +1724,51 @@ router.post('/offer-job', isCollege, async (req, res) => {
         });
       }
     }
+
+    // Get company details
+    const company = job._company || await Company.findById(job._company);
+    const companyName = company?.name || '';
+    const displayCompanyName = job.displayCompanyName || company?.displayCompanyName || companyName;
+
+    // Create JobOffer with all job details
     const jobOfferData = {
       placement: placementId,
       _job: jobId,
       _company: job._company,
       college: college._id,
-      offeredBy: userId,
+      createdBy: userId,
       status: 'offered',
-      isActive: true
+      isActive: true,
+      
+      // Copy job details from Vacancy
+      title: job.title || '',
+      companyName: companyName,
+      displayCompanyName: displayCompanyName,
+      _qualification: job._qualification || null,
+      _industry: job._industry || null,
+      _jobCategory: job._jobCategory || null,
+      state: job.state || null,
+      city: job.city || null,
+      validity: job.validity || null,
+      jobDescription: job.jobDescription || '',
+      requirement: job.requirement || '',
+      noOfPosition: job.noOfPosition || 1
     };
 
+    // Add candidate and course if available
     if (candidateId) {
       jobOfferData._candidate = candidateId;
+      console.log('JobOffer will have _candidate:', candidateId);
+    } else {
+      console.error('ERROR: candidateId is null! Cannot create job offer without candidate.');
+      return res.status(400).json({
+        success: false,
+        message: 'Candidate ID not found in placement. Cannot send job offer without candidate link.'
+      });
+    }
+
+    if (courseId) {
+      jobOfferData._course = courseId;
     }
 
     if (dateOfJoining) {
@@ -1683,7 +1786,28 @@ router.post('/offer-job', isCollege, async (req, res) => {
       remarks: `Job "${job.title}" offered to candidate. ${remarks || ''}`
     }];
 
-    const jobOffer = await JobOffer.create(jobOfferData);
+    // Check if job offer already exists for this candidate and job
+    const existingJobOffer = await JobOffer.findOne({
+      _candidate: candidateId,
+      _job: jobId,
+      isActive: true
+    });
+
+    let jobOffer;
+    if (existingJobOffer) {
+      // Update existing job offer
+      // console.log('Updating existing job offer:', existingJobOffer._id);
+      Object.assign(existingJobOffer, jobOfferData);
+      await existingJobOffer.save();
+      jobOffer = existingJobOffer;
+    } else {
+      // Create new job offer
+      // console.log('Creating new job offer with data:', JSON.stringify(jobOfferData, null, 2));
+      jobOffer = await JobOffer.create(jobOfferData);
+      // console.log('JobOffer created successfully:', jobOffer._id);
+      // console.log('JobOffer _candidate:', jobOffer._candidate);
+      // console.log('JobOffer status:', jobOffer.status);
+    }
 
     return res.status(200).json({
       success: true,

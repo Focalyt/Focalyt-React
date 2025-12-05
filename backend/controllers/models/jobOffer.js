@@ -26,6 +26,8 @@ const jobOfferSchema = new mongoose.Schema({
   status: { type: String, default: 'draft', enum: ['draft', 'offered', 'active', 'closed'] },
   isActive: { type: Boolean, default: true },
   remarks: { type: String, trim: true },
+  candidateResponse: { type: String, enum: ['accepted', 'rejected', null], default: null },
+  respondedAt: { type: Date },
 
   // Activity log
   logs: [{

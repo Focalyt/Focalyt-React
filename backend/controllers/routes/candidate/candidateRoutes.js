@@ -4974,43 +4974,189 @@ router.get("/job-offers", [isCandidate], async (req, res) => {
       });
     }
 
-    const appliedCourses = await AppliedCourses.find({
-      _candidate: candidate._id,
-      movetoplacementstatus: true
-    }).select('_course').lean();
+    // Only show job offers that were specifically sent via "send offer" button
+    // These offers have _candidate set and status = 'offered'
+    const jobOfferQuery = {
+      isActive: true,
+      _candidate: candidate._id,  // Only job offers directly sent to this candidate
+      status: 'offered'  // Only offers with 'offered' status (sent via offer-job endpoint)
+    };
 
-    const courseIds = appliedCourses.map(ac => ac._course).filter(Boolean);
+    // console.log('=== Fetching Job Offers ===');
+    // console.log('Candidate ID:', candidate._id);
+    // console.log('Candidate Mobile:', candidate.mobile);
+    // console.log('Query:', JSON.stringify(jobOfferQuery, null, 2));
 
-    if (courseIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: 'No job offers available',
-        data: []
-      });
-    }
-
-    const jobOffers = await JobOffer.find({
-      _course: { $in: courseIds },
-      isActive: true
-    })
+    const jobOffers = await JobOffer.find(jobOfferQuery)
       .populate([
         { path: '_qualification', select: 'name' },
         { path: '_industry', select: 'name' },
         { path: '_jobCategory', select: 'name' },
         { path: 'state', select: 'name' },
         { path: 'city', select: 'name' },
-        { path: '_course', select: 'name' }
+        { path: '_company', select: 'name displayCompanyName' }
       ])
       .sort({ createdAt: -1 })
       .lean();
 
+   
+
+    // Format job offers with company details
+    const formattedJobOffers = jobOffers.map(offer => ({
+      ...offer,
+      displayCompanyName: offer.displayCompanyName || offer._company?.displayCompanyName || offer._company?.name || offer.companyName || 'N/A',
+      companyName: offer.companyName || offer._company?.name || offer.displayCompanyName || 'N/A'
+    }));
+
+    // console.log('Returning formatted job offers:', formattedJobOffers.length);
     return res.status(200).json({
       success: true,
       message: 'Job offers fetched successfully',
-      data: jobOffers
+      data: formattedJobOffers || []
     });
   } catch (err) {
     console.error('Error fetching job offers:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Accept job offer
+router.post("/job-offers/:jobOfferId/accept", [isCandidate], async (req, res) => {
+  try {
+    const { jobOfferId } = req.params;
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+    
+    if (error) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid candidate data" 
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: "Candidate not found"
+      });
+    }
+
+    const jobOffer = await JobOffer.findById(jobOfferId);
+
+    if (!jobOffer) {
+      return res.status(404).json({
+        success: false,
+        message: "Job offer not found"
+      });
+    }
+
+    // Verify that the job offer belongs to this candidate
+    if (jobOffer._candidate.toString() !== candidate._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized. This job offer does not belong to you."
+      });
+    }
+
+    // Update job offer with acceptance
+    jobOffer.candidateResponse = 'accepted';
+    jobOffer.respondedAt = new Date();
+    jobOffer.status = 'active';
+    jobOffer.logs.push({
+      user: candidate._id,
+      timestamp: new Date(),
+      action: 'Accepted',
+      remarks: 'Candidate accepted the job offer'
+    });
+    await jobOffer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job offer accepted successfully',
+      data: jobOffer
+    });
+  } catch (err) {
+    console.error('Error accepting job offer:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Reject job offer
+router.post("/job-offers/:jobOfferId/reject", [isCandidate], async (req, res) => {
+  try {
+    const { jobOfferId } = req.params;
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+    
+    if (error) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid candidate data" 
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: "Candidate not found"
+      });
+    }
+
+    const jobOffer = await JobOffer.findById(jobOfferId);
+
+    if (!jobOffer) {
+      return res.status(404).json({
+        success: false,
+        message: "Job offer not found"
+      });
+    }
+
+    // Verify that the job offer belongs to this candidate
+    if (jobOffer._candidate.toString() !== candidate._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized. This job offer does not belong to you."
+      });
+    }
+
+    // Update job offer with rejection
+    jobOffer.candidateResponse = 'rejected';
+    jobOffer.respondedAt = new Date();
+    jobOffer.logs.push({
+      user: candidate._id,
+      timestamp: new Date(),
+      action: 'Rejected',
+      remarks: 'Candidate rejected the job offer'
+    });
+    await jobOffer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job offer rejected successfully',
+      data: jobOffer
+    });
+  } catch (err) {
+    console.error('Error rejecting job offer:', err.message);
     return res.status(500).json({
       success: false,
       message: 'Server Error',

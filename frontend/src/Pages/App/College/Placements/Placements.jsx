@@ -705,6 +705,14 @@ const Placements = () => {
     remarks: ''
   });
   const [offeringJob, setOfferingJob] = useState(false);
+  // Track sent job offers: Set of "placementId_jobId" strings
+  const [sentJobOffers, setSentJobOffers] = useState(new Set());
+  
+  // Bulk job offer state
+  const [showBulkJobMode, setShowBulkJobMode] = useState(false);
+  const [bulkJobInputValue, setBulkJobInputValue] = useState('');
+  const [selectedBulkJob, setSelectedBulkJob] = useState(null);
+  const [sendingBulkJobs, setSendingBulkJobs] = useState(false);
 
   // WhatsApp Panel states
   const [showPanel, setShowPanel] = useState('');
@@ -1244,7 +1252,21 @@ const Placements = () => {
       });
 
       if (response.data.status) {
-        setLeads(response.data.data.placements || []);
+        const placements = response.data.data.placements || [];
+        setLeads(placements);
+        const existingOffers = new Set();
+        placements.forEach(placement => {
+          if (placement.jobOffers && Array.isArray(placement.jobOffers)) {
+            placement.jobOffers.forEach(jobOffer => {
+              if (jobOffer._job && placement._id) {
+                const offerKey = `${placement._id}_${jobOffer._job}`;
+                existingOffers.add(offerKey);
+              }
+            });
+          }
+        });
+        setSentJobOffers(existingOffers);
+        
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
@@ -3546,58 +3568,165 @@ const Placements = () => {
   };
 
 
-  // Open offer job modal
-  const handleOpenOfferJobModal = (placement, job) => {
-    setSelectedPlacementForJob(placement);
-    setSelectedJobForOffer(job);
-    setOfferJobData({
-      dateOfJoining: placement.dateOfJoining ? moment(placement.dateOfJoining).format('YYYY-MM-DD') : '',
-      remarks: ''
-    });
-    setShowOfferJobModal(true);
-  };
-
-  // Offer job to candidate
-  const handleOfferJob = async () => {
+  // Offer job to candidate directly (without modal)
+  const handleOfferJob = async (placement, job) => {
     try {
-      if (!selectedPlacementForJob || !selectedJobForOffer) {
+      if (!placement || !job) {
         alert('Please select placement and job');
         return;
       }
 
+      const jobId = job._id || job._job?._id;
+      const jobTitle = job.title || job._job?.title || 'N/A';
+
+      if (!jobId) {
+        alert('Job ID not found. Please try again.');
+        return;
+      }
+
+      // Confirm before sending offer
+      if (!window.confirm(`Are you sure you want to send job offer "${jobTitle}" to candidate?`)) {
+        return;
+      }
+
+      // Set loading state for this specific button
+      setSelectedPlacementForJob(placement);
+      setSelectedJobForOffer(job);
       setOfferingJob(true);
 
       const response = await axios.post(
         `${backendUrl}/college/placementStatus/offer-job`,
         {
-          placementId: selectedPlacementForJob._id,
-          jobId: selectedJobForOffer._id,
-          dateOfJoining: offerJobData.dateOfJoining,
-          remarks: offerJobData.remarks
+          placementId: placement._id,
+          jobId: jobId,
+          dateOfJoining: placement.dateOfJoining ? moment(placement.dateOfJoining).format('YYYY-MM-DD') : '',
+          remarks: ''
         },
         { headers: { 'x-auth': token } }
       );
 
       if (response.data && response.data.success) {
-        alert('Job offered successfully and candidate marked as placed!');
-        setShowOfferJobModal(false);
-        setSelectedPlacementForJob(null);
-        setSelectedJobForOffer(null);
-        setOfferJobData({ dateOfJoining: '', remarks: '' });
-        // Refresh placements
-        fetchLeads();
+        alert('Job offer sent successfully! Candidate can now see this offer in their portal.');
+        
+        const offerKey = `${placement._id}_${jobId}`;
+        setSentJobOffers(prev => new Set([...prev, offerKey]));
+        
+        // Refresh placements and company jobs
+        fetchLeads(selectedStatusFilter, currentPage);
+        if (selectedProfile) {
+          fetchCompanyJobs(selectedProfile);
+        }
       } else {
-        alert(response.data.message || 'Failed to offer job');
+        alert(response.data.message || 'Failed to send job offer');
       }
     } catch (error) {
       console.error('Error offering job:', error);
-      alert(error.response?.data?.message || 'Error offering job');
+      alert(error.response?.data?.message || 'Error sending job offer. Please try again.');
     } finally {
       setOfferingJob(false);
+      setSelectedPlacementForJob(null);
+      setSelectedJobForOffer(null);
     }
   };
 
+  // Handle bulk job offer
+  const handleBulkJobOffer = async () => {
+    if (!selectedBulkJob) {
+      alert('Please select a job first');
+      return;
+    }
 
+    const numCandidates = parseInt(bulkJobInputValue, 10);
+    const totalCandidates = leads?.length || 0;
+
+    if (!numCandidates || numCandidates < 1) {
+      alert('Please enter a valid number of candidates');
+      return;
+    }
+
+    if (numCandidates > totalCandidates) {
+      alert(`Cannot send to ${numCandidates} candidates. Total available: ${totalCandidates}`);
+      return;
+    }
+
+    const jobId = selectedBulkJob._id || selectedBulkJob._job?._id;
+    const jobTitle = selectedBulkJob.title || selectedBulkJob._job?.title || 'N/A';
+
+    if (!jobId) {
+      alert('Job ID not found. Please try again.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to send job offer "${jobTitle}" to ${numCandidates} candidate(s)?`)) {
+      return;
+    }
+
+    try {
+      setSendingBulkJobs(true);
+      const candidatesToSend = leads.slice(0, numCandidates);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const placement of candidatesToSend) {
+        try {
+          const response = await axios.post(
+            `${backendUrl}/college/placementStatus/offer-job`,
+            {
+              placementId: placement._id,
+              jobId: jobId,
+              dateOfJoining: placement.dateOfJoining ? moment(placement.dateOfJoining).format('YYYY-MM-DD') : '',
+              remarks: 'Bulk job offer'
+            },
+            { headers: { 'x-auth': token } }
+          );
+
+          if (response.data && response.data.success) {
+            successCount++;
+            // Mark as sent
+            const offerKey = `${placement._id}_${jobId}`;
+            setSentJobOffers(prev => new Set([...prev, offerKey]));
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Error sending job offer to ${placement._id}:`, error);
+          failCount++;
+        }
+      }
+
+      alert(`Bulk job offer completed!\nSuccess: ${successCount}\nFailed: ${failCount}`);
+      
+      // Refresh placements
+      fetchLeads(selectedStatusFilter, currentPage);
+      
+      // Reset bulk mode
+      setBulkJobInputValue('');
+      setShowBulkJobMode(false);
+    } catch (error) {
+      console.error('Error in bulk job offer:', error);
+      alert('Error sending bulk job offers. Please try again.');
+    } finally {
+      setSendingBulkJobs(false);
+    }
+  };
+
+  // Open bulk job mode
+  const handleOpenBulkJobMode = async () => {
+    setShowBulkJobMode(true);
+    setBulkJobInputValue('');
+    setSelectedBulkJob(null);
+    
+    // Fetch company jobs if not already loaded
+    if (companyJobs.length === 0) {
+      try {
+        await fetchCompanyJobs();
+      } catch (error) {
+        console.error('Error fetching company jobs:', error);
+        alert('Error loading jobs. Please try again.');
+        setShowBulkJobMode(false);
+      }
+    }
+  };
 
   useEffect(() => {
     if (showPanel === 'leadHistory') {
@@ -4136,22 +4265,210 @@ const Placements = () => {
           }}>
             <section className="list-view">
               {/* Desktop Layout */}
-              {/* <div className="d-none d-md-flex justify-content-end gap-2 mb-3">
-                <button
-                  onClick={() => handleOpenCreateJobModal()}
-                  className="btn btn-primary btn-sm"
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <i className="fas fa-plus"></i> Create Job
-                </button>
-              </div> */}
+              <div className="row">
+                {/* Desktop Layout */}
+                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                 
+                  {/* Left side - Buttons */}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                  
+                  <button 
+                    className="btn btn-sm btn-outline-primary" 
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={handleOpenBulkJobMode}
+                    disabled={sendingBulkJobs}
+                  >
+                    <i className="fas fa-briefcase" style={{ fontSize: "10px" }}></i>
+                    Bulk jobs
+                  </button>
+                  
+                  </div>
+
+                  {/* Right side - Input Fields */}
+                  {showBulkJobMode && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px"
+                    }}>
+                      {/* Job Selection Dropdown */}
+                      <select
+                        className="form-select form-select-sm"
+                        style={{
+                          width: "200px",
+                          fontSize: "12px",
+                          padding: "4px 8px"
+                        }}
+                        value={selectedBulkJob?._id || selectedBulkJob?._job?._id || ''}
+                        onChange={(e) => {
+                          const jobId = e.target.value;
+                          const job = companyJobs.find(j => (j._id || j._job?._id) === jobId);
+                          setSelectedBulkJob(job || null);
+                        }}
+                      >
+                        <option value="">Select Job</option>
+                        {companyJobs.map((job) => (
+                          <option key={job._id || job._job?._id} value={job._id || job._job?._id}>
+                            {job.title || job._job?.title || 'N/A'} - {job.displayCompanyName || job.companyName || job._company?.displayCompanyName || job._company?.name || 'N/A'}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Input Fields */}
+                      <div style={{
+                        display: "flex",
+                        alignItems: "stretch",
+                        border: "1px solid #dee2e6",
+                        borderRadius: "4px",
+                        backgroundColor: "#fff",
+                        overflow: "hidden",
+                        width: "200px",
+                        height: "32px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                      }}>
+                        <input
+                          type="text"
+                          placeholder="No. of candidates"
+                          value={bulkJobInputValue}
+                          onKeyDown={(e) => {
+                            if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                              e.preventDefault();
+                            }
+                            if (e.key === 'Enter' && bulkJobInputValue && selectedBulkJob) {
+                              e.preventDefault();
+                              handleBulkJobOffer();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const maxValue = leads?.length || 0;
+                            let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                            
+                            // Convert to number for validation
+                            const numValue = parseInt(inputValue, 10);
+                            
+                            // Prevent values less than 1 (minimum is 1)
+                            if (inputValue !== '' && (numValue < 1 || isNaN(numValue))) {
+                              inputValue = '1';
+                            }
+                            // Prevent values greater than max (number of leads)
+                            else if (inputValue !== '' && numValue > maxValue && maxValue > 0) {
+                              inputValue = maxValue.toString();
+                            }
+                            
+                            setBulkJobInputValue(inputValue);
+                          }}
+                          style={{
+                            width: "50%",
+                            border: "none",
+                            borderRight: "1px solid #dee2e6",
+                            outline: "none",
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            backgroundColor: "transparent",
+                            height: "100%",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={leads?.length || 0}
+                          readOnly
+                          placeholder="Total"
+                          style={{
+                            width: "50%",
+                            border: "none",
+                            outline: "none",
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            backgroundColor: "#f8f9fa",
+                            height: "100%",
+                            boxSizing: "border-box",
+                            cursor: "default",
+                            textAlign: "center",
+                            fontWeight: "600",
+                            color: "#495057"
+                          }}
+                        />
+                      </div>
+
+                      {/* Send Button */}
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={handleBulkJobOffer}
+                        disabled={!selectedBulkJob || !bulkJobInputValue || sendingBulkJobs}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                      >
+                        {sendingBulkJobs ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-paper-plane" style={{ fontSize: "10px" }}></i>
+                            Send
+                          </>
+                        )}
+                      </button>
+
+                      {/* Close Button */}
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => {
+                          setShowBulkJobMode(false);
+                          setBulkJobInputValue('');
+                          setSelectedBulkJob(null);
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600"
+                        }}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
+                  
+                </div>
+
+                {/* Mobile Layout */}
+                <div className="d-md-none">
+                  <div className="row g-2">
+                   
+                      <div className="col-6">
+                        <button className="btn btn-sm btn-outline-primary w-100" style={{
+                          padding: "8px 6px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px"
+                        }}
+                        >
+                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
+                          Add Leads
+                        </button>
+                      </div>
+                   
+                  </div>
+                </div>
+              </div>
 
 
               {/* Loading State */}
@@ -5191,6 +5508,7 @@ const Placements = () => {
                                                     <th>Industry</th>
                                                     <th>State</th>
                                                     <th>City</th>
+                                                    <th>Status</th>
                                                     <th>Actions</th>
                                                   </tr>
                                                 </thead>
@@ -5217,15 +5535,65 @@ const Placements = () => {
                                                       <td>{job.state?.name || 'N/A'}</td>
                                                       <td>{job.city?.name || 'N/A'}</td>
                                                       <td>
+                                                        {(() => {
+                                                          // Find job offer for this placement and job
+                                                          const jobOffer = placement.jobOffers?.find(
+                                                            offer => (offer._job?.toString() === (job._id || job._job?._id)?.toString())
+                                                          );
+                                                          const response = jobOffer?.candidateResponse;
+                                                          
+                                                          if (response === 'accepted') {
+                                                            return (
+                                                              <span className="badge bg-success" style={{ fontSize: '11px' }}>
+                                                                <i className="fas fa-check-circle me-1"></i> Accepted
+                                                              </span>
+                                                            );
+                                                          } else if (response === 'rejected') {
+                                                            return (
+                                                              <span className="badge bg-danger" style={{ fontSize: '11px' }}>
+                                                                <i className="fas fa-times-circle me-1"></i> Rejected
+                                                              </span>
+                                                            );
+                                                          } else {
+                                                            return (
+                                                              <span className="badge bg-secondary" style={{ fontSize: '11px' }}>
+                                                                <i className="fas fa-clock me-1"></i> Pending
+                                                              </span>
+                                                            );
+                                                          }
+                                                        })()}
+                                                      </td>
+                                                      <td>
                                                         <div className="d-flex gap-2">
                                                           <button
                                                             className="btn btn-sm btn-primary"
-                                                            title="Apply Now"
-                                                            disabled
+                                                            title="Send job offer to candidate"
+                                                            onClick={() => handleOfferJob(placement, job)}
+                                                            disabled={
+                                                              (offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id)) ||
+                                                              sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) ||
+                                                              (placement.jobOffers && placement.jobOffers.some(offer => 
+                                                                (offer._job?.toString() === (job._id || job._job?._id)?.toString())
+                                                              ))
+                                                            }
                                                           >
-                                                            <i className="fas fa-paper-plane me-1"></i> Apply
+                                                            {offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id) ? (
+                                                              <>
+                                                                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                                                Sending...
+                                                              </>
+                                                            ) : (sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) || (placement.jobOffers && placement.jobOffers.some(offer => 
+                                                              (offer._job?.toString() === (job._id || job._job?._id)?.toString())
+                                                            ))) ? (
+                                                              <>
+                                                                <i className="fas fa-check me-1"></i> Offer Sent
+                                                              </>
+                                                            ) : (
+                                                              <>
+                                                                <i className="fas fa-paper-plane me-1"></i> send offer
+                                                              </>
+                                                            )}
                                                           </button>
-                                                          
                                                         </div>
                                                       </td>
                                                     </tr>
@@ -6668,8 +7036,8 @@ const Placements = () => {
         </div>
       )}
 
-      {/* Offer Job Modal */}
-      {showOfferJobModal && selectedPlacementForJob && selectedJobForOffer && (
+      {/* Offer Job Modal - Commented out as we're sending offers directly */}
+      {/* {showOfferJobModal && selectedPlacementForJob && selectedJobForOffer && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
@@ -6724,7 +7092,7 @@ const Placements = () => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>

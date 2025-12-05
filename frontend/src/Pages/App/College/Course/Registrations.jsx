@@ -840,6 +840,9 @@ const CRMDashboard = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [input1Value, setInput1Value] = useState('');
+  const [showBulkInputs, setShowBulkInputs] = useState(false);
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -928,12 +931,6 @@ const CRMDashboard = () => {
  
   const [showWhatsappModal, setShowWhatsappModal] = useState(false);
   const [selectedSenderId, setSelectedSenderId] = useState('');
-  const [countStatus, setCountStatus] = useState({
-    monthlyBusinessInitiated: { used: 0, available: 50000, total: 50000 },
-    dailyBusinessInitiated: { used: 0, available: 1000, total: 1000 },
-    monthlySessionMessages: { used: 0, available: 100000, total: 100000 },
-    dailySessionMessages: { used: 0, available: 1000, total: 1000 }
-  });
   const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
   const [responseRecipient, setResponseRecipient] = useState('sender');
   const [selectedWhatsappTemplateModal, setSelectedWhatsappTemplateModal] = useState('');
@@ -1025,14 +1022,10 @@ const CRMDashboard = () => {
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
       const updatedMessages = prevMessages.map((msg) => {
-        // WhatsApp API sends 'id' field which is the wamid (WhatsApp message ID)
-        // Try to match by database ID or wamid first (most reliable)
         const matchById = (data.messageId && msg.dbId === data.messageId) ||
           (data.wamid && msg.wamid === data.wamid) ||
-          (data.id && msg.wamid === data.id) || // ← NEW: Match WhatsApp 'id' field
-          (data.id && msg.whatsappMessageId === data.id); // ← NEW: Also check whatsappMessageId field
-
-        // Fallback: Match by text/template (less reliable, but for backwards compatibility)
+          (data.id && msg.wamid === data.id) ||
+          (data.id && msg.whatsappMessageId === data.id); 
         const matchByText = msg.type === 'template'
           ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
           : msg.text === data.message;
@@ -2429,7 +2422,7 @@ const CRMDashboard = () => {
     try {
       if (showPanel === 'bulkstatuschange') {
         // Validation checks
-        if (!selectedProfiles) {
+        if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
           alert('No profile selected');
           return;
         }
@@ -3174,6 +3167,8 @@ const CRMDashboard = () => {
   const handleCrmFilterClick = async (index) => {
     setActiveCrmFilter(index);
     setCurrentPage(1);
+    setInput1Value(''); 
+    setSelectedProfiles([]); // Reset selected profiles when tab changes
 
     let newFilterData = { ...filterData };
 
@@ -3187,6 +3182,37 @@ const CRMDashboard = () => {
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
   };
+
+  // Auto-select profiles based on Input 1 value
+  useEffect(() => {
+    if (!allProfiles || allProfiles.length === 0) {
+      return;
+    }
+
+    const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
+    
+    if (isNaN(numValue) || numValue < 1) {
+      // Invalid value, deselect all (minimum is 1)
+      setSelectedProfiles([]);
+      return;
+    }
+
+    // Ensure numValue doesn't exceed the number of leads
+    const maxLeads = allProfiles.length;
+    const validNumValue = Math.min(numValue, maxLeads);
+
+    // Select first N profiles where N = validNumValue
+    const profilesToSelect = allProfiles.slice(0, validNumValue).map(profile => profile._id);
+    setSelectedProfiles(profilesToSelect);
+
+    // If bulk mode is 'whatsapp' and valid number is entered, open modal
+    if (bulkMode === 'whatsapp' && validNumValue >= 1 && validNumValue <= maxLeads && input1Value !== '') {
+      // Small delay to ensure profiles are selected first
+      setTimeout(() => {
+        setShowWhatsappModal(true);
+      }, 200);
+    }
+  }, [input1Value, allProfiles, bulkMode]);
 
 
 
@@ -3243,10 +3269,15 @@ const CRMDashboard = () => {
 
 
   const closePanel = () => {
+    // Hide bulk inputs when bulkstatuschange panel is closed
+    if (showPanel === 'bulkstatuschange') {
+      setShowBulkInputs(false);
+      setBulkMode(null);
+    }
     setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     setSelectedProfile(null);
     setSelectedStatus(null)
     setSelectedSubStatus(null)
@@ -5492,6 +5523,8 @@ const CRMDashboard = () => {
         setResponseRecipient('sender');
         setSelectedWhatsappTemplateModal('');
         setWhatsappMessage('');
+        setShowBulkInputs(false);
+        setBulkMode(null);
       }
 
     } catch (error) {
@@ -5570,7 +5603,7 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('leadHistory');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -5586,7 +5619,7 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('changeCenter');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -5603,7 +5636,7 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('ProfileEdit');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -7168,21 +7201,14 @@ const CRMDashboard = () => {
 
                                     });
                                   } else {
-                                    // Fallback: Use default mapping if no stored mappings
-
-                                    // Replace {{1}} with name
                                     text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
 
-                                    // Replace {{2}} with gender
                                     text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
 
-                                    // Replace {{3}} with mobile
                                     text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
 
-                                    // Replace {{4}} with email
                                     text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
 
-                                    // Replace {{5}} with course name
                                     text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
 
                                     // Replace {{6}} with counselor name
@@ -8727,7 +8753,10 @@ const CRMDashboard = () => {
             <section className="list-view">
               <div className="row">
                 {/* Desktop Layout */}
-                <div className="d-none d-md-flex justify-content-end gap-2">
+                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                 
+                  {/* Left side - Buttons */}
+                  <div style={{ display: "flex", gap: "8px" }}>
                   <button className="btn btn-sm btn-outline-primary" style={{
                     padding: "6px 12px",
                     fontSize: "11px",
@@ -8749,7 +8778,11 @@ const CRMDashboard = () => {
                     alignItems: "center",
                     gap: "4px"
                   }}
-                  onClick={() => setShowWhatsappModal(true)}
+                  onClick={() => {
+                    setShowBulkInputs(true);
+                    setBulkMode('whatsapp');
+                    setInput1Value('');
+                  }}
                   >
                     <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
                     Bulk Messages
@@ -8804,12 +8837,106 @@ const CRMDashboard = () => {
                           alignItems: "center",
                           gap: "4px"
                         }}
-                        onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                        onClick={() => { 
+                          setShowBulkInputs(true);
+                          setBulkMode('bulkaction');
+                          setInput1Value('');
+                          openEditPanel(null, 'bulkstatuschange');
+                        }}
                       >
                         <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                         Bulk Action
                       </button>
                     </>)}
+                  </div>
+
+                  {/* Right side - Input Fields */}
+                  {showBulkInputs && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "stretch",
+                      border: "1px solid #dee2e6",
+                      borderRadius: "4px",
+                      backgroundColor: "#fff",
+                      overflow: "hidden",
+                      width: "200px",
+                      height: "32px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                    }}>
+                      <input
+                        type="text"
+                        placeholder="Input 1"
+                        value={input1Value}
+                        onKeyDown={(e) => {
+                          // Allow numbers, backspace, delete, arrows, tab, enter
+                          if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                            e.preventDefault();
+                          }
+                          // If Enter is pressed and bulk mode is 'whatsapp' and input has value
+                          if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
+                            e.preventDefault();
+                            const numValue = parseInt(input1Value, 10);
+                            const maxValue = allProfiles?.length || 0;
+                            if (numValue >= 1 && numValue <= maxValue) {
+                              setShowWhatsappModal(true);
+                            }
+                          }
+                        }}
+                        onChange={(e) => {
+                          const maxValue = allProfiles?.length || 0;
+                          let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                          
+                          // Allow empty string for clearing the input
+                          if (inputValue === '') {
+                            setInput1Value('');
+                            return;
+                          }
+                          
+                          // Convert to number for validation
+                          const numValue = parseInt(inputValue, 10);
+                          
+                          // Prevent values less than 1 (minimum is 1)
+                          if (numValue < 1 || isNaN(numValue)) {
+                            inputValue = '1';
+                          }
+                          // Prevent values greater than max (number of leads)
+                          else if (numValue > maxValue && maxValue > 0) {
+                            inputValue = maxValue.toString();
+                          }
+                          
+                          setInput1Value(inputValue);
+                        }}
+                        style={{
+                          width: "50%",
+                          border: "none",
+                          borderRight: "1px solid #dee2e6",
+                          outline: "none",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          backgroundColor: "transparent",
+                          height: "100%",
+                          boxSizing: "border-box"
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Input 2"
+                        value={crmFilters[activeCrmFilter]?.count || 0}
+                        readOnly
+                        style={{
+                          width: "50%",
+                          border: "none",
+                          outline: "none",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          backgroundColor: "transparent",
+                          height: "100%",
+                          boxSizing: "border-box",
+                          cursor: "default"
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Mobile Layout */}
@@ -8928,7 +9055,12 @@ const CRMDashboard = () => {
                                   <div className="col-md-7">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-md-3 me-sm-1 me-1">
-                                        <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
+                                        <input 
+                                          onChange={(e) => handleCheckboxChange(profile, e.target.checked)} 
+                                          checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                          className="form-check-input" 
+                                          type="checkbox" 
+                                        />
                                       </div>
                                       <div className="me-md-3 me-sm-1 me-1">
                                         <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
@@ -10607,76 +10739,12 @@ const CRMDashboard = () => {
                                       setResponseRecipient('sender');
                                       setSelectedWhatsappTemplateModal('');
                                       setWhatsappMessage('');
+                                      setShowBulkInputs(false);
+                                      setBulkMode(null);
                                     }}></button>
                                   </div>
                                   <div className="modal-body" style={{ padding: '20px' }}>
                                     
-                                    <div className="mb-4">
-                                      <label htmlFor="senderId" className="form-label fw-bold mb-2">Select sender's ID</label>
-                                      <div className="position-relative">
-                                        <select
-                                          className="form-select border-0 shadow-sm"
-                                          id="senderId"
-                                          value={selectedSenderId}
-                                          onChange={(e) => setSelectedSenderId(e.target.value)}
-                                          style={{
-                                            height: '48px',
-                                            padding: '12px 16px',
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            fontSize: '14px',
-                                            transition: 'all 0.3s ease',
-                                            border: '1px solid #e9ecef',
-                                          }}
-                                        >
-                                          <option value="">Select Sender Id</option>
-                                          <option value="B2C - 918699011108">B2C - 918699011108</option>
-                                        </select>
-                                      </div>
-                                    </div>
-
-                                    <div className="mb-4">
-                                      <h5 className="fw-bold mb-3">Count Status</h5>
-                                      <div className="table-responsive">
-                                        <table className="table table-bordered" style={{ fontSize: '14px' }}>
-                                          <thead>
-                                            <tr style={{ backgroundColor: '#ff6b35', color: 'white' }}>
-                                              <th style={{ padding: '10px' }}></th>
-                                              <th style={{ padding: '10px' }}>Used</th>
-                                              <th style={{ padding: '10px' }}>Available</th>
-                                              <th style={{ padding: '10px' }}>Total</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            <tr>
-                                              <td style={{ padding: '10px', fontWeight: '500' }}>Monthly Business Initiated Messages...</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.used}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.available}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlyBusinessInitiated.total}</td>
-                                            </tr>
-                                            <tr>
-                                              <td style={{ padding: '10px', fontWeight: '500' }}>Daily Business Initiated Messages(B...</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.used}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.available}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailyBusinessInitiated.total}</td>
-                                            </tr>
-                                            <tr>
-                                              <td style={{ padding: '10px', fontWeight: '500' }}>Monthly Session Messages</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.used}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.available}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.monthlySessionMessages.total}</td>
-                                            </tr>
-                                            <tr>
-                                              <td style={{ padding: '10px', fontWeight: '500' }}>Daily Session Messages</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.used}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.available}</td>
-                                              <td style={{ padding: '10px' }}>{countStatus.dailySessionMessages.total}</td>
-                                            </tr>
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
-
                                     <div className="mb-4">
                                       <h5 className="fw-bold mb-3">Select the whatsapp number to send</h5>
                                       <div className="d-flex flex-column gap-2">
@@ -10704,7 +10772,7 @@ const CRMDashboard = () => {
                                       </div>
                                     </div>
 
-                                    <div className="mb-4">
+                                    {/* <div className="mb-4">
                                       <h5 className="fw-bold mb-3">Select a user to receive students response</h5>
                                       <div className="d-flex flex-column gap-2">
                                         <div className="form-check">
@@ -10738,7 +10806,7 @@ const CRMDashboard = () => {
                                           </label>
                                         </div>
                                       </div>
-                                    </div>
+                                    </div> */}
 
                                     {/* Select WhatsApp Template Section */}
                                     <div className="mb-4">
@@ -10775,28 +10843,6 @@ const CRMDashboard = () => {
                                           Fetching templates...
                                         </small>
                                       )}
-                                    </div>
-
-                                    {/* Message Section */}
-                                    <div className="mb-4">
-                                      <label htmlFor="whatsappMessage" className="form-label fw-bold mb-2">Message</label>
-                                      <textarea
-                                        className="form-control border-0 shadow-sm"
-                                        id="whatsappMessage"
-                                        rows="6"
-                                        value={whatsappMessage}
-                                        onChange={(e) => setWhatsappMessage(e.target.value)}
-                                        placeholder="Message"
-                                        style={{
-                                          padding: '12px 16px',
-                                          backgroundColor: '#f8f9fa',
-                                          borderRadius: '8px',
-                                          fontSize: '14px',
-                                          transition: 'all 0.3s ease',
-                                          border: '1px solid #e9ecef',
-                                          resize: 'vertical'
-                                        }}
-                                      />
                                     </div>
                                   </div>
                                   <div className="modal-footer">

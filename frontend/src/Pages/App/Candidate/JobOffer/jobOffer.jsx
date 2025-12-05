@@ -12,6 +12,7 @@ function JobOffer() {
     const [selectedJob, setSelectedJob] = useState(null);
     const [showJobDetails, setShowJobDetails] = useState(false);
     const [useDummyData, setUseDummyData] = useState(false);
+    const [processingJobId, setProcessingJobId] = useState(null);
 
     const dummyJobOffers = [
         {
@@ -99,11 +100,11 @@ function JobOffer() {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const useDummy = urlParams.get('dummy') === 'true';
-        setUseDummyData(useDummy);
         
         if (useDummy) {
             setTimeout(() => {
                 setJobOffers(dummyJobOffers);
+                setUseDummyData(true);
                 setLoading(false);
             }, 1000);
         } else {
@@ -118,40 +119,43 @@ function JobOffer() {
             if (!token) {
                 console.warn('No token found');
                 setJobOffers([]);
+                setUseDummyData(false);
                 setLoading(false);
                 return;
             }
+
+            console.log('=== Fetching Job Offers ===');
+            console.log('Backend URL:', backendUrl);
+            console.log('Token exists:', !!token);
 
             const response = await axios.get(`${backendUrl}/candidate/job-offers`, {
                 headers: { 'x-auth': token }
             });
 
+            console.log('API Response:', response.data);
+
             if (response.data && response.data.success) {
                 const jobs = response.data.data || [];
                 console.log('Fetched job offers:', jobs.length);
-                // If no jobs found, show dummy data for preview
-                if (jobs.length === 0) {
-                    console.log('No jobs found, showing dummy data for preview');
-                    setJobOffers(dummyJobOffers);
-                    setUseDummyData(true);
-                } else {
-                    setJobOffers(jobs);
-                    setUseDummyData(false);
-                }
+                console.log('Job offers data:', jobs);
+                // Only show real job offers from API, no dummy data
+                setJobOffers(jobs);
+                setUseDummyData(false);
             } else {
-                console.warn('No job offers found or API returned error, showing dummy data');
-                setJobOffers(dummyJobOffers);
-                setUseDummyData(true);
+                console.warn('No job offers found or API returned error');
+                console.warn('Response:', response.data);
+                // Show empty array, not dummy data
+                setJobOffers([]);
+                setUseDummyData(false);
             }
         } catch (error) {
             console.error('Error fetching job offers:', error);
             if (error.response) {
                 console.error('Response error:', error.response.data);
             }
-            // Show dummy data on error for preview
-            console.log('Showing dummy data due to error');
-            setJobOffers(dummyJobOffers);
-            setUseDummyData(true);
+            // Show empty array on error, not dummy data
+            setJobOffers([]);
+            setUseDummyData(false);
         } finally {
             setLoading(false);
         }
@@ -170,6 +174,107 @@ function JobOffer() {
     const formatDate = (date) => {
         if (!date) return 'N/A';
         return moment(date).format('DD MMM YYYY');
+    };
+
+    const handleAcceptJob = async (jobId) => {
+        try {
+            setProcessingJobId(jobId);
+            
+            if (!token) {
+                alert('Authentication required. Please login again.');
+                return;
+            }
+
+            const response = await axios.post(
+                `${backendUrl}/candidate/job-offers/${jobId}/accept`,
+                {},
+                {
+                    headers: { 'x-auth': token }
+                }
+            );
+
+            if (response.data && response.data.success) {
+                alert('Job offer accepted successfully!');
+                
+                setJobOffers(prevOffers => 
+                    prevOffers.map(job => 
+                        job._id === jobId 
+                            ? { ...job, status: 'accepted' }
+                            : job
+                    )
+                );
+                
+                if (selectedJob && selectedJob._id === jobId) {
+                    setSelectedJob({ ...selectedJob, status: 'accepted' });
+                }
+            } else {
+                alert(response.data?.message || 'Failed to accept job offer');
+            }
+        } catch (error) {
+            console.error('Error accepting job offer:', error);
+            if (error.response?.data?.message) {
+                alert(`Failed to accept job offer: ${error.response.data.message}`);
+            } else {
+                alert('Failed to accept job offer. Please try again.');
+            }
+        } finally {
+            setProcessingJobId(null);
+        }
+    };
+
+    const handleRejectJob = async (jobId) => {
+        if (!window.confirm('Are you sure you want to reject this job offer?')) {
+            return;
+        }
+
+        try {
+            setProcessingJobId(jobId);
+            
+            if (!token) {
+                alert('Authentication required. Please login again.');
+                return;
+            }
+
+            const response = await axios.post(
+                `${backendUrl}/candidate/job-offers/${jobId}/reject`,
+                {},
+                {
+                    headers: { 'x-auth': token }
+                }
+            );
+
+            if (response.data && response.data.success) {
+                alert('Job offer rejected successfully.');
+                
+                // Update job offer status in the list
+                setJobOffers(prevOffers => 
+                    prevOffers.map(job => 
+                        job._id === jobId 
+                            ? { ...job, status: 'rejected' }
+                            : job
+                    )
+                );
+                
+                // Update selected job if it's the same one
+                if (selectedJob && selectedJob._id === jobId) {
+                    setSelectedJob({ ...selectedJob, status: 'rejected' });
+                }
+                
+                // Close modal after rejection
+                handleCloseDetails();
+            } else {
+                alert(response.data?.message || 'Failed to reject job offer');
+            }
+        } catch (error) {
+            console.error('Error rejecting job offer:', error);
+            if (error.response?.data?.message) {
+                alert(`Failed to reject job offer: ${error.response.data.message}`);
+            } else {
+                alert('Failed to reject job offer. Please try again.');
+            }
+        } finally {
+            setProcessingJobId(null);
+        }
     };
 
     return (
@@ -215,25 +320,8 @@ function JobOffer() {
                                 color: '#6c757d',
                                 fontSize: '14px'
                             }}>
-                                Explore job opportunities offered by your college
+                                View job offers sent to you by your college
                             </p>
-                            {useDummyData && (
-                                <div style={{
-                                    marginTop: '12px',
-                                    padding: '8px 12px',
-                                    backgroundColor: '#fff3cd',
-                                    border: '1px solid #ffc107',
-                                    borderRadius: '6px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
-                                    <i className="fas fa-info-circle" style={{ color: '#856404' }}></i>
-                                    <span style={{ color: '#856404', fontSize: '12px', fontWeight: '600' }}>
-                                        Showing Sample Data for Preview
-                                    </span>
-                                </div>
-                            )}
                         </div>
                         <div style={{
                             display: 'flex',
@@ -254,39 +342,6 @@ function JobOffer() {
                                     {jobOffers.length} {jobOffers.length === 1 ? 'Offer' : 'Offers'} Available
                                 </span>
                             </div>
-                            {jobOffers.length === 0 && !loading && (
-                                <button
-                                    onClick={() => {
-                                        setJobOffers(dummyJobOffers);
-                                        setUseDummyData(true);
-                                    }}
-                                    style={{
-                                        padding: '8px 16px',
-                                        backgroundColor: '#28a745',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '600',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        transition: 'all 0.3s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#218838';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#28a745';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    <i className="fas fa-eye"></i>
-                                    View Sample Jobs
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -332,41 +387,17 @@ function JobOffer() {
                         <p style={{
                             color: '#6c757d',
                             fontSize: '16px',
-                            marginBottom: '24px'
+                            marginBottom: '12px'
                         }}>
-                            There are no job offers available at the moment. Please check back later.
+                            You don't have any job offers at the moment.
                         </p>
-                        <button
-                            onClick={() => {
-                                setJobOffers(dummyJobOffers);
-                                setUseDummyData(true);
-                            }}
-                            style={{
-                                padding: '12px 24px',
-                                backgroundColor: '#007bff',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontSize: '15px',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                transition: 'all 0.3s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#0056b3';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#007bff';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                        >
-                            <i className="fas fa-eye"></i>
-                            View Sample Jobs (Preview)
-                        </button>
+                        <p style={{
+                            color: '#6c757d',
+                            fontSize: '14px',
+                            fontStyle: 'italic'
+                        }}>
+                            Job offers will appear here when your college sends them to you.
+                        </p>
                     </div>
                 ) : (
                     /* Job Offers Grid */
@@ -565,31 +596,150 @@ function JobOffer() {
                                     </div>
                                 )}
 
-                                {/* Action Button */}
+                                {/* Action Buttons */}
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    marginTop: '12px'
+                                }}>
+                                    <button
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px 24px',
+                                            backgroundColor: job.status === 'accepted' ? '#28a745' : '#007bff',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '600',
+                                            cursor: job.status === 'accepted' || processingJobId === job._id ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (job.status === 'accepted' || processingJobId === job._id) ? 0.7 : 1
+                                        }}
+                                        disabled={job.status === 'accepted' || processingJobId === job._id}
+                                        onMouseEnter={(e) => {
+                                            if (job.status !== 'accepted' && processingJobId !== job._id) {
+                                                e.currentTarget.style.backgroundColor = job.status === 'accepted' ? '#28a745' : '#0056b3';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (job.status !== 'accepted') {
+                                                e.currentTarget.style.backgroundColor = '#007bff';
+                                            }
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (job.status === 'accepted') {
+                                                handleViewDetails(job);
+                                            } else {
+                                                handleAcceptJob(job._id);
+                                            }
+                                        }}
+                                    >
+                                        {processingJobId === job._id && job.status !== 'accepted' ? (
+                                            <>
+                                                <div className="spinner-border spinner-border-sm" role="status" style={{ width: '16px', height: '16px', borderWidth: '2px' }}>
+                                                    <span className="visually-hidden">Loading...</span>
+                                                </div>
+                                                Processing...
+                                            </>
+                                        ) : job.status === 'accepted' ? (
+                                            <>
+                                                <i className="fas fa-check-circle"></i>
+                                                Accepted
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-check"></i>
+                                                Accept
+                                            </>
+                                        )}
+                                    </button>
+                                    
+                                    <button
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px 24px',
+                                            backgroundColor: job.status === 'rejected' ? '#6c757d' : '#dc3545',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '600',
+                                            cursor: (job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id) ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id) ? 0.7 : 1
+                                        }}
+                                        disabled={job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id}
+                                        onMouseEnter={(e) => {
+                                            if (job.status !== 'rejected' && job.status !== 'accepted' && processingJobId !== job._id) {
+                                                e.currentTarget.style.backgroundColor = '#c82333';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (job.status !== 'rejected') {
+                                                e.currentTarget.style.backgroundColor = '#dc3545';
+                                            }
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (job.status !== 'rejected' && job.status !== 'accepted') {
+                                                handleRejectJob(job._id);
+                                            }
+                                        }}
+                                    >
+                                        {job.status === 'rejected' ? (
+                                            <>
+                                                <i className="fas fa-times-circle"></i>
+                                                Rejected
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-times"></i>
+                                                Reject
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                                
+                                {/* View Details Button */}
                                 <button
                                     style={{
                                         width: '100%',
-                                        padding: '12px 24px',
-                                        backgroundColor: '#007bff',
-                                        color: '#ffffff',
-                                        border: 'none',
+                                        padding: '10px 24px',
+                                        backgroundColor: 'transparent',
+                                        color: '#007bff',
+                                        border: '1px solid #007bff',
                                         borderRadius: '8px',
-                                        fontSize: '15px',
+                                        fontSize: '14px',
                                         fontWeight: '600',
                                         cursor: 'pointer',
                                         transition: 'all 0.3s ease',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        gap: '8px'
+                                        gap: '8px',
+                                        marginTop: '8px'
                                     }}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#0056b3';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.backgroundColor = '#007bff';
+                                        e.currentTarget.style.color = '#ffffff';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#007bff';
-                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                        e.currentTarget.style.color = '#007bff';
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -648,15 +798,41 @@ function JobOffer() {
                                 zIndex: 10,
                                 borderRadius: '12px 12px 0 0'
                             }}>
-                                <div>
-                                    <h3 style={{
-                                        margin: 0,
-                                        fontSize: '24px',
-                                        fontWeight: '700',
-                                        color: '#212529'
-                                    }}>
-                                        {selectedJob.title || 'Job Details'}
-                                    </h3>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                        <h3 style={{
+                                            margin: 0,
+                                            fontSize: '24px',
+                                            fontWeight: '700',
+                                            color: '#212529'
+                                        }}>
+                                            {selectedJob.title || 'Job Details'}
+                                        </h3>
+                                        {(selectedJob.status === 'accepted' || selectedJob.status === 'rejected') && (
+                                            <span style={{
+                                                padding: '4px 12px',
+                                                borderRadius: '20px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                textTransform: 'uppercase',
+                                                backgroundColor: selectedJob.status === 'accepted' ? '#d4edda' : '#f8d7da',
+                                                color: selectedJob.status === 'accepted' ? '#155724' : '#721c24',
+                                                border: `1px solid ${selectedJob.status === 'accepted' ? '#c3e6cb' : '#f5c6cb'}`
+                                            }}>
+                                                {selectedJob.status === 'accepted' ? (
+                                                    <>
+                                                        <i className="fas fa-check-circle me-1"></i>
+                                                        Accepted
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <i className="fas fa-times-circle me-1"></i>
+                                                        Rejected
+                                                    </>
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p style={{
                                         margin: '8px 0 0 0',
                                         fontSize: '16px',
@@ -879,13 +1055,121 @@ function JobOffer() {
                                 padding: '20px 24px',
                                 borderTop: '1px solid #e9ecef',
                                 display: 'flex',
-                                justifyContent: 'flex-end',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
                                 gap: '12px',
                                 position: 'sticky',
                                 bottom: 0,
                                 backgroundColor: '#ffffff',
-                                borderRadius: '0 0 12px 12px'
+                                borderRadius: '0 0 12px 12px',
+                                flexWrap: 'wrap'
                             }}>
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    flex: 1,
+                                    minWidth: '250px'
+                                }}>
+                                    <button
+                                        onClick={() => handleAcceptJob(selectedJob._id)}
+                                        disabled={selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id}
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px 24px',
+                                            backgroundColor: selectedJob.status === 'accepted' ? '#28a745' : '#007bff',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '600',
+                                            cursor: (selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id) ? 0.7 : 1
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (selectedJob.status !== 'accepted' && selectedJob.status !== 'rejected' && processingJobId !== selectedJob._id) {
+                                                e.currentTarget.style.backgroundColor = '#0056b3';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (selectedJob.status !== 'accepted') {
+                                                e.currentTarget.style.backgroundColor = '#007bff';
+                                            }
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                    >
+                                        {processingJobId === selectedJob._id && selectedJob.status !== 'accepted' ? (
+                                            <>
+                                                <div className="spinner-border spinner-border-sm" role="status" style={{ width: '16px', height: '16px', borderWidth: '2px' }}>
+                                                    <span className="visually-hidden">Loading...</span>
+                                                </div>
+                                                Processing...
+                                            </>
+                                        ) : selectedJob.status === 'accepted' ? (
+                                            <>
+                                                <i className="fas fa-check-circle"></i>
+                                                Accepted
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-check"></i>
+                                                Accept Offer
+                                            </>
+                                        )}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => handleRejectJob(selectedJob._id)}
+                                        disabled={selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id}
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px 24px',
+                                            backgroundColor: selectedJob.status === 'rejected' ? '#6c757d' : '#dc3545',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '600',
+                                            cursor: (selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id) ? 0.7 : 1
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (selectedJob.status !== 'rejected' && selectedJob.status !== 'accepted' && processingJobId !== selectedJob._id) {
+                                                e.currentTarget.style.backgroundColor = '#c82333';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (selectedJob.status !== 'rejected') {
+                                                e.currentTarget.style.backgroundColor = '#dc3545';
+                                            }
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                    >
+                                        {selectedJob.status === 'rejected' ? (
+                                            <>
+                                                <i className="fas fa-times-circle"></i>
+                                                Rejected
+                                            </>
+                                        ) : (
+                                            <>
+                                                <i className="fas fa-times"></i>
+                                                Reject Offer
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                                
                                 <button
                                     onClick={handleCloseDetails}
                                     style={{
@@ -897,7 +1181,8 @@ function JobOffer() {
                                         fontSize: '15px',
                                         fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.3s ease'
+                                        transition: 'all 0.3s ease',
+                                        minWidth: '100px'
                                     }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.backgroundColor = '#5a6268';
