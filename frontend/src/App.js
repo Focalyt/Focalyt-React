@@ -123,6 +123,7 @@ import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
 import ReEnquire from './Pages/App/College/Course/ReEnquire';
 import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
+import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -283,6 +284,7 @@ const Layout = () => {
           <Route path='dripmarketing' element={<DripMarketing/>}/>
           <Route path='re-enquire' element={<ReEnquire/>}/>
           <Route path='trainerManagement' element={<TrainerManagement/>}/>
+          <Route path='whatsappChat' element={<WhatsappChat/>}/>
         </Route>
 
         {/* company  */}

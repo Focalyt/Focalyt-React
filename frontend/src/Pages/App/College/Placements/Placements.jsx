@@ -1258,7 +1258,7 @@ const Placements = () => {
         placements.forEach(placement => {
           if (placement.jobOffers && Array.isArray(placement.jobOffers)) {
             placement.jobOffers.forEach(jobOffer => {
-              if (jobOffer._job && placement._id) {
+              if (jobOffer._job && placement._id && (jobOffer.status === 'offered' || jobOffer.status === 'active')) {
                 const offerKey = `${placement._id}_${jobOffer._job}`;
                 existingOffers.add(offerKey);
               }
@@ -5573,7 +5573,8 @@ const Placements = () => {
                                                               (offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id)) ||
                                                               sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) ||
                                                               (placement.jobOffers && placement.jobOffers.some(offer => 
-                                                                (offer._job?.toString() === (job._id || job._job?._id)?.toString())
+                                                                (offer._job?.toString() === (job._id || job._job?._id)?.toString()) &&
+                                                                (offer.status === 'offered' || offer.status === 'active')
                                                               ))
                                                             }
                                                           >
@@ -5583,7 +5584,8 @@ const Placements = () => {
                                                                 Sending...
                                                               </>
                                                             ) : (sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) || (placement.jobOffers && placement.jobOffers.some(offer => 
-                                                              (offer._job?.toString() === (job._id || job._job?._id)?.toString())
+                                                              (offer._job?.toString() === (job._id || job._job?._id)?.toString()) &&
+                                                              (offer.status === 'offered' || offer.status === 'active')
                                                             ))) ? (
                                                               <>
                                                                 <i className="fas fa-check me-1"></i> Offer Sent
