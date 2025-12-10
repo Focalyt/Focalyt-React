@@ -136,6 +136,101 @@ router.post("/add", async (req, res) => {
   });
 
 
+  router.get("/edit/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const teamMember = await Team.findById(id);
+
+      if (!teamMember) {
+        req.flash("error", "Team member not found!");
+        return res.redirect("/admin/team/view");
+      }
+
+      return res.render(`${req.vPath}/admin/team/edit`, { 
+        teamMember, 
+        menu: 'team' 
+      });
+    } catch (err) {
+      req.flash("error", err.message || "Something went wrong!");
+      return res.redirect("back");
+    }
+  });
+
+  router.post("/edit/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const teamMember = await Team.findById(id);
+
+      if (!teamMember) {
+        return res.send({
+          status: false,
+          message: "Team member not found"
+        });
+      }
+
+      const updateData = {
+        name: req.body.name,
+        position: req.body.position,
+        designation: req.body.designation,
+        description: req.body.description || ""
+      };
+
+      if (req.files && req.files.file) {
+        const { name, mimetype: ContentType } = req.files.file;
+
+        if (Array.isArray(req.files.file)) {
+          return res.send({
+            status: false,
+            message: "Only 1 image is allowed"
+          });
+        }
+
+        const ext = name.split(".").pop();
+        const key = `team/${uuid()}.${ext}`;
+        const data = req.files.file.data;
+
+        const params = {
+          Bucket: bucketName,
+          Body: data,
+          Key: key,
+          ContentType
+        };
+
+        const uploadResult = await s3.upload(params).promise();
+        updateData.image = {
+          fileURL: uploadResult.Location
+        };
+      }
+r
+      const updatedTeam = await Team.findByIdAndUpdate(
+        id,
+        { $set: updateData },
+        { new: true }
+      );
+
+      if (!updatedTeam) {
+        return res.send({
+          status: false,
+          message: "Failed to update team member"
+        });
+      }
+
+      return res.send({
+        status: true,
+        message: "Team member updated successfully",
+        data: updatedTeam
+      });
+
+    } catch (err) {
+      console.error("Edit error:", err);
+      return res.send({
+        status: false,
+        message: err.message || "Something went wrong!"
+      });
+    }
+  });
+
+
   router.patch("/teamsequence", async (req, res) => {
     const { id, val } = req.body
     const update = await Team.findByIdAndUpdate({ _id: id }, { sequence: +(val) })
