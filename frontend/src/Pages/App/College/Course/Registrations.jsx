@@ -6580,10 +6580,10 @@ const CRMDashboard = () => {
             </div>
             <div className="flex-grow-1">
               <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
-                {selectedProfile?._candidate?.name || 'Ravi Prakash'}
+                {selectedProfile?._candidate?.name || 'N/A'}
               </h6>
               <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
-                {selectedProfile?._candidate?.mobile || '8957066852'}
+                {selectedProfile?._candidate?.mobile || 'N/A'}
               </p>
             </div>
             <button
@@ -7538,7 +7538,7 @@ const CRMDashboard = () => {
                     value={whatsappNewMessage}
                     onChange={(e) => setWhatsappNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
-                    placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] || 'Ravi Prakash'}...`}
+                    placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
                     style={{
                       height: '42px',
                       paddingRight: '50px',
