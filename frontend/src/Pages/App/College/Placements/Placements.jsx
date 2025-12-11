@@ -710,7 +710,7 @@ const Placements = () => {
   
   // Bulk job offer state
   const [showBulkJobMode, setShowBulkJobMode] = useState(false);
-  const [bulkJobInputValue, setBulkJobInputValue] = useState('');
+  const [bulkJobInputValue, setBulkJobInputValue] = useState(''); 
   const [selectedBulkJob, setSelectedBulkJob] = useState(null);
   const [sendingBulkJobs, setSendingBulkJobs] = useState(false);
 
@@ -1088,6 +1088,18 @@ const Placements = () => {
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
 
 
+  useEffect(() => {
+    if (bulkJobInputValue && leads && leads.length > 0) {
+      const numCandidates = parseInt(bulkJobInputValue, 10);
+      if (!isNaN(numCandidates) && numCandidates > 0) {
+        const maxCount = Math.min(numCandidates, leads.length);
+        const firstNIds = leads.slice(0, maxCount).map(placement => placement._id).filter(Boolean);
+        setSelectedProfiles(firstNIds);
+      }
+    } else if (!bulkJobInputValue || bulkJobInputValue === '') {
+      setSelectedProfiles([]);
+    }
+  }, [bulkJobInputValue, leads]);
   const [filters, setFilters] = useState({
     search: '',
     placementStatus: '',
@@ -3694,7 +3706,7 @@ const Placements = () => {
         }
       }
 
-      alert(`Bulk job offer completed!\nSuccess: ${successCount}\nFailed: ${failCount}`);
+      alert(`Bulk job offer completed!`);
       
       // Refresh placements
       fetchLeads(selectedStatusFilter, currentPage);
@@ -4508,6 +4520,7 @@ const Placements = () => {
                                         <div className="form-check me-md-3 me-sm-1 me-1">
                                           <input
                                             onChange={(e) => handleCheckboxChange(placement, e.target.checked)}
+                                            checked={selectedProfiles.includes(placement._id)}
                                             className="form-check-input"
                                             type="checkbox"
                                           />
@@ -5588,11 +5601,11 @@ const Placements = () => {
                                                               (offer.status === 'offered' || offer.status === 'active')
                                                             ))) ? (
                                                               <>
-                                                                <i className="fas fa-check me-1"></i> Offer Sent
+                                                                <i className="fas fa-check me-1"></i> Sent Successfully
                                                               </>
                                                             ) : (
                                                               <>
-                                                                <i className="fas fa-paper-plane me-1"></i> send offer
+                                                                <i className="fas fa-paper-plane me-1"></i> Send Application
                                                               </>
                                                             )}
                                                           </button>

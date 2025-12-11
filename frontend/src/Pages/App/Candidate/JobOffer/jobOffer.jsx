@@ -11,105 +11,10 @@ function JobOffer() {
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState(null);
     const [showJobDetails, setShowJobDetails] = useState(false);
-    const [useDummyData, setUseDummyData] = useState(false);
     const [processingJobId, setProcessingJobId] = useState(null);
 
-    const dummyJobOffers = [
-        {
-            _id: '1',
-            title: 'Software Developer',
-            companyName: 'Tech Solutions Pvt Ltd',
-            displayCompanyName: 'Tech Solutions',
-            _qualification: { name: 'B.Tech Computer Science' },
-            _industry: { name: 'Information Technology' },
-            state: { name: 'Delhi' },
-            city: { name: 'New Delhi' },
-            noOfPosition: 5,
-            validity: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 
-            jobDescription: 'We are looking for a skilled Software Developer to join our dynamic team. The ideal candidate should have strong programming skills and experience in web development.',
-            requirement: '• B.Tech in Computer Science or related field\n• 2+ years of experience in web development\n• Knowledge of React, Node.js, and MongoDB\n• Strong problem-solving skills\n• Good communication skills',
-            status: 'active',
-            createdAt: new Date()
-        },
-        {
-            _id: '2',
-            title: 'Data Analyst',
-            companyName: 'Analytics Pro',
-            displayCompanyName: 'Analytics Pro',
-            _qualification: { name: 'B.Tech / MCA' },
-            _industry: { name: 'Data Analytics' },
-            state: { name: 'Maharashtra' },
-            city: { name: 'Mumbai' },
-            noOfPosition: 3,
-            validity: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-            jobDescription: 'Join our data analytics team and help transform raw data into actionable insights. Work with cutting-edge tools and technologies.',
-            requirement: '• B.Tech/MCA in relevant field\n• Experience with Python, SQL, and data visualization tools\n• Strong analytical thinking\n• Attention to detail',
-            status: 'active',
-            createdAt: new Date()
-        },
-        {
-            _id: '3',
-            title: 'Frontend Developer',
-            companyName: 'Digital Innovations',
-            displayCompanyName: 'Digital Innovations',
-            _qualification: { name: 'B.Tech / BCA' },
-            _industry: { name: 'Web Development' },
-            state: { name: 'Karnataka' },
-            city: { name: 'Bangalore' },
-            noOfPosition: 4,
-            validity: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
-            jobDescription: 'We need a creative Frontend Developer to build beautiful and responsive user interfaces. Work on exciting projects with modern frameworks.',
-            requirement: '• B.Tech/BCA in Computer Science\n• Proficiency in HTML, CSS, JavaScript\n• Experience with React or Vue.js\n• Understanding of UI/UX principles',
-            status: 'active',
-            createdAt: new Date()
-        },
-        {
-            _id: '4',
-            title: 'Backend Developer',
-            companyName: 'Cloud Services Inc',
-            displayCompanyName: 'Cloud Services',
-            _qualification: { name: 'B.Tech Computer Science' },
-            _industry: { name: 'Cloud Computing' },
-            state: { name: 'Telangana' },
-            city: { name: 'Hyderabad' },
-            noOfPosition: 6,
-            validity: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), 
-            jobDescription: 'Looking for an experienced Backend Developer to design and implement scalable server-side applications. Work with microservices architecture.',
-            requirement: '• B.Tech in Computer Science\n• Strong knowledge of Node.js, Express, or similar\n• Experience with databases (MongoDB, PostgreSQL)\n• Understanding of RESTful APIs\n• Knowledge of cloud platforms (AWS, Azure)',
-            status: 'active',
-            createdAt: new Date()
-        },
-        {
-            _id: '5',
-            title: 'Full Stack Developer',
-            companyName: 'Startup Hub',
-            displayCompanyName: 'Startup Hub',
-            _qualification: { name: 'B.Tech / M.Tech' },
-            _industry: { name: 'Software Development' },
-            state: { name: 'Gujarat' },
-            city: { name: 'Ahmedabad' },
-            noOfPosition: 2,
-            validity: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), 
-            jobDescription: 'Join our fast-growing startup as a Full Stack Developer. Work on end-to-end features and make a real impact on our product.',
-            requirement: '• B.Tech/M.Tech in Computer Science\n• Full stack development experience\n• Knowledge of React, Node.js, and databases\n• Ability to work in a fast-paced environment\n• Strong problem-solving skills',
-            status: 'active',
-            createdAt: new Date()
-        }
-    ];
-
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const useDummy = urlParams.get('dummy') === 'true';
-        
-        if (useDummy) {
-            setTimeout(() => {
-                setJobOffers(dummyJobOffers);
-                setUseDummyData(true);
-                setLoading(false);
-            }, 1000);
-        } else {
-            fetchJobOffers();
-        }
+        fetchJobOffers();
     }, []);
 
     const fetchJobOffers = async () => {
@@ -119,7 +24,6 @@ function JobOffer() {
             if (!token) {
                 console.warn('No token found');
                 setJobOffers([]);
-                setUseDummyData(false);
                 setLoading(false);
                 return;
             }
@@ -138,24 +42,18 @@ function JobOffer() {
                 const jobs = response.data.data || [];
                 console.log('Fetched job offers:', jobs.length);
                 console.log('Job offers data:', jobs);
-                // Only show real job offers from API, no dummy data
                 setJobOffers(jobs);
-                setUseDummyData(false);
             } else {
                 console.warn('No job offers found or API returned error');
                 console.warn('Response:', response.data);
-                // Show empty array, not dummy data
                 setJobOffers([]);
-                setUseDummyData(false);
             }
         } catch (error) {
             console.error('Error fetching job offers:', error);
             if (error.response) {
                 console.error('Response error:', error.response.data);
             }
-            // Show empty array on error, not dummy data
             setJobOffers([]);
-            setUseDummyData(false);
         } finally {
             setLoading(false);
         }

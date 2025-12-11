@@ -1758,7 +1758,7 @@ router.post('/offer-job', isCollege, async (req, res) => {
     // Add candidate and course if available
     if (candidateId) {
       jobOfferData._candidate = candidateId;
-      console.log('JobOffer will have _candidate:', candidateId);
+      // console.log('JobOffer will have _candidate:', candidateId);
     } else {
       console.error('ERROR: candidateId is null! Cannot create job offer without candidate.');
       return res.status(400).json({
