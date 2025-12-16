@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const Profile = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
   const [college, setCollege] = useState({
     name: '',
     stateId: '',
@@ -37,40 +38,82 @@ const Profile = () => {
   const [universities, setUniversities] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Fetch initial data
-    fetchProfileData();
     fetchStates();
-    // fetchUniversities();
+    fetchProfileData();
+    
+    const timer = setTimeout(() => {
     initializeGoogleMaps();
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      // Cleanup preview URL on unmount
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
   }, []);
+
+  // Cleanup preview URL when it changes
+  useEffect(() => {
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
+  }, [logoPreview]);
 
   const fetchProfileData = async () => {
     try {
       const response = await axios.get(`${backendUrl}/college/profile`, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+        headers: { 'x-auth': token }
       });
       if (response.data && response.data.college) {
-        setCollege(response.data.college);
-        if (response.data.college.stateId) {
-          fetchCities(response.data.college.stateId);
+        const collegeData = response.data.college;
+        
+        if (collegeData._concernPerson) {
+          if (Array.isArray(collegeData._concernPerson)) {
+            const concernPerson = collegeData._concernPerson.find(cp => 
+              cp._id && cp._id.toString() === userData._id?.toString()
+            );
+            if (concernPerson && !concernPerson.mobile && userData.mobile) {
+              concernPerson.mobile = userData.mobile;
+            }
+          } else {
+            if (!collegeData._concernPerson.mobile && userData.mobile) {
+              collegeData._concernPerson.mobile = userData.mobile;
+            }
+          }
+        }
+        
+        setCollege(collegeData);
+        if (collegeData.stateId) {
+          fetchCities(collegeData.stateId);
         }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      alert('Error loading profile data. Please refresh the page.');
     }
   };
 
   const fetchStates = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/states`, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+      const response = await axios.get(`${backendUrl}/college/profile-options`, {
+        headers: { 'x-auth': token }
       });
-      console.log('States API response:', response.data);
-      setStates(Array.isArray(response.data) ? response.data : response.data.states || []);
+      if (response.data && response.data.status) {
+        setStates(response.data.states || []);
+        setUniversities(response.data.universities || []);
+      }
     } catch (error) {
       console.error('Error fetching states:', error);
+      alert('Error loading states. Please refresh the page.');
     }
   };
 
@@ -81,7 +124,7 @@ const Profile = () => {
     try {
       const response = await axios.get(`${backendUrl}/company/getcitiesbyId`, {
         params: { stateId },
-        headers: { 'x-auth': localStorage.getItem('token') }
+        headers: { 'x-auth': token }
       });
       setCities(response.data?.cityValues || []);
     } catch (error) {
@@ -89,20 +132,13 @@ const Profile = () => {
     }
   };
 
-  //   const fetchUniversities = async () => {
-  //     try {
-  //       const response = await axios.get(`${backendUrl}/universities`, {
-  //         headers: { 'x-auth': localStorage.getItem('token') }
-  //       });
-  //       setUniversities(response.data || []);
-  //     } catch (error) {
-  //       console.error('Error fetching universities:', error);
-  //     }
-  //   };
 
   const initializeGoogleMaps = () => {
-    if (window.google) {
+    // Wait for Google Maps to load and DOM to be ready
+    const initAutocomplete = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
       const input = document.getElementById('work-loc');
+        if (input) {
       const options = {
         componentRestrictions: { country: "in" },
         types: ["establishment"]
@@ -112,13 +148,36 @@ const Profile = () => {
 
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
+            if (place.geometry) {
         setCollege(prev => ({
           ...prev,
           place: input.value,
           latitude: place.geometry.location.lat(),
           longitude: place.geometry.location.lng()
         }));
-      });
+            }
+          });
+        }
+      } else {
+        // Retry after a short delay if Google Maps isn't loaded yet
+        setTimeout(initAutocomplete, 100);
+      }
+    };
+
+    // Check if Google Maps script is already loaded
+    if (window.google && window.google.maps) {
+      initAutocomplete();
+    } else {
+      // Wait for Google Maps to load
+      const checkGoogleMaps = setInterval(() => {
+        if (window.google && window.google.maps) {
+          clearInterval(checkGoogleMaps);
+          initAutocomplete();
+        }
+      }, 100);
+
+      // Stop checking after 10 seconds
+      setTimeout(() => clearInterval(checkGoogleMaps), 10000);
     }
   };
 
@@ -165,49 +224,163 @@ const Profile = () => {
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    console.log('File selected for upload:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
 
     if (!checkImageValidation(file.type) || !checkImageSize(file.size)) {
       alert("This format not accepted and each image should be 2MB");
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setLogoPreview(null);
       return;
     }
+
+    // Create preview URL immediately
+    const previewUrl = URL.createObjectURL(file);
+    setLogoPreview(previewUrl);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const response = await axios.post('/api/uploadSingleFile', formData, {
+      console.log('Uploading logo to:', `${backendUrl}/api/uploadSingleFile`);
+      
+      // Use backendUrl for the upload endpoint
+      const response = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, {
         headers: {
-          'x-auth': localStorage.getItem('token'),
+          'x-auth': token,
           'Content-Type': 'multipart/form-data'
         }
       });
 
-      if (response.data.status) {
-        setCollege(prev => ({
-          ...prev,
-          logo: response.data.data.Key
-        }));
+      console.log('Logo upload response:', response.data);
+
+      if (response.data && response.data.status) {
+        const logoKey = response.data.data.Key || response.data.data.key || response.data.data.Location?.split('/').pop();
+        
+        if (logoKey) {
+          console.log('Logo key received:', logoKey);
+          setCollege(prev => ({
+            ...prev,
+            logo: logoKey
+          }));
+          
+          // Clear preview and use uploaded logo
+          if (logoPreview) {
+            URL.revokeObjectURL(logoPreview);
+            setLogoPreview(null);
+          }
+          
+          // Trigger logo update event for navbar (preview before save)
+          window.dispatchEvent(new Event('collegeLogoUpdated'));
+          
+          alert('Logo uploaded successfully! Click Save to update your profile.');
+        } else {
+          console.error('Logo key not found in response:', response.data);
+          alert('Logo uploaded but key not found. Please check console for details.');
+          // Clear preview on error
+          if (logoPreview) {
+            URL.revokeObjectURL(logoPreview);
+            setLogoPreview(null);
+          }
+        }
+      } else {
+        console.error('Upload failed - response:', response.data);
+        alert('Failed to upload logo. Please try again.');
+        // Clear preview on error
+        if (logoPreview) {
+          URL.revokeObjectURL(logoPreview);
+          setLogoPreview(null);
+        }
+      }
+      
+      // Reset input after upload (success or failure) so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     } catch (error) {
       console.error('Error uploading logo:', error);
+      console.error('Error response:', error.response);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Error uploading logo. Please try again.';
+      alert(`Error: ${errorMessage}\n\nCheck browser console (F12) for more details.`);
+      
+      // Clear preview on error
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+        setLogoPreview(null);
+      }
+      
+      // Reset input on error
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   const handleRemoveLogo = async () => {
+    if (!college.logo && !logoPreview) return;
+    
+    if (!window.confirm('Are you sure you want to remove the logo?')) {
+      return;
+    }
+
+    // Clear preview if exists
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+
+    // If no uploaded logo, just clear state and return
+    if (!college.logo || college.logo.trim() === '') {
+      setCollege(prev => ({
+        ...prev,
+        logo: ''
+      }));
+      return;
+    }
+
     try {
-      await axios.post('/api/deleteSingleFile', { key: college.logo }, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+      await axios.post(`${backendUrl}/api/deleteSingleFile`, { key: college.logo }, {
+        headers: { 'x-auth': token }
       });
 
-      await axios.post(`${backendUrl}/company/removelogo`, { key: college.logo });
+      await axios.post(`${backendUrl}/company/removelogo`, { key: college.logo }, {
+        headers: { 'x-auth': token }
+      });
 
       setCollege(prev => ({
         ...prev,
         logo: ''
       }));
+      
+      alert('Logo removed successfully! Click Save to update your profile.');
     } catch (error) {
       console.error('Error removing logo:', error);
+      // Even if API call fails, clear the logo from state to show default placeholder
+      setCollege(prev => ({
+        ...prev,
+        logo: ''
+      }));
+      alert('Logo removed from display. Click Save to update your profile.');
     }
   };
 
@@ -224,22 +397,38 @@ const Profile = () => {
   const validateForm = () => {
     const errors = {};
 
-    if (!college.name.trim()) errors.collegeName = true;
+    if (!college.name?.trim()) errors.collegeName = true;
     if (!college.stateId) errors.state = true;
     if (!college.cityId) errors.city = true;
     if (!college._university) errors.university = true;
-    if (!college.place) errors.workLocation = true;
-    if (!college._concernPerson.name.trim()) errors.concernName = true;
-    if (!college._concernPerson.designation.trim()) errors.concernDesignation = true;
-    if (!checkEmail(college._concernPerson.email)) errors.concernEmail = true;
-    if (!checkMobile(college._concernPerson.mobile)) errors.concernMobile = true;
+    if (!college.place?.trim()) errors.workLocation = true;
+    if (!college._concernPerson?.name?.trim()) errors.concernName = true;
+    if (!college._concernPerson?.designation?.trim()) errors.concernDesignation = true;
+    if (!checkEmail(college._concernPerson?.email)) errors.concernEmail = true;
+    // Mobile is disabled, so skip validation if it's from userData
+    if (!college._concernPerson?.mobile && !userData.mobile) {
+      errors.concernMobile = true;
+    } else if (college._concernPerson?.mobile && !checkMobile(college._concernPerson.mobile)) {
+      errors.concernMobile = true;
+    }
 
     setErrors(errors);
+    
+    // Log validation errors for debugging
+    if (Object.keys(errors).length > 0) {
+      console.log('Validation errors:', errors);
+      console.log('College data:', college);
+    }
+    
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    // Validate form first
+    if (!validateForm()) {
+      alert('Please fill all required fields correctly.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -266,13 +455,50 @@ const Profile = () => {
         )
       };
 
-      await axios.post(`${backendUrl}/college/myprofile`, body, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+      console.log('Submitting profile data:', body);
+
+      const response = await axios.post(`${backendUrl}/college/myprofile`, body, {
+        headers: { 'x-auth': token }
       });
 
-      window.location.href = "/college/myprofile";
+      console.log('Profile save response:', response.data);
+
+      if (response.data && (response.data.status === 200 || response.data.status === true)) {
+        // Show success message
+        alert('Profile updated successfully!');
+        
+        // Fetch updated profile data to refresh the form with latest data
+        // This updates the form without full page reload
+        try {
+          await fetchProfileData();
+          
+          // Trigger logo update event for navbar
+          if (college.logo) {
+            window.dispatchEvent(new Event('collegeLogoUpdated'));
+          }
+        } catch (fetchError) {
+          console.error('Error fetching updated profile:', fetchError);
+          // If fetch fails, do a full reload as fallback
+          window.location.reload();
+        }
+      } else {
+        alert(response.data?.message || 'Profile updated successfully!');
+        try {
+          await fetchProfileData();
+          
+          // Trigger logo update event for navbar
+          if (college.logo) {
+            window.dispatchEvent(new Event('collegeLogoUpdated'));
+          }
+        } catch (fetchError) {
+          console.error('Error fetching updated profile:', fetchError);
+          window.location.reload();
+        }
+      }
     } catch (error) {
       console.error('Error saving profile:', error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Error saving profile. Please try again.';
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -285,7 +511,9 @@ const Profile = () => {
   };
 
   const checkMobile = (number) => {
-    return number.length === 10 && !isNaN(number);
+    if (!number) return false;
+    const numStr = String(number).trim();
+    return numStr.length === 10 && !isNaN(numStr);
   };
 
   const checkImageSize = (size) => {
@@ -391,8 +619,10 @@ const Profile = () => {
                           type="text"
                           className={`form-control ${errors.workLocation ? 'error' : ''}`}
                           id="work-loc"
-                          value={college.place}
-                          onChange={(e) => handleInputChange(e, 'college', null, 'place')}
+                          name="place"
+                          placeholder="Enter a location"
+                          value={college.place || ''}
+                          onChange={(e) => handleInputChange(e, 'college')}
                         />
                       </div>
                     </div>
@@ -486,42 +716,125 @@ const Profile = () => {
                     </div>
 
                     <div className="col-xl-1 col-lg-1 col-md-6 mb-0 mt-2" style={{ alignSelf: 'center' }}>
-                      <div className="image-upload">
-                        {college.logo ? (
-                          <>
-                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer' }}>
-                              <img
-                                src={`${bucketUrl}/${college.logo}`}
-                                className="pointer companylogo"
-                                height="auto"
-                                width="60"
-                                alt="College Logo"
-                              />
+                      <div className="image-upload" style={{ position: 'relative', display: 'inline-block' }}>
+                        {(logoPreview || (college.logo && college.logo.trim() !== '')) ? (
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer', display: 'block' }}>
+                              <div style={{ position: 'relative', display: 'inline-block' }}>
+                                <img
+                                  src={logoPreview || `${bucketUrl}/${college.logo}?t=${Date.now()}`}
+                                  className="pointer companylogo"
+                                  height="auto"
+                                  width="60"
+                                  alt="College Logo"
+                                  style={{ 
+                                    borderRadius: '4px',
+                                    border: logoPreview ? '2px solid #fc2b5a' : '2px solid #ddd',
+                                    padding: '2px',
+                                    transition: 'opacity 0.3s'
+                                  }}
+                                  onError={(e) => {
+                                    console.error('Error loading logo image:', college.logo);
+                                    e.target.style.display = 'none';
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.opacity = '0.8';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.opacity = '1';
+                                  }}
+                                  title={logoPreview ? "Preview - Click Save to update" : "Click to update logo"}
+                                />
+                                {logoPreview && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '-90px',
+                                    width: '100px',
+                                    left: '0',
+                                    right: '0',
+                                    background: 'rgba(252, 43, 90, 0.8)',
+                                    color: 'white',
+                                    fontSize: '9px',
+                                    padding: '2px',
+                                    textAlign: 'center',
+                                    fontWeight: 'bold'
+                                  }}>Preview</div>
+                                )}
+                                {!logoPreview && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '-70px',
+                                    left: '0',
+                                    right: '0',
+                                    // background: 'rgba(0,0,0,0.6)',
+                                    color: 'black',
+                                    fontSize: '10px',
+                                    padding: '2px',
+                                    textAlign: 'center',
+                                    opacity: 0,
+                                    transition: 'opacity 0.3s',
+                                    pointerEvents: 'none',
+                                    width:'200px',
+                                    height:'120px'
+                                  }} className="logo-hover-text">Click to update</div>
+                                )}
+                              </div>
                             </label>
-                            <i
-                              className="feather icon-x remove_uploaded_pic pointer"
-                              style={{ color: 'red' }}
-                              onClick={handleRemoveLogo}
-                            ></i>
-                            College Logo
-                          </>
+                            {!logoPreview && (
+                              <button
+                                className="remove-logo-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveLogo();
+                                }}
+                                title="Remove logo"
+                                style={{
+                                  position: 'absolute',
+                                  top: '-8px',
+                                  right: '-8px',
+                                  background: 'red',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                                  zIndex: 1,
+                                  lineHeight: '1'
+                                }}
+                              >
+                                &times;
+                              </button>
+                            )}
+                            <p className="mt-1" style={{ textAlign: 'center', fontSize: '12px', marginTop: '5px' }}>
+                              {logoPreview ? 'Preview (Click Save)' : 'College Logo'}
+                            </p>
+                          </div>
                         ) : (
                           <>
-                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer', alignSelf: 'center' }}>
+                            <label htmlFor="uploadlogo" style={{ cursor: 'pointer', alignSelf: 'center', display: 'block' }}>
                               <img
                                 className="custom-cursor-pointer default"
                                 src="/Assets/images/add_receipt.png"
                                 width="60"
                                 height="auto"
                                 alt="Upload logo"
+                                style={{ display: 'block', margin: '0 auto' }}
                               />
                             </label>
-                            <p className="mt-1 custom-cursor-pointer">
-                              <label>Upload logo</label>
+                            <p className="mt-1 custom-cursor-pointer" style={{ textAlign: 'center', fontSize: '12px', marginTop: '5px' }}>
+                              <label htmlFor="uploadlogo" style={{ cursor: 'pointer' }}>Upload logo</label>
                             </p>
                           </>
                         )}
                         <input
+                          ref={fileInputRef}
                           id="uploadlogo"
                           type="file"
                           className="my-logo-uploader form-control"
@@ -531,6 +844,29 @@ const Profile = () => {
                         />
                       </div>
                     </div>
+                    {/* <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-1 mt-2">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
+                          Preview (Click Save)
+                        </p>
+                        <button
+                          className="btn"
+                          onClick={() => setShowPreviewModal(true)}
+                          style={{
+                            backgroundColor: '#fc2b5a',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 20px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Preview
+                        </button>
+                      </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -538,6 +874,287 @@ const Profile = () => {
           </div>
         </div>
       </section>
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div 
+          className="resume-preview-modal"
+          onClick={() => setShowPreviewModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div 
+            className="resume-preview-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              width: '90%',
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '15px 20px',
+              borderBottom: '1px solid #eee'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>College Profile Preview</h2>
+              <button 
+                onClick={() => setShowPreviewModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  color: '#555'
+                }}
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '20px',
+              backgroundColor: '#f5f5f5'
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '40px',
+                maxWidth: '800px',
+                margin: '0 auto',
+                boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)',
+                fontFamily: 'Roboto, Arial, sans-serif'
+              }}>
+                {/* College Logo and Name */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  marginBottom: '30px',
+                  paddingBottom: '20px',
+                  borderBottom: '2px solid #fc2b5a'
+                }}>
+                  {(logoPreview || (college.logo && college.logo.trim() !== '')) ? (
+                    <img
+                      src={logoPreview || `${bucketUrl}/${college.logo}?t=${Date.now()}`}
+                      alt="College Logo"
+                      style={{
+                        width: '120px',
+                        height: '120px',
+                        objectFit: 'contain',
+                        borderRadius: '8px',
+                        border: '2px solid #ddd',
+                        padding: '5px',
+                        backgroundColor: '#fff'
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '120px',
+                      height: '120px',
+                      borderRadius: '8px',
+                      border: '2px solid #ddd',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#f0f0f0',
+                      color: '#aaa',
+                      fontSize: '14px'
+                    }}>
+                      No Logo
+                    </div>
+                  )}
+                  <div>
+                    <h1 style={{
+                      fontSize: '28px',
+                      fontWeight: 700,
+                      margin: '0 0 5px 0',
+                      color: '#333'
+                    }}>
+                      {college.name || 'College Name'}
+                    </h1>
+                    {college.place && (
+                      <p style={{
+                        fontSize: '16px',
+                        color: '#666',
+                        margin: 0
+                      }}>
+                        <i className="bi bi-geo-alt-fill" style={{ color: '#fc2b5a', marginRight: '5px' }}></i>
+                        {college.place}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* College Information */}
+                <div style={{ marginBottom: '25px' }}>
+                  <h3 style={{
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#fc2b5a',
+                    margin: '0 0 15px 0',
+                    paddingBottom: '5px',
+                    borderBottom: '1px solid #eee'
+                  }}>
+                    College Information
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
+                    {college._university && (
+                      <div>
+                        <strong>University:</strong> {universities.find(u => u._id === college._university)?.name || college._university}
+                      </div>
+                    )}
+                    {college.website && (
+                      <div>
+                        <strong>Website:</strong> <a href={college.website} target="_blank" rel="noopener noreferrer" style={{ color: '#fc2b5a' }}>{college.website}</a>
+                      </div>
+                    )}
+                    {college.linkedin && (
+                      <div>
+                        <strong>LinkedIn:</strong> <a href={college.linkedin} target="_blank" rel="noopener noreferrer" style={{ color: '#fc2b5a' }}>{college.linkedin}</a>
+                      </div>
+                    )}
+                    {college.facebook && (
+                      <div>
+                        <strong>Facebook:</strong> <a href={college.facebook} target="_blank" rel="noopener noreferrer" style={{ color: '#fc2b5a' }}>{college.facebook}</a>
+                      </div>
+                    )}
+                    {college.zipcode && (
+                      <div>
+                        <strong>Zipcode:</strong> {college.zipcode}
+                      </div>
+                    )}
+                    {college.address && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <strong>Address:</strong> {college.address}
+                      </div>
+                    )}
+                    {college.description && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <strong>Description:</strong>
+                        <p style={{ marginTop: '5px', lineHeight: '1.6', color: '#555' }}>{college.description}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Concerned Person */}
+                {college._concernPerson && (
+                  <div style={{ marginBottom: '25px' }}>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      color: '#fc2b5a',
+                      margin: '0 0 15px 0',
+                      paddingBottom: '5px',
+                      borderBottom: '1px solid #eee'
+                    }}>
+                      Concerned Person
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
+                      {college._concernPerson.name && (
+                        <div>
+                          <strong>Name:</strong> {college._concernPerson.name}
+                        </div>
+                      )}
+                      {college._concernPerson.designation && (
+                        <div>
+                          <strong>Designation:</strong> {college._concernPerson.designation}
+                        </div>
+                      )}
+                      {college._concernPerson.email && (
+                        <div>
+                          <strong>Email:</strong> {college._concernPerson.email}
+                        </div>
+                      )}
+                      {college._concernPerson.mobile && (
+                        <div>
+                          <strong>Contact Number:</strong> {college._concernPerson.mobile}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* College Representatives */}
+                {college.collegeRepresentatives && college.collegeRepresentatives.length > 0 && college.collegeRepresentatives.some(rep => rep.name || rep.designation || rep.email || rep.mobile) && (
+                  <div>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      color: '#fc2b5a',
+                      margin: '0 0 15px 0',
+                      paddingBottom: '5px',
+                      borderBottom: '1px solid #eee'
+                    }}>
+                      College Representatives
+                    </h3>
+                    {college.collegeRepresentatives.filter(rep => rep.name || rep.designation || rep.email || rep.mobile).map((rep, index) => (
+                      <div key={index} style={{
+                        padding: '15px',
+                        backgroundColor: '#f9f9f9',
+                        borderRadius: '8px',
+                        marginBottom: '15px',
+                        borderLeft: '3px solid #fc2b5a'
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                          {rep.name && <div><strong>Name:</strong> {rep.name}</div>}
+                          {rep.designation && <div><strong>Designation:</strong> {rep.designation}</div>}
+                          {rep.email && <div><strong>Email:</strong> {rep.email}</div>}
+                          {rep.mobile && <div><strong>Contact:</strong> {rep.mobile}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{
+              padding: '15px 20px',
+              borderTop: '1px solid #eee',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '15px'
+            }}>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  backgroundColor: '#f8f9fa',
+                  color: '#333',
+                  border: '1px solid #ddd'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Concerned Person Section */}
       <section id="Concerned-Person">
@@ -594,8 +1211,9 @@ const Profile = () => {
                         type="number"
                         name="mobile"
                         className={`form-control ${errors.concernMobile ? 'error' : ''}`}
-                        value={college._concernPerson?.mobile || ''}
+                        value={college._concernPerson?.mobile || userData.mobile || ''}
                         disabled
+                        placeholder="Mobile number from signup"
                       />
                     </div>
                   </div>
@@ -750,6 +1368,7 @@ input[type="date"],
 select {
   background-color: transparent !important;
   border: var(--bs-border-width) solid var(--bs-border-color);
+  color: #333 !important;
 }
 .card {
     margin-bottom: 2.2rem;
@@ -2247,6 +2866,117 @@ max-width: 600px;
 
   .pac-container {
     z-index: 10000 !important;
+    font-family: inherit !important;
+    border-radius: 4px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+    margin-top: 2px !important;
+    background-color: #fff !important;
+    border: 1px solid #d4d4d4 !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+  }
+
+  /* Work Location Input Styling */
+  #work-loc {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 14px !important;
+  }
+
+  #work-loc::placeholder {
+    color: #999 !important;
+    opacity: 1;
+    font-size: 14px !important;
+  }
+
+  /* Google Places Autocomplete Dropdown Styling */
+  .pac-container .pac-item {
+    color: #333 !important;
+    font-size: 13px !important;
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    border-top: 1px solid #e6e6e6 !important;
+    line-height: 1.4 !important;
+    min-height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .pac-container .pac-item:first-child {
+    border-top: none !important;
+  }
+
+  .pac-container .pac-item:hover {
+    background-color: #f1f1f1 !important;
+  }
+
+  /* Logo Upload Hover Effect */
+  .image-upload label:hover .logo-hover-text {
+    opacity: 1 !important;
+  }
+
+  .image-upload label:hover img.companylogo {
+    opacity: 0.8 !important;
+    border-color: #fc2b5a !important;
+  }
+
+  .remove-logo-btn:hover {
+    background: #dc3545 !important;
+    transform: scale(1.1);
+    transition: all 0.2s;
+  }
+
+  .image-upload label {
+    position: relative;
+    display: inline-block;
+  }
+
+  .image-upload label:hover > div > .logo-hover-text {
+    opacity: 1 !important;
+  }
+  }
+
+  .pac-container .pac-item-selected {
+    background-color: #e8f0fe !important;
+  }
+
+  .pac-container .pac-item-query {
+    color: #333 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding-right: 3px !important;
+  }
+
+  .pac-container .pac-icon {
+    width: 15px !important;
+    height: 20px !important;
+    margin-right: 8px !important;
+  }
+
+  .pac-container .pac-matched {
+    font-weight: 600 !important;
+    color: #1a73e8 !important;
+  }
+
+  .pac-container .pac-item-query .pac-matched {
+    color: #1a73e8 !important;
+  }
+
+  .pac-container .pac-item-text {
+    font-size: 12px !important;
+    color: #666 !important;
+    margin-top: 2px !important;
+  }
+
+  .pac-container .pac-item-text .pac-matched {
+    color: #1a73e8 !important;
+    font-weight: 500 !important;
+  }
+
+  /* Hide "powered by Google" text if needed, or style it */
+  .pac-container .pac-logo:after {
+    font-size: 10px !important;
+    color: #999 !important;
   }
 
   

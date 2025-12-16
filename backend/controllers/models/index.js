@@ -111,3 +111,4 @@ module.exports.Source = require("./source");
 module.exports.PlacementStatus = require("./PlacementStatus");
 module.exports.Placement = require("./Placement");
 module.exports.JobOffer = require("./jobOffer");
+module.exports.UploadCandidates = require("./uploadCandidates");

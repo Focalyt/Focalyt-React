@@ -24,12 +24,53 @@ function CollegeLayout({ children }) {
   // const permissions = userData?.permissions
   const [permissions, setPermissions] = useState();
   const [user, setUser] = useState();
+  const [collegeLogo, setCollegeLogo] = useState(null);
   const location = useLocation();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const token = userData.token;
+  
   useEffect(() => {
-    updatedPermission()
-  }, [])
+    updatedPermission();
+    fetchCollegeLogo();
+  }, []);
+
+  // Listen for logo updates from profile page
+  useEffect(() => {
+    const handleStorageChange = () => {
+      fetchCollegeLogo();
+    };
+    
+    // Listen for custom event when logo is updated
+    window.addEventListener('collegeLogoUpdated', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('collegeLogoUpdated', handleStorageChange);
+    };
+  }, []);
+
+  const fetchCollegeLogo = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/profile`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data && response.data.college && response.data.college.logo) {
+        const logo = response.data.college.logo;
+        // Only set logo if it's not empty
+        if (logo && logo.trim() !== '') {
+          setCollegeLogo(logo);
+        } else {
+          setCollegeLogo(null);
+        }
+      } else {
+        setCollegeLogo(null);
+      }
+    } catch (error) {
+      console.error('Error fetching college logo:', error);
+      // Keep default logo on error
+      setCollegeLogo(null);
+    }
+  };
 
   const updatedPermission = async () => {
 
@@ -297,7 +338,19 @@ function CollegeLayout({ children }) {
             <ul className="nav navbar-nav flex-row">
               <li className="nav-item mr-auto">
                 <Link to="/institute/myprofile" className="navbar-brand">
-                  <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Logo" />
+                  {collegeLogo && collegeLogo.trim() !== '' ? (
+                    <img 
+                      className="img-fluid logocs" 
+                      src={`${bucketUrl}/${collegeLogo}?t=${Date.now()}`} 
+                      alt="College Logo"
+                      onError={(e) => {
+                        e.target.src = "/Assets/images/logo/logo.png";
+                        setCollegeLogo(null);
+                      }}
+                    />
+                  ) : (
+                    <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Focalyt Logo" />
+                  )}
                 </Link>
               </li>
               <li className="nav-item nav-toggle">
@@ -309,8 +362,8 @@ function CollegeLayout({ children }) {
             </ul>
           </div>
           <div className="shadow-bottom"></div>
-          <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0">
-            <ul className="navigation navigation-main" id="main-menu-navigation">
+          <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 0px)' }}>
+            <ul className="navigation navigation-main" id="main-menu-navigation" style={{ flex: 1, overflowY: 'auto' }}>
 
               {/* Your Profile */}
               <li className={`nav-item ${location.pathname === '/institute/myProfile' ? 'active' : ''}`}>
@@ -713,6 +766,24 @@ function CollegeLayout({ children }) {
               </li>
 
             </ul>
+            
+            {collegeLogo && collegeLogo.trim() !== '' ? (
+              <div className="sidebar-footer-logo" style={{
+                padding: '15px 20px 25px 10px',
+                textAlign: 'center',
+                borderTop: '1px solid #e0e0e0',
+                marginTop: 'auto',
+                background: '#fff',
+                flexShrink: 0
+              }}>
+                <img 
+                  className="img-fluid" 
+                  src="/Assets/images/logo/logo.png" 
+                  alt="Focalyt Logo"
+                  style={{ maxWidth: '100px', height: 'auto', display: 'block', margin: '0 auto' }}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 

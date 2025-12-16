@@ -3151,6 +3151,88 @@ router.get("/Coins", [isCandidate], async (req, res) => {
     page
   });
 });
+router.get("/coins", [isCandidate], async (req, res) => {
+  
+  try {
+    const p = parseInt(req.query.page);
+    const page = p || 1;
+    const perPage = 10;
+    
+    if (!req.user || !req.user.mobile) {
+      console.log("ERROR: No user or mobile in request");
+      return res.json({ status: false, error: "User not authenticated", message: "Please login again" });
+    }
+    
+    let validation = { mobile: req.user.mobile }
+    let { value, error } = await CandidateValidators.userMobile(validation)
+    if (error) {
+      console.log("Validation error:", error)
+      return res.json({ status: false, error: "Something went wrong!", message: error });
+    }
+
+    // console.log("Finding candidate with mobile:", value.mobile);
+    let candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      status: true,
+      isDeleted: false,
+    }).select("_id creditLeft");
+    
+    if (!candidate) {
+      console.log("ERROR: Candidate not found");
+      return res.json({ status: false, error: "Candidate not found" });
+    }
+
+    // console.log("Candidate found:", candidate._id);
+    
+    let populate = {
+      path: "_offer",
+      select: "displayOffer",
+    };
+    let count = await PaymentDetails.countDocuments({ _candidate: candidate._id })
+    const totalPages = Math.ceil(count / perPage);
+    // console.log("Total transactions count:", count, "Total pages:", totalPages);
+    
+    let latestTransactions = await PaymentDetails.find({
+      _candidate: candidate._id,
+    })
+      .populate(populate)
+      .skip(perPage * page - perPage)
+      .limit(perPage)
+      .sort({ createdAt: -1 });
+    
+    // console.log("Latest transactions found:", latestTransactions.length);
+    
+    let coinOffers = await coinsOffers.find({
+      forCandidate: true,
+      isDeleted: false,
+      status: true,
+      activeTill: { $gte: moment().startOf("day") },
+    }).sort({ createdAt: -1 });
+    
+    // console.log("Coin offers found:", coinOffers.length);
+    // console.log("Coin offers data:", JSON.stringify(coinOffers, null, 2));
+
+    const responseData = {
+      status: true,
+      candidate,
+      coinOffers,
+      latestTransactions,
+      totalPages,
+      count,
+      page,
+      perPage
+    };
+    
+    // console.log("Sending response with", coinOffers.length, "coin offers");
+    return res.json(responseData);
+    
+  } catch (error) {
+    console.error("=== ERROR in /coins route ===");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    return res.json({ status: false, error: "Internal server error", message: error.message });
+  }
+});
 
 router.get("/completeProfile", [isCandidate, authenti], async (req, res) => {
   try {

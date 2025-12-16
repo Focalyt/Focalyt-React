@@ -569,11 +569,12 @@ router
         console.log('====== register error ', error, value)
         return res.send({ status: "failure", error: "Something went wrong!" });
       }
-      const { firstName, lastName, email, phoneNumber, companyName, password,
-        confirmPassword } = value;
-      if (!password || !confirmPassword || password !== confirmPassword) {
-        return res.send({ status: "failure", error: "Passwords do not match!" });
-      }
+      const { firstName, lastName, email, phoneNumber, companyName} = value;
+      // const { firstName, lastName, email, phoneNumber, companyName, password,
+      //   confirmPassword } = value;
+      // if (!password || !confirmPassword || password !== confirmPassword) {
+      //   return res.send({ status: "failure", error: "Passwords do not match!" });
+      // }
       let checkEmail = await users.findOne({
         email: email,
         isDeleted: false,
@@ -590,7 +591,7 @@ router
           error: "Number and Email already exists!",
         });
       }
-      const hashedPassword = await bcrypt.hash(password, 10);
+      // const hashedPassword = await bcrypt.hash(password, 10);
       const name = firstName + " " + lastName;
       if (!checkEmail && !checkNumber) {
         const user = await User.create({
@@ -598,7 +599,7 @@ router
           email,
           mobile: phoneNumber,
           role: 1,
-          password: hashedPassword,
+          // password: hashedPassword,
         });
         if (!user) {
           return res.send({

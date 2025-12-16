@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -3744,11 +3744,22 @@ router.route("/myprofile")
 	.post(authenti, isCollege, async (req, res) => {
 		try {
 			const { collegeInfo, concernedPerson, representativeInfo } = req.body;
+			
+			const user = req.user || req.session?.user;
+			const collegeId = req.college?._id || req.session?.user?.collegeId;
+			
+			if (!user || !collegeId) {
+				return res.status(401).json({ status: false, message: "User not authenticated" });
+			}
+
 			const college = await College.findOne({
-				_id: req.session.user.collegeId,
+				_id: collegeId,
 			});
 
-			if (!college) throw req.ykError("College doesn't exist!");
+			if (!college) {
+				return res.status(404).json({ status: false, message: "College doesn't exist!" });
+			}
+
 			const userUpdatedFields = {};
 			if (concernedPerson) {
 				Object.keys(concernedPerson).forEach((key) => {
@@ -3758,12 +3769,15 @@ router.route("/myprofile")
 				});
 			}
 
+			const userId = user._id || user.id;
 			const userUpdate = await User.findOneAndUpdate(
-				{ _id: req.session.user._id, role: "2" },
+				{ _id: userId, role: "2" },
 				userUpdatedFields
 			);
 
-			if (!userUpdate) throw req.ykError("User not updated!");
+			if (!userUpdate) {
+				return res.status(400).json({ status: false, message: "User not updated!" });
+			}
 
 			const updatedFields = { isProfileCompleted: true };
 			if (representativeInfo && representativeInfo.length > 0) {
@@ -3779,20 +3793,108 @@ router.route("/myprofile")
 			}
 
 			const collegeUpdate = await College.findOneAndUpdate(
-				{ _id: req.session.user.collegeId },
+				{ _id: collegeId },
 				updatedFields,
 				{ new: true }
 			).populate({ path: '_concernPerson' });
 
-			if (!collegeUpdate) throw req.ykError("Candidate not updated!");
-			req.flash("success", "Company updated successfully!");
-			res.send({ status: 200, message: "Profile Updated Successfully" });
-		} catch (err) {
+			if (!collegeUpdate) {
+				return res.status(400).json({ status: false, message: "College not updated!" });
+			}
 
-			req.flash("error", err.message || "Something went wrong!");
-			return res.send({ status: "failure", error: "Something went wrong!" });
+			// For EJS (session-based), use flash messages
+			if (req.session) {
+				req.flash("success", "Company updated successfully!");
+			}
+
+			// Return JSON response for React
+			return res.json({ status: 200, message: "Profile Updated Successfully" });
+		} catch (err) {
+			console.error('Error updating profile:', err);
+			const errorMessage = err.message || "Something went wrong!";
+			
+			// For EJS (session-based), use flash messages
+			if (req.session) {
+				req.flash("error", errorMessage);
+			}
+
+			// Return JSON response for React
+			return res.status(500).json({ status: "failure", error: errorMessage });
 		}
 	});
+
+
+router.get('/profile', [isCollege], async (req, res) => {
+	try {
+		const user = req.user;
+		if (!user || !user._id) {
+			return res.status(401).json({ status: false, message: "User not authenticated" });
+		}
+
+		const college = await College.findOne({ 
+			'_concernPerson._id': user._id, 
+			status: true 
+		})
+			.populate([{
+				path: "_concernPerson",
+				select: "name designation email mobile"
+			}]);
+
+		if (!college) {
+			return res.status(404).json({ status: false, message: "College not found" });
+		}
+
+		
+		const collegeObj = college.toObject ? college.toObject() : college;
+
+		if (collegeObj._concernPerson) {
+			if (Array.isArray(collegeObj._concernPerson)) {
+				const concernPerson = collegeObj._concernPerson.find(cp => 
+					cp._id && cp._id.toString() === user._id.toString()
+				);
+				if (concernPerson) {
+					if (!concernPerson.mobile && user.mobile) {
+						concernPerson.mobile = user.mobile;
+					}
+				}
+			} else {
+				if (!collegeObj._concernPerson.mobile && user.mobile) {
+					collegeObj._concernPerson.mobile = user.mobile;
+				}
+			}
+		}
+
+		res.status(200).json({
+			status: true,
+			college: collegeObj
+		});
+	} catch (err) {
+		console.error('Error fetching profile:', err);
+		res.status(500).json({ status: false, message: "Error fetching profile data" });
+	}
+});
+
+router.get('/profile-options', [isCollege], async (req, res) => {
+	try {
+		const states = await State.find({
+			countryId: "101",
+			status: { $ne: false },
+		}).select('_id name stateId').sort({ name: 1 });
+
+		const universities = await University.find({ status: true })
+			.select('_id name')
+			.sort({ name: 1 });
+
+		res.status(200).json({
+			status: true,
+			states: states,
+			universities: universities
+		});
+	} catch (err) {
+		console.error('Error fetching profile options:', err);
+		res.status(500).json({ status: false, message: "Error fetching profile options" });
+	}
+});
 
 router.get('/availablejobs', [isCollege], async (req, res) => {
 	try {
@@ -3875,7 +3977,7 @@ router.get('/job/:jobId', [isCollege], async (req, res) => {
 	}
 })
 
-router.post('/uploadfiles', [isCollege], async (req, res) => {
+router.post('/uploadfile', [isCollege], async (req, res) => {
 	try {
 		let files = req.files;
 		if (req.files == undefined) {
@@ -4175,6 +4277,285 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 		return res.redirect("back");
 	}
 })
+
+router.post('/uploadfiles', [isCollege], async (req, res) => {
+	try {
+		let files = req.files;
+		if (req.files == undefined) {
+			return res.status(400).json({ status: false, message: "Please select file" });
+		}
+		var data1 = req.files.filename;
+		if (!req.files.filename) {
+			return res.status(400).json({ status: false, message: "Please select file" });
+		}
+		const college = req.college;
+		if (!college) {
+			return res.status(400).json({ status: false, message: "College not found" });
+		}
+		var checkFileError = true;
+		let extension = req.files.filename.name.split(".").pop();
+		if (extension !== "ods" && extension !== "xlsx" && extension !== "xls" && extension !== "xl") {
+			return res.status(400).json({ status: false, message: "Excel format not matched." });
+		}
+		let filename = new Date().getTime() + "_" + data1.name;
+		const write = await fs.promises.writeFile("public/" + filename, data1.data)
+			.then(() => console.log("********* File Upload successfully!"))
+			.catch((err) => {
+				console.log(err.message)
+				return res.status(500).json({ status: false, message: "Error saving file" });
+			});
+		let errorMessages = []
+		let actualHeadersFound = []; // Store original headers for error message
+		await readXlsxFile(
+			path.join(__dirname, "../../../public/" + filename)
+		).then((rows) => {
+			// Normalize headers - trim, convert to lowercase, and remove spaces
+			const headerRow = rows[0] || [];
+			actualHeadersFound = headerRow.map(h => h ? h.toString().trim() : ''); // Store original headers
+			const normalizedHeaders = headerRow.map(h => h ? h.toString().trim().toLowerCase().replace(/\s+/g, '') : '');
+			
+			// Expected headers
+			const expectedHeaders = ['name', 'rollno', 'fathername', 'course', 'session', 'college'];
+			
+			// Check if headers match
+			let headersMatch = true;
+			let mismatchDetails = [];
+			
+			for (let i = 0; i < expectedHeaders.length; i++) {
+				if (normalizedHeaders[i] !== expectedHeaders[i]) {
+					headersMatch = false;
+					mismatchDetails.push(`Column ${i + 1}: Expected "${expectedHeaders[i]}", Found "${normalizedHeaders[i] || '(empty)'}"`);
+				}
+			}			
+			if (!headersMatch) {
+				checkFileError = false;
+				console.log('Header mismatch details:', mismatchDetails);
+			} else {
+				checkFileError = true;
+			}
+
+		}).catch(err => {
+			console.error('Error reading file:', err);
+			return res.status(400).json({ status: false, message: "Caught error while reading file: " + err.message });
+		})
+
+		if (checkFileError == false) {
+			await fs.promises.unlink("public/" + filename).catch(() => {});
+			return res.status(400).json({ 
+				status: false, 
+				message: "Please upload right pattern file. Expected columns: name, rollNo, fatherName, course, session, college. " +
+					(actualHeadersFound.length > 0 ? `Found columns: ${actualHeadersFound.join(', ')}` : '')
+			});
+		} else {
+			let allRows = []
+			let successCount = 0;
+			await readXlsxFile(
+				path.join(__dirname, "../../../public/" + filename)
+			).then(async (rowsList) => {
+				rowsList.shift(); 
+				for (let [index, rows] of rowsList.entries()) {
+					let message = "";
+					let name = rows[0] ? rows[0].toString().trim() : '';
+					let rollNo = rows[1] ? rows[1].toString().trim() : '';
+					let fatherName = rows[2] ? rows[2].toString().trim() : '';
+					let course = rows[3] ? rows[3].toString().trim() : '';
+					let session = rows[4] ? rows[4].toString().trim() : '';
+					let collegeName = rows[5] ? rows[5].toString().trim() : ''; 
+
+					// Validation
+					if (!name) {
+						message += `Name `
+					}
+					if (!rollNo) {
+						message += `Roll No `
+					}
+					if (!fatherName) {
+						message += `Father Name `
+					}
+					if (!course) {
+						message += `Course `
+					}
+					if (!session) {
+						message += `Session `
+					}
+					if (!collegeName) {
+						message += `College Name `
+					}
+
+					if (message) {
+						message += `not populated for row ${index + 1}`
+						errorMessages.push(message)
+						continue;
+					}
+
+					// Check for duplicate rollNo in same college
+					let isExistCandidate = await UploadCandidates.findOne({
+						rollNo: rollNo,
+						college: college._id
+					});
+
+					if (isExistCandidate) {
+						errorMessages.push(`Candidate with Roll No ${rollNo} already exists for row ${index + 1}.`)
+						continue;
+					}
+
+					// Check for duplicate in current upload
+					let dup = allRows.find(can => can.rollNo.toString() === rollNo.toString() && can.collegeName.toString() === collegeName.toString())
+
+					if (!isExistCandidate && !dup) {
+						allRows.push({ rollNo, collegeName })
+						
+						// Create UploadCandidates record
+						const uploadCandidate = await UploadCandidates.create({
+							name: name,
+							rollNo: rollNo,
+							fatherName: fatherName,
+							course: course,
+							session: session,
+							college: college._id,
+							collegeName: collegeName 
+						});
+
+						if (!uploadCandidate) {
+							errorMessages.push(`Candidate not created for row ${index + 1}.`)
+							continue;
+						}
+						successCount++;
+					} else {
+						errorMessages.push(`Candidate with Roll No ${rollNo} already exists for row ${index + 1}.`)
+					}
+				}
+
+				// Create import record
+				var imports = {
+					name: req.files.filename.name,
+					message: errorMessages.length <= 0 ? "success" : errorMessages.join('</br>'),
+					status: "Completed",
+					record: successCount
+				};
+
+				await CandidateImport.create(imports);
+				
+				// Clean up file
+				await fs.promises.unlink("public/" + filename).catch((err) => {
+					console.log("Error deleting file:", err);
+				});
+
+				return res.status(200).json({
+					status: true,
+					message: errorMessages.length <= 0 ? "File uploaded successfully" : "File uploaded with some errors",
+					errorCount: errorMessages.length,
+					successCount: successCount,
+					totalRows: rowsList.length,
+					errors: errorMessages
+				});
+			}).catch(async (err) => {
+				console.log("Error processing file:", err);
+				await fs.promises.unlink("public/" + filename).catch(() => {});
+				return res.status(500).json({ status: false, message: "Error processing file: " + err.message });
+			});
+		}
+	} catch (err) {
+		console.log(err)
+		return res.status(500).json({ status: false, message: err.message || "Something went wrong!" });
+	}
+})
+
+
+router.get("/imports", isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = req.college;
+		
+		if (!college) {
+			return res.status(400).json({ status: false, message: "College not found" });
+		}
+
+		const perPage = 10;
+		const p = parseInt(req.query.page, 10);
+		const page = p || 1;
+
+		let imports = await CandidateImport.find({ status: "Completed" })
+			.sort({ createdAt: -1 })
+			.skip(perPage * page - perPage)
+			.limit(perPage)
+			.lean();
+
+		let count = await CandidateImport.countDocuments({ status: "Completed" });
+		const totalPages = Math.ceil(count / perPage);
+
+		return res.status(200).json({
+			status: true,
+			imports: imports,
+			totalPages: totalPages,
+			currentPage: page,
+			totalCount: count
+		});
+	} catch (err) {
+		console.error('Error fetching imports:', err);
+		return res.status(500).json({ status: false, message: err.message || "Server Error" });
+	}
+});
+
+router.get("/uploaded-candidates", isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = req.college;
+		
+		if (!college) {
+			console.log('College not found for user:', user._id);
+			return res.status(400).json({ status: false, message: "College not found" });
+		}
+
+		const perPage = parseInt(req.query.limit) || 50;
+		const p = parseInt(req.query.page, 10);
+		const page = p || 1;
+
+		const collegeId = mongoose.Types.ObjectId.isValid(college._id) 
+			? new mongoose.Types.ObjectId(college._id) 
+			: college._id;;
+		let candidates = await UploadCandidates.aggregate([
+			{ $match: { college: collegeId } },
+			{
+				$addFields: {
+					numericRollNo: {
+						$cond: {
+							if: { $eq: [{ $type: "$rollNo" }, "string"] },
+							then: {
+								$toDouble: {
+									$ifNull: [
+										{ $toDouble: { $trim: { input: "$rollNo" } } },
+										0
+									]
+								}
+							},
+							else: { $toDouble: { $ifNull: ["$rollNo", 0] } }
+						}
+					}
+				}
+			},
+			{ $sort: { numericRollNo: 1 } }, 
+			{ $skip: perPage * page - perPage },
+			{ $limit: perPage },
+			{ $project: { numericRollNo: 0 } } 
+		]);
+
+		let count = await UploadCandidates.countDocuments({ college: collegeId });
+		
+		const totalPages = Math.ceil(count / perPage);
+
+		return res.status(200).json({
+			status: true,
+			candidates: candidates,
+			totalPages: totalPages,
+			currentPage: page,
+			totalCount: count
+		});
+	} catch (err) {
+		console.error('Error fetching uploaded candidates:', err);
+		return res.status(500).json({ status: false, message: err.message || "Server Error" });
+	}
+});
 
 router.get("/uploadcandidates", async (req, res) => {
 	const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
@@ -4501,11 +4882,12 @@ router.route('/uploadTemplates')
 			return res.send({ status: false, message: err.message })
 		}
 	})
-
-router.route("/single").get(auth1, function (req, res) {
+	// router.route("/single").get(auth1, function (req, res) {
+router.route("/single").get(isCollege, function (req, res) {
 	res.download("public/Student.xlsx", function (err) {
 		if (err) {
 			console.log(err);
+			return res.status(500).json({ status: false, message: "Error downloading sample file" });
 		}
 	});
 });
@@ -12598,7 +12980,7 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 		const { courseId } = req.query;
 		const user = req.user;
 		const collegeId = req.college._id;
-		const {centerId }  = req.query;
+		const { centerId } = req.query;
 		const trainerId = user._id;
 
 		if (courseId) {
