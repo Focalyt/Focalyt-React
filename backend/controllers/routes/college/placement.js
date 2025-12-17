@@ -901,7 +901,7 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
       contactNumber,
       dateOfJoining,
       location,
-      appliedCourseId
+      appliedCourseId: appliedCourseid
     } = req.body;
 
     const userId = req.user._id;
@@ -910,6 +910,7 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
     
     let placement = null;
     let appliedCourse = null;
+    let appliedCourseId = appliedCourseid;
 
     placement = await Placement.findById(id);
     
