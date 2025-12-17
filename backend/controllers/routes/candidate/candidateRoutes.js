@@ -5061,7 +5061,7 @@ router.get("/job-offers", [isCandidate], async (req, res) => {
     const jobOfferQuery = {
       isActive: true,
       _candidate: candidate._id,  // Only job offers directly sent to this candidate
-      status: 'offered'  // Only offers with 'offered' status (sent via offer-job endpoint)
+      status: { $in: ['offered', 'active'] }  // Show both pending and accepted offers
     };
 
     // console.log('=== Fetching Job Offers ===');

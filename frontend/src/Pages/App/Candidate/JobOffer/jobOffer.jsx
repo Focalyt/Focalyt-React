@@ -22,30 +22,24 @@ function JobOffer() {
             setLoading(true);
             
             if (!token) {
-                console.warn('No token found');
                 setJobOffers([]);
                 setLoading(false);
                 return;
             }
 
-            console.log('=== Fetching Job Offers ===');
-            console.log('Backend URL:', backendUrl);
-            console.log('Token exists:', !!token);
-
             const response = await axios.get(`${backendUrl}/candidate/job-offers`, {
                 headers: { 'x-auth': token }
             });
 
-            console.log('API Response:', response.data);
-
             if (response.data && response.data.success) {
                 const jobs = response.data.data || [];
-                console.log('Fetched job offers:', jobs.length);
-                console.log('Job offers data:', jobs);
-                setJobOffers(jobs);
+                // Normalize status: use candidateResponse if available, otherwise use status
+                const normalizedJobs = jobs.map(job => ({
+                    ...job,
+                    displayStatus: job.candidateResponse || job.status || 'active'
+                }));
+                setJobOffers(normalizedJobs);
             } else {
-                console.warn('No job offers found or API returned error');
-                console.warn('Response:', response.data);
                 setJobOffers([]);
             }
         } catch (error) {
@@ -74,6 +68,22 @@ function JobOffer() {
         return moment(date).format('DD MMM YYYY');
     };
 
+    // Helper function to get candidate response status
+    const getCandidateResponse = (job) => {
+        if (!job) return null;
+        return job.candidateResponse || job.displayStatus || null;
+    };
+
+    // Helper function to check if job is accepted
+    const isAccepted = (job) => {
+        return getCandidateResponse(job) === 'accepted';
+    };
+
+    // Helper function to check if job is rejected
+    const isRejected = (job) => {
+        return getCandidateResponse(job) === 'rejected';
+    };
+
     const handleAcceptJob = async (jobId) => {
         try {
             setProcessingJobId(jobId);
@@ -94,16 +104,16 @@ function JobOffer() {
             if (response.data && response.data.success) {
                 alert('Job offer accepted successfully!');
                 
-                setJobOffers(prevOffers => 
-                    prevOffers.map(job => 
-                        job._id === jobId 
-                            ? { ...job, status: 'accepted' }
-                            : job
-                    )
-                );
+                // Refresh job offers list to get updated data from backend
+                await fetchJobOffers();
                 
+                // Update selected job if modal is open
                 if (selectedJob && selectedJob._id === jobId) {
-                    setSelectedJob({ ...selectedJob, status: 'accepted' });
+                    const updatedJob = response.data.data;
+                    setSelectedJob({ 
+                        ...updatedJob, 
+                        displayStatus: updatedJob.candidateResponse || updatedJob.status || 'active'
+                    });
                 }
             } else {
                 alert(response.data?.message || 'Failed to accept job offer');
@@ -144,18 +154,16 @@ function JobOffer() {
             if (response.data && response.data.success) {
                 alert('Job offer rejected successfully.');
                 
-                // Update job offer status in the list
-                setJobOffers(prevOffers => 
-                    prevOffers.map(job => 
-                        job._id === jobId 
-                            ? { ...job, status: 'rejected' }
-                            : job
-                    )
-                );
+                // Refresh job offers list to get updated data from backend
+                await fetchJobOffers();
                 
-                // Update selected job if it's the same one
+                // Update selected job if modal is open
                 if (selectedJob && selectedJob._id === jobId) {
-                    setSelectedJob({ ...selectedJob, status: 'rejected' });
+                    const updatedJob = response.data.data;
+                    setSelectedJob({ 
+                        ...updatedJob, 
+                        displayStatus: updatedJob.candidateResponse || updatedJob.status || 'active'
+                    });
                 }
                 
                 // Close modal after rejection
@@ -338,11 +346,11 @@ function JobOffer() {
                                     fontSize: '11px',
                                     fontWeight: '600',
                                     textTransform: 'uppercase',
-                                    backgroundColor: job.status === 'active' ? '#d4edda' : '#fff3cd',
-                                    color: job.status === 'active' ? '#155724' : '#856404',
-                                    border: `1px solid ${job.status === 'active' ? '#c3e6cb' : '#ffeaa7'}`
+                                    backgroundColor: isAccepted(job) ? '#d4edda' : isRejected(job) ? '#f8d7da' : '#fff3cd',
+                                    color: isAccepted(job) ? '#155724' : isRejected(job) ? '#721c24' : '#856404',
+                                    border: `1px solid ${isAccepted(job) ? '#c3e6cb' : isRejected(job) ? '#f5c6cb' : '#ffeaa7'}`
                                 }}>
-                                    {job.status || 'Active'}
+                                    {isAccepted(job) ? 'Accepted' : isRejected(job) ? 'Rejected' : 'Pending'}
                                 </div>
 
                                 {/* Company Info */}
@@ -504,50 +512,50 @@ function JobOffer() {
                                         style={{
                                             flex: 1,
                                             padding: '12px 24px',
-                                            backgroundColor: job.status === 'accepted' ? '#28a745' : '#007bff',
+                                            backgroundColor: isAccepted(job) ? '#28a745' : '#007bff',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '8px',
                                             fontSize: '15px',
                                             fontWeight: '600',
-                                            cursor: job.status === 'accepted' || processingJobId === job._id ? 'not-allowed' : 'pointer',
+                                            cursor: isAccepted(job) || processingJobId === job._id ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.3s ease',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: '8px',
-                                            opacity: (job.status === 'accepted' || processingJobId === job._id) ? 0.7 : 1
+                                            opacity: (isAccepted(job) || processingJobId === job._id) ? 0.7 : 1
                                         }}
-                                        disabled={job.status === 'accepted' || processingJobId === job._id}
+                                        disabled={isAccepted(job) || processingJobId === job._id}
                                         onMouseEnter={(e) => {
-                                            if (job.status !== 'accepted' && processingJobId !== job._id) {
-                                                e.currentTarget.style.backgroundColor = job.status === 'accepted' ? '#28a745' : '#0056b3';
+                                            if (!isAccepted(job) && processingJobId !== job._id) {
+                                                e.currentTarget.style.backgroundColor = '#0056b3';
                                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
-                                            if (job.status !== 'accepted') {
+                                            if (!isAccepted(job)) {
                                                 e.currentTarget.style.backgroundColor = '#007bff';
                                             }
                                             e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (job.status === 'accepted') {
+                                            if (isAccepted(job)) {
                                                 handleViewDetails(job);
                                             } else {
                                                 handleAcceptJob(job._id);
                                             }
                                         }}
                                     >
-                                        {processingJobId === job._id && job.status !== 'accepted' ? (
+                                        {processingJobId === job._id && !isAccepted(job) ? (
                                             <>
                                                 <div className="spinner-border spinner-border-sm" role="status" style={{ width: '16px', height: '16px', borderWidth: '2px' }}>
                                                     <span className="visually-hidden">Loading...</span>
                                                 </div>
                                                 Processing...
                                             </>
-                                        ) : job.status === 'accepted' ? (
+                                        ) : isAccepted(job) ? (
                                             <>
                                                 <i className="fas fa-check-circle"></i>
                                                 Accepted
@@ -564,41 +572,41 @@ function JobOffer() {
                                         style={{
                                             flex: 1,
                                             padding: '12px 24px',
-                                            backgroundColor: job.status === 'rejected' ? '#6c757d' : '#dc3545',
+                                            backgroundColor: isRejected(job) ? '#6c757d' : '#dc3545',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '8px',
                                             fontSize: '15px',
                                             fontWeight: '600',
-                                            cursor: (job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id) ? 'not-allowed' : 'pointer',
+                                            cursor: (isRejected(job) || isAccepted(job) || processingJobId === job._id) ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.3s ease',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: '8px',
-                                            opacity: (job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id) ? 0.7 : 1
+                                            opacity: (isRejected(job) || isAccepted(job) || processingJobId === job._id) ? 0.7 : 1
                                         }}
-                                        disabled={job.status === 'rejected' || job.status === 'accepted' || processingJobId === job._id}
+                                        disabled={isRejected(job) || isAccepted(job) || processingJobId === job._id}
                                         onMouseEnter={(e) => {
-                                            if (job.status !== 'rejected' && job.status !== 'accepted' && processingJobId !== job._id) {
+                                            if (!isRejected(job) && !isAccepted(job) && processingJobId !== job._id) {
                                                 e.currentTarget.style.backgroundColor = '#c82333';
                                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
-                                            if (job.status !== 'rejected') {
+                                            if (!isRejected(job)) {
                                                 e.currentTarget.style.backgroundColor = '#dc3545';
                                             }
                                             e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (job.status !== 'rejected' && job.status !== 'accepted') {
+                                            if (!isRejected(job) && !isAccepted(job)) {
                                                 handleRejectJob(job._id);
                                             }
                                         }}
                                     >
-                                        {job.status === 'rejected' ? (
+                                        {isRejected(job) ? (
                                             <>
                                                 <i className="fas fa-times-circle"></i>
                                                 Rejected
@@ -706,18 +714,18 @@ function JobOffer() {
                                         }}>
                                             {selectedJob.title || 'Job Details'}
                                         </h3>
-                                        {(selectedJob.status === 'accepted' || selectedJob.status === 'rejected') && (
+                                        {(isAccepted(selectedJob) || isRejected(selectedJob)) && (
                                             <span style={{
                                                 padding: '4px 12px',
                                                 borderRadius: '20px',
                                                 fontSize: '12px',
                                                 fontWeight: '600',
                                                 textTransform: 'uppercase',
-                                                backgroundColor: selectedJob.status === 'accepted' ? '#d4edda' : '#f8d7da',
-                                                color: selectedJob.status === 'accepted' ? '#155724' : '#721c24',
-                                                border: `1px solid ${selectedJob.status === 'accepted' ? '#c3e6cb' : '#f5c6cb'}`
+                                                backgroundColor: isAccepted(selectedJob) ? '#d4edda' : '#f8d7da',
+                                                color: isAccepted(selectedJob) ? '#155724' : '#721c24',
+                                                border: `1px solid ${isAccepted(selectedJob) ? '#c3e6cb' : '#f5c6cb'}`
                                             }}>
-                                                {selectedJob.status === 'accepted' ? (
+                                                {isAccepted(selectedJob) ? (
                                                     <>
                                                         <i className="fas fa-check-circle me-1"></i>
                                                         Accepted
@@ -970,45 +978,45 @@ function JobOffer() {
                                 }}>
                                     <button
                                         onClick={() => handleAcceptJob(selectedJob._id)}
-                                        disabled={selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id}
+                                        disabled={isAccepted(selectedJob) || isRejected(selectedJob) || processingJobId === selectedJob._id}
                                         style={{
                                             flex: 1,
                                             padding: '12px 24px',
-                                            backgroundColor: selectedJob.status === 'accepted' ? '#28a745' : '#007bff',
+                                            backgroundColor: isAccepted(selectedJob) ? '#28a745' : '#007bff',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '8px',
                                             fontSize: '15px',
                                             fontWeight: '600',
-                                            cursor: (selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
+                                            cursor: (isAccepted(selectedJob) || isRejected(selectedJob) || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.3s ease',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: '8px',
-                                            opacity: (selectedJob.status === 'accepted' || selectedJob.status === 'rejected' || processingJobId === selectedJob._id) ? 0.7 : 1
+                                            opacity: (isAccepted(selectedJob) || isRejected(selectedJob) || processingJobId === selectedJob._id) ? 0.7 : 1
                                         }}
                                         onMouseEnter={(e) => {
-                                            if (selectedJob.status !== 'accepted' && selectedJob.status !== 'rejected' && processingJobId !== selectedJob._id) {
+                                            if (!isAccepted(selectedJob) && !isRejected(selectedJob) && processingJobId !== selectedJob._id) {
                                                 e.currentTarget.style.backgroundColor = '#0056b3';
                                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
-                                            if (selectedJob.status !== 'accepted') {
+                                            if (!isAccepted(selectedJob)) {
                                                 e.currentTarget.style.backgroundColor = '#007bff';
                                             }
                                             e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                     >
-                                        {processingJobId === selectedJob._id && selectedJob.status !== 'accepted' ? (
+                                        {processingJobId === selectedJob._id && !isAccepted(selectedJob) ? (
                                             <>
                                                 <div className="spinner-border spinner-border-sm" role="status" style={{ width: '16px', height: '16px', borderWidth: '2px' }}>
                                                     <span className="visually-hidden">Loading...</span>
                                                 </div>
                                                 Processing...
                                             </>
-                                        ) : selectedJob.status === 'accepted' ? (
+                                        ) : isAccepted(selectedJob) ? (
                                             <>
                                                 <i className="fas fa-check-circle"></i>
                                                 Accepted
@@ -1023,38 +1031,38 @@ function JobOffer() {
                                     
                                     <button
                                         onClick={() => handleRejectJob(selectedJob._id)}
-                                        disabled={selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id}
+                                        disabled={isRejected(selectedJob) || isAccepted(selectedJob) || processingJobId === selectedJob._id}
                                         style={{
                                             flex: 1,
                                             padding: '12px 24px',
-                                            backgroundColor: selectedJob.status === 'rejected' ? '#6c757d' : '#dc3545',
+                                            backgroundColor: isRejected(selectedJob) ? '#6c757d' : '#dc3545',
                                             color: '#ffffff',
                                             border: 'none',
                                             borderRadius: '8px',
                                             fontSize: '15px',
                                             fontWeight: '600',
-                                            cursor: (selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
+                                            cursor: (isRejected(selectedJob) || isAccepted(selectedJob) || processingJobId === selectedJob._id) ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.3s ease',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             gap: '8px',
-                                            opacity: (selectedJob.status === 'rejected' || selectedJob.status === 'accepted' || processingJobId === selectedJob._id) ? 0.7 : 1
+                                            opacity: (isRejected(selectedJob) || isAccepted(selectedJob) || processingJobId === selectedJob._id) ? 0.7 : 1
                                         }}
                                         onMouseEnter={(e) => {
-                                            if (selectedJob.status !== 'rejected' && selectedJob.status !== 'accepted' && processingJobId !== selectedJob._id) {
+                                            if (!isRejected(selectedJob) && !isAccepted(selectedJob) && processingJobId !== selectedJob._id) {
                                                 e.currentTarget.style.backgroundColor = '#c82333';
                                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
-                                            if (selectedJob.status !== 'rejected') {
+                                            if (!isRejected(selectedJob)) {
                                                 e.currentTarget.style.backgroundColor = '#dc3545';
                                             }
                                             e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                     >
-                                        {selectedJob.status === 'rejected' ? (
+                                        {isRejected(selectedJob) ? (
                                             <>
                                                 <i className="fas fa-times-circle"></i>
                                                 Rejected

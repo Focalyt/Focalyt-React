@@ -8,7 +8,7 @@ import axios from 'axios';
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
-  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faWallet, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie
 } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -705,6 +705,12 @@ function CollegeLayout({ children }) {
                     <Link to="/institute/whatappTemplate" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faFileAlt} />
                       <span className="menu-title">Create Template</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/whatsappWallet' ? 'active' : ''}`}>
+                    <Link to="/institute/whatsappWallet" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faWallet} />
+                      <span className="menu-title">Whatsapp Wallet</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>

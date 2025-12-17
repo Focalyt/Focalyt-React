@@ -2345,7 +2345,7 @@ const Placements = () => {
     setShowPopup(null);
     setShowPanel('leadHistory');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -3741,10 +3741,10 @@ const Placements = () => {
   };
 
   useEffect(() => {
-    if (showPanel === 'leadHistory') {
+    if (showPanel === 'leadHistory' && selectedProfile && selectedProfile._id) {
       fetchLeadLogs(selectedProfile._id);
     }
-  }, [showPanel]);
+  }, [showPanel, selectedProfile]);
 
   // Video modal cleanup
   useEffect(() => {
@@ -4520,7 +4520,7 @@ const Placements = () => {
                                         <div className="form-check me-md-3 me-sm-1 me-1">
                                           <input
                                             onChange={(e) => handleCheckboxChange(placement, e.target.checked)}
-                                            checked={selectedProfiles.includes(placement._id)}
+                                            checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(placement._id) : false}
                                             className="form-check-input"
                                             type="checkbox"
                                           />
