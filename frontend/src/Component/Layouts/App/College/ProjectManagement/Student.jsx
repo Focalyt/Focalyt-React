@@ -5329,6 +5329,7 @@ const Student = ({
                                                     >
                                                       Dropout
                                                     </button>)}
+                                                    {/* {filterData.status === "batchFreezed" && ( */}
                                                     <button
                                                       className="dropdown-item"
                                                       style={{
@@ -5351,6 +5352,7 @@ const Student = ({
                                                     >
                                                       Move to Placements
                                                     </button>
+                                                    {/* )} */}
                                                 </div>
                                               )}
 

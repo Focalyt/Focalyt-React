@@ -386,12 +386,12 @@ const UploadCandidates = () => {
                                         <thead>
                                           <tr>
                                             <th>Sr. No.</th>
+                                            <th>Roll No</th>
                                             <th>Candidate Name</th>
                                             <th>Father Name</th>
-                                            <th>Roll No</th>
                                             <th>Course</th>
-                                            <th>Session</th>
-                                            <th>College Name</th>
+                                            <th>Year (1st/2nd/3rd/4th)</th>
+                                            <th>Session/Semester</th>
                                             <th>Upload Date</th>
                                           </tr>
                                         </thead>
@@ -399,12 +399,12 @@ const UploadCandidates = () => {
                                           {uploadedCandidates.map((candidate, index) => (
                                             <tr key={candidate._id}>
                                               <td>{(candidatesPage - 1) * 50 + index + 1}</td>
+                                              <td>{candidate.rollNo || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.name || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
-                                              <td>{candidate.rollNo || 'N/A'}</td>
+                                              
                                               <td>{candidate.course || 'N/A'}</td>
                                               <td>{candidate.session || 'N/A'}</td>
-                                              <td>{candidate.collegeName || 'N/A'}</td>
                                               <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
                                             </tr>
                                           ))}

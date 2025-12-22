@@ -1386,7 +1386,7 @@ const Placements = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
-
+console.log("response.data",response.data)
           setSelectedStatus('');
           setSelectedSubStatus(null);
           setFollowupFormData({
