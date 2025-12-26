@@ -14,6 +14,7 @@ const { ykError, headerAuthKey, extraEdgeAuthToken, extraEdgeUrl, env, fbConvers
 const { updateSpreadSheetValues } = require("../services/googleservice")
 
 const CandidateDoc = require('../../models/candidatedoc');
+const UploadCandidates = require('../../models/uploadCandidates');
 const bizSdk = require('facebook-nodejs-business-sdk');
 const Content = bizSdk.Content;
 const CustomData = bizSdk.CustomData;
@@ -642,6 +643,35 @@ router
         source: "System"
       }
       await sendNotification(notificationData)
+       
+      try {
+      
+        const cleanMobile = String(mobile).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '');
+        
+        await UploadCandidates.updateMany(
+          {
+            $or: [
+              { contactNumber: mobile },
+              { contactNumber: cleanMobile },
+              { contactNumber: `+91${cleanMobile}` },
+              { contactNumber: `91${cleanMobile}` },
+              { contactNumber: parseInt(cleanMobile) }
+            ],
+            status: 'inactive'
+          },
+          {
+            $set: {
+              status: 'active',
+              user: usr._id 
+            }
+          }
+        );
+        // console.log(`✅ Updated UploadCandidates status to 'active' for mobile: ${mobile}`);
+      } catch (uploadCandidatesError) {
+        // Don't fail registration if UploadCandidates update fails
+        console.error('⚠️ Failed to update UploadCandidates status:', uploadCandidatesError.message);
+      }
+      
       return res.send({
         status: "success",
         error: "Candidate added successfully!",

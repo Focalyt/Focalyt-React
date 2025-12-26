@@ -1402,8 +1402,10 @@ console.log("response.data",response.data)
           const selectedCrmFilter = crmFilters.find(f => f._id === statusId);
           const milestone = selectedCrmFilter?.milestone;
 
+          // Update filter to the new status so candidate appears in the correct tab (like Admission Cycle)
+          setSelectedStatusFilter(statusId);
 
-          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchLeads(statusId, currentPage);
           await fetchStatusCounts();
 
 

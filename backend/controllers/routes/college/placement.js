@@ -8,11 +8,19 @@ const { isCollege, auth1, authenti } = require("../../../helpers");
 const PlacementStatus = require('../../models/PlacementStatus');
 const Placement = require('../../models/Placement');
 const AppliedCourses = require('../../models/appliedCourses');
+const UploadCandidates = require('../../models/uploadCandidates');
+const CandidateProfile = require('../../models/candidateProfile');
 const { Vacancy, Company, City, State, Qualification, Industry, Skill, JobCategory, JobOffer } = require('../../models');
 
 router.get('/', isCollege, async (req, res) => {
   try {
-    const statuses = await PlacementStatus.find({ college: req.user.college._id }).sort({ index: 1 });
+    // Include both college-specific statuses and global statuses (college: null)
+    const statuses = await PlacementStatus.find({
+      $or: [
+        { college: req.user.college._id },
+        { college: null }
+      ]
+    }).sort({ index: 1 });
 
     return res.status(200).json({ 
       success: true, 
@@ -29,8 +37,13 @@ router.get('/status-count', isCollege, async (req, res) => {
   try {
     const college = req.user.college;
 
-    // Get all PlacementStatus statuses for the college
-    const statuses = await PlacementStatus.find({ college: college._id }).sort({ index: 1 });
+    // Get all PlacementStatus statuses - include both college-specific and global statuses (college: null)
+    const statuses = await PlacementStatus.find({
+      $or: [
+        { college: college._id },
+        { college: null }
+      ]
+    }).sort({ index: 1 });
 
     // Get total count from AppliedCourses where movetoplacementstatus is true
     const totalPlacementsPipeline = [
@@ -391,10 +404,13 @@ router.post('/:statusId/substatus', isCollege, async (req, res) => {
 
 router.get('/:statusId/substatus', isCollege, async (req, res) => {
   try {
-    // Find status and verify it belongs to the college
+    // Find status - include both college-specific and global statuses (college: null)
     const status = await PlacementStatus.findOne({
       _id: req.params.statusId,
-      college: req.user.college._id
+      $or: [
+        { college: req.user.college._id },
+        { college: null }
+      ]
     });
 
     if (!status) {
@@ -708,6 +724,129 @@ router.get('/candidates', isCollege, async (req, res) => {
 
     const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
 
+    // Fetch active UploadCandidates for this college
+    // Only include upload candidates if no placementStatus filter is applied
+    // (since upload candidates don't have placement records yet)
+    let activeUploadCandidates = [];
+    if (!placementStatus) {
+      const uploadCandidatesQuery = {
+        college: new mongoose.Types.ObjectId(college._id),
+        status: 'active'
+      };
+
+      // Apply search filter to UploadCandidates if provided
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        uploadCandidatesQuery.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { contactNumber: searchRegex }
+        ];
+      }
+
+      activeUploadCandidates = await UploadCandidates.find(uploadCandidatesQuery)
+      .populate('user', 'name email mobile')
+      .sort({ createdAt: -1 })
+      .lean();
+    }
+
+    // Convert UploadCandidates to placement format
+    const uploadCandidatesPlacements = await Promise.all(
+      activeUploadCandidates.map(async (uploadCandidate) => {
+        // Try to find candidate profile if user is linked
+        let candidateProfile = null;
+        if (uploadCandidate.user) {
+          candidateProfile = await CandidateProfile.findOne({ 
+            email: uploadCandidate.email || uploadCandidate.user.email 
+          }).lean();
+        }
+
+        // Get default placement status (first status for the college)
+        const defaultStatus = await PlacementStatus.findOne({ 
+          college: new mongoose.Types.ObjectId(college._id) 
+        }).sort({ index: 1 }).lean();
+
+        return {
+          _id: uploadCandidate._id,
+          _candidate: candidateProfile ? {
+            _id: candidateProfile._id,
+            name: candidateProfile.name || uploadCandidate.name,
+            email: candidateProfile.email || uploadCandidate.email,
+            mobile: candidateProfile.mobile || uploadCandidate.contactNumber,
+            personalInfo: candidateProfile.personalInfo || {},
+            sex: candidateProfile.sex || uploadCandidate.gender,
+            dob: candidateProfile.dob || uploadCandidate.dob
+          } : {
+            _id: uploadCandidate.user?._id || null,
+            name: uploadCandidate.name,
+            email: uploadCandidate.email,
+            mobile: uploadCandidate.contactNumber,
+            personalInfo: {},
+            sex: uploadCandidate.gender,
+            dob: uploadCandidate.dob
+          },
+          _student: candidateProfile ? {
+            _id: candidateProfile._id,
+            name: candidateProfile.name || uploadCandidate.name,
+            email: candidateProfile.email || uploadCandidate.email,
+            mobile: candidateProfile.mobile || uploadCandidate.contactNumber,
+            personalInfo: candidateProfile.personalInfo || {},
+            sex: candidateProfile.sex || uploadCandidate.gender,
+            dob: candidateProfile.dob || uploadCandidate.dob
+          } : {
+            _id: uploadCandidate.user?._id || null,
+            name: uploadCandidate.name,
+            email: uploadCandidate.email,
+            mobile: uploadCandidate.contactNumber,
+            personalInfo: {},
+            sex: uploadCandidate.gender,
+            dob: uploadCandidate.dob
+          },
+          status: defaultStatus ? {
+            _id: defaultStatus._id,
+            title: defaultStatus.title,
+            substatuses: defaultStatus.substatuses || []
+          } : null,
+          subStatus: null,
+          appliedCourseId: null,
+          placementId: null,
+          companyName: null,
+          employerName: null,
+          contactNumber: null,
+          dateOfJoining: null,
+          location: null,
+          remark: null,
+          remarks: null,
+          _course: uploadCandidate.course ? {
+            _id: null,
+            name: uploadCandidate.course,
+            sectors: null,
+            project: null
+          } : null,
+          sector: null,
+          projectName: null,
+          _center: null,
+          counsellor: null,
+          leadAssignment: [],
+          followup: null,
+          followupDate: null,
+          registeredBy: null,
+          addedBy: null,
+          updatedBy: null,
+          logs: [],
+          createdAt: uploadCandidate.createdAt,
+          updatedAt: uploadCandidate.updatedAt,
+          jobOffers: [],
+          isUploadCandidate: true, 
+          uploadCandidateData: {
+            fatherName: uploadCandidate.fatherName,
+            year: uploadCandidate.year,
+            session: uploadCandidate.session
+          }
+        };
+      })
+    );
+
     const placements = appliedCourses.map(appliedCourse => {
       const placementRecord = appliedCourse.placementRecord?.[0] || null;
       const statusDoc = placementRecord && appliedCourse.placementStatuses?.find(
@@ -794,15 +933,50 @@ router.get('/candidates', isCollege, async (req, res) => {
       };
     });
 
+    // Merge placements and upload candidates
+    const allPlacements = [...placements, ...uploadCandidatesPlacements];
+    
+    // Sort by createdAt (newest first)
+    allPlacements.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+
+    // Calculate total count including upload candidates (only if no placementStatus filter)
+    let totalUploadCandidates = 0;
+    if (!placementStatus) {
+      totalUploadCandidates = await UploadCandidates.countDocuments(
+        search ? {
+          college: new mongoose.Types.ObjectId(college._id),
+          status: 'active',
+          $or: [
+            { name: new RegExp(search, 'i') },
+            { email: new RegExp(search, 'i') },
+            { contactNumber: new RegExp(search, 'i') }
+          ]
+        } : {
+          college: new mongoose.Types.ObjectId(college._id),
+          status: 'active'
+        }
+      );
+    }
+
+    const totalAllPlacements = totalPlacements + totalUploadCandidates;
+    const totalPagesAll = Math.ceil(totalAllPlacements / parseInt(limit));
+
+    // Apply pagination to merged results
+    const paginatedPlacements = allPlacements.slice(skip, skip + parseInt(limit));
+
     return res.status(200).json({
       status: true,
       message: 'Placements fetched successfully',
       data: {
-        placements,
+        placements: paginatedPlacements,
         pagination: {
           currentPage: parseInt(page),
-          totalPages,
-          totalPlacements,
+          totalPages: totalPagesAll,
+          totalPlacements: totalAllPlacements,
           limit: parseInt(limit)
         }
       }
@@ -1146,10 +1320,10 @@ router.get('/company-jobs', isCollege, async (req, res) => {
         // console.log('Company found:', company.name, company._id);
         filter._company = company._id;
       } else {
-        console.log('No company found for:', searchName, '- showing all jobs');
+        // console.log('No company found for:', searchName, '- showing all jobs');
       }
     } else {
-      console.log('No company name provided - showing all jobs');
+      // console.log('No company name provided - showing all jobs');
     }
 
     const jobs = await Vacancy.find(filter)

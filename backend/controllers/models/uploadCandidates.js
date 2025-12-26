@@ -13,11 +13,7 @@ fatherName:{
     required: true,
     trim: true
 },
-rollNo:{
-    type: String,
-    required: true,
-    trim: true
-},
+
 course:{
     type: String,
     required: true,
@@ -26,6 +22,10 @@ course:{
 session:{
     type: String,
     required: true,
+    trim: true
+},
+year:{
+    type: String,
     trim: true
 },
 college: {
@@ -38,6 +38,34 @@ collegeName:{
     required: true,
     trim: true
 },
+contactNumber:{
+    type: String,
+    trim: true
+},
+email:{
+    type: String,
+    trim: true,
+    lowercase: true
+},
+gender:{
+    type: String,
+    trim: true,
+    enum: ['Male', 'Female', 'Other', 'male', 'female', 'other', '']
+},
+dob:{
+    type: Date
+},
+status:{
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'inactive',
+    trim: true
+},
+user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+}
 
 
 }, { timestamps: true })

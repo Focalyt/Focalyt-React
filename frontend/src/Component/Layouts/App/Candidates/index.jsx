@@ -1040,12 +1040,12 @@ function CandidateLayout({ children }) {
                     transition: 'max-height 0.3s ease-in-out'
                   }}
                 >
-                  <li className={`nav-item ${location.pathname === '/candidate/cashback' ? 'active' : ''}`}>
+                  {/* <li className={`nav-item ${location.pathname === '/candidate/cashback' ? 'active' : ''}`}>
                     <Link to="/candidate/cashback" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faIndianRupeeSign} />
                       <span className="menu-title">Cashback Offers</span>
                     </Link>
-                  </li>
+                  </li> */}
                   <li className={`nav-item ${location.pathname === '/candidate/myEarnings' ? 'active' : ''}`}>
                     <Link to="/candidate/myEarnings" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farMoneyBill1} />

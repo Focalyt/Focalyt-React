@@ -1445,29 +1445,34 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
 
+      console.log('B2B fetchStatus response:', response.data);
 
       if (response.data.success) {
         const status = response.data.data;
+        console.log('B2B Fetched statuses:', status);
         const allFilter = { _id: 'all', name: 'All' };
-
 
         setCrmFilters([allFilter, ...status.map(r => ({
           _id: r._id,
           name: r.title,
-          milestone: r.milestone,  // agar backend me count nahi hai to 0
+          milestone: r.milestone,
         }))]);
 
         setStatuses(status.map(r => ({
           _id: r._id,
           name: r.title,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
+          count: r.count || 0,
         })));
 
-
+        console.log('B2B Statuses set:', status.length);
+      } else {
+        console.error('API returned error:', response.data);
+        alert('Failed to fetch Status: ' + (response.data.message || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error fetching roles:', error);
-      alert('Failed to fetch Status');
+      console.error('Error fetching B2B statuses:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      alert('Failed to fetch Status: ' + (error.response?.data?.message || error.message));
     }
   };
 

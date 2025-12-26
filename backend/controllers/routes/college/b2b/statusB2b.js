@@ -14,7 +14,32 @@ const AppliedCourses = require('../../../models/appliedCourses');
 // @access  Public
 router.get('/', isCollege, async (req, res) => {
  try {
-    const statuses = await Status.find({college: req.user.college._id}).sort({ index: 1 });
+    // Include both college-specific statuses and global statuses (college: null)
+    const collegeId = req.user?.college?._id;
+    
+    // Build query to include both college-specific and global (null) statuses
+    let query = {};
+    if (collegeId) {
+      query = {
+        $or: [
+          { college: collegeId },
+          { college: null },
+          { college: { $exists: false } } // Also include documents where college field doesn't exist
+        ]
+      };
+    } else {
+      query = {
+        $or: [
+          { college: null },
+          { college: { $exists: false } }
+        ]
+      };
+    }
+    
+    console.log('Fetching B2B statuses with query:', JSON.stringify(query));
+    console.log('College ID:', collegeId);
+    const statuses = await Status.find(query).sort({ index: 1 });
+    console.log('Found statuses:', statuses.length);
 
     // For each status, get count of AppliedCourses with _leadStatus = status._id
 

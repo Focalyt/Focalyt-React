@@ -14,7 +14,13 @@ const AppliedCourses = require('../../models/appliedCourses');
 // @access  Public
 router.get('/', isCollege, async (req, res) => {
  try {
-    const statuses = await Status.find({college: req.user.college._id}).sort({ index: 1 });
+    // Include both college-specific statuses and global statuses (college: null)
+    const statuses = await Status.find({
+      $or: [
+        { college: req.user.college._id },
+        { college: null }
+      ]
+    }).sort({ index: 1 });
 
     // For each status, get count of AppliedCourses with _leadStatus = status._id
 

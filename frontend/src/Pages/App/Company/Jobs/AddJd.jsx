@@ -1197,6 +1197,99 @@ const AddJd = () => {
                 </div>
               </div>
             </section>
+            <section id="job-section">
+              <div className="row">
+                <div className="col-xl-12 col-lg-12 px-3">
+                  <div className="card">
+                    <div className="card-content">
+                      <div className="card-body">
+                        <div className="row">
+                          <div className="col-12">
+                            <h5 className="h1">Do you want the candidate to contact you directly?</h5>
+                          </div>
+                          <div className="col-xl-12 col-lg-12 col-12">
+                            <div className="form-check-inline">
+                              <input 
+                                type="radio" 
+                                name="isContact" 
+                                value="true"
+                                checked={formData.isContact === true}
+                                onChange={(e) => handleContactChange(e.target.value)}
+                              />
+                              <label>Yes</label>
+                            </div>
+                            <div className="form-check-inline">
+                              <input 
+                                type="radio" 
+                                name="isContact" 
+                                value="false"
+                                checked={formData.isContact === false}
+                                onChange={(e) => handleContactChange(e.target.value)}
+                              />
+                              <label>No</label>
+                            </div>
+                          </div>
+
+                          {showContactInfo && (
+                            <div className="col-12 mt-3">
+                              <div className="row">
+                                <div className="col-xl-3 mb-1">
+                                  <label>Name</label>
+                                  <input 
+                                    type="text" 
+                                    className="form-control"
+                                    name="nameof"
+                                    value={formData.nameof}
+                                    onChange={handleInputChange}
+                                    placeholder="Name"
+                                  />
+                                </div>
+                                <div className="col-xl-3 mb-1">
+                                  <label>Phone Number <span className="mandatory">*</span></label>
+                                  <input 
+                                    type="tel" 
+                                    className={`form-control ${errors.phoneNumberof ? 'error' : ''}`}
+                                    name="phoneNumberof"
+                                    value={formData.phoneNumberof}
+                                    onChange={handleInputChange}
+                                    placeholder="Phone no"
+                                    maxLength="10"
+                                  />
+                                  {errors.phoneNumberof && <span className="error-text">{errors.phoneNumberof}</span>}
+                                </div>
+                                <div className="col-xl-3 mb-1">
+                                  <label>WhatsApp Number</label>
+                                  <input 
+                                    type="tel" 
+                                    className="form-control"
+                                    name="whatsappNumberof"
+                                    value={formData.whatsappNumberof}
+                                    onChange={handleInputChange}
+                                    placeholder="WhatsApp Number"
+                                    maxLength="10"
+                                  />
+                                </div>
+                                <div className="col-xl-3 mb-1">
+                                  <label>Email</label>
+                                  <input 
+                                    type="email" 
+                                    className="form-control"
+                                    name="emailof"
+                                    value={formData.emailof}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter your email"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
 
             {/* Questions and Answers */}
             <section id="qa-section">

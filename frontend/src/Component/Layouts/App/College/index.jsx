@@ -374,7 +374,7 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Courses */}
-              <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
                   <FontAwesomeIcon icon={faBookOpen} />
                   <span className="menu-title">Courses</span>
@@ -417,10 +417,10 @@ function CollegeLayout({ children }) {
               {/* Sales (B2C) */}
               {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
 
-                <li className={`nav-item has-sub ${openSubmenu.sales ? 'open' : ''}`}>
+                <li className={`nav-item has-sub dropdown-sales ${openSubmenu.sales ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('sales')}>
                     <FontAwesomeIcon icon={faShoppingCart} />
-                    <span className="menu-title">Sales (B2C)</span>
+                    <span className="menu-title">Admissions (B2C)</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -479,10 +479,10 @@ function CollegeLayout({ children }) {
 
               {/* Sales (B2B) */}
               {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
-                <li className={`nav-item has-sub ${openSubmenu.salesb2b ? 'open' : ''}`}>
+                <li className={`nav-item has-sub dropdown-salesb2b ${openSubmenu.salesb2b ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
                     <FontAwesomeIcon icon={faHandshake} />
-                    <span className="menu-title">Sales (B2B)</span>
+                    <span className="menu-title">Admissions (B2B)</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -526,7 +526,7 @@ function CollegeLayout({ children }) {
                   </ul>
                 </li>
               )}
-              <li className={`nav-item has-sub ${openSubmenu.placements ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-placements ${openSubmenu.placements ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('placements')}>
                   <FontAwesomeIcon icon={faHandshake} />
                   <span className="menu-title">Placements</span>
@@ -613,7 +613,7 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Events */}
-              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-events ${openSubmenu.events ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('events')}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Events</span>
@@ -651,7 +651,7 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Settings */}
-              <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-settings ${openSubmenu.settings ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('settings')}>
                   <FontAwesomeIcon icon={faCogs} />
                   <span className="menu-title">Settings</span>
@@ -677,24 +677,24 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Access Management</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faSitemap} />
                       <span className="menu-title">Status Design (B2B)</span>
                     </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
+                  </li> */}
+                  {/* <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesignb2c" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
                       <span className="menu-title">Status Design (B2C)</span>
                     </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
+                  </li> */}
+                  {/* <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
                     <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
                       <span className="menu-title">Status Design (Placements)</span>
                     </Link>
-                  </li>
+                  </li> */}
                   <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
                     <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWhatsapp} />
@@ -849,10 +849,18 @@ function CollegeLayout({ children }) {
     background-color: #fc2b5a;
 }
 
-.navigation li.active > a , .navigation li.active > a > span {
-  background-color: #ff3366;
-  color: #fff;
+.navigation li.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
   font-weight: 500;
+  width: 100%;
+  display: block;
+}
+
+.navigation li.active > a > span,
+.navigation li.active > a > svg,
+.navigation li.active > a > i {
+  color: #fff !important;
 }
 
 /* Make dropdown items visually distinct */
@@ -879,15 +887,320 @@ function CollegeLayout({ children }) {
   transform: rotate(90deg);
 }
 
-/* Add hover effect to show it's clickable */
+/* Differentiate menu items with dropdowns/submenus - Base Styles */
+.nav-item.has-sub > a {
+  background-color: #f8f9fa !important;
+  border-left: 2px solid #fc2b5a;
+  font-weight: 500;
+  color: #333 !important;
+  position: relative;
+  width: 100%;
+}
+
+/* Regular menu items (without dropdown) */
+.nav-item:not(.has-sub) > a,
+.nav-item:not(.has-sub) > Link {
+  background-color: transparent !important;
+  border-left: 2px solid transparent;
+  color: #666 !important;
+  width: 100%;
+  display: block;
+}
+
+/* Active state for regular menu items */
+.nav-item:not(.has-sub).active > a,
+.nav-item:not(.has-sub).active > Link {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+  font-weight: 500;
+  width: 100%;
+  display: block;
+}
+
+.nav-item:not(.has-sub).active > a > span,
+.nav-item:not(.has-sub).active > a > svg,
+.nav-item:not(.has-sub).active > Link > span,
+.nav-item:not(.has-sub).active > Link > svg {
+  color: #fff !important;
+}
+
+/* Courses Dropdown - Blue Color */
+.nav-item.has-sub.dropdown-courses > a {
+  background-color: #eff6ff !important;
+  border-left: 2px solid #3b82f6;
+}
+
+.nav-item.has-sub.dropdown-courses > a:hover {
+  background-color: #dbeafe !important;
+  border-left-color: #2563eb;
+}
+
+.nav-item.has-sub.dropdown-courses.open > a {
+  background-color: #dbeafe !important;
+  border-left-color: #2563eb;
+  color: #1e40af !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content {
+  background-color: #eff6ff !important;
+  border-left: 2px solid #3b82f6;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item > a {
+  background-color: #eff6ff !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item > a:hover {
+  background-color: #dbeafe !important;
+  color: #3b82f6 !important;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Admissions (B2C) Dropdown - Pink Color */
+.nav-item.has-sub.dropdown-sales > a {
+  background-color: #fef2f2 !important;
+  border-left: 2px solid #fc2b5a;
+}
+
+.nav-item.has-sub.dropdown-sales > a:hover {
+  background-color: #fee2e2 !important;
+  border-left-color: #ef4444;
+}
+
+.nav-item.has-sub.dropdown-sales.open > a {
+  background-color: #fee2e2 !important;
+  border-left-color: #ef4444;
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-sales .menu-content {
+  background-color: #fef2f2 !important;
+  border-left: 2px solid #fc2b5a;
+}
+
+.nav-item.has-sub.dropdown-sales .menu-content .nav-item > a {
+  background-color: #fef2f2 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-sales .menu-content .nav-item > a:hover {
+  background-color: #fee2e2 !important;
+  color: #fc2b5a !important;
+}
+
+.nav-item.has-sub.dropdown-sales .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Admissions (B2B) Dropdown - Green Color */
+.nav-item.has-sub.dropdown-salesb2b > a {
+  background-color: #f0fdf4 !important;
+  border-left: 2px solid #10b981;
+}
+
+.nav-item.has-sub.dropdown-salesb2b > a:hover {
+  background-color: #dcfce7 !important;
+  border-left-color: #059669;
+}
+
+.nav-item.has-sub.dropdown-salesb2b.open > a {
+  background-color: #dcfce7 !important;
+  border-left-color: #059669;
+  color: #047857 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-salesb2b .menu-content {
+  background-color: #f0fdf4 !important;
+  border-left: 2px solid #10b981;
+}
+
+.nav-item.has-sub.dropdown-salesb2b .menu-content .nav-item > a {
+  background-color: #f0fdf4 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-salesb2b .menu-content .nav-item > a:hover {
+  background-color: #dcfce7 !important;
+  color: #10b981 !important;
+}
+
+.nav-item.has-sub.dropdown-salesb2b .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Placements Dropdown - Orange Color */
+.nav-item.has-sub.dropdown-placements > a {
+  background-color: #fff7ed !important;
+  border-left: 2px solid #f59e0b;
+}
+
+.nav-item.has-sub.dropdown-placements > a:hover {
+  background-color: #ffedd5 !important;
+  border-left-color: #d97706;
+}
+
+.nav-item.has-sub.dropdown-placements.open > a {
+  background-color: #ffedd5 !important;
+  border-left-color: #d97706;
+  color: #b45309 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-placements .menu-content {
+  background-color: #fff7ed !important;
+  border-left: 2px solid #f59e0b;
+}
+
+.nav-item.has-sub.dropdown-placements .menu-content .nav-item > a {
+  background-color: #fff7ed !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-placements .menu-content .nav-item > a:hover {
+  background-color: #ffedd5 !important;
+  color: #f59e0b !important;
+}
+
+.nav-item.has-sub.dropdown-placements .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Events Dropdown - Purple Color */
+.nav-item.has-sub.dropdown-events > a {
+  background-color: #faf5ff !important;
+  border-left: 2px solid #8b5cf6;
+}
+
+.nav-item.has-sub.dropdown-events > a:hover {
+  background-color: #f3e8ff !important;
+  border-left-color: #7c3aed;
+}
+
+.nav-item.has-sub.dropdown-events.open > a {
+  background-color: #f3e8ff !important;
+  border-left-color: #7c3aed;
+  color: #6d28d9 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content {
+  background-color: #faf5ff !important;
+  border-left: 2px solid #8b5cf6;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item > a {
+  background-color: #faf5ff !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item > a:hover {
+  background-color: #f3e8ff !important;
+  color: #8b5cf6 !important;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Settings Dropdown - Gray Color */
+.nav-item.has-sub.dropdown-settings > a {
+  background-color: #f9fafb !important;
+  border-left: 2px solid #6b7280;
+}
+
+.nav-item.has-sub.dropdown-settings > a:hover {
+  background-color: #f3f4f6 !important;
+  border-left-color: #4b5563;
+}
+
+.nav-item.has-sub.dropdown-settings.open > a {
+  background-color: #f3f4f6 !important;
+  border-left-color: #4b5563;
+  color: #374151 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content {
+  background-color: #f9fafb !important;
+  border-left: 2px solid #6b7280;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item > a {
+  background-color: #f9fafb !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item > a:hover {
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Nested dropdown inside settings */
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a {
+  background-color: #f9fafb !important;
+  border-left: 3px solid #6b7280;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a:hover {
+  background-color: #f3f4f6 !important;
+  border-left-color: #4b5563;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub.open > a {
+  background-color: #f3f4f6 !important;
+  border-left-color: #4b5563;
+  color: #374151 !important;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .menu-content {
+  background-color: #f9fafb !important;
+  border-left: 2px solid #6b7280;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a {
+  background-color: #f9fafb !important;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a:hover {
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Common hover effect for all dropdowns */
 .nav-item.has-sub > a:hover {
-  background-color: rgba(115, 103, 240, 0.08);
   cursor: pointer;
 }
 
-/* Style for open dropdown */
-.nav-item.has-sub.open > a {
-  background-color: rgba(115, 103, 240, 0.12);
+/* Submenu items styling - Base (will be overridden by specific dropdowns) */
+.nav-item.has-sub .menu-content {
+  margin-left: 10px;
+}
+
+.nav-item.has-sub .menu-content .nav-item > a {
+  padding-left: 2.5rem !important;
+  font-size: 0.9rem;
 }
         
         `}

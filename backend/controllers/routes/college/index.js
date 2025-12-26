@@ -4306,30 +4306,66 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			});
 		let errorMessages = []
 		let actualHeadersFound = []; // Store original headers for error message
+		let columnMap = {}; // Map to store column indices
+		
 		await readXlsxFile(
 			path.join(__dirname, "../../../public/" + filename)
 		).then((rows) => {
-			// Normalize headers - trim, convert to lowercase, and remove spaces
+			// Normalize headers - trim, convert to lowercase, and remove spaces/special chars
 			const headerRow = rows[0] || [];
 			actualHeadersFound = headerRow.map(h => h ? h.toString().trim() : ''); // Store original headers
-			const normalizedHeaders = headerRow.map(h => h ? h.toString().trim().toLowerCase().replace(/\s+/g, '') : '');
+			const normalizedHeaders = headerRow.map(h => h ? h.toString().trim().toLowerCase().replace(/\s+/g, '').replace(/[\/\(\)]/g, '') : '');
 			
-			// Expected headers
-			const expectedHeaders = ['name', 'rollno', 'fathername', 'course', 'session', 'college'];
+			// Build column map dynamically
+			normalizedHeaders.forEach((header, index) => {
+				const normalized = header.replace(/[\/\(\)]/g, '');
+				// Skip Sr. No. column
+				if (normalized.includes('srno') || normalized.includes('serial') || normalized === 'sr.') {
+					return; // Skip this column
+				}
+				// Map various header name variations to standard names
+				if (normalized.includes('candidatename') || normalized === 'name') {
+					columnMap['name'] = index;
+				} else if (normalized.includes('fathername') || normalized === 'father') {
+					columnMap['fatherName'] = index;
+				} else if (normalized === 'course') {
+					columnMap['course'] = index;
+				} else if (normalized === 'year' || normalized.includes('year')) {
+					columnMap['year'] = index;
+				} else if (normalized.includes('contactnumber') || normalized.includes('contact') || normalized.includes('phone') || normalized.includes('mobile')) {
+					columnMap['contactNumber'] = index;
+				} else if (normalized === 'email') {
+					columnMap['email'] = index;
+				} else if (normalized === 'gender') {
+					columnMap['gender'] = index;
+				} else if (normalized === 'dob' || normalized.includes('dateofbirth') || normalized.includes('birthdate')) {
+					columnMap['dob'] = index;
+				} else if (normalized === 'session' || normalized.includes('semester')) {
+					columnMap['session'] = index;
+				} else if (normalized.includes('collegename') || normalized === 'college') {
+					columnMap['collegeName'] = index;
+				}
+			});
 			
-			// Check if headers match
+			// Required headers (College is optional - will use logged-in college if not provided)
+			const requiredHeaders = ['name', 'fatherName', 'course', 'session'];
+			
+			// Check if minimum required headers are present
 			let headersMatch = true;
 			let mismatchDetails = [];
 			
-			for (let i = 0; i < expectedHeaders.length; i++) {
-				if (normalizedHeaders[i] !== expectedHeaders[i]) {
+			// Check for required headers
+			for (let reqHeader of requiredHeaders) {
+				if (!columnMap[reqHeader] && columnMap[reqHeader] !== 0) {
 					headersMatch = false;
-					mismatchDetails.push(`Column ${i + 1}: Expected "${expectedHeaders[i]}", Found "${normalizedHeaders[i] || '(empty)'}"`);
+					mismatchDetails.push(`Required column "${reqHeader}" not found`);
 				}
-			}			
+			}
+			
 			if (!headersMatch) {
 				checkFileError = false;
-				console.log('Header mismatch details:', mismatchDetails);
+				// console.log('Header mismatch details:', mismatchDetails);
+				// console.log('Column map:', columnMap);
 			} else {
 				checkFileError = true;
 			}
@@ -4343,7 +4379,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			await fs.promises.unlink("public/" + filename).catch(() => {});
 			return res.status(400).json({ 
 				status: false, 
-				message: "Please upload right pattern file. Expected columns: name, rollNo, fatherName, course, session, college. " +
+				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester, College (optional). " +
 					(actualHeadersFound.length > 0 ? `Found columns: ${actualHeadersFound.join(', ')}` : '')
 			});
 		} else {
@@ -4352,22 +4388,30 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			await readXlsxFile(
 				path.join(__dirname, "../../../public/" + filename)
 			).then(async (rowsList) => {
-				rowsList.shift(); 
+				rowsList.shift(); // Remove header row
 				for (let [index, rows] of rowsList.entries()) {
 					let message = "";
-					let name = rows[0] ? rows[0].toString().trim() : '';
-					let rollNo = rows[1] ? rows[1].toString().trim() : '';
-					let fatherName = rows[2] ? rows[2].toString().trim() : '';
-					let course = rows[3] ? rows[3].toString().trim() : '';
-					let session = rows[4] ? rows[4].toString().trim() : '';
-					let collegeName = rows[5] ? rows[5].toString().trim() : ''; 
+					// Map columns dynamically based on columnMap
+					let name = columnMap['name'] !== undefined && rows[columnMap['name']] ? rows[columnMap['name']].toString().trim() : '';
+					let fatherName = columnMap['fatherName'] !== undefined && rows[columnMap['fatherName']] ? rows[columnMap['fatherName']].toString().trim() : '';
+					let course = columnMap['course'] !== undefined && rows[columnMap['course']] ? rows[columnMap['course']].toString().trim() : '';
+					let year = columnMap['year'] !== undefined && rows[columnMap['year']] ? rows[columnMap['year']].toString().trim() : '';
+					let contactNumber = columnMap['contactNumber'] !== undefined && rows[columnMap['contactNumber']] ? rows[columnMap['contactNumber']].toString().trim() : '';
+					let email = columnMap['email'] !== undefined && rows[columnMap['email']] ? rows[columnMap['email']].toString().trim() : '';
+					let gender = columnMap['gender'] !== undefined && rows[columnMap['gender']] ? rows[columnMap['gender']].toString().trim() : '';
+					let dob = columnMap['dob'] !== undefined && rows[columnMap['dob']] ? rows[columnMap['dob']].toString().trim() : '';
+					let session = columnMap['session'] !== undefined && rows[columnMap['session']] ? rows[columnMap['session']].toString().trim() : '';
+					// College is optional - use logged-in college if not provided
+					let collegeName = columnMap['collegeName'] !== undefined && rows[columnMap['collegeName']] ? rows[columnMap['collegeName']].toString().trim() : '';
+					
+					// If college name not provided, use logged-in college name
+					if (!collegeName && college && college.name) {
+						collegeName = college.name;
+					}
 
-					// Validation
+					// Validation for required fields
 					if (!name) {
 						message += `Name `
-					}
-					if (!rollNo) {
-						message += `Roll No `
 					}
 					if (!fatherName) {
 						message += `Father Name `
@@ -4378,51 +4422,174 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					if (!session) {
 						message += `Session `
 					}
-					if (!collegeName) {
-						message += `College Name `
-					}
 
 					if (message) {
-						message += `not populated for row ${index + 1}`
+						message += `not populated for row ${index + 2}` // +2 because index is 0-based and we removed header
 						errorMessages.push(message)
 						continue;
 					}
 
-					// Check for duplicate rollNo in same college
+					// Parse DOB if provided
+					let dobDate = null;
+					if (dob) {
+						// Try to parse date in various formats
+						const parsedDate = new Date(dob);
+						if (!isNaN(parsedDate.getTime())) {
+							dobDate = parsedDate;
+						}
+					}
+
+					// Check for duplicate candidate (name + fatherName + college combination)
 					let isExistCandidate = await UploadCandidates.findOne({
-						rollNo: rollNo,
+						name: name,
+						fatherName: fatherName,
 						college: college._id
 					});
 
 					if (isExistCandidate) {
-						errorMessages.push(`Candidate with Roll No ${rollNo} already exists for row ${index + 1}.`)
+						errorMessages.push(`Candidate with Name "${name}" and Father Name "${fatherName}" already exists for row ${index + 2}.`)
 						continue;
 					}
 
-					// Check for duplicate in current upload
-					let dup = allRows.find(can => can.rollNo.toString() === rollNo.toString() && can.collegeName.toString() === collegeName.toString())
+					// Check for duplicate in current upload batch
+					let dup = allRows.find(can => 
+						can.name.toLowerCase() === name.toLowerCase() && 
+						can.fatherName.toLowerCase() === fatherName.toLowerCase() && 
+						can.collegeName.toLowerCase() === collegeName.toLowerCase()
+					);
 
 					if (!isExistCandidate && !dup) {
-						allRows.push({ rollNo, collegeName })
+						allRows.push({ name, fatherName, collegeName })
 						
-						// Create UploadCandidates record
-						const uploadCandidate = await UploadCandidates.create({
+						// Check if user account already exists (role 3 - student/candidate)
+						let existingUser = null;
+						let candidateStatus = 'inactive'; // Default status
+						
+						// Check by mobile number (User model has mobile as Number type)
+						if (contactNumber && contactNumber.trim()) {
+							const cleanMobile = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '');
+							const mobileNumber = parseInt(cleanMobile);
+							
+							// console.log(`🔍 Checking for user with mobile: ${mobileNumber} (original: ${contactNumber})`);
+							
+							if (!isNaN(mobileNumber) && mobileNumber > 0) {
+								// Try to find user - check both Number and String format for role (as used in candidateRoutes.js)
+								existingUser = await User.findOne({
+									mobile: mobileNumber,
+									role: 3  // Try Number format first
+								});
+								
+								// If not found, try String format (as used in candidateRoutes.js)
+								if (!existingUser) {
+									existingUser = await User.findOne({
+										mobile: mobileNumber,
+										role: "3"
+									});
+								}
+								
+								if (existingUser) {
+									candidateStatus = 'active';
+									// console.log(`✅ User account found for mobile ${mobileNumber}, setting status to 'active' | User ID: ${existingUser._id}`);
+								} else {
+									// console.log(`ℹ️ No user account found for mobile ${mobileNumber} with role 3`);
+								}
+							} else {
+								// console.log(`⚠️ Invalid mobile number format: ${contactNumber}`);
+							}
+						}
+						
+						
+						if (!existingUser && email && email.trim()) {
+							const cleanEmail = email.toLowerCase().trim();
+							// console.log(`🔍 Checking for user with email: ${cleanEmail}`);
+							
+							existingUser = await User.findOne({
+								email: cleanEmail,
+								role: 3  
+							});
+							
+							
+							if (!existingUser) {
+								existingUser = await User.findOne({
+									email: cleanEmail,
+									role: "3"
+								});
+							}
+							
+							if (existingUser) {
+								candidateStatus = 'active';
+								// console.log(`✅ User account found for email ${cleanEmail}, setting status to 'active' | User ID: ${existingUser._id}`);
+							} else {
+								// console.log(`ℹ️ No user account found for email ${cleanEmail} with role 3`);
+							}
+						}
+						
+						// console.log(`📊 Candidate status for ${name} (${contactNumber || email || 'N/A'}): ${candidateStatus}`);
+						
+						// Create UploadCandidates record with all fields
+						const uploadCandidateData = {
 							name: name,
-							rollNo: rollNo,
 							fatherName: fatherName,
 							course: course,
+							year: year || undefined,
+							contactNumber: contactNumber || undefined,
+							email: email || undefined,
+							gender: gender || undefined,
+							dob: dobDate || undefined,
 							session: session,
 							college: college._id,
-							collegeName: collegeName 
-						});
+							collegeName: collegeName,
+							status: candidateStatus, // 'active' if user exists, else 'inactive'
+						};
+						
+						// Link user if exists
+						if (existingUser) {
+							uploadCandidateData.user = existingUser._id;
+						}
+						
+					
+						
+						const uploadCandidate = await UploadCandidates.create(uploadCandidateData);
 
 						if (!uploadCandidate) {
-							errorMessages.push(`Candidate not created for row ${index + 1}.`)
+							errorMessages.push(`Candidate not created for row ${index + 2}.`)
 							continue;
 						}
+						
+						if (contactNumber && contactNumber.trim() && candidateStatus === 'inactive') {
+							try {
+								const sendTemplateData = {
+									templateName: 'registration_link',
+									to: contactNumber,
+									collegeId: college._id.toString(),
+									variableValues: []
+								};
+
+								// Get token from request headers
+								const authToken = req.headers['x-auth'] || token;
+								
+								const protocol = req.protocol || 'http';
+								const host = req.get('host');
+								const baseUrl = `${protocol}://${host}`;
+								
+								await axios.post(`${baseUrl}/college/whatsapp/send-template`, sendTemplateData, {
+									headers: {
+										'x-auth': authToken,
+										'Content-Type': 'application/json'
+									},
+									timeout: 10000 
+								});
+								
+								// console.log(`✅ WhatsApp template 'registration_link' sent to ${contactNumber}`);
+							} catch (whatsappError) {
+								
+								 console.error(`⚠️ Failed to send WhatsApp template for row ${index + 2}:`, whatsappError.response?.data?.message || whatsappError.message);
+							}
+						}
+						
 						successCount++;
 					} else {
-						errorMessages.push(`Candidate with Roll No ${rollNo} already exists for row ${index + 1}.`)
+						errorMessages.push(`Duplicate candidate found in upload: Name "${name}" and Father Name "${fatherName}" for row ${index + 2}.`)
 					}
 				}
 
@@ -4503,44 +4670,33 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const college = req.college;
 		
 		if (!college) {
-			console.log('College not found for user:', user._id);
+			// console.log('College not found for user:', user._id);
 			return res.status(400).json({ status: false, message: "College not found" });
 		}
 
 		const perPage = parseInt(req.query.limit) || 50;
 		const p = parseInt(req.query.page, 10);
 		const page = p || 1;
+		const status = req.query.status; 
 
 		const collegeId = mongoose.Types.ObjectId.isValid(college._id) 
 			? new mongoose.Types.ObjectId(college._id) 
-			: college._id;;
+			: college._id;
+
+		// Build match condition
+		const matchCondition = { college: collegeId };
+		if (status && (status === 'active' || status === 'inactive')) {
+			matchCondition.status = status;
+		}
+
 		let candidates = await UploadCandidates.aggregate([
-			{ $match: { college: collegeId } },
-			{
-				$addFields: {
-					numericRollNo: {
-						$cond: {
-							if: { $eq: [{ $type: "$rollNo" }, "string"] },
-							then: {
-								$toDouble: {
-									$ifNull: [
-										{ $toDouble: { $trim: { input: "$rollNo" } } },
-										0
-									]
-								}
-							},
-							else: { $toDouble: { $ifNull: ["$rollNo", 0] } }
-						}
-					}
-				}
-			},
-			{ $sort: { numericRollNo: 1 } }, 
+			{ $match: matchCondition },
+			{ $sort: { createdAt: -1 } }, // Sort by creation date (newest first)
 			{ $skip: perPage * page - perPage },
-			{ $limit: perPage },
-			{ $project: { numericRollNo: 0 } } 
+			{ $limit: perPage }
 		]);
 
-		let count = await UploadCandidates.countDocuments({ college: collegeId });
+		let count = await UploadCandidates.countDocuments(matchCondition);
 		
 		const totalPages = Math.ceil(count / perPage);
 

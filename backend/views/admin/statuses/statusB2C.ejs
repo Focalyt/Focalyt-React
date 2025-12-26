@@ -1,0 +1,672 @@
+<% include ../partials/header %>
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+	<div class="content-header-left col-md-9 col-12 mb-2">
+		<div class="row breadcrumbs-top">
+			<div class="col-12">
+				<h3 class="content-header-title float-left mb-0">Lead Status Flow (B2C)</h3>
+				<div class="breadcrumb-wrapper col-12">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
+						</li>
+						<li class="breadcrumb-item active">Lead Status Flow (B2C)</li>
+					</ol>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="content-body">
+	<div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 100%; margin: 0 auto; padding: 24px;">
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+			<h1 style="font-size: 24px; font-weight: 600; color: #333; margin: 0;">
+				Lead Status Flow (B2C)
+			</h1>
+			<button
+				onclick="openStatusModal(false, null)"
+				style="display: flex; align-items: center; gap: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 10px 20px; font-weight: 500; cursor: pointer;">
+				<span style="font-size: 18px; margin-right: 4px;">+</span>
+				Add New Status
+			</button>
+		</div>
+
+		<div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 32px 16px; margin-top: 24px; overflow-x: auto; white-space: nowrap;">
+			<div id="status-container" style="display: flex; align-items: flex-start; padding: 20px 16px; min-width: max-content;">
+				<% if (statuses && statuses.length > 0) { %>
+					<% statuses.forEach((status, index) => { %>
+						<div style="display: flex; flex-direction: row; align-items: flex-top; min-width: 220; margin: 0 4px;">
+							<div style="margin-top: 15%;">
+								<button
+									onclick="handleMoveLeft('<%= status._id %>', <%= index %>)"
+									disabled="<%= index === 0 %>"
+									style="background: none; border: none; cursor: <%= index === 0 ? 'not-allowed' : 'pointer' %>; color: <%= index === 0 ? '#cbd5e0' : '#4299e1' %>; margin-right: 4px; padding: 0; font-size: 14px; opacity: <%= index === 0 ? 0.5 : 1 %>; position: relative; top: 2px;"
+									title="Move Left">
+									← Move Left
+								</button>
+							</div>
+							<div style="display: flex; flex-direction: column; align-items: center;">
+								<div
+									id="status-card-<%= status._id %>"
+									style="width: 220; min-height: 140; border: 1px solid #e2e8f0; border-radius: 4px; background-color: white; display: flex; flex-direction: column; cursor: grab; user-select: none; position: relative;"
+									draggable="true"
+									data-index="<%= index %>"
+									data-id="<%= status._id %>"
+									ondragstart="handleDragStart(event, <%= index %>)"
+									ondragover="handleDragOver(event)"
+									ondrop="handleDrop(event, <%= index %>)">
+									<div style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 500; color: #4a5568; display: flex; justify-content: space-between; align-items: center;">
+										<span>Position: <%= index + 1 %></span>
+										<div>
+											<button
+												onclick="openStatusModal(true, <%= index %>)"
+												disabled="<%= index === 0 %>"
+												style="background: none; border: none; cursor: pointer; color: #4299e1; margin-right: 8px; padding: 0; font-size: 14px;">
+												✏️
+											</button>
+											<button
+												onclick="handleDeleteStatus('<%= status._id %>', '<%= status.title %>')"
+												disabled="<%= index === 0 %>"
+												style="background: none; border: none; cursor: pointer; color: #f56565; padding: 0; font-size: 14px;">
+												🗑️
+											</button>
+										</div>
+									</div>
+									<div style="text-align: center; font-weight: 500; margin-top: 12; font-size: 16px; color: #333;">
+										<%= status.title %>
+									</div>
+									<div style="text-align: center; font-size: 14px; color: #666; margin-top: 6;">
+										<%= status.description || '' %>
+									</div>
+									<% if (status.milestone) { %>
+										<div style="text-align: center; font-size: 14px; color: #666; margin-top: 6;">
+											<%= status.milestone %>
+										</div>
+									<% } %>
+									<div
+										id="substatus-toggle-<%= status._id %>"
+										style="text-align: center; margin-top: auto; padding: 8px; border-top: 1px solid #f0f0f0; cursor: pointer;"
+										onclick="toggleSubstatuses('<%= status._id %>')">
+										<span style="color: #4299e1; font-size: 14px;">
+											<span id="substatus-text-<%= status._id %>">Hide Substatus ▲</span>
+										</span>
+									</div>
+								</div>
+
+								<div id="substatus-connector-<%= status._id %>" style="width: 3px; height: 15px; background-color: #cbd5e0; display: block;"></div>
+
+								<div id="substatus-container-<%= status._id %>" style="width: 90%; border: 1px solid #e2e8f0; border-radius: 4px; background-color: #f9fafb; padding: 12px; margin-top: 5px; display: block;">
+									<div style="margin-bottom: 12px; font-weight: 500; color: #4a5568; font-size: 14px;">
+										Substatus
+									</div>
+
+									<% if (status.substatuses && status.substatuses.length > 0) { %>
+										<div style="margin-bottom: 16px;">
+											<% status.substatuses.forEach((substatus, subIndex) => { %>
+												<div style="display: flex; flex-direction: column; padding: 10px; border-bottom: 1px solid #edf2f7; background-color: white; margin-bottom: 6px; border-radius: 4px;">
+													<div style="display: flex; justify-content: space-between; align-items: center;">
+														<div>
+															<div style="font-weight: 500; font-size: 14px;"><%= substatus.title %></div>
+															<div style="font-size: 12px; color: #718096;"><%= substatus.description || '' %></div>
+															<div style="margin-top: 4px;">
+																<% if (substatus.hasRemarks) { %>
+																	<span style="background-color: #38b2ac; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-right: 4px; font-weight: 500;">Remarks</span>
+																<% } %>
+																<% if (substatus.hasFollowup) { %>
+																	<span style="background-color: #ed8936; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-right: 4px; font-weight: 500;">Followup</span>
+																<% } %>
+																<% if (substatus.hasAttachment) { %>
+																	<span style="background-color: #805ad5; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-right: 4px; font-weight: 500;">Attachment</span>
+																<% } %>
+															</div>
+														</div>
+														<div>
+															<button
+																onclick="openSubstatusModal(true, <%= index %>, <%= subIndex %>)"
+																style="background: none; border: none; cursor: pointer; color: #4299e1; margin-right: 8px; padding: 0; font-size: 12px;">
+																✏️
+															</button>
+															<button
+																onclick="handleDeleteSubstatus('<%= status._id %>', '<%= substatus._id %>', '<%= substatus.title %>')"
+																style="background: none; border: none; cursor: pointer; color: #f56565; padding: 0; font-size: 12px;">
+																🗑️
+															</button>
+														</div>
+													</div>
+												</div>
+											<% }); %>
+										</div>
+									<% } else { %>
+										<div style="text-align: center; color: #a0aec0; font-size: 13px; padding: 8px 0;">
+											No substatus available
+										</div>
+									<% } %>
+
+									<button
+										onclick="openSubstatusModal(false, <%= index %>, null)"
+										style="display: flex; align-items: center; justify-content: center; width: 100%; padding: 8px; background-color: white; color: #4299e1; border: 1px dashed #4299e1; border-radius: 4px; font-size: 13px; cursor: pointer;">
+										<span style="margin-right: 4px;">+</span> Add New Substatus
+									</button>
+								</div>
+							</div>
+							<div style="margin-top: 15%;">
+								<button
+									onclick="handleMoveRight('<%= status._id %>', <%= index %>)"
+									disabled="<%= index === statuses.length - 1 %>"
+									style="background: none; border: none; cursor: <%= index === statuses.length - 1 ? 'not-allowed' : 'pointer' %>; color: <%= index === statuses.length - 1 ? '#cbd5e0' : '#4299e1' %>; margin-right: 4px; padding: 0; font-size: 14px; opacity: <%= index === statuses.length - 1 ? 0.5 : 1 %>;"
+									title="Move Right">
+									→ Move Right
+								</button>
+							</div>
+						</div>
+						<% if (index < statuses.length - 1) { %>
+							<div style="width: 80; min-width: 80; display: flex; align-items: center; justify-content: center; position: relative; height: 1; margin: 0 -4px;">
+								<div style="height: 1px; background: #ccc; width: 100%; position: relative;">
+									<div style="position: absolute; right: 0; top: -4; width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 8px solid #ccc;"></div>
+								</div>
+							</div>
+						<% } %>
+					<% }); %>
+				<% } else { %>
+					<div style="text-align: center; padding: 40px; color: #a0aec0;">
+						No statuses available. Click "Add New Status" to get started.
+					</div>
+				<% } %>
+			</div>
+		</div>
+
+		<div style="background: #f9fafb; margin-top: 20px; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
+			<h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 500; color: #4a5568;">Instructions:</h3>
+			<ul style="margin: 0; padding: 0 0 0 20px; color: #4a5568; font-size: 14px;">
+				<li style="margin-bottom: 8px;">Drag and drop status cards to change their order</li>
+				<li style="margin-bottom: 8px;">Click on "Show Substatus ▼" to view substatus options</li>
+				<li style="margin-bottom: 8px;">Use the "Add New Substatus" button to add substatus to a status</li>
+				<li style="margin-bottom: 8px;">When adding a substatus, choose additional options with toggle switches</li>
+				<li style="margin-bottom: 8px;">Use ✏️ and 🗑️ buttons to edit or delete statuses and substatuses</li>
+			</ul>
+		</div>
+	</div>
+
+	<!-- Status Add/Edit Modal -->
+	<div id="statusModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; z-index: 100;">
+		<div style="background: white; padding: 24px; border-radius: 8px; width: 400; max-width: 90%;">
+			<h3 id="statusModalTitle" style="margin: 0 0 20px; font-size: 18; font-weight: 600;"></h3>
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 500;">Status Name:</label>
+				<input type="text" id="statusTitle" placeholder="Example: In Review" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+			</div>
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 500;">Status Description:</label>
+				<input type="text" id="statusDescription" placeholder="Example: Needs manager approval" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+			</div>
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 500;">Milestone:</label>
+				<input type="text" id="statusMilestone" placeholder="Example: 1st Milestone" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+			</div>
+			<div style="display: flex; justify-content: flex-end; gap: 12px;">
+				<button type="button" onclick="closeStatusModal()" style="padding: 8px 16px; background: #f1f5f9; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+				<button type="button" onclick="saveStatus()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Substatus Add/Edit Modal -->
+	<div id="substatusModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; z-index: 100;">
+		<div style="background: white; padding: 24px; border-radius: 8px; width: 400; max-width: 90%;">
+			<h3 id="substatusModalTitle" style="margin: 0 0 20px; font-size: 18; font-weight: 600;"></h3>
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 500;">Substatus Name:</label>
+				<input type="text" id="substatusTitle" placeholder="Example: In Review" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+			</div>
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 500;">Substatus Description:</label>
+				<input type="text" id="substatusDescription" placeholder="Example: Needs manager approval" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+			</div>
+			<div style="margin-top: 20px; padding: 12px 0; border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; margin-bottom: 20px;">
+				<div style="font-weight: 500; color: #4a5568; margin-bottom: 8px; font-size: 14px;">Additional Options:</div>
+				<div style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0;">
+					<label style="cursor: pointer; font-size: 14px; font-weight: 500; color: #4a5568;">Remarks Required</label>
+					<div style="position: relative;">
+						<input type="checkbox" id="substatusRemarks" style="position: absolute; opacity: 0; width: 0; height: 0;">
+						<div id="toggleRemarks" style="width: 36px; height: 20px; background-color: #cbd5e0; border-radius: 10px; padding: 2px; transition: background-color 0.2s; cursor: pointer;" onclick="toggleSwitch('substatusRemarks', 'toggleRemarks')">
+							<div id="toggleRemarksKnob" style="width: 16px; height: 16px; background-color: white; border-radius: 50%; transform: translateX(0); transition: transform 0.2s;"></div>
+						</div>
+					</div>
+				</div>
+				<div style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0;">
+					<label style="cursor: pointer; font-size: 14px; font-weight: 500; color: #4a5568;">Followup Required</label>
+					<div style="position: relative;">
+						<input type="checkbox" id="substatusFollowup" style="position: absolute; opacity: 0; width: 0; height: 0;">
+						<div id="toggleFollowup" style="width: 36px; height: 20px; background-color: #cbd5e0; border-radius: 10px; padding: 2px; transition: background-color 0.2s; cursor: pointer;" onclick="toggleSwitch('substatusFollowup', 'toggleFollowup')">
+							<div id="toggleFollowupKnob" style="width: 16px; height: 16px; background-color: white; border-radius: 50%; transform: translateX(0); transition: transform 0.2s;"></div>
+						</div>
+					</div>
+				</div>
+				<div style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0;">
+					<label style="cursor: pointer; font-size: 14px; font-weight: 500; color: #4a5568;">Attachment Required</label>
+					<div style="position: relative;">
+						<input type="checkbox" id="substatusAttachment" style="position: absolute; opacity: 0; width: 0; height: 0;">
+						<div id="toggleAttachment" style="width: 36px; height: 20px; background-color: #cbd5e0; border-radius: 10px; padding: 2px; transition: background-color 0.2s; cursor: pointer;" onclick="toggleSwitch('substatusAttachment', 'toggleAttachment')">
+							<div id="toggleAttachmentKnob" style="width: 16px; height: 16px; background-color: white; border-radius: 50%; transform: translateX(0); transition: transform 0.2s;"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div style="display: flex; justify-content: flex-end; gap: 12px;">
+				<button type="button" onclick="closeSubstatusModal()" style="padding: 8px 16px; background: #f1f5f9; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+				<button type="button" onclick="saveSubstatus()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Delete Confirmation Modal -->
+	<div id="deleteModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; z-index: 100;">
+		<div style="background: white; padding: 24px; border-radius: 8px; width: 400; max-width: 90%;">
+			<h3 id="deleteModalTitle" style="margin: 0 0 20px; font-size: 18; font-weight: 600; color: #e53e3e;"></h3>
+			<p id="deleteModalMessage" style="margin-bottom: 24px; font-size: 14px; line-height: 1.6;"></p>
+			<div style="display: flex; justify-content: flex-end; gap: 12px;">
+				<button type="button" onclick="closeDeleteModal()" style="padding: 8px 16px; background: #f1f5f9; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+				<button type="button" onclick="confirmDelete()" style="padding: 8px 16px; background: #e53e3e; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const backendUrl = '<%= process.env.MIPIE_BACKEND_URL %>';
+		if (typeof axios !== 'undefined') {
+			axios.defaults.withCredentials = true;
+			axios.defaults.headers.common['Content-Type'] = 'application/json';
+		}
+		
+		const originalAxiosRequest = axios.request;
+		if (typeof axios !== 'undefined' && originalAxiosRequest) {
+			axios.request = function(config) {
+				if (!config.withCredentials) {
+					config.withCredentials = true;
+				}
+				return originalAxiosRequest.call(this, config);
+			};
+		}
+		
+		let statuses = <%- JSON.stringify(statuses || []) %>;
+		let draggedItem = null;
+		let isEditMode = false;
+		let editingStatusIndex = null;
+		let editingSubstatusIndex = null;
+		let deletingStatusId = null;
+		let deletingSubstatusId = null;
+		let isDeletingSubstatus = false;
+
+		// Status Modal Functions
+		function openStatusModal(edit, index) {
+			isEditMode = edit;
+			editingStatusIndex = index;
+			const modal = document.getElementById('statusModal');
+			const titleInput = document.getElementById('statusTitle');
+			const descInput = document.getElementById('statusDescription');
+			const milestoneInput = document.getElementById('statusMilestone');
+			const modalTitle = document.getElementById('statusModalTitle');
+
+			if (edit && index !== null && statuses[index]) {
+				const status = statuses[index];
+				titleInput.value = status.title || '';
+				descInput.value = status.description || '';
+				milestoneInput.value = status.milestone || '';
+				modalTitle.textContent = 'Edit Status';
+			} else {
+				titleInput.value = '';
+				descInput.value = '';
+				milestoneInput.value = '';
+				modalTitle.textContent = 'Add New Status';
+			}
+			modal.style.display = 'flex';
+		}
+
+		function closeStatusModal() {
+			document.getElementById('statusModal').style.display = 'none';
+		}
+
+		async function saveStatus() {
+			const title = document.getElementById('statusTitle').value.trim();
+			const description = document.getElementById('statusDescription').value.trim();
+			const milestone = document.getElementById('statusMilestone').value.trim();
+
+			if (!title) {
+				alert('Please enter a status name');
+				return;
+			}
+
+			try {
+				if (isEditMode && editingStatusIndex !== null) {
+					const statusId = statuses[editingStatusIndex]._id;
+					const response = await axios.put(`${backendUrl}/admin/statusB2C/edit/${statusId}`, {
+						title, description, milestone
+					}, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert("Status updated successfully");
+						location.reload();
+					}
+				} else {
+					const response = await axios.post(`${backendUrl}/admin/statusB2C/add`, {
+						title, description, milestone
+					}, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert("Status added successfully");
+						location.reload();
+					}
+				}
+			} catch (error) {
+				console.error('Error saving status:', error);
+				console.error('Error response:', error.response);
+				alert('Failed to save status: ' + (error.response?.data?.message || error.message));
+			}
+		}
+
+		// Substatus Modal Functions
+		function openSubstatusModal(edit, statusIndex, substatusIndex) {
+			isEditMode = edit;
+			editingStatusIndex = statusIndex;
+			editingSubstatusIndex = substatusIndex;
+			const modal = document.getElementById('substatusModal');
+			const titleInput = document.getElementById('substatusTitle');
+			const descInput = document.getElementById('substatusDescription');
+			const modalTitle = document.getElementById('substatusModalTitle');
+
+			if (edit && statusIndex !== null && substatusIndex !== null && statuses[statusIndex] && statuses[statusIndex].substatuses[substatusIndex]) {
+				const substatus = statuses[statusIndex].substatuses[substatusIndex];
+				titleInput.value = substatus.title || '';
+				descInput.value = substatus.description || '';
+				document.getElementById('substatusRemarks').checked = substatus.hasRemarks || false;
+				document.getElementById('substatusFollowup').checked = substatus.hasFollowup || false;
+				document.getElementById('substatusAttachment').checked = substatus.hasAttachment || false;
+				updateToggleSwitches();
+				modalTitle.textContent = 'Edit Substatus';
+			} else {
+				titleInput.value = '';
+				descInput.value = '';
+				document.getElementById('substatusRemarks').checked = false;
+				document.getElementById('substatusFollowup').checked = false;
+				document.getElementById('substatusAttachment').checked = false;
+				updateToggleSwitches();
+				modalTitle.textContent = 'Add New Substatus';
+			}
+			modal.style.display = 'flex';
+		}
+
+		function closeSubstatusModal() {
+			document.getElementById('substatusModal').style.display = 'none';
+		}
+
+		function toggleSwitch(checkboxId, toggleId) {
+			const checkbox = document.getElementById(checkboxId);
+			checkbox.checked = !checkbox.checked;
+			updateToggleSwitch(checkboxId, toggleId);
+		}
+
+		function updateToggleSwitch(checkboxId, toggleId) {
+			const checkbox = document.getElementById(checkboxId);
+			const toggle = document.getElementById(toggleId);
+			const knob = document.getElementById(toggleId + 'Knob');
+			if (checkbox.checked) {
+				toggle.style.backgroundColor = '#4299e1';
+				knob.style.transform = 'translateX(16px)';
+			} else {
+				toggle.style.backgroundColor = '#cbd5e0';
+				knob.style.transform = 'translateX(0)';
+			}
+		}
+
+		function updateToggleSwitches() {
+			updateToggleSwitch('substatusRemarks', 'toggleRemarks');
+			updateToggleSwitch('substatusFollowup', 'toggleFollowup');
+			updateToggleSwitch('substatusAttachment', 'toggleAttachment');
+		}
+
+		async function saveSubstatus() {
+			const title = document.getElementById('substatusTitle').value.trim();
+			const description = document.getElementById('substatusDescription').value.trim();
+			const hasRemarks = document.getElementById('substatusRemarks').checked;
+			const hasFollowup = document.getElementById('substatusFollowup').checked;
+			const hasAttachment = document.getElementById('substatusAttachment').checked;
+
+			if (!title) {
+				alert('Please enter a substatus name');
+				return;
+			}
+
+			if (editingStatusIndex === null || !statuses[editingStatusIndex]) {
+				alert('Invalid status');
+				return;
+			}
+
+			try {
+				const statusId = statuses[editingStatusIndex]._id;
+				if (isEditMode && editingSubstatusIndex !== null) {
+					const substatusId = statuses[editingStatusIndex].substatuses[editingSubstatusIndex]._id;
+					const response = await axios.put(`${backendUrl}/admin/statusB2C/${statusId}/substatus/${substatusId}`, {
+						title, description, hasRemarks, hasFollowup, hasAttachment
+					}, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert("Substatus updated successfully");
+						location.reload();
+					}
+				} else {
+					const response = await axios.post(`${backendUrl}/admin/statusB2C/${statusId}/substatus`, {
+						title, description, hasRemarks, hasFollowup, hasAttachment
+					}, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert("Substatus added successfully");
+						location.reload();
+					}
+				}
+			} catch (error) {
+				console.error('Error saving substatus:', error);
+				console.error('Error response:', error.response);
+				alert('Failed to save substatus: ' + (error.response?.data?.message || error.message));
+			}
+		}
+
+		// Delete Functions
+		function handleDeleteStatus(statusId, title) {
+			deletingStatusId = statusId;
+			isDeletingSubstatus = false;
+			document.getElementById('deleteModalTitle').textContent = 'Delete Status';
+			document.getElementById('deleteModalMessage').innerHTML = `Are you sure you want to delete the status <strong>"${title}"</strong>? This action cannot be undone.`;
+			document.getElementById('deleteModal').style.display = 'flex';
+		}
+
+		function handleDeleteSubstatus(statusId, substatusId, title) {
+			deletingStatusId = statusId;
+			deletingSubstatusId = substatusId;
+			isDeletingSubstatus = true;
+			document.getElementById('deleteModalTitle').textContent = 'Delete Substatus';
+			document.getElementById('deleteModalMessage').innerHTML = `Are you sure you want to delete the substatus <strong>"${title}"</strong>? This action cannot be undone.`;
+			document.getElementById('deleteModal').style.display = 'flex';
+		}
+
+		function closeDeleteModal() {
+			document.getElementById('deleteModal').style.display = 'none';
+		}
+
+		async function confirmDelete() {
+			try {
+				if (isDeletingSubstatus) {
+					const response = await axios.delete(`${backendUrl}/admin/statusB2C/deleteSubStatus/${deletingStatusId}/substatus/${deletingSubstatusId}`, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert('Sub status deleted successfully');
+						location.reload();
+					} else {
+						alert('Failed to delete sub status');
+					}
+				} else {
+					const response = await axios.delete(`${backendUrl}/admin/statusB2C/delete/${deletingStatusId}`, {
+						withCredentials: true
+					});
+
+					if (response.data.success) {
+						alert('Status deleted successfully');
+						location.reload();
+					} else {
+						alert('Failed to delete status');
+					}
+				}
+			} catch (error) {
+				console.error('Error deleting:', error);
+				console.error('Error response:', error.response);
+				alert('Error occurred while deleting: ' + (error.response?.data?.message || error.message));
+			}
+			closeDeleteModal();
+		}
+
+		// Drag and Drop Functions
+		function handleDragStart(e, index) {
+			draggedItem = index;
+			e.dataTransfer.effectAllowed = "move";
+		}
+
+		function handleDragOver(e) {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "move";
+		}
+
+		async function handleDrop(e, targetIndex) {
+			e.preventDefault();
+			if (draggedItem === targetIndex) return;
+
+			const newStatuses = [...statuses];
+			const draggedStatus = newStatuses[draggedItem];
+			newStatuses.splice(draggedItem, 1);
+			newStatuses.splice(targetIndex, 0, draggedStatus);
+			statuses = newStatuses;
+			draggedItem = null;
+
+			try {
+				const statusOrder = newStatuses.map((status, index) => ({
+					_id: status._id,
+					index: index
+				}));
+
+				const response = await axios.put(`${backendUrl}/admin/statusB2C/reorder`, {
+					statusOrder
+				}, {
+					withCredentials: true
+				});
+
+				if (response.data.success) {
+					location.reload();
+				} else {
+					alert('Failed to reorder status');
+				}
+			} catch (error) {
+				console.error('Error reordering status:', error);
+				alert('Error while updating order on server');
+			}
+		}
+
+		// Move Left/Right Functions
+		async function handleMoveLeft(statusId, currentIndex) {
+			if (currentIndex <= 0) return;
+
+			const newStatuses = [...statuses];
+			const statusToMove = newStatuses[currentIndex];
+			const prevStatus = newStatuses[currentIndex - 1];
+			newStatuses[currentIndex] = prevStatus;
+			newStatuses[currentIndex - 1] = statusToMove;
+			statuses = newStatuses;
+
+			try {
+				const statusOrder = newStatuses.map((status, index) => ({
+					_id: status._id,
+					index: index
+				}));
+
+				const response = await axios.put(`${backendUrl}/admin/statusB2C/reorder`, {
+					statusOrder
+				}, {
+					withCredentials: true
+				});
+
+				if (response.data.success) {
+					location.reload();
+				} else {
+					alert('Failed to reorder status');
+				}
+			} catch (error) {
+				console.error('Error reordering status:', error);
+				alert('Error while updating order on server');
+			}
+		}
+
+		async function handleMoveRight(statusId, currentIndex) {
+			if (currentIndex >= statuses.length - 1) return;
+
+			const newStatuses = [...statuses];
+			const statusToMove = newStatuses[currentIndex];
+			const nextStatus = newStatuses[currentIndex + 1];
+			newStatuses[currentIndex] = nextStatus;
+			newStatuses[currentIndex + 1] = statusToMove;
+			statuses = newStatuses;
+
+			try {
+				const statusOrder = newStatuses.map((status, index) => ({
+					_id: status._id,
+					index: index
+				}));
+
+				const response = await axios.put(`${backendUrl}/admin/statusB2C/reorder`, {
+					statusOrder
+				}, {
+					withCredentials: true
+				});
+
+				if (response.data.success) {
+					location.reload();
+				} else {
+					alert('Failed to reorder status');
+				}
+			} catch (error) {
+				console.error('Error reordering status:', error);
+				alert('Error while updating order on server');
+			}
+		}
+
+		// Toggle Substatuses
+		function toggleSubstatuses(statusId) {
+			const connector = document.getElementById('substatus-connector-' + statusId);
+			const container = document.getElementById('substatus-container-' + statusId);
+			const text = document.getElementById('substatus-text-' + statusId);
+
+			if (container.style.display === 'none') {
+				container.style.display = 'block';
+				connector.style.display = 'block';
+				text.textContent = 'Hide Substatus ▲';
+			} else {
+				container.style.display = 'none';
+				connector.style.display = 'none';
+				text.textContent = 'Show Substatus ▼';
+			}
+		}
+
+		// Initialize toggle switches
+		document.addEventListener('DOMContentLoaded', function() {
+			updateToggleSwitches();
+		});
+	</script>
+</div>
+<% include ../partials/footer %>
+</body>
+</html>
+

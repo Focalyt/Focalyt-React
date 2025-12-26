@@ -53,7 +53,8 @@ const StatusSchema = new mongoose.Schema({
   college: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'College',
-    required: true
+    required: false,
+    default: null
   },
   createdAt: {
     type: Date,

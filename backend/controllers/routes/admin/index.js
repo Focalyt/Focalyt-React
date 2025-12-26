@@ -69,6 +69,9 @@ const eventRoutes = require('./events');
 const addCenterRoutes = require('./center');
 const addPortalAccessRoutes = require('./portalAccess');
 const addControlRoutes = require('./autoControl');
+const statusB2BRoutes = require('./statusB2B');
+const statusB2CRoutes = require('./statusB2C');
+const placementStatusRoutes = require('./placementStatus');
 
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
@@ -118,6 +121,9 @@ router.use('/center', addCenterRoutes);
 router.use('/portalaccess', addPortalAccessRoutes);
 router.use('/autocontrol', addControlRoutes);
 router.use('/eventType', eventTypeRoutes);
+router.use('/statusB2B', statusB2BRoutes);
+router.use('/statusB2C', statusB2CRoutes);
+router.use('/placementStatus', placementStatusRoutes);
 
 const backendUrl = process.env.MIPIE_BACKEND_URL;
 
