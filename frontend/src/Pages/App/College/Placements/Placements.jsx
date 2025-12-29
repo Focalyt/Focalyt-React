@@ -3454,6 +3454,27 @@ console.log("response.data",response.data)
     }
   };
 
+  // Helper function to find job offer for a placement and job
+  const findJobOffer = (placement, job) => {
+    if (!placement?.jobOffers || !job) return null;
+    
+    const jobId = job._id || job._job?._id;
+    const jobIdStr = jobId?.toString();
+    
+    if (!jobIdStr) return null;
+    
+    return placement.jobOffers.find(offer => {
+      if (!offer._job) return false;
+      
+      // Handle different _job formats: ObjectId, string, or object with _id
+      const offerJobId = typeof offer._job === 'object' && offer._job !== null
+        ? (offer._job._id?.toString() || offer._job.toString())
+        : offer._job.toString();
+      
+      return offerJobId === jobIdStr;
+    });
+  };
+
   // Fetch Published Jobs for Company Jobs tab (using /company-jobs API)
   const fetchCompanyJobs = async (placement = null) => {
     try {
@@ -5551,10 +5572,7 @@ console.log("response.data",response.data)
                                                       <td>{job.city?.name || 'N/A'}</td>
                                                       <td>
                                                         {(() => {
-                                                          // Find job offer for this placement and job
-                                                          const jobOffer = placement.jobOffers?.find(
-                                                            offer => (offer._job?.toString() === (job._id || job._job?._id)?.toString())
-                                                          );
+                                                          const jobOffer = findJobOffer(placement, job);
                                                           const response = jobOffer?.candidateResponse;
                                                           
                                                           if (response === 'accepted') {
@@ -5587,10 +5605,10 @@ console.log("response.data",response.data)
                                                             disabled={
                                                               (offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id)) ||
                                                               sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) ||
-                                                              (placement.jobOffers && placement.jobOffers.some(offer => 
-                                                                (offer._job?.toString() === (job._id || job._job?._id)?.toString()) &&
-                                                                (offer.status === 'offered' || offer.status === 'active')
-                                                              ))
+                                                              (() => {
+                                                                const existingOffer = findJobOffer(placement, job);
+                                                                return existingOffer && (existingOffer.status === 'offered' || existingOffer.status === 'active');
+                                                              })()
                                                             }
                                                           >
                                                             {offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id) ? (
@@ -5598,10 +5616,10 @@ console.log("response.data",response.data)
                                                                 <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                                                                 Sending...
                                                               </>
-                                                            ) : (sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) || (placement.jobOffers && placement.jobOffers.some(offer => 
-                                                              (offer._job?.toString() === (job._id || job._job?._id)?.toString()) &&
-                                                              (offer.status === 'offered' || offer.status === 'active')
-                                                            ))) ? (
+                                                            ) : (sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) || (() => {
+                                                              const existingOffer = findJobOffer(placement, job);
+                                                              return existingOffer && (existingOffer.status === 'offered' || existingOffer.status === 'active');
+                                                            })()) ? (
                                                               <>
                                                                 <i className="fas fa-check me-1"></i> Sent Successfully
                                                               </>

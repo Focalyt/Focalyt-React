@@ -10,7 +10,7 @@ const Placement = require('../../models/Placement');
 const AppliedCourses = require('../../models/appliedCourses');
 const UploadCandidates = require('../../models/uploadCandidates');
 const CandidateProfile = require('../../models/candidateProfile');
-const { Vacancy, Company, City, State, Qualification, Industry, Skill, JobCategory, JobOffer } = require('../../models');
+const { Vacancy, Company, City, State, Qualification, Industry, Skill, JobCategory, JobOffer, College } = require('../../models');
 
 router.get('/', isCollege, async (req, res) => {
   try {
@@ -753,6 +753,47 @@ router.get('/candidates', isCollege, async (req, res) => {
     // Convert UploadCandidates to placement format
     const uploadCandidatesPlacements = await Promise.all(
       activeUploadCandidates.map(async (uploadCandidate) => {
+        // ✅ Check if Placement record already exists for this UploadCandidate
+        let placementRecord = await Placement.findOne({ 
+          uploadCandidate: uploadCandidate._id 
+        }).lean();
+
+        // ✅ If Placement record doesn't exist, create one
+        if (!placementRecord) {
+          // Get default placement status (first status for the college)
+          const defaultStatus = await PlacementStatus.findOne({ 
+            college: new mongoose.Types.ObjectId(college._id) 
+          }).sort({ index: 1 }).lean();
+
+          // Try to find candidate profile if user is linked
+          let candidateProfile = null;
+          if (uploadCandidate.user) {
+            candidateProfile = await CandidateProfile.findOne({ 
+              email: uploadCandidate.email || uploadCandidate.user.email 
+            }).lean();
+          }
+
+          // Create Placement record for UploadCandidate
+          const newPlacement = new Placement({
+            companyName: 'Not Set',
+            dateOfJoining: new Date(),
+            location: 'Not Set',
+            college: new mongoose.Types.ObjectId(college._id),
+            uploadCandidate: uploadCandidate._id,
+            status: defaultStatus ? defaultStatus._id : null,
+            addedBy: req.user._id,
+            logs: [{
+              user: req.user._id,
+              timestamp: new Date(),
+              action: 'Placement record created from UploadCandidate',
+              remarks: `Placement record created for uploaded candidate: ${uploadCandidate.name || 'Unknown'}`
+            }]
+          });
+
+          placementRecord = await newPlacement.save();
+          placementRecord = placementRecord.toObject();
+        }
+
         // Try to find candidate profile if user is linked
         let candidateProfile = null;
         if (uploadCandidate.user) {
@@ -761,13 +802,26 @@ router.get('/candidates', isCollege, async (req, res) => {
           }).lean();
         }
 
-        // Get default placement status (first status for the college)
-        const defaultStatus = await PlacementStatus.findOne({ 
-          college: new mongoose.Types.ObjectId(college._id) 
-        }).sort({ index: 1 }).lean();
+        // Get placement status
+        let placementStatus = null;
+        if (placementRecord.status) {
+          placementStatus = await PlacementStatus.findById(placementRecord.status).lean();
+        }
+        if (!placementStatus) {
+          placementStatus = await PlacementStatus.findOne({ 
+            college: new mongoose.Types.ObjectId(college._id) 
+          }).sort({ index: 1 }).lean();
+        }
+
+        // Get job offers for this placement
+        const jobOffers = await JobOffer.find({ 
+          placement: placementRecord._id 
+        }).populate('_job').lean();
 
         return {
-          _id: uploadCandidate._id,
+          _id: placementRecord._id, // Use Placement record ID instead of UploadCandidate ID
+          placementId: placementRecord._id,
+          uploadCandidateId: uploadCandidate._id,
           _candidate: candidateProfile ? {
             _id: candidateProfile._id,
             name: candidateProfile.name || uploadCandidate.name,
@@ -802,21 +856,20 @@ router.get('/candidates', isCollege, async (req, res) => {
             sex: uploadCandidate.gender,
             dob: uploadCandidate.dob
           },
-          status: defaultStatus ? {
-            _id: defaultStatus._id,
-            title: defaultStatus.title,
-            substatuses: defaultStatus.substatuses || []
+          status: placementStatus ? {
+            _id: placementStatus._id,
+            title: placementStatus.title,
+            substatuses: placementStatus.substatuses || []
           } : null,
-          subStatus: null,
+          subStatus: placementRecord.subStatus || null,
           appliedCourseId: null,
-          placementId: null,
-          companyName: null,
-          employerName: null,
-          contactNumber: null,
-          dateOfJoining: null,
-          location: null,
-          remark: null,
-          remarks: null,
+          companyName: placementRecord.companyName || null,
+          employerName: placementRecord.employerName || null,
+          contactNumber: placementRecord.contactNumber || null,
+          dateOfJoining: placementRecord.dateOfJoining || null,
+          location: placementRecord.location || null,
+          remark: placementRecord.remark || null,
+          remarks: placementRecord.remark || null,
           _course: uploadCandidate.course ? {
             _id: null,
             name: uploadCandidate.course,
@@ -831,12 +884,19 @@ router.get('/candidates', isCollege, async (req, res) => {
           followup: null,
           followupDate: null,
           registeredBy: null,
-          addedBy: null,
-          updatedBy: null,
-          logs: [],
-          createdAt: uploadCandidate.createdAt,
-          updatedAt: uploadCandidate.updatedAt,
-          jobOffers: [],
+          addedBy: placementRecord.addedBy || null,
+          updatedBy: placementRecord.updatedBy || null,
+          logs: placementRecord.logs || [],
+          createdAt: placementRecord.createdAt || uploadCandidate.createdAt,
+          updatedAt: placementRecord.updatedAt || uploadCandidate.updatedAt,
+          jobOffers: jobOffers.map(offer => ({
+            _id: offer._id,
+            _job: offer._job,
+            title: offer.title || (offer._job?.title || ''),
+            candidateResponse: offer.candidateResponse,
+            respondedAt: offer.respondedAt,
+            status: offer.status
+          })),
           isUploadCandidate: true, 
           uploadCandidateData: {
             fatherName: uploadCandidate.fatherName,
@@ -1091,67 +1151,113 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
     if (placement) {
       appliedCourseId = placement.appliedCourse;
       
-    if (placement.college.toString() !== collegeId.toString()) {
-      return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
-      }
-      
-      appliedCourse = await AppliedCourses.findById(appliedCourseId)
-        .populate({
-          path: '_course',
-          select: 'college'
-        });
-    } else {
-      appliedCourse = await AppliedCourses.findById(id)
-        .populate({
-          path: '_course',
-          select: 'college'
-        });
-
-      if (!appliedCourse) {
-        return res.status(404).json({ success: false, message: 'Applied course not found' });
-      }
-
-      if (appliedCourse._course && appliedCourse._course.college.toString() !== collegeId.toString()) {
+      if (placement.college.toString() !== collegeId.toString()) {
         return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
       }
+      
+      if (appliedCourseId) {
+        appliedCourse = await AppliedCourses.findById(appliedCourseId)
+          .populate({
+            path: '_course',
+            select: 'college'
+          });
+      }
+    } else {
+      // ✅ Check if this is an UploadCandidate ID
+      const uploadCandidate = await UploadCandidates.findById(id);
+      if (uploadCandidate) {
+        if (uploadCandidate.college.toString() !== collegeId.toString()) {
+          return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+        }
+        // Find Placement record for this UploadCandidate
+        placement = await Placement.findOne({ uploadCandidate: id });
+      } else {
+        // Try to find as AppliedCourse
+        appliedCourse = await AppliedCourses.findById(id)
+          .populate({
+            path: '_course',
+            select: 'college'
+          });
 
-      placement = await Placement.findOne({ appliedCourse: id });
+        if (!appliedCourse) {
+          return res.status(404).json({ success: false, message: 'Applied course or UploadCandidate not found' });
+        }
+
+        if (appliedCourse._course && appliedCourse._course.college.toString() !== collegeId.toString()) {
+          return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
+        }
+
+        placement = await Placement.findOne({ appliedCourse: id });
+      }
     }
 
     if (!placement) {
-      const CandidateProfile = mongoose.model('CandidateProfile');
-      const candidate = await CandidateProfile.findById(appliedCourse._candidate).select('name mobile').lean();
-
-   
-      const placementCompanyName = companyName ? String(companyName).trim() : (candidate?.name || 'Not Set');
-      const placementEmployerName = employerName ? String(employerName).trim() : (candidate?.name || '');
-      let placementContactNumber = contactNumber ? String(contactNumber) : (candidate?.mobile ? String(candidate.mobile) : '');
-      
-
-      if (placementContactNumber && placementContactNumber.trim() !== '') {
-        placementContactNumber = placementContactNumber.replace(/\D/g, '');
-        if (!/^[6-9]\d{9}$/.test(placementContactNumber)) {
+      // ✅ Check if this is for an UploadCandidate
+      const uploadCandidate = await UploadCandidates.findById(id);
+      if (uploadCandidate) {
+        // Create Placement record for UploadCandidate
+        const placementCompanyName = companyName ? String(companyName).trim() : 'Not Set';
+        const placementEmployerName = employerName ? String(employerName).trim() : '';
+        let placementContactNumber = contactNumber ? String(contactNumber) : (uploadCandidate.contactNumber || '');
+        
+        if (placementContactNumber && placementContactNumber.trim() !== '') {
+          placementContactNumber = placementContactNumber.replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(placementContactNumber)) {
+            placementContactNumber = '';
+          }
+        } else {
           placementContactNumber = '';
         }
-      } else {
-        placementContactNumber = '';
-      }
 
-      placement = new Placement({
-        companyName: placementCompanyName,
-        employerName: placementEmployerName,
-        contactNumber: placementContactNumber,
-        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
-        location: location || 'Not Set',
-        college: collegeId,
-        appliedCourse: appliedCourseId,
-        addedBy: userId,
-        logs: [{
-          user: userId,
-          action: 'Placement record created from AppliedCourse',
-          remarks: `Placement record created for student: ${candidate?.name || 'Unknown'}`
-        }]
-      });
+        placement = new Placement({
+          companyName: placementCompanyName,
+          employerName: placementEmployerName,
+          contactNumber: placementContactNumber,
+          dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
+          location: location || 'Not Set',
+          college: collegeId,
+          uploadCandidate: id,
+          addedBy: userId,
+          logs: [{
+            user: userId,
+            action: 'Placement record created from UploadCandidate',
+            remarks: `Placement record created for uploaded candidate: ${uploadCandidate.name || 'Unknown'}`
+          }]
+        });
+      } else if (appliedCourse) {
+        // Create Placement record for AppliedCourse
+        const CandidateProfile = mongoose.model('CandidateProfile');
+        const candidate = await CandidateProfile.findById(appliedCourse._candidate).select('name mobile').lean();
+
+        const placementCompanyName = companyName ? String(companyName).trim() : (candidate?.name || 'Not Set');
+        const placementEmployerName = employerName ? String(employerName).trim() : (candidate?.name || '');
+        let placementContactNumber = contactNumber ? String(contactNumber) : (candidate?.mobile ? String(candidate.mobile) : '');
+        
+        if (placementContactNumber && placementContactNumber.trim() !== '') {
+          placementContactNumber = placementContactNumber.replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(placementContactNumber)) {
+            placementContactNumber = '';
+          }
+        } else {
+          placementContactNumber = '';
+        }
+
+        placement = new Placement({
+          companyName: placementCompanyName,
+          employerName: placementEmployerName,
+          contactNumber: placementContactNumber,
+          dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
+          location: location || 'Not Set',
+          college: collegeId,
+          appliedCourse: appliedCourseId,
+          addedBy: userId,
+          logs: [{
+            user: userId,
+            action: 'Placement record created from AppliedCourse',
+            remarks: `Placement record created for student: ${candidate?.name || 'Unknown'}`
+          }]
+        });
+      }
     } else {
       if (companyName) placement.companyName = String(companyName).trim();
       if (employerName !== undefined) {
@@ -1251,7 +1357,24 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
 router.get('/company-jobs', isCollege, async (req, res) => {
   try {
     const { companyName } = req.query;
-    const college = req.user.college;
+    const user = req.user;
+    
+    // Get college ID for private job filtering
+    const college = await College.findOne({
+      '_concernPerson._id': user._id
+    });
+    
+    if (!college) {
+      console.error('College not found for user:', user._id);
+      return res.status(404).json({
+        success: false,
+        message: 'College not found',
+        jobs: []
+      });
+    }
+    
+    const collegeId = college._id.toString();
+    // console.log('College ID for filtering:', collegeId);
     
     const populate = [
       {
@@ -1331,8 +1454,33 @@ router.get('/company-jobs', isCollege, async (req, res) => {
       .sort({ sequence: 1, createdAt: -1 })
       .lean();
 
-    // console.log('Total active jobs found:', jobs.length);
-    const jobsData = jobs.map(job => {
+    // console.log(`Total jobs found: ${jobs.length}`);
+    // console.log(`College ID for matching: ${collegeId}`);
+ 
+    const filteredJobs = jobs.filter(job => {
+      const postingType = job.postingType;
+      
+      // Debug logging for private jobs
+      if (postingType === 'Private') {
+        // ✅ Trim and normalize both values for comparison
+        const jobCollegeAcNo = job.collegeAcNo ? job.collegeAcNo.toString().trim() : null;
+        const normalizedCollegeId = collegeId.trim();
+        const matches = jobCollegeAcNo && jobCollegeAcNo === normalizedCollegeId;
+        
+        // console.log(`Private Job ${job._id}: collegeAcNo="${jobCollegeAcNo}", collegeId="${normalizedCollegeId}", matches=${matches}`);
+        
+        // Private job - only show if collegeAcNo matches collegeId
+        return matches;
+      } else {
+        // Public job or no postingType set - show to all
+        return true;
+      }
+    });
+    
+    // console.log(`Filtered jobs count: ${filteredJobs.length} (Public + matching Private)`);
+
+    // console.log('Total active jobs found:', filteredJobs.length);
+    const jobsData = filteredJobs.map(job => {
       const jobData = {
         ...job,
         displayCompanyName: job.displayCompanyName || job._company?.displayCompanyName || job._company?.name || 'N/A'
@@ -1544,7 +1692,7 @@ router.get('/job-offers', isCollege, async (req, res) => {
           { companyName: { $regex: new RegExp(searchName, 'i') } },
           { displayCompanyName: { $regex: new RegExp(searchName, 'i') } }
         ];
-        console.log('Company not found, filtering by companyName field:', searchName);
+        // console.log('Company not found, filtering by companyName field:', searchName);
       }
     }
 
@@ -1789,6 +1937,13 @@ router.post('/offer-job', isCollege, async (req, res) => {
           path: '_candidate',
           select: '_id name mobile'
         }
+      })
+      .populate({
+        path: 'uploadCandidate',
+        populate: {
+          path: 'user',
+          select: '_id name email mobile'
+        }
       });
 
     if (!placement) {
@@ -1840,7 +1995,66 @@ router.post('/offer-job', isCollege, async (req, res) => {
     await placement.save();
 
     let candidateId = null;
-    if (placement.appliedCourse) {
+    
+    // ✅ Check if this is an UploadCandidate placement
+    if (placement.uploadCandidate) {
+      const uploadCandidateId = typeof placement.uploadCandidate === 'object' 
+        ? placement.uploadCandidate._id 
+        : placement.uploadCandidate;
+      
+      // Fetch UploadCandidate document
+      const uploadCandidateDoc = await UploadCandidates.findById(uploadCandidateId)
+        .populate('user', 'name email mobile')
+        .lean();
+      
+      if (uploadCandidateDoc) {
+        // If user is linked to UploadCandidate, try to find CandidateProfile
+        if (uploadCandidateDoc.user) {
+          // Try to find by email
+          const userEmail = uploadCandidateDoc.user.email || uploadCandidateDoc.email;
+          if (userEmail) {
+            const candidateProfile = await CandidateProfile.findOne({ 
+              email: userEmail 
+            }).lean();
+            if (candidateProfile) {
+              candidateId = candidateProfile._id;
+            }
+          }
+          
+          // If still no candidateId, try to find by mobile
+          if (!candidateId) {
+            const mobile = uploadCandidateDoc.user.mobile || uploadCandidateDoc.contactNumber;
+            if (mobile) {
+              const candidateProfile = await CandidateProfile.findOne({ 
+                mobile: mobile 
+              }).lean();
+              if (candidateProfile) {
+                candidateId = candidateProfile._id;
+              }
+            }
+          }
+        } else {
+          // No user linked, try to find by email or contactNumber directly
+          if (uploadCandidateDoc.email) {
+            const candidateProfile = await CandidateProfile.findOne({ 
+              email: uploadCandidateDoc.email 
+            }).lean();
+            if (candidateProfile) {
+              candidateId = candidateProfile._id;
+            }
+          }
+          
+          if (!candidateId && uploadCandidateDoc.contactNumber) {
+            const candidateProfile = await CandidateProfile.findOne({ 
+              mobile: uploadCandidateDoc.contactNumber 
+            }).lean();
+            if (candidateProfile) {
+              candidateId = candidateProfile._id;
+            }
+          }
+        }
+      }
+    } else if (placement.appliedCourse) {
       // Check if _candidate is already populated
       if (placement.appliedCourse._candidate) {
         candidateId = placement.appliedCourse._candidate;
@@ -1931,15 +2145,14 @@ router.post('/offer-job', isCollege, async (req, res) => {
     };
 
     // Add candidate and course if available
+    // ✅ For UploadCandidates, candidateId might be null - that's okay, JobOffer can still be created
     if (candidateId) {
       jobOfferData._candidate = candidateId;
       // console.log('JobOffer will have _candidate:', candidateId);
     } else {
-      console.error('ERROR: candidateId is null! Cannot create job offer without candidate.');
-      return res.status(400).json({
-        success: false,
-        message: 'Candidate ID not found in placement. Cannot send job offer without candidate link.'
-      });
+      // For UploadCandidates without linked user/CandidateProfile, we can still create JobOffer
+      // but log a warning
+      console.warn('WARNING: candidateId is null for placement. Creating JobOffer without candidate link.');
     }
 
     if (courseId) {
@@ -1961,12 +2174,19 @@ router.post('/offer-job', isCollege, async (req, res) => {
       remarks: `Job "${job.title}" offered to candidate. ${remarks || ''}`
     }];
 
-    // Check if job offer already exists for this candidate and job
-    const existingJobOffer = await JobOffer.findOne({
-      _candidate: candidateId,
+    // ✅ Check if job offer already exists - use placement and job, candidateId is optional
+    const existingJobOfferQuery = {
+      placement: placementId,
       _job: jobId,
       isActive: true
-    });
+    };
+    
+    // If candidateId exists, also check by candidate to avoid duplicates
+    if (candidateId) {
+      existingJobOfferQuery._candidate = candidateId;
+    }
+    
+    const existingJobOffer = await JobOffer.findOne(existingJobOfferQuery);
 
     let jobOffer;
     if (existingJobOffer) {

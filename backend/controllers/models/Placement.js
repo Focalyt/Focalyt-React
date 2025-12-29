@@ -41,6 +41,10 @@ const PlacementSchema = new mongoose.Schema({
     type: ObjectId,
     ref: 'AppliedCourses'
   },
+  uploadCandidate: {
+    type: ObjectId,
+    ref: 'UploadCandidates'
+  },
   addedBy: {
     type: ObjectId,
     ref: 'User'

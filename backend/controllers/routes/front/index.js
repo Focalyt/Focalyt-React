@@ -258,7 +258,17 @@ router.get("/joblisting", async (req, res) => {
 		sector = ''
 	}
 
-	let filter = { status: true, _company: { $ne: null }, validity: { $gte: moment().utcOffset('+05:30') }, verified: true }
+	let filter = { 
+		status: true, 
+		_company: { $ne: null }, 
+		validity: { $gte: moment().utcOffset('+05:30') }, 
+		verified: true,
+		$or: [
+			{ postingType: 'Public' },
+			{ postingType: { $exists: false } }, 
+			{ postingType: null }
+		]
+	}
 
 	if (salary) {
 		filter["$or"] = [{ isFixed: true, amount: { $gte: salary } }, { isFixed: false, max: { $gte: salary } }]

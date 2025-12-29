@@ -662,6 +662,49 @@
                         <div class="card-content">
                           <div class="card-body">
                             <div class="row">
+                              <label for="job-public" class="px-1 h1 col-6">Do you want job public ?</label>
+                              <div class="col-xl-12 col-lg-12 col-12">
+                                <div class="form-check-inline">
+                                  <input type="radio" id="job-public-yes" name="isPublic" value="true"
+                                    <% if(vacancy?.postingType==='Public' || !vacancy?.postingType) {%> checked <% } %>/>
+                                    <label for="job-public-yes">Yes</label>
+                                </div>
+                                <div class="form-check-inline">
+                                  <input type="radio" id="job-public-no" name="isPublic" value="false"
+                                    <% if(vacancy?.postingType==='Private') {%> checked <% } %>/>
+                                    <label for="job-public-no">No</label>
+                                </div>
+                              </div>
+                              <div class="col-12" id="college-ac-info" style="display: none;">
+                                <div class="row">
+                                  <div class="col-xl-6 mb-1" id="jd-collegeAcNo">
+                                    <label>College Account Number</label><span class="mandatory"> *</span>
+                                    <input type="text" class="form-control" id="collegeAcNo"
+                                      placeholder="Enter College Account Number" name="collegeAcNo"
+                                      value="<%= vacancy?.collegeAcNo %>" required
+                                      oninvalid="this.setCustomValidity('Please enter College Account Number for private job')"
+                                      oninput="this.setCustomValidity('')">
+                                    <small class="form-text text-muted">
+                                      <i class="feather icon-info"></i> 
+                                      Enter the College Account Number. This job will only be visible to the specified college.
+                                    </small>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-xl-12 col-lg-12 px-3">
+                    <div class="card">
+                      <div class="card-content">
+                        <div class="card-content">
+                          <div class="card-body">
+                            <div class="row">
                               <label for="contact-directly" class="px-1 h1 col-6">Do you want the candidate to contact
                                 you
                                 directly?</label>
@@ -671,14 +714,18 @@
                               <div class="col-xl-12 col-lg-12 col-12">
                                 <div class="form-check-inline">
                                   <input type="radio" id="contact-directly-yes" name="isContact" value="true"
-                                    onclick="showContactInfo()" <% if(vacancy?.isContact==true ) {%> checked <% } %>/>
-                                    <label for="contact-directly-yes">Yes</label>
+                                    onclick="showContactInfo()" <% if(vacancy?.isContact==true ) {%> checked <% } %> disabled style="display: none;"/>
+                                    <label for="contact-directly-yes" style="display: none;">Yes</label>
                                 </div>
                                 <div class="form-check-inline">
                                   <input type="radio" id="contact-directly-no" name="isContact" value="false"
-                                    onclick="hideContactInfo()" <% if(vacancy?.isContact==false ) {%> checked <% } %>/>
-                                    <label for="contact-directly-no">No</label>
+                                    onclick="hideContactInfo()" <% if(vacancy?.isContact==false ) {%> checked <% } %> disabled style="display: none;"/>
+                                    <label for="contact-directly-no" style="display: none;">No</label>
                                 </div>
+                                <small class="form-text text-muted">
+                                  <i class="feather icon-info"></i> 
+                                  This field is automatically set based on "Job Public" selection above.
+                                </small>
                               </div>
                               <div class="col-12" id="contact-info" style="display: none;">
                                 <div class="row">
@@ -1320,17 +1367,15 @@
                 return false
               }
               event.preventDefault();
-              // 25coin modal
+              // 25coin modal - Check if job is Private (requires coins)
               const creditLeft = +("<%=company.creditLeft%>");
               const coinsRequired = +("<%=coinsRequired?.contactcoins%>");
+              
+              // Get isPublic value to determine if job is Private
+              const jobPublicValue = document.querySelector('input[name="isPublic"]:checked')?.value;
+              const isJobPrivate = (jobPublicValue === 'false'); // No = Private
 
-              if (creditLeft < coinsRequired && isContactvalue === "true") {
-                e.preventDefault();
-                document.getElementById("sub-btn").setAttribute("data-toggle", "modal");
-                document.getElementById("sub-btn").setAttribute("data-target", "#addCoins");
-                document.getElementById("sub-btn").setAttribute("data-dismiss", "modal");
-                lessCoins = true
-              } else if (isContactvalue === true && creditLeft < coinsRequired) {
+              if (creditLeft < coinsRequired && isJobPrivate) {
                 e.preventDefault();
                 document.getElementById("sub-btn").setAttribute("data-toggle", "modal");
                 document.getElementById("sub-btn").setAttribute("data-target", "#addCoins");
@@ -1384,6 +1429,17 @@
               });
 
               let formData = new FormData(document.querySelector("form")); // FormData Object बनाएं
+
+              formData.delete('isContact');
+              // ✅ Convert isPublic to isContact for backend compatibility
+              // Yes (Public) = isPublic=true → isContact=false
+              // No (Private) = isPublic=false → isContact=true
+              const publicValue = document.querySelector('input[name="isPublic"]:checked')?.value;
+              if (publicValue === 'true') {
+                formData.append('isContact', 'false'); // Public
+              } else if (publicValue === 'false') {
+                formData.append('isContact', 'true'); // Private
+              }
 
               // ✅ Form Fields Append करें
               // formData.append("displayCompanyName", document.getElementById('organizationName').value);
@@ -1457,6 +1513,7 @@
               $('#jd-whatsappNumber').removeClass('error');
               $('#jd-name').removeClass('error');
               $('#jd-email').removeClass('error');
+              $('#jd-collegeAcNo').removeClass('error');
               let title = $('#jobTitle').val();
 
               $('#jd-subqua-field').removeClass('error')
@@ -1648,6 +1705,18 @@
                   flag = false;
                 }
               }
+              
+          
+              const isJobPrivate = document.querySelector('input[name="isPublic"]:checked')?.value === 'false';
+              const collegeAcNo = document.getElementById('collegeAcNo')?.value?.trim();
+              if (isJobPrivate) {
+                if (!collegeAcNo || collegeAcNo === '') {
+                  $('#jd-collegeAcNo').addClass('error');
+                  firstError = firstError ? firstError : $('#collegeAcNo');
+                  flag = false;
+                }
+              }
+              
               if (firstError) {
                 firstError.focus();
               }
@@ -1669,21 +1738,46 @@
             function showContactInfo() {
               document.getElementById("contact-info").style.display = "block";
               var coinLabel = document.querySelector('label[for="25 coin"]');
-              coinLabel.style.display = "block";
+              if (coinLabel) coinLabel.style.display = "block";
             }
             function hideContactInfo() {
               document.getElementById("contact-info").style.display = "none";
               var coinLabel = document.querySelector('label[for="25 coin"]');
-              coinLabel.style.display = "none";
+              if (coinLabel) coinLabel.style.display = "none";
+            }
+            function showCollegeAcInfo() {
+              document.getElementById("college-ac-info").style.display = "block";
+            }
+            function hideCollegeAcInfo() {
+              document.getElementById("college-ac-info").style.display = "none";
             }
             $(document).ready(function () {
               if ($('#contact-directly-yes').prop('checked')) {
                 showContactInfo();
               }
+              // Handle job public/private toggle
+              $('input[name="isPublic"]').change(function() {
+                if ($(this).val() === 'false') {
+                  showCollegeAcInfo();
+                } else {
+                  hideCollegeAcInfo();
+                }
+              });
+              // Initialize college ac info visibility
+              if ($('#job-public-no').prop('checked')) {
+                showCollegeAcInfo();
+              }
             });
 
 
-            let isContactvalue = "<%=vacancy?.isContact%>";
+            // Derive isContactvalue from isPublic (for job visibility)
+            // Yes (Public) = isPublic=true → isContact=false
+            // No (Private) = isPublic=false → isContact=true
+            let isContactvalue = "<%=vacancy?.postingType === 'Private' ? 'true' : 'false'%>";
+            $('input[name="isPublic"]').change(function () {
+              const isPublicValue = $('input[name="isPublic"]:checked').val();
+              isContactvalue = (isPublicValue === 'false') ? 'true' : 'false'; // Private = true, Public = false
+            });
             $('input[name="isContact"]').click(function () {
               isContactvalue = $('input[name="isContact"]:checked').val() === 'true';
             });

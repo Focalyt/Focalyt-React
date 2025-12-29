@@ -5,6 +5,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const [collegeAccountNo, setCollegeAccountNo] = useState(null);
 
   useEffect(() => {
     const name = localStorage.getItem('name');
@@ -12,6 +13,18 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
       const userNameElement = document.getElementById('user-name');
       if (userNameElement) {
         userNameElement.textContent = `Welcome ${name}`;
+      }
+    }
+
+    const userData = sessionStorage.getItem('user');
+    if (userData) {
+      try {
+        const parsedUserData = JSON.parse(userData);
+        if (parsedUserData?.collegeId) {
+          setCollegeAccountNo(parsedUserData.collegeId);
+        }
+      } catch (error) {
+        console.error('Error parsing user data:', error);
       }
     }
   }, []);
@@ -60,6 +73,15 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                     </a>
                   </li>
                 </ul>
+                {collegeAccountNo && (
+                  <ul className="nav navbar-nav" style={{ marginLeft: '20px' }}>
+                    <li className="nav-item">
+                      <span className="text-white" style={{ fontSize: '13px', opacity: 0.9, lineHeight: '40px' }}>
+                        Account No: <strong style={{ fontSize: '12px' }}>{collegeAccountNo}</strong>
+                      </span>
+                    </li>
+                  </ul>
+                )}
                 <ul className="nav navbar-nav bookmark-icons d-none">
                   <li className="nav-item d-none d-lg-block">
                     <a className="nav-link" href="mailto:info@focalyt.in" target="_top" data-toggle="tooltip" data-placement="top" title="Email">

@@ -624,15 +624,23 @@ const UploadCandidates = () => {
         headers: { 'x-auth': token }
       });
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // response.data is already a Blob when using responseType: 'blob'
+      const url = window.URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'sample.xlsx');
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      
+      // Clean up after download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (error) {
       console.error('Error downloading sample:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Error downloading sample file';
+      setMessage(errorMessage);
     }
   };
 

@@ -3900,6 +3900,13 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 	try {
 		const data = req.query
 		const { qualification, experience, industry, state, jobType, minSalary, techSkills } = req.query
+
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+		const collegeId = college?._id?.toString();
+		
 		const populate = [
 			{
 				path: "_qualification",
@@ -3937,11 +3944,26 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 		if (minSalary) {
 			filter["$or"] = [{ isFixed: true, amount: { $gte: minSalary } }, { isFixed: false, min: { $gte: minSalary } }]
 		}
+		
 		const allQualification = await Qualification.find({ status: true }).sort({ basic: -1 })
 		const allIndustry = await Industry.find({ status: true })
 		const allStates = await State.find({ countryId: '101', status: { $ne: false } })
 		const allJobs = await Vacancy.find(filter).populate(populate)
-		let jobs = allJobs.filter(job => job._company?.isDeleted === false && job._company?.status === true)
+		let jobs = allJobs.filter(job => {
+			// Filter deleted/inactive companies
+			if (job._company?.isDeleted === true || job._company?.status === false) {
+				return false;
+			}
+			
+			// Check posting type
+			const postingType = job.postingType;
+			if (postingType === 'Private') {
+				return job.collegeAcNo && job.collegeAcNo.toString() === collegeId;
+			} else {
+				// Public job or no postingType set - show to all
+				return true;
+			}
+		})
 		let skills = await Skill.find({ status: true })
 		res.render(`${req.vPath}/app/college/searchjob`, { menu: 'Jobs', jobs, allQualification, allIndustry, allStates, data, skills })
 	} catch (err) {
@@ -5040,12 +5062,53 @@ router.route('/uploadTemplates')
 	})
 	// router.route("/single").get(auth1, function (req, res) {
 router.route("/single").get(isCollege, function (req, res) {
-	res.download("public/Student.xlsx", function (err) {
-		if (err) {
-			console.log(err);
-			return res.status(500).json({ status: false, message: "Error downloading sample file" });
-		}
-	});
+	try {
+		const XLSX = require('xlsx');
+		
+		// Define headers matching the table structure
+		const headers = [
+			'Candidate Name',
+			'Father Name',
+			'Course',
+			'Year (1st/2nd/3rd/4th)',
+			'Contact Number',
+			'Email',
+			'Gender',
+			'DOB',
+			'Session/Semester'
+		];
+		
+		// Create worksheet data with headers only (sample template)
+		const worksheetData = [headers];
+		
+		// Create workbook and worksheet
+		const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+		const workbook = XLSX.utils.book_new();
+		XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample');
+		
+		// Set column widths
+		const colWidths = headers.map(header => ({ wch: Math.max(header.length + 5, 20) }));
+		worksheet['!cols'] = colWidths;
+		
+		// Generate buffer
+		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		
+		// Set response headers
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		res.setHeader('Content-Disposition', 'attachment; filename=sample.xlsx');
+		
+		// Send the file
+		res.send(excelBuffer);
+	} catch (err) {
+		console.error('Error generating sample file:', err);
+		// Fallback to static file if dynamic generation fails
+		res.download("public/Student.xlsx", function (downloadErr) {
+			if (downloadErr) {
+				console.log(downloadErr);
+				return res.status(500).json({ status: false, message: "Error downloading sample file" });
+			}
+		});
+	}
 });
 router.post("/courses/add", [isCollege], async (req, res) => {
 	try {

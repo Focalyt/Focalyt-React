@@ -152,7 +152,17 @@ commonRoutes.post("/userverification", async (req, res) => {
 
 commonRoutes.get("/joblist", async (req, res) => {
 	try {
-		let recentJobs = await Vacancy.find({ status: true, _company: { $ne: null }, validity: { $gte: moment().utcOffset('+05:30') }, verified: true }).populate([
+		let recentJobs = await Vacancy.find({ 
+			status: true, 
+			_company: { $ne: null }, 
+			validity: { $gte: moment().utcOffset('+05:30') }, 
+			verified: true,
+			$or: [
+				{ postingType: 'Public' },
+				{ postingType: { $exists: false } }, // For backward compatibility
+				{ postingType: null }
+			]
+		}).populate([
 			{
 				path: '_company',
 				select: "name logo stateId cityId"

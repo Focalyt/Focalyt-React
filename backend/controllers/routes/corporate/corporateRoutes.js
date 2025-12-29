@@ -1252,17 +1252,21 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
     if (job?.isedited) {
       updatedJob['isedited'] = true
     }
-    if (req.body.isContact == true) {
+    if (req.body.isContact == true || req.body.isContact === "true") {
+      updatedJob['postingType'] = 'Public';
       updatedJob['nameof'] = req.body.nameof;
       console.log("here>>>>>>>>>> inside is conastct")
       updatedJob['phoneNumberof'] = req.body.phoneNumberof;
       updatedJob['whatsappNumberof'] = req.body.whatsappNumberof;
       updatedJob['emailof'] = req.body.emailof;
+      updatedJob['collegeAcNo'] = req.body.collegeAcNo;
     } else {
+      updatedJob['postingType'] = 'Private';
       updatedJob['nameof'] = "";
       updatedJob['phoneNumberof'] = "";
       updatedJob['whatsappNumberof'] = "";
       updatedJob['emailof'] = "";
+      updatedJob['collegeAcNo'] = "";
     }
     if (updatedJob["isEdit"] == "true") {
       updatedJob["_subQualification"] = []
@@ -1462,7 +1466,13 @@ router
       if (req.body) {
         Object.keys(req.body).forEach((key) => {
           if (req.body[key] !== "") {
-            jobDetails[key] = req.body[key];
+            
+            if (key === 'isContact') {
+              const value = Array.isArray(req.body[key]) ? req.body[key][req.body[key].length - 1] : req.body[key];
+              jobDetails[key] = value === 'true' || value === true;
+            } else {
+              jobDetails[key] = req.body[key];
+            }
           }
         });
         if (req.body.latitude && req.body.longitude) {
@@ -1580,17 +1590,22 @@ router
       if (jobDetails['isEdit'] == "true") {
         jobDetails['_subQualification'] = []
       }
-      if (jobDetails.isContact == true) {
+      if (jobDetails.isContact == true || jobDetails.isContact === "true") {
+        jobDetails['postingType'] = 'Private';
         jobDetails['nameof'] = req.body.nameof;
         jobDetails['phoneNumberof'] = req.body.phoneNumberof;
         jobDetails['whatsappNumberof'] = req.body.whatsappNumberof;
         jobDetails['emailof'] = req.body.emailof;
+        jobDetails['collegeAcNo'] = req.body.collegeAcNo ? req.body.collegeAcNo.trim() : '';
+        console.log('Private Job - collegeAcNo saved:', jobDetails['collegeAcNo']);
         jobDetails['isedited'] = true
       } else {
+        jobDetails['postingType'] = 'Public';
         jobDetails['nameof'] = "";
         jobDetails['phoneNumberof'] = "";
         jobDetails['whatsappNumberof'] = "";
         jobDetails['emailof'] = "";
+        jobDetails['collegeAcNo'] = "";
       }
       const jd = await Vacancy.create(jobDetails);
 

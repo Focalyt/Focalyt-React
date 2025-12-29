@@ -338,8 +338,17 @@ router.get('/leadowner', [isCollege], async (req, res) => {
 
   router.get("/joblisting", async (req, res) => {
  
- 
-	let recentJobs = await Vacancy.find({status: true,validity: { $gte: moment().utcOffset('+05:30') }, verified: true}).select('title');
+	// ✅ Only show Public jobs, exclude Private jobs
+	let recentJobs = await Vacancy.find({
+		status: true,
+		validity: { $gte: moment().utcOffset('+05:30') }, 
+		verified: true,
+		$or: [
+			{ postingType: 'Public' },
+			{ postingType: { $exists: false } }, 
+			{ postingType: null }
+		]
+	}).select('title');
 	// console.log("recentJobs",recentJobs)
 	
 
