@@ -1926,8 +1926,8 @@ async function saveMessageToDatabase(messageData) {
     
     // Save to database
     const savedMessage = await WhatsAppMessage.create(messageDoc);
-    console.log('Message saved to database:', savedMessage._id);
-    console.log('WhatsApp Message ID:', whatsappMessageId);
+    // console.log('Message saved to database:', savedMessage._id);
+    // console.log('WhatsApp Message ID:', whatsappMessageId);
     
     return savedMessage;
   } catch (error) {
@@ -2773,7 +2773,7 @@ router.post('/send-template', isCollege, async (req, res) => {
         } else if (candidateData && template.variableMappings) {
           // Fallback: Calculate from candidateData if variableValues not provided
           actualExamples = generateActualExamples(bodyComponent.text, candidateData, template.variableMappings);
-          console.log('⚠️  Calculated example values from candidateData (fallback):', actualExamples);
+        //   console.log('⚠️  Calculated example values from candidateData (fallback):', actualExamples);
         }
         
         if (actualExamples.length > 0) {

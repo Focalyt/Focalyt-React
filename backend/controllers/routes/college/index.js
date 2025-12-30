@@ -4426,7 +4426,23 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					let contactNumber = columnMap['contactNumber'] !== undefined && rows[columnMap['contactNumber']] ? rows[columnMap['contactNumber']].toString().trim() : '';
 					let email = columnMap['email'] !== undefined && rows[columnMap['email']] ? rows[columnMap['email']].toString().trim() : '';
 					let gender = columnMap['gender'] !== undefined && rows[columnMap['gender']] ? rows[columnMap['gender']].toString().trim() : '';
-					let dob = columnMap['dob'] !== undefined && rows[columnMap['dob']] ? rows[columnMap['dob']].toString().trim() : '';
+					// Extract DOB - handle Date objects, numbers (Excel serial), and strings
+					let dob = null;
+					if (columnMap['dob'] !== undefined && rows[columnMap['dob']] !== null && rows[columnMap['dob']] !== undefined && rows[columnMap['dob']] !== '') {
+						const dobValue = rows[columnMap['dob']];
+						// If it's already a Date object, use it directly
+						if (dobValue instanceof Date) {
+							dob = dobValue;
+						}
+						// If it's a number (Excel serial), keep it as number
+						else if (typeof dobValue === 'number') {
+							dob = dobValue;
+						}
+						// Otherwise, convert to string and trim
+						else {
+							dob = dobValue.toString().trim();
+						}
+					}
 					let session = columnMap['session'] !== undefined && rows[columnMap['session']] ? rows[columnMap['session']].toString().trim() : '';
 					// College is optional - use logged-in college if not provided
 					let collegeName = columnMap['collegeName'] !== undefined && rows[columnMap['collegeName']] ? rows[columnMap['collegeName']].toString().trim() : '';
@@ -4459,10 +4475,49 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					// Parse DOB if provided
 					let dobDate = null;
 					if (dob) {
-						// Try to parse date in various formats
-						const parsedDate = new Date(dob);
-						if (!isNaN(parsedDate.getTime())) {
-							dobDate = parsedDate;
+						let parsedDate = null;
+						
+						if (dob instanceof Date) {
+							parsedDate = dob;
+						}
+						else if (typeof dob === 'number' || (!isNaN(dob) && !isNaN(parseFloat(dob)) && parseFloat(dob) > 0 && parseFloat(dob) < 100000)) {
+							const excelSerialNumber = typeof dob === 'number' ? dob : parseFloat(dob);
+							const excelEpoch = new Date(1899, 11, 30); // December 30, 1899 (day before Jan 1, 1900)
+							parsedDate = new Date(excelEpoch.getTime() + excelSerialNumber * 24 * 60 * 60 * 1000);
+						}
+						else if (typeof dob === 'string' && dob.trim()) {
+							const dobStr = dob.trim();
+							const ddmmyyyy = dobStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+							if (ddmmyyyy) {
+								const day = parseInt(ddmmyyyy[1], 10);
+								const month = parseInt(ddmmyyyy[2], 10) - 1; // Month is 0-indexed
+								const year = parseInt(ddmmyyyy[3], 10);
+								parsedDate = new Date(year, month, day);
+							}
+							// Format: YYYY-MM-DD (ISO format)
+							else {
+								const yyyymmdd = dobStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+								if (yyyymmdd) {
+									const year = parseInt(yyyymmdd[1], 10);
+									const month = parseInt(yyyymmdd[2], 10) - 1;
+									const day = parseInt(yyyymmdd[3], 10);
+									parsedDate = new Date(year, month, day);
+								}
+								// Try standard Date parsing (handles most formats)
+								else {
+									parsedDate = new Date(dobStr);
+								}
+							}
+						}
+						
+						// Validate the parsed date
+						if (parsedDate && !isNaN(parsedDate.getTime())) {
+							// Check if date is reasonable (not too far in past or future)
+							const year = parsedDate.getFullYear();
+							const currentYear = new Date().getFullYear();
+							if (year >= 1950 && year <= currentYear + 5) {
+								dobDate = parsedDate;
+							}
 						}
 					}
 

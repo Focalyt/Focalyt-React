@@ -1173,12 +1173,12 @@ const UploadCandidates = () => {
                                             <th>Sr. No.</th>
                                             <th>Candidate Name</th>
                                             <th>Father Name</th>
-                                            <th>Course</th>
-                                            <th>Year (1st/2nd/3rd/4th)</th>
                                             <th>Contact Number</th>
                                             <th>Email</th>
                                             <th>Gender</th>
                                             <th>DOB</th>
+                                            <th>Course</th>
+                                            <th>Year (1st/2nd/3rd/4th)</th>
                                             <th>Session/Semester</th>
                                             <th>Upload Date</th>
                                           </tr>
@@ -1189,12 +1189,12 @@ const UploadCandidates = () => {
                                               <td>{(inactivePage - 1) * 50 + index + 1}</td>
                                               <td className="text-capitalize">{candidate.name || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
-                                              <td>{candidate.course || 'N/A'}</td>
-                                              <td>{candidate.year || 'N/A'}</td>
                                               <td>{candidate.contactNumber || 'N/A'}</td>
                                               <td>{candidate.email || 'N/A'}</td>
                                               <td>{candidate.gender || 'N/A'}</td>
                                               <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
+                                              <td>{candidate.course || 'N/A'}</td>
+                                              <td>{candidate.year || 'N/A'}</td>
                                               <td>{candidate.session || 'N/A'}</td>
                                               <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
                                             </tr>
