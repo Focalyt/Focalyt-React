@@ -745,7 +745,7 @@ const Profile = () => {
                                   }}
                                   title={logoPreview ? "Preview - Click Save to update" : "Click to update logo"}
                                 />
-                                {logoPreview && (
+                                {/* {logoPreview && (
                                   <div style={{
                                     position: 'absolute',
                                     bottom: '-90px',
@@ -759,7 +759,7 @@ const Profile = () => {
                                     textAlign: 'center',
                                     fontWeight: 'bold'
                                   }}>Preview</div>
-                                )}
+                                )} */}
                                 {!logoPreview && (
                                   <div style={{
                                     position: 'absolute',

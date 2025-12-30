@@ -7,8 +7,21 @@ router.use(isAdmin);
 // Route to render statusB2C.ejs template
 router.route("/").get(async (req, res) => {
 	try {
-		// Show all statuses (no college filtering)
-		const statuses = await Status.find({})
+		const selectedCollegeId = req.query.collegeId || null;
+		
+		const colleges = await College.find({ status: true, isDeleted: { $ne: true } })
+			.select('_id name')
+			.sort({ name: 1 })
+			.lean();
+
+		let query = {};
+		if (selectedCollegeId) {
+			query = { college: selectedCollegeId };
+		} else {
+			query = { college: null };
+		}
+
+		const statuses = await Status.find(query)
 			.sort({ index: 1 })
 			.lean();
 
@@ -20,12 +33,15 @@ router.route("/").get(async (req, res) => {
 			milestone: status.milestone || '',
 			description: status.description || '',
 			substatuses: status.substatuses || [],
-			index: status.index
+			index: status.index,
+			college: status.college || null
 		}));
 
 		return res.render(`${req.vPath}/admin/statuses/statusB2C`, {
 			menu: 'statusB2C',
-			statuses: formattedStatuses
+			statuses: formattedStatuses,
+			colleges: colleges,
+			selectedCollegeId: selectedCollegeId
 		});
 	} catch (err) {
 		console.error('Error fetching statusB2C:', err);
@@ -37,8 +53,16 @@ router.route("/").get(async (req, res) => {
 // GET API endpoint for fetching statuses (for React app or API calls)
 router.get('/api', async (req, res) => {
 	try {
-		// Show all statuses (no college filtering)
-		const statuses = await Status.find({})
+		const collegeId = req.query.collegeId || null;
+	
+		let query = {};
+		if (collegeId) {
+			query = { college: collegeId };
+		} else {
+			query = { college: null };
+		}
+
+		const statuses = await Status.find(query)
 			.sort({ index: 1 })
 			.lean();
 
@@ -56,11 +80,37 @@ router.get('/api', async (req, res) => {
 // API Endpoints for CRUD operations (for EJS templates and React app - Admin only, no college token needed)
 router.post('/add', async (req, res) => {
 	try {
-		const { title, description, milestone } = req.body;
-		console.log(req.body);
+		const { title, description, milestone, collegeId } = req.body;
 		
-		// Find the highest index to add new status at the end (no college filtering)
-		const highestIndexStatus = await Status.findOne({}).sort('-index');
+	
+		// console.log('Creating status:', {
+		// 	title,
+		// 	collegeId: collegeId || 'null (global)',
+		// 	collegeIdType: typeof collegeId
+		// });
+		
+		// Validate collegeId if provided
+		let validatedCollegeId = null;
+		if (collegeId) {
+			// Check if college exists
+			const college = await College.findById(collegeId);
+			if (!college) {
+				return res.status(400).json({ 
+					success: false, 
+					message: 'Invalid college ID provided' 
+				});
+			}
+			validatedCollegeId = collegeId;
+		}
+		
+		let indexQuery = {};
+		if (validatedCollegeId) {
+			indexQuery = { college: validatedCollegeId };
+		} else {
+			indexQuery = { college: null };
+		}
+		
+		const highestIndexStatus = await Status.findOne(indexQuery).sort('-index');
 		const newIndex = highestIndexStatus ? highestIndexStatus.index + 1 : 0;
 		
 		const newStatus = new Status({
@@ -69,14 +119,20 @@ router.post('/add', async (req, res) => {
 			milestone: milestone || '',
 			index: newIndex,
 			substatuses: [],
-			college: null
+			college: validatedCollegeId || null  // Explicitly set to null if no collegeId
 		});
 		
 		const data = await newStatus.save();
 		
+		// console.log('Status created:', {
+		// 	statusId: data._id,
+		// 	college: data.college || 'null (global)',
+		// 	index: data.index
+		// });
+		
 		return res.status(201).json({ success: true, message: 'Status created successfully', data: data });
 	} catch (err) {
-		console.error(err.message);
+		console.error('Error creating status:', err.message);
 		return res.status(500).json({ success: false, message: 'Server Error', error: err.message });
 	}
 });
@@ -91,7 +147,14 @@ router.put('/edit/:id', async (req, res) => {
 			return res.status(404).json({ success: false, message: 'Status not found' });
 		}
 		
-		// Update fields
+		
+		// console.log('Editing status:', {
+		// 	statusId: status._id,
+		// 	currentCollege: status.college,
+		// 	title: status.title,
+		// 	newTitle: title
+		// });
+		
 		if (title !== undefined) status.title = title;
 		if (description !== undefined) status.description = description;
 		if (milestone !== undefined) status.milestone = milestone;
@@ -116,10 +179,24 @@ router.delete('/delete/:id', async (req, res) => {
 			return res.status(404).json({ success: false, message: 'Status not found' });
 		}
 		
+		const collegeId = status.college;
+		
 		await status.deleteOne();
 		
-		// Reindex all remaining statuses (no college filtering)
-		const remainingStatuses = await Status.find({}).sort('index');
+		
+		let reindexQuery = {};
+		if (collegeId) {
+			reindexQuery = {
+				$or: [
+					{ college: collegeId },
+					{ college: null }
+				]
+			};
+		} else {
+			reindexQuery = { college: null };
+		}
+		
+		const remainingStatuses = await Status.find(reindexQuery).sort('index');
 		for (let i = 0; i < remainingStatuses.length; i++) {
 			remainingStatuses[i].index = i;
 			await remainingStatuses[i].save();
@@ -137,12 +214,30 @@ router.delete('/delete/:id', async (req, res) => {
 
 router.put('/reorder', async (req, res) => {
 	try {
-		const { statusOrder } = req.body;
+		const { statusOrder, collegeId } = req.body;
 		
 		if (!Array.isArray(statusOrder)) {
 			return res.status(400).json({ success: false, message: 'Invalid statusOrder array' });
 		}
 		
+		
+		const statusIds = statusOrder.map(s => s._id).filter(id => require('mongoose').Types.ObjectId.isValid(id));
+		
+		if (statusIds.length === 0) {
+			return res.status(400).json({ success: false, message: 'No valid status IDs provided' });
+		}
+		const statusesToReorder = await Status.find({ _id: { $in: statusIds } });
+		
+		const expectedCollegeId = collegeId || null;
+		for (const status of statusesToReorder) {
+			const statusCollegeId = status.college ? status.college.toString() : null;
+			if (statusCollegeId !== expectedCollegeId) {
+				return res.status(400).json({ 
+					success: false, 
+					message: `Cannot reorder: Status "${status.title}" belongs to a different college context` 
+				});
+			}
+		}
 		for (let i = 0; i < statusOrder.length; i++) {
 			const { _id, index } = statusOrder[i];
 			

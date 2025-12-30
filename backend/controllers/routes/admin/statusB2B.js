@@ -7,8 +7,21 @@ router.use(isAdmin);
 // Route to render statusB2B.ejs template
 router.route("/").get(async (req, res) => {
 	try {
-		// Show all statuses (no college filtering)
-		const statuses = await StatusB2b.find({})
+		const selectedCollegeId = req.query.collegeId || null;
+		
+		const colleges = await College.find({ status: true, isDeleted: { $ne: true } })
+			.select('_id name')
+			.sort({ name: 1 })
+			.lean();
+
+		let query = {};
+		if (selectedCollegeId) {
+			query = { college: selectedCollegeId };
+		} else {
+			query = { college: null };
+		}
+
+		const statuses = await StatusB2b.find(query)
 			.sort({ index: 1 })
 			.lean();
 
@@ -20,12 +33,15 @@ router.route("/").get(async (req, res) => {
 			milestone: status.milestone || '',
 			description: status.description || '',
 			substatuses: status.substatuses || [],
-			index: status.index
+			index: status.index,
+			college: status.college || null
 		}));
 
 		return res.render(`${req.vPath}/admin/statuses/statusB2B`, {
 			menu: 'statusB2B',
-			statuses: formattedStatuses
+			statuses: formattedStatuses,
+			colleges: colleges,
+			selectedCollegeId: selectedCollegeId
 		});
 	} catch (err) {
 		console.error('Error fetching statusB2B:', err);
@@ -37,8 +53,16 @@ router.route("/").get(async (req, res) => {
 // GET API endpoint for fetching statuses (for React app or API calls)
 router.get('/api', async (req, res) => {
 	try {
-		// Show all statuses (no college filtering)
-		const statuses = await StatusB2b.find({})
+		const collegeId = req.query.collegeId || null;
+	
+		let query = {};
+		if (collegeId) {
+			query = { college: collegeId };
+		} else {
+			query = { college: null };
+		}
+
+		const statuses = await StatusB2b.find(query)
 			.sort({ index: 1 })
 			.lean();
 
@@ -56,10 +80,29 @@ router.get('/api', async (req, res) => {
 // API Endpoints for CRUD operations (for EJS templates and React app - Admin only, no college token needed)
 router.post('/add', async (req, res) => {
 	try {
-		const { title, description, milestone } = req.body;
+		const { title, description, milestone, collegeId } = req.body;
+	
+		// Validate collegeId if provided
+		let validatedCollegeId = null;
+		if (collegeId) {
+			const college = await College.findById(collegeId);
+			if (!college) {
+				return res.status(400).json({ 
+					success: false, 
+					message: 'Invalid college ID provided' 
+				});
+			}
+			validatedCollegeId = collegeId;
+		}
 		
-		// Find the highest index to add new status at the end (no college filtering)
-		const highestIndexStatus = await StatusB2b.findOne({}).sort('-index');
+		let indexQuery = {};
+		if (validatedCollegeId) {
+			indexQuery = { college: validatedCollegeId };
+		} else {
+			indexQuery = { college: null };
+		}
+		
+		const highestIndexStatus = await StatusB2b.findOne(indexQuery).sort('-index');
 		const newIndex = highestIndexStatus ? highestIndexStatus.index + 1 : 0;
 		
 		const newStatus = new StatusB2b({
@@ -68,7 +111,7 @@ router.post('/add', async (req, res) => {
 			milestone: milestone || '',
 			index: newIndex,
 			substatuses: [],
-			college: null
+			college: validatedCollegeId || null
 		});
 		
 		const data = await newStatus.save();
@@ -90,7 +133,6 @@ router.put('/edit/:id', async (req, res) => {
 			return res.status(404).json({ success: false, message: 'Status not found' });
 		}
 		
-		// Update fields
 		if (title !== undefined) status.title = title;
 		if (description !== undefined) status.description = description;
 		if (milestone !== undefined) status.milestone = milestone;
@@ -115,10 +157,23 @@ router.delete('/delete/:id', async (req, res) => {
 			return res.status(404).json({ success: false, message: 'Status not found' });
 		}
 		
+		const collegeId = status.college;
+		
 		await status.deleteOne();
 		
-		// Reindex all remaining statuses (no college filtering)
-		const remainingStatuses = await StatusB2b.find({}).sort('index');
+		let reindexQuery = {};
+		if (collegeId) {
+			reindexQuery = {
+				$or: [
+					{ college: collegeId },
+					{ college: null }
+				]
+			};
+		} else {
+			reindexQuery = { college: null };
+		}
+		
+		const remainingStatuses = await StatusB2b.find(reindexQuery).sort('index');
 		for (let i = 0; i < remainingStatuses.length; i++) {
 			remainingStatuses[i].index = i;
 			await remainingStatuses[i].save();
@@ -136,10 +191,28 @@ router.delete('/delete/:id', async (req, res) => {
 
 router.put('/reorder', async (req, res) => {
 	try {
-		const { statusOrder } = req.body;
+		const { statusOrder, collegeId } = req.body;
 		
 		if (!Array.isArray(statusOrder)) {
 			return res.status(400).json({ success: false, message: 'Invalid statusOrder array' });
+		}
+		
+		const statusIds = statusOrder.map(s => s._id).filter(id => require('mongoose').Types.ObjectId.isValid(id));
+		
+		if (statusIds.length === 0) {
+			return res.status(400).json({ success: false, message: 'No valid status IDs provided' });
+		}
+		const statusesToReorder = await StatusB2b.find({ _id: { $in: statusIds } });
+		
+		const expectedCollegeId = collegeId || null;
+		for (const status of statusesToReorder) {
+			const statusCollegeId = status.college ? status.college.toString() : null;
+			if (statusCollegeId !== expectedCollegeId) {
+				return res.status(400).json({ 
+					success: false, 
+					message: `Cannot reorder: Status "${status.title}" belongs to a different college context` 
+				});
+			}
 		}
 		
 		for (let i = 0; i < statusOrder.length; i++) {

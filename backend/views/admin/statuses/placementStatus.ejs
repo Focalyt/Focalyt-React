@@ -29,6 +29,71 @@
 			</button>
 		</div>
 
+		<!-- College Selector -->
+		<div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+			<label style="display: block; font-weight: 500; color: #4a5568; margin-bottom: 8px; font-size: 14px;">
+				Select College 
+			</label>
+			<div style="position: relative; width: 100%; max-width: 400px;">
+				<input 
+					type="text" 
+					id="college-search-input" 
+					placeholder="Type to search college..." 
+					autocomplete="off"
+					style="width: 100%; padding: 10px 12px; padding-right: 40px; border: 1px solid <%= selectedCollegeId ? '#059669' : '#d1d5db' %>; border-radius: 6px; font-size: 14px; background: <%= selectedCollegeId ? '#f0fdf4' : 'white' %>; font-weight: <%= selectedCollegeId ? '500' : 'normal' %>;"
+					oninput="filterColleges()"
+					onfocus="showCollegeDropdown()"
+					onblur="hideCollegeDropdown()"
+					value="<%= selectedCollegeId && colleges ? (colleges.find(c => c._id.toString() === selectedCollegeId.toString())?.name || '') : '' %>"
+					<%= selectedCollegeId ? 'readonly' : '' %>
+				/>
+				<span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6b7280; pointer-events: none;">🔍</span>
+				<input type="hidden" id="college-selector" value="<%= selectedCollegeId || '' %>" />
+				<div id="college-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+					<div 
+						class="college-option" 
+						data-college-id=""
+						data-college-display-name="Global Statuses (All Colleges)"
+						style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; <%= !selectedCollegeId ? 'background-color: #dbeafe; border-left: 3px solid #3b82f6; font-weight: 600;' : '' %>"
+						onclick="selectCollegeFromElement(this)"
+						onmouseover="if (!this.style.borderLeft || this.style.borderLeft === 'none') this.style.backgroundColor='#f9fafb'"
+						onmouseout="if (!this.style.borderLeft || this.style.borderLeft === 'none') this.style.backgroundColor=''">
+						<strong>Global Statuses (All Colleges)</strong>
+						<% if (!selectedCollegeId) { %>
+							<span style="float: right; color: #059669; font-size: 12px;">✓ Selected</span>
+						<% } %>
+					</div>
+					<% if (colleges && colleges.length > 0) { %>
+						<% colleges.forEach((college) => { %>
+							<div 
+								class="college-option" 
+								data-college-id="<%= college._id %>"
+								data-college-name="<%= (college.name || '').toLowerCase() %>"
+								data-college-display-name="<%= college.name %>"
+								style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; <%= selectedCollegeId && selectedCollegeId.toString() === college._id.toString() ? 'background-color: #dbeafe; border-left: 3px solid #3b82f6; font-weight: 600;' : '' %>"
+								onclick="selectCollegeFromElement(this)"
+								onmouseover="if (!this.style.borderLeft || this.style.borderLeft === 'none') this.style.backgroundColor='#f9fafb'"
+								onmouseout="if (!this.style.borderLeft || this.style.borderLeft === 'none') this.style.backgroundColor=''">
+								<%= college.name %>
+								<% if (selectedCollegeId && selectedCollegeId.toString() === college._id.toString()) { %>
+									<span style="float: right; color: #059669; font-size: 12px;">✓ Selected</span>
+								<% } %>
+							</div>
+						<% }); %>
+					<% } %>
+				</div>
+			</div>
+			<% if (selectedCollegeId) { %>
+				<p style="margin-top: 8px; font-size: 13px; color: #059669;">
+					✓ Managing statuses for selected college. Changes will reflect in that college's module.
+				</p>
+			<% } else { %>
+				<p style="margin-top: 8px; font-size: 13px; color: #6b7280;">
+					Managing global statuses. Select a college to manage college-specific statuses.
+				</p>
+			<% } %>
+		</div>
+
 		<div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 32px 16px; margin-top: 24px; overflow-x: auto; white-space: nowrap;">
 			<div id="status-container" style="display: flex; align-items: flex-start; padding: 20px 16px; min-width: max-content;">
 				<% if (statuses && statuses.length > 0) { %>
@@ -296,6 +361,127 @@
 		let deletingSubstatusId = null;
 		let isDeletingSubstatus = false;
 
+		// College Selector Functions
+		const allColleges = <%- JSON.stringify(colleges || []) %>;
+		
+		function filterColleges() {
+			const searchInput = document.getElementById('college-search-input');
+			const dropdown = document.getElementById('college-dropdown');
+			const searchTerm = searchInput.value.toLowerCase().trim();
+			
+			const options = dropdown.querySelectorAll('.college-option');
+			let hasVisibleOptions = false;
+			
+			options.forEach(option => {
+				const collegeName = option.getAttribute('data-college-name') || option.textContent.toLowerCase();
+				const isGlobalOption = !option.getAttribute('data-college-id');
+				
+				if (isGlobalOption) {
+					option.style.display = 'block';
+					hasVisibleOptions = true;
+				} else if (collegeName.includes(searchTerm) || searchTerm === '') {
+					option.style.display = 'block';
+					hasVisibleOptions = true;
+				} else {
+					option.style.display = 'none';
+				}
+			});
+			
+			if (searchInput === document.activeElement && hasVisibleOptions) {
+				showCollegeDropdown();
+			}
+		}
+		
+		function showCollegeDropdown() {
+			const dropdown = document.getElementById('college-dropdown');
+			const searchInput = document.getElementById('college-search-input');
+			dropdown.style.display = 'block';
+			
+			// Reset input styling when dropdown opens
+			if (!searchInput.value) {
+				searchInput.style.borderColor = '#d1d5db';
+				searchInput.style.backgroundColor = 'white';
+			}
+			
+			filterColleges();
+		}
+		
+		function hideCollegeDropdown() {
+			setTimeout(() => {
+				const dropdown = document.getElementById('college-dropdown');
+				dropdown.style.display = 'none';
+			}, 200);
+		}
+		
+		function selectCollege(collegeId, collegeName) {
+			const searchInput = document.getElementById('college-search-input');
+			const hiddenInput = document.getElementById('college-selector');
+			
+			if (collegeId) {
+				searchInput.value = collegeName;
+				hiddenInput.value = collegeId;
+				searchInput.style.borderColor = '#059669';
+				searchInput.style.backgroundColor = '#f0fdf4';
+				searchInput.setAttribute('readonly', 'readonly');
+			} else {
+				searchInput.value = '';
+				hiddenInput.value = '';
+				searchInput.style.borderColor = '#d1d5db';
+				searchInput.style.backgroundColor = 'white';
+				searchInput.removeAttribute('readonly');
+			}
+			
+			updateSelectedCollegeDisplay(collegeId);
+			hideCollegeDropdown();
+			handleCollegeChange();
+		}
+		
+		function selectCollegeFromElement(element) {
+			const collegeId = element.getAttribute('data-college-id') || '';
+			const collegeName = element.getAttribute('data-college-display-name') || element.textContent.trim();
+			selectCollege(collegeId, collegeName);
+		}
+		
+		function updateSelectedCollegeDisplay(selectedCollegeId) {
+			const options = document.querySelectorAll('.college-option');
+			options.forEach(option => {
+				const optionCollegeId = option.getAttribute('data-college-id') || '';
+				if (optionCollegeId === selectedCollegeId) {
+					option.style.backgroundColor = '#dbeafe';
+					option.style.borderLeft = '3px solid #3b82f6';
+					option.style.fontWeight = '600';
+				} else {
+					option.style.backgroundColor = '';
+					option.style.borderLeft = '';
+					option.style.fontWeight = '';
+				}
+			});
+		}
+		
+		function handleCollegeChange() {
+			const hiddenInput = document.getElementById('college-selector');
+			const collegeId = hiddenInput.value;
+			const url = new URL(window.location.href);
+			
+			if (collegeId) {
+				url.searchParams.set('collegeId', collegeId);
+			} else {
+				url.searchParams.delete('collegeId');
+			}
+			
+			window.location.href = url.toString();
+		}
+		
+		document.getElementById('college-search-input').addEventListener('keydown', function(e) {
+			const dropdown = document.getElementById('college-dropdown');
+			const visibleOptions = Array.from(dropdown.querySelectorAll('.college-option')).filter(opt => opt.style.display !== 'none');
+			
+			if (e.key === 'Enter' && visibleOptions.length > 0) {
+				e.preventDefault();
+				visibleOptions[0].click();
+			}
+		});
+
 		// Status Modal Functions
 		function openStatusModal(edit, index) {
 			isEditMode = edit;
@@ -329,6 +515,8 @@
 			const title = document.getElementById('statusTitle').value.trim();
 			const description = document.getElementById('statusDescription').value.trim();
 			const milestone = document.getElementById('statusMilestone').value.trim();
+			const collegeSelector = document.getElementById('college-selector');
+			const collegeId = collegeSelector ? collegeSelector.value : null;
 
 			if (!title) {
 				alert('Please enter a status name');
@@ -350,7 +538,7 @@
 					}
 				} else {
 					const response = await axios.post(`${backendUrl}/admin/placementStatus/add`, {
-						title, description, milestone
+						title, description, milestone, collegeId: collegeId || null
 					}, {
 						withCredentials: true
 					});
@@ -555,13 +743,17 @@
 			draggedItem = null;
 
 			try {
+				const collegeSelector = document.getElementById('college-selector');
+				const collegeId = collegeSelector ? collegeSelector.value : null;
+				
 				const statusOrder = newStatuses.map((status, index) => ({
 					_id: status._id,
 					index: index
 				}));
 
 				const response = await axios.put(`${backendUrl}/admin/placementStatus/reorder`, {
-					statusOrder
+					statusOrder,
+					collegeId: collegeId || null
 				}, {
 					withCredentials: true
 				});
@@ -589,13 +781,17 @@
 			statuses = newStatuses;
 
 			try {
+				const collegeSelector = document.getElementById('college-selector');
+				const collegeId = collegeSelector ? collegeSelector.value : null;
+				
 				const statusOrder = newStatuses.map((status, index) => ({
 					_id: status._id,
 					index: index
 				}));
 
 				const response = await axios.put(`${backendUrl}/admin/placementStatus/reorder`, {
-					statusOrder
+					statusOrder,
+					collegeId: collegeId || null
 				}, {
 					withCredentials: true
 				});
@@ -622,13 +818,17 @@
 			statuses = newStatuses;
 
 			try {
+				const collegeSelector = document.getElementById('college-selector');
+				const collegeId = collegeSelector ? collegeSelector.value : null;
+				
 				const statusOrder = newStatuses.map((status, index) => ({
 					_id: status._id,
 					index: index
 				}));
 
 				const response = await axios.put(`${backendUrl}/admin/placementStatus/reorder`, {
-					statusOrder
+					statusOrder,
+					collegeId: collegeId || null
 				}, {
 					withCredentials: true
 				});

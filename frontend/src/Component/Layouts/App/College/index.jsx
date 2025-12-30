@@ -334,26 +334,27 @@ function CollegeLayout({ children }) {
     <div className="min-h-screen flex flex-col">
       <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
-          <div className={`navbar-header ${expanded ? 'expanded' : ''}`}>
-            <ul className="nav navbar-nav flex-row">
-              <li className="nav-item mr-auto">
-                <Link to="/institute/myprofile" className="navbar-brand">
+          <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
+            <ul className="nav navbar-nav flex-row" style={{ width: '100%', justifyContent: 'center', alignItems: 'center' }}>
+              <li className="nav-item" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <Link to="/institute/myprofile" className="navbar-brand" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                   {collegeLogo && collegeLogo.trim() !== '' ? (
                     <img 
                       className="img-fluid logocs" 
                       src={`${bucketUrl}/${collegeLogo}?t=${Date.now()}`} 
                       alt="College Logo"
+                      style={{ maxWidth: '180px', width: 'auto', height: 'auto', display: 'block' }}
                       onError={(e) => {
                         e.target.src = "/Assets/images/logo/logo.png";
                         setCollegeLogo(null);
                       }}
                     />
                   ) : (
-                    <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Focalyt Logo" />
+                    <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Focalyt Logo" style={{ maxWidth: '180px', width: 'auto', height: 'auto', display: 'block' }} />
                   )}
                 </Link>
               </li>
-              <li className="nav-item nav-toggle">
+              <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px' }}>
                 <a className="nav-link modern-nav-toggle pr-0" onClick={toggleSidebar}>
                   <i className={`icon-x d-block d-xl-none font-medium-4 primary toggle-icon feather ${expanded ? 'icon-disc' : 'icon-circle'}`}></i>
                   <i className={`toggle-icon icon-disc font-medium-4 d-none d-xl-block collapse-toggle-icon primary feather`}></i>

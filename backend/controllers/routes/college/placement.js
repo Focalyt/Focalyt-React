@@ -1361,7 +1361,7 @@ router.get('/company-jobs', isCollege, async (req, res) => {
     
     // Get college ID for private job filtering
     const college = await College.findOne({
-      '_concernPerson._id': user._id
+      _concernPerson: { $elemMatch: { _id: user._id } }
     });
     
     if (!college) {
@@ -1462,14 +1462,18 @@ router.get('/company-jobs', isCollege, async (req, res) => {
       
       // Debug logging for private jobs
       if (postingType === 'Private') {
-        // ✅ Trim and normalize both values for comparison
-        const jobCollegeAcNo = job.collegeAcNo ? job.collegeAcNo.toString().trim() : null;
+        // ✅ Check if collegeId is in collegeAcNo array
+        const jobCollegeAcNos = Array.isArray(job.collegeAcNo) 
+          ? job.collegeAcNo.map(no => no.toString().trim())
+          : job.collegeAcNo 
+            ? [job.collegeAcNo.toString().trim()]
+            : [];
         const normalizedCollegeId = collegeId.trim();
-        const matches = jobCollegeAcNo && jobCollegeAcNo === normalizedCollegeId;
+        const matches = jobCollegeAcNos.length > 0 && jobCollegeAcNos.includes(normalizedCollegeId);
         
-        // console.log(`Private Job ${job._id}: collegeAcNo="${jobCollegeAcNo}", collegeId="${normalizedCollegeId}", matches=${matches}`);
+        // console.log(`Private Job ${job._id}: collegeAcNos="${jobCollegeAcNos.join(',')}", collegeId="${normalizedCollegeId}", matches=${matches}`);
         
-        // Private job - only show if collegeAcNo matches collegeId
+        // Private job - only show if collegeId is in collegeAcNo array
         return matches;
       } else {
         // Public job or no postingType set - show to all

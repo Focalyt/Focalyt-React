@@ -3958,7 +3958,12 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 			// Check posting type
 			const postingType = job.postingType;
 			if (postingType === 'Private') {
-				return job.collegeAcNo && job.collegeAcNo.toString() === collegeId;
+				const jobCollegeAcNos = Array.isArray(job.collegeAcNo) 
+					? job.collegeAcNo.map(no => no.toString().trim())
+					: job.collegeAcNo 
+						? [job.collegeAcNo.toString().trim()]
+						: [];
+				return jobCollegeAcNos.length > 0 && jobCollegeAcNos.includes(collegeId.toString().trim());
 			} else {
 				// Public job or no postingType set - show to all
 				return true;

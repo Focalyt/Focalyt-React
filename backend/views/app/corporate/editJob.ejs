@@ -636,6 +636,54 @@
                     <div class="card-content">
                       <div class="card-content">
                         <div class="card-body">
+                          <div class="row">
+                            <div class="col-xl-12 col-lg-12 col-12">
+                              <label for="job-public" class="px-1 h1 col-6">Do you want job public ?</label>
+                              <div class="col-xl-12 col-lg-12 col-12">
+                                <div class="form-check-inline">
+                                  <input type="radio" id="job-public-yes" name="isPublic" value="true"
+                                    onclick="hideCollegeAcInfo()" 
+                                    <% if(jd && jd.postingType === 'Public') { %> checked <% } else if(!jd || !jd.postingType) { %> checked <% } %>/>
+                                    <label for="job-public-yes">Yes</label>
+                                </div>
+                                <div class="form-check-inline">
+                                  <input type="radio" id="job-public-no" name="isPublic" value="false"
+                                    onclick="showCollegeAcInfo()" 
+                                    <% if(jd && jd.postingType === 'Private') { %> checked <% } %>/>
+                                    <label for="job-public-no">No</label>
+                                </div>
+                              </div>
+                              <div class="col-12" id="college-ac-info" style="display: none;">
+                                <div class="row">
+                                  <div class="col-xl-8 col-lg-10 mb-1">
+                                    <label>College Account Numbers</label><span class="mandatory"> *</span>
+                                    <small class="form-text text-muted d-block mb-2">
+                                      <i class="feather icon-info"></i> 
+                                      Enter College Account Numbers. This job will be visible to the specified colleges. You can add multiple colleges.
+                                    </small>
+                                    <div id="college-ac-list" class="row">
+                                      <!-- College Account Numbers will be added here dynamically -->
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-success mt-2" onclick="addCollegeAcNo()">
+                                      <i class="feather icon-plus"></i> Add College Account Number
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-xl-12 col-lg-12 px-3">
+                  <div class="card">
+                    <div class="card-content">
+                      <div class="card-content">
+                        <div class="card-body">
                           <div class="row contact-edited">
                             <label for="contact-directly" class="px-1 h1 col-6">Do you want the candidate to contact you
                               directly?</label>
@@ -1482,6 +1530,7 @@
             $('#jd-comp .error').removeClass('error')
             $('#jd-shift-info .error').removeClass('error')
             $('#jd-skills .error').removeClass('error')
+            $('#college-ac-info').removeClass('error');
             let title = $('#jobTitle').val()
             $('#jd-subqua-field').removeClass('error')
             let industry = $('#jd-industry').val();
@@ -1624,6 +1673,24 @@
                 flag = false;
               }
             }
+            
+            // Validate college account numbers for private jobs
+            const isJobPrivate = document.querySelector('input[name="isPublic"]:checked')?.value === 'false';
+            if (isJobPrivate) {
+              const collegeAcInputs = document.querySelectorAll('.college-ac-input');
+              let hasValidInput = false;
+              collegeAcInputs.forEach(input => {
+                if (input.value.trim() !== '') {
+                  hasValidInput = true;
+                }
+              });
+              if (!hasValidInput || collegeAcInputs.length === 0) {
+                $('#college-ac-info').addClass('error');
+                firstError = firstError ? firstError : (collegeAcInputs[0] || document.querySelector('.college-ac-input'));
+                flag = false;
+              }
+            }
+            
             if (firstError) {
               firstError.focus();
             }
@@ -1701,6 +1768,75 @@
 
 
 
+          // College Account Numbers Functions
+          let collegeAcNoIndex = 0;
+          function addCollegeAcNo() {
+            const container = document.getElementById('college-ac-list');
+            const index = collegeAcNoIndex++;
+            const div = document.createElement('div');
+            div.className = 'col-12 col-md-6 col-lg-4 mb-2 college-ac-item';
+            div.id = 'college-ac-item-' + index;
+            div.innerHTML = '<div class="input-group">' +
+              '<input type="text" class="form-control college-ac-input" id="collegeAcNo-' + index + '" name="collegeAcNo[]" placeholder="Enter College Account Number" required oninvalid="this.setCustomValidity(\'Please enter College Account Number\')" oninput="this.setCustomValidity(\'\')">' +
+              '<div class="input-group-append">' +
+              '<button type="button" class="btn btn-sm btn-danger" onclick="removeCollegeAcNo(' + index + ')">' +
+              '<i class="feather icon-trash-2"></i> <span class="d-none d-md-inline">Remove</span>' +
+              '</button>' +
+              '</div>' +
+              '</div>';
+            container.appendChild(div);
+          }
+          
+          function removeCollegeAcNo(index) {
+            var item = document.getElementById('college-ac-item-' + index);
+            if (item) {
+              item.remove();
+              // Ensure at least one input remains
+              var container = document.getElementById('college-ac-list');
+              if (container.children.length === 0) {
+                addCollegeAcNo();
+              }
+            }
+          }
+          
+          // Initialize college account numbers from existing data (for edit mode)
+          function initializeCollegeAcNos() {
+            <% 
+            var collegeAcNosArray = [];
+            if (jd && jd.collegeAcNo) {
+              if (Array.isArray(jd.collegeAcNo)) {
+                collegeAcNosArray = jd.collegeAcNo;
+              } else if (typeof jd.collegeAcNo === 'string' && jd.collegeAcNo.trim() !== '') {
+                collegeAcNosArray = [jd.collegeAcNo];
+              }
+            }
+            if (collegeAcNosArray.length > 0) { %>
+              var collegeAcNos = <%- JSON.stringify(collegeAcNosArray) %>;
+              for (var idx = 0; idx < collegeAcNos.length; idx++) {
+                var acNo = collegeAcNos[idx];
+                var container = document.getElementById('college-ac-list');
+                var index = collegeAcNoIndex++;
+                var div = document.createElement('div');
+                div.className = 'col-12 col-md-6 col-lg-4 mb-2 college-ac-item';
+                div.id = 'college-ac-item-' + index;
+                var inputHtml = '<div class="input-group"><input type="text" class="form-control college-ac-input" id="collegeAcNo-' + index + '" name="collegeAcNo[]" value="' + acNo + '" placeholder="Enter College Account Number" required oninvalid="this.setCustomValidity(\'Please enter College Account Number\')" oninput="this.setCustomValidity(\'\')"><div class="input-group-append"><button type="button" class="btn btn-sm btn-danger" onclick="removeCollegeAcNo(' + index + ')"><i class="feather icon-trash-2"></i> <span class="d-none d-md-inline">Remove</span></button></div></div>';
+                div.innerHTML = inputHtml;
+                container.appendChild(div);
+              }
+            <% } %>
+          }
+          
+          function showCollegeAcInfo() {
+            document.getElementById("college-ac-info").style.display = "block";
+            // Initialize with one input if empty
+            if (document.getElementById('college-ac-list').children.length === 0) {
+              addCollegeAcNo();
+            }
+          }
+          function hideCollegeAcInfo() {
+            document.getElementById("college-ac-info").style.display = "none";
+          }
+
           function showContactInfo() {
             document.getElementById("contact-info").style.display = "block";
             var coinLabel = document.querySelector('label[for="25 coin"]');
@@ -1712,6 +1848,27 @@
             coinLabel.style.display = "none";
           }
           $(document).ready(function () {
+            // Handle job public/private toggle - only affects college-ac-info
+            $('input[name="isPublic"]').change(function() {
+              const isPublicValue = $(this).val();
+              if (isPublicValue === 'false') {
+                // No = Private job, show college ac info
+                showCollegeAcInfo();
+              } else {
+                // Yes = Public job, hide college ac info
+                hideCollegeAcInfo();
+              }
+            });
+            
+            // Initialize college-ac-info visibility on page load
+            if ($('#job-public-no').prop('checked')) {
+              showCollegeAcInfo();
+              initializeCollegeAcNos();
+            } else {
+              hideCollegeAcInfo();
+            }
+            
+            // Initialize contact-info visibility (independent of isPublic)
             if ($('#contact-directly-yes').prop('checked')) {
               showContactInfo();
             }

@@ -654,7 +654,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="row">
                   <div class="col-xl-12 col-lg-12 px-3">
                     <div class="card">
@@ -677,17 +676,18 @@
                               </div>
                               <div class="col-12" id="college-ac-info" style="display: none;">
                                 <div class="row">
-                                  <div class="col-xl-6 mb-1" id="jd-collegeAcNo">
-                                    <label>College Account Number</label><span class="mandatory"> *</span>
-                                    <input type="text" class="form-control" id="collegeAcNo"
-                                      placeholder="Enter College Account Number" name="collegeAcNo"
-                                      value="<%= vacancy?.collegeAcNo %>" required
-                                      oninvalid="this.setCustomValidity('Please enter College Account Number for private job')"
-                                      oninput="this.setCustomValidity('')">
-                                    <small class="form-text text-muted">
+                                  <div class="col-xl-8 col-lg-10 mb-1">
+                                    <label>College Account Numbers</label><span class="mandatory"> *</span>
+                                    <small class="form-text text-muted d-block mb-2">
                                       <i class="feather icon-info"></i> 
-                                      Enter the College Account Number. This job will only be visible to the specified college.
+                                      Enter College Account Numbers. This job will be visible to the specified colleges. You can add multiple colleges.
                                     </small>
+                                    <div id="college-ac-list" class="row">
+                                      <!-- College Account Numbers will be added here dynamically -->
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-success mt-2" onclick="addCollegeAcNo()">
+                                      <i class="feather icon-plus"></i> Add College Account Number
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -698,6 +698,7 @@
                     </div>
                   </div>
                 </div>
+                
                 <div class="row">
                   <div class="col-xl-12 col-lg-12 px-3">
                     <div class="card">
@@ -714,18 +715,14 @@
                               <div class="col-xl-12 col-lg-12 col-12">
                                 <div class="form-check-inline">
                                   <input type="radio" id="contact-directly-yes" name="isContact" value="true"
-                                    onclick="showContactInfo()" <% if(vacancy?.isContact==true ) {%> checked <% } %> disabled style="display: none;"/>
-                                    <label for="contact-directly-yes" style="display: none;">Yes</label>
+                                    onclick="showContactInfo()" <% if(vacancy?.isContact==true ) {%> checked <% } %>/>
+                                    <label for="contact-directly-yes">Yes</label>
                                 </div>
                                 <div class="form-check-inline">
                                   <input type="radio" id="contact-directly-no" name="isContact" value="false"
-                                    onclick="hideContactInfo()" <% if(vacancy?.isContact==false ) {%> checked <% } %> disabled style="display: none;"/>
-                                    <label for="contact-directly-no" style="display: none;">No</label>
+                                    onclick="hideContactInfo()" <% if(vacancy?.isContact==false ) {%> checked <% } %>/>
+                                    <label for="contact-directly-no">No</label>
                                 </div>
-                                <small class="form-text text-muted">
-                                  <i class="feather icon-info"></i> 
-                                  This field is automatically set based on "Job Public" selection above.
-                                </small>
                               </div>
                               <div class="col-12" id="contact-info" style="display: none;">
                                 <div class="row">
@@ -1367,15 +1364,12 @@
                 return false
               }
               event.preventDefault();
-              // 25coin modal - Check if job is Private (requires coins)
+              // 25coin modal
               const creditLeft = +("<%=company.creditLeft%>");
               const coinsRequired = +("<%=coinsRequired?.contactcoins%>");
-              
-              // Get isPublic value to determine if job is Private
-              const jobPublicValue = document.querySelector('input[name="isPublic"]:checked')?.value;
-              const isJobPrivate = (jobPublicValue === 'false'); // No = Private
+              const isContactChecked = document.querySelector('#contact-directly-yes')?.checked || false;
 
-              if (creditLeft < coinsRequired && isJobPrivate) {
+              if (isContactChecked && creditLeft < coinsRequired) {
                 e.preventDefault();
                 document.getElementById("sub-btn").setAttribute("data-toggle", "modal");
                 document.getElementById("sub-btn").setAttribute("data-target", "#addCoins");
@@ -1429,17 +1423,6 @@
               });
 
               let formData = new FormData(document.querySelector("form")); // FormData Object बनाएं
-
-              formData.delete('isContact');
-              // ✅ Convert isPublic to isContact for backend compatibility
-              // Yes (Public) = isPublic=true → isContact=false
-              // No (Private) = isPublic=false → isContact=true
-              const publicValue = document.querySelector('input[name="isPublic"]:checked')?.value;
-              if (publicValue === 'true') {
-                formData.append('isContact', 'false'); // Public
-              } else if (publicValue === 'false') {
-                formData.append('isContact', 'true'); // Private
-              }
 
               // ✅ Form Fields Append करें
               // formData.append("displayCompanyName", document.getElementById('organizationName').value);
@@ -1513,7 +1496,7 @@
               $('#jd-whatsappNumber').removeClass('error');
               $('#jd-name').removeClass('error');
               $('#jd-email').removeClass('error');
-              $('#jd-collegeAcNo').removeClass('error');
+              $('#college-ac-info').removeClass('error');
               let title = $('#jobTitle').val();
 
               $('#jd-subqua-field').removeClass('error')
@@ -1706,17 +1689,22 @@
                 }
               }
               
-          
+              // Validate College Account Numbers if job is Private
               const isJobPrivate = document.querySelector('input[name="isPublic"]:checked')?.value === 'false';
-              const collegeAcNo = document.getElementById('collegeAcNo')?.value?.trim();
               if (isJobPrivate) {
-                if (!collegeAcNo || collegeAcNo === '') {
-                  $('#jd-collegeAcNo').addClass('error');
-                  firstError = firstError ? firstError : $('#collegeAcNo');
+                const collegeAcInputs = document.querySelectorAll('.college-ac-input');
+                let hasValidInput = false;
+                collegeAcInputs.forEach(input => {
+                  if (input.value.trim() !== '') {
+                    hasValidInput = true;
+                  }
+                });
+                if (!hasValidInput || collegeAcInputs.length === 0) {
+                  $('#college-ac-info').addClass('error');
+                  firstError = firstError ? firstError : (collegeAcInputs[0] || document.querySelector('.college-ac-input'));
                   flag = false;
                 }
               }
-              
               if (firstError) {
                 firstError.focus();
               }
@@ -1738,46 +1726,111 @@
             function showContactInfo() {
               document.getElementById("contact-info").style.display = "block";
               var coinLabel = document.querySelector('label[for="25 coin"]');
-              if (coinLabel) coinLabel.style.display = "block";
+              coinLabel.style.display = "block";
             }
             function hideContactInfo() {
               document.getElementById("contact-info").style.display = "none";
               var coinLabel = document.querySelector('label[for="25 coin"]');
-              if (coinLabel) coinLabel.style.display = "none";
+              coinLabel.style.display = "none";
             }
+            let collegeAcNoIndex = 0;
+            function addCollegeAcNo() {
+              const container = document.getElementById('college-ac-list');
+              const index = collegeAcNoIndex++;
+              const div = document.createElement('div');
+              div.className = 'col-12 col-md-6 col-lg-4 mb-2 college-ac-item';
+              div.id = 'college-ac-item-' + index;
+              div.innerHTML = '<div class="input-group">' +
+                '<input type="text" class="form-control college-ac-input" id="collegeAcNo-' + index + '" name="collegeAcNo[]" placeholder="Enter College Account Number" required oninvalid="this.setCustomValidity(\'Please enter College Account Number\')" oninput="this.setCustomValidity(\'\')">' +
+                '<div class="input-group-append">' +
+                '<button type="button" class="btn btn-sm btn-danger" onclick="removeCollegeAcNo(' + index + ')">' +
+                '<i class="feather icon-trash-2"></i> <span class="d-none d-md-inline">Remove</span>' +
+                '</button>' +
+                '</div>' +
+                '</div>';
+              container.appendChild(div);
+            }
+            
+            function removeCollegeAcNo(index) {
+              var item = document.getElementById('college-ac-item-' + index);
+              if (item) {
+                item.remove();
+                // Ensure at least one input remains
+                var container = document.getElementById('college-ac-list');
+                if (container.children.length === 0) {
+                  addCollegeAcNo();
+                }
+              }
+            }
+            
+            // Initialize college account numbers from existing data (for edit mode)
+            function initializeCollegeAcNos() {
+              <% 
+              var collegeAcNosArray = [];
+              if (vacancy && vacancy.collegeAcNo) {
+                if (Array.isArray(vacancy.collegeAcNo)) {
+                  collegeAcNosArray = vacancy.collegeAcNo;
+                } else if (typeof vacancy.collegeAcNo === 'string' && vacancy.collegeAcNo.trim() !== '') {
+                  collegeAcNosArray = [vacancy.collegeAcNo];
+                }
+              }
+              if (collegeAcNosArray.length > 0) { %>
+                var collegeAcNos = <%- JSON.stringify(collegeAcNosArray) %>;
+                for (var idx = 0; idx < collegeAcNos.length; idx++) {
+                  var acNo = collegeAcNos[idx];
+                  var container = document.getElementById('college-ac-list');
+                  var index = collegeAcNoIndex++;
+                  var div = document.createElement('div');
+                  div.className = 'col-12 col-md-6 col-lg-4 mb-2 college-ac-item';
+                  div.id = 'college-ac-item-' + index;
+                  var inputHtml = '<div class="input-group"><input type="text" class="form-control college-ac-input" id="collegeAcNo-' + index + '" name="collegeAcNo[]" value="' + acNo + '" placeholder="Enter College Account Number" required oninvalid="this.setCustomValidity(\'Please enter College Account Number\')" oninput="this.setCustomValidity(\'\')"><div class="input-group-append"><button type="button" class="btn btn-sm btn-danger" onclick="removeCollegeAcNo(' + index + ')"><i class="feather icon-trash-2"></i> <span class="d-none d-md-inline">Remove</span></button></div></div>';
+                  div.innerHTML = inputHtml;
+                  container.appendChild(div);
+                }
+              <% } %>
+            }
+            
             function showCollegeAcInfo() {
               document.getElementById("college-ac-info").style.display = "block";
+              // Initialize with one input if empty
+              if (document.getElementById('college-ac-list').children.length === 0) {
+                addCollegeAcNo();
+              }
             }
             function hideCollegeAcInfo() {
               document.getElementById("college-ac-info").style.display = "none";
             }
+            
             $(document).ready(function () {
-              if ($('#contact-directly-yes').prop('checked')) {
-                showContactInfo();
-              }
-              // Handle job public/private toggle
+              // Handle job public/private toggle - only affects college-ac-info
               $('input[name="isPublic"]').change(function() {
-                if ($(this).val() === 'false') {
+                const isPublicValue = $(this).val();
+                if (isPublicValue === 'false') {
+                  // No = Private job, show college ac info
                   showCollegeAcInfo();
                 } else {
+                  // Yes = Public job, hide college ac info
                   hideCollegeAcInfo();
                 }
               });
-              // Initialize college ac info visibility
+              
+              // Initialize college-ac-info visibility on page load
               if ($('#job-public-no').prop('checked')) {
                 showCollegeAcInfo();
+                initializeCollegeAcNos();
+              } else {
+                hideCollegeAcInfo();
+              }
+              
+              // Initialize contact-info visibility (independent of isPublic)
+              if ($('#contact-directly-yes').prop('checked')) {
+                showContactInfo();
               }
             });
 
 
-            // Derive isContactvalue from isPublic (for job visibility)
-            // Yes (Public) = isPublic=true → isContact=false
-            // No (Private) = isPublic=false → isContact=true
-            let isContactvalue = "<%=vacancy?.postingType === 'Private' ? 'true' : 'false'%>";
-            $('input[name="isPublic"]').change(function () {
-              const isPublicValue = $('input[name="isPublic"]:checked').val();
-              isContactvalue = (isPublicValue === 'false') ? 'true' : 'false'; // Private = true, Public = false
-            });
+            // Initialize isContactvalue - check radio button state directly for accuracy
+            let isContactvalue = document.querySelector('#contact-directly-yes')?.checked || false;
             $('input[name="isContact"]').click(function () {
               isContactvalue = $('input[name="isContact"]:checked').val() === 'true';
             });

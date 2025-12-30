@@ -1,5 +1,6 @@
 import React, { useEffect , useState} from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import "./CollegeHeader.css";
 const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
@@ -45,6 +46,30 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
     logoutDiv.classList.toggle('show');
   };
 
+  const copyAccountNo = async () => {
+    try {
+      await navigator.clipboard.writeText(collegeAccountNo);
+      toast.success('Account number copied to clipboard!', {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error('Failed to copy account number', {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       const logoutDiv = document.getElementById('logout-div');
@@ -76,9 +101,74 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                 {collegeAccountNo && (
                   <ul className="nav navbar-nav" style={{ marginLeft: '20px' }}>
                     <li className="nav-item">
-                      <span className="text-white" style={{ fontSize: '13px', opacity: 0.9, lineHeight: '40px' }}>
-                        Account No: <strong style={{ fontSize: '12px' }}>{collegeAccountNo}</strong>
-                      </span>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <span className="text-white" style={{ 
+                          fontSize: '13px', 
+                          fontWeight: '600',
+                          letterSpacing: '0.3px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Account No:
+                        </span>
+                        <span className="text-white" style={{ 
+                          fontSize: '13px', 
+                          fontWeight: 'bold',
+                          maxWidth: '180px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontFamily: 'monospace',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          letterSpacing: '0.5px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)'
+                        }}>
+                          {collegeAccountNo}
+                        </span>
+                        <button
+                          id="copy-account-btn"
+                          onClick={copyAccountNo}
+                          className="btn btn-sm"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            color: 'white',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minWidth: '32px',
+                            height: '32px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                          title="Copy Account Number"
+                        >
+                          <i className="fas fa-copy" style={{ fontSize: '13px' }}></i>
+                        </button>
+                      </div>
                     </li>
                   </ul>
                 )}

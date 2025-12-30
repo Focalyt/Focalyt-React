@@ -66,7 +66,7 @@ const vacancySchema = new Schema(
     phoneNumberof: Number,
     whatsappNumberof: Number,
     emailof: String,
-    collegeAcNo: String,
+    collegeAcNo: [String],
     ageMax: Number,
     ageMin: Number,
     shifttimings:String,

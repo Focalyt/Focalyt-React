@@ -1252,21 +1252,51 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
     if (job?.isedited) {
       updatedJob['isedited'] = true
     }
-    if (req.body.isContact == true || req.body.isContact === "true") {
+
+    const isPublic = req.body.isPublic === 'true' || req.body.isPublic === true;
+    
+    if (!isPublic) {
+      // Private job - requires college account numbers
+      updatedJob['postingType'] = 'Private';
+      // Handle collegeAcNo as array - check both 'collegeAcNo' and 'collegeAcNo[]' (FormData array notation)
+      let collegeAcNoData = req.body.collegeAcNo || req.body['collegeAcNo[]'];
+      
+      
+      let collegeAcNos = [];
+      if (collegeAcNoData) {
+        collegeAcNos = Array.isArray(collegeAcNoData) 
+          ? collegeAcNoData.map(no => no.trim()).filter(no => no !== '')
+          : [collegeAcNoData.trim()].filter(no => no !== '');
+      }
+      
+      // Validate: Private jobs must have at least one college account number
+      if (collegeAcNos.length === 0) {
+        return res.status(400).send({ 
+          status: false, 
+          error: 'Private jobs require at least one College Account Number. Please add college account numbers or make the job public.' 
+        });
+      }
+      
+      updatedJob['collegeAcNo'] = collegeAcNos;
+    } else {
+      // Public job
       updatedJob['postingType'] = 'Public';
+      updatedJob['collegeAcNo'] = [];
+    }
+    
+    // Handle contact info separately (independent of postingType)
+    if (req.body.isContact == true || req.body.isContact === "true") {
       updatedJob['nameof'] = req.body.nameof;
-      console.log("here>>>>>>>>>> inside is conastct")
+      console.log("here>>>>>>>>>> inside is contact")
       updatedJob['phoneNumberof'] = req.body.phoneNumberof;
       updatedJob['whatsappNumberof'] = req.body.whatsappNumberof;
       updatedJob['emailof'] = req.body.emailof;
-      updatedJob['collegeAcNo'] = req.body.collegeAcNo;
+      updatedJob['isedited'] = true;
     } else {
-      updatedJob['postingType'] = 'Private';
       updatedJob['nameof'] = "";
       updatedJob['phoneNumberof'] = "";
       updatedJob['whatsappNumberof'] = "";
       updatedJob['emailof'] = "";
-      updatedJob['collegeAcNo'] = "";
     }
     if (updatedJob["isEdit"] == "true") {
       updatedJob["_subQualification"] = []
@@ -1590,22 +1620,57 @@ router
       if (jobDetails['isEdit'] == "true") {
         jobDetails['_subQualification'] = []
       }
-      if (jobDetails.isContact == true || jobDetails.isContact === "true") {
+      
+      // Determine postingType from isPublic field (not isContact)
+      // isPublic = "true" → Public job
+      // isPublic = "false" → Private job (requires collegeAcNo)
+      const isPublic = req.body.isPublic === 'true' || req.body.isPublic === true;
+      
+      if (!isPublic) {
+        // Private job - requires college account numbers
         jobDetails['postingType'] = 'Private';
+        // Handle collegeAcNo as array - check both 'collegeAcNo' and 'collegeAcNo[]' (FormData array notation)
+        let collegeAcNoData = req.body.collegeAcNo || req.body['collegeAcNo[]'];
+        console.log('Creating Private Job - req.body.collegeAcNo:', req.body.collegeAcNo);
+        console.log('Creating Private Job - req.body["collegeAcNo[]"]:', req.body['collegeAcNo[]']);
+        console.log('Creating Private Job - collegeAcNoData:', collegeAcNoData);
+        
+        let collegeAcNos = [];
+        if (collegeAcNoData) {
+          collegeAcNos = Array.isArray(collegeAcNoData) 
+            ? collegeAcNoData.map(no => no.trim()).filter(no => no !== '')
+            : [collegeAcNoData.trim()].filter(no => no !== '');
+        }
+        
+        // Validate: Private jobs must have at least one college account number
+        if (collegeAcNos.length === 0) {
+          console.log('ERROR: Private job created without collegeAcNo');
+          return res.status(400).send({ 
+            status: false, 
+            error: 'Private jobs require at least one College Account Number. Please add college account numbers or make the job public.' 
+          });
+        }
+        
+        jobDetails['collegeAcNo'] = collegeAcNos;
+        console.log('Private Job - collegeAcNo saved:', jobDetails['collegeAcNo']);
+      } else {
+        // Public job
+        jobDetails['postingType'] = 'Public';
+        jobDetails['collegeAcNo'] = [];
+      }
+      
+      // Handle contact info separately (independent of postingType)
+      if (jobDetails.isContact == true || jobDetails.isContact === "true") {
         jobDetails['nameof'] = req.body.nameof;
         jobDetails['phoneNumberof'] = req.body.phoneNumberof;
         jobDetails['whatsappNumberof'] = req.body.whatsappNumberof;
         jobDetails['emailof'] = req.body.emailof;
-        jobDetails['collegeAcNo'] = req.body.collegeAcNo ? req.body.collegeAcNo.trim() : '';
-        console.log('Private Job - collegeAcNo saved:', jobDetails['collegeAcNo']);
-        jobDetails['isedited'] = true
+        jobDetails['isedited'] = true;
       } else {
-        jobDetails['postingType'] = 'Public';
         jobDetails['nameof'] = "";
         jobDetails['phoneNumberof'] = "";
         jobDetails['whatsappNumberof'] = "";
         jobDetails['emailof'] = "";
-        jobDetails['collegeAcNo'] = "";
       }
       const jd = await Vacancy.create(jobDetails);
 
