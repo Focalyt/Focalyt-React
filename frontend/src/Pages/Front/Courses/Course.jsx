@@ -563,7 +563,7 @@ function Course() {
 
 
                                       {/* Action Buttons */}
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 me-2 text-center">
                                         <a
                                           className="btn cta-callnow btn-bg-color shr--width"
                                           href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
@@ -576,13 +576,13 @@ function Course() {
                                           Chat Now
                                         </a>
                                       </div> */}
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                       <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
                                           Chat Now
                                         </button>
-                                      </div>  
+                                      </div>   */}
                                       
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 ms-2 text-center">
                                         <button
                                           onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
                                           {/* <Share2 size={16} className="mr-1" /> */}
