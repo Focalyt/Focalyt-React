@@ -4,6 +4,9 @@ const { exec } = require('child_process');
 
 const cron = require('node-cron');
 // backupAndRestore();
+// console.log("Local URI:", process.env.MIPIE_MONGODB_URI);
+// console.log("Cloud URI:", process.env.MIPIE_BACKUP_MONGODB_URI);
+
 // Schedule a task to run at 2 AM every day
 cron.schedule('0 2 * * *', () => {
   // console.log('Starting scheduled database backup at 2 AM...');
@@ -25,7 +28,7 @@ function backupAndRestore() {
     console.log("Backup Path:", backupPath);
 
     // Restoring the backup to Cloud MongoDB and overwriting the data
-    exec(`mongorestore --uri="${process.env.MIPIE_BACKUP_MONGODB_URI}" --drop "${backupPath}/mmt"`, (err, stdout, stderr) => {
+    exec(`mongorestore --uri="${process.env.MIPIE_BACKUP_MONGODB_URI}" --drop "${backupPath}/mmt-local"`, (err, stdout, stderr) => {
       if (err) {
         console.error('Error during restore:', stderr);
         return;
