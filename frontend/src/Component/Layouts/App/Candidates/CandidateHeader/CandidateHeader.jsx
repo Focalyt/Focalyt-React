@@ -169,15 +169,15 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
                       width: "100%", position: "absolute", background: "#fff", top: "70px",
                       borderRadius: "6px"
                     }}>
-                      <a className="dropdown-item" href="/candidate/myProfile">
-                        <i class="fa-thin fa-user"></i> Edit Profile
+                      <a className="dropdown-item" href="/candidate/myProfile" style={{display: "flex", alignItems: "center", gap: "8px"}}>
+                        <i className="fa-solid fa-user-pen" style={{width: "16px"}}></i> Edit Profile
                       </a>
-                      <a className="dropdown-item" href="/candidate/myProfile">
-                        <i class="feather icon-user"></i>  Show Profile
+                      <a className="dropdown-item" href="/candidate/myProfile" style={{display: "flex", alignItems: "center", gap: "8px"}}>
+                        <i className="fa-solid fa-eye" style={{width: "16px"}}></i> Show Profile
                       </a>
                       <div className="dropdown-divider"></div>
-                      <a className="dropdown-item" onClick={handleLogout} style={{cursor: "pointer"}}>
-                        <i className="feather icon-power"></i> Logout
+                      <a className="dropdown-item" onClick={handleLogout} style={{cursor: "pointer", color: "#dc3545", display: "flex", alignItems: "center", gap: "8px"}}>
+                        <i className="fa-solid fa-power-off" style={{width: "16px"}}></i> Logout
                       </a>
                     </div>
                   )}
@@ -219,6 +219,27 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
     overflow: hidden;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
+
+.dropdownProfile .dropdown-item {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #333;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.dropdownProfile .dropdown-item:hover {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.dropdownProfile .dropdown-item i {
+    width: 16px;
+    text-align: center;
+}
+
 #navbar-mobile{
 display:flex;
 align-items:center;

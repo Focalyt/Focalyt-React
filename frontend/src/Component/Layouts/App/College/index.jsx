@@ -145,7 +145,8 @@ function CollegeLayout({ children }) {
     sales: false,
     salesb2b: false,
     dropdown: false,
-    events: false
+    events: false,
+    placements: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -219,7 +220,8 @@ function CollegeLayout({ children }) {
     sales: useRef(null),
     salesb2b: useRef(null),
     dropdown: useRef(null),
-    events: useRef(null)
+    events: useRef(null),
+    placements: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -236,7 +238,8 @@ function CollegeLayout({ children }) {
     sales: '0px',
     salesb2b: '0px',
     dropdown: '0px',
-    events: '0px'
+    events: '0px',
+    placements: '0px'
   });
 
   useLayoutEffect(() => {
@@ -834,9 +837,54 @@ function CollegeLayout({ children }) {
     .float-left {
     float: left !important;
 }
+        /* Webkit Scrollbar Styling for Sidebar */
+        .navigation-main::-webkit-scrollbar {
+          width: 6px !important;
+          -webkit-width: 6px !important;
+        }
+
+        .navigation-main::-webkit-scrollbar-track {
+          background: #f1f1f1 !important;
+          -webkit-background: #f1f1f1 !important;
+          border-radius: 10px !important;
+          -webkit-border-radius: 10px !important;
+        }
+
+        .navigation-main::-webkit-scrollbar-thumb {
+          background: #888 !important;
+          -webkit-background: #888 !important;
+          border-radius: 10px !important;
+          -webkit-border-radius: 10px !important;
+        }
+
+        .navigation-main::-webkit-scrollbar-thumb:hover {
+          background: #555 !important;
+          -webkit-background: #555 !important;
+        }
+
+        .main-menu-content::-webkit-scrollbar {
+          width: 6px !important;
+          -webkit-width: 6px !important;
+        }
+
+        .main-menu-content::-webkit-scrollbar-track {
+          background: #f1f1f1 !important;
+          -webkit-background: #f1f1f1 !important;
+        }
+
+        .main-menu-content::-webkit-scrollbar-thumb {
+          background: #888 !important;
+          -webkit-background: #888 !important;
+          border-radius: 10px !important;
+          -webkit-border-radius: 10px !important;
+        }
+
+        
         .menu-content {
           overflow: hidden;
           transition: max-height 0.3s ease-in-out;
+          width: 100% !important;
+          -webkit-width: 100% !important;
         }
 
 .card{
@@ -927,34 +975,34 @@ function CollegeLayout({ children }) {
 
 /* Courses Dropdown - Blue Color */
 .nav-item.has-sub.dropdown-courses > a {
-  background-color: #eff6ff !important;
+  background-color: #dbeafe !important;
   border-left: 2px solid #3b82f6;
 }
 
 .nav-item.has-sub.dropdown-courses > a:hover {
-  background-color: #dbeafe !important;
+  background-color: #bfdbfe !important;
   border-left-color: #2563eb;
 }
 
 .nav-item.has-sub.dropdown-courses.open > a {
-  background-color: #dbeafe !important;
+  background-color: #bfdbfe !important;
   border-left-color: #2563eb;
   color: #1e40af !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-courses .menu-content {
-  background-color: #eff6ff !important;
+  background-color: #dbeafe !important;
   border-left: 2px solid #3b82f6;
 }
 
 .nav-item.has-sub.dropdown-courses .menu-content .nav-item > a {
-  background-color: #eff6ff !important;
+  background-color: #dbeafe !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-courses .menu-content .nav-item > a:hover {
-  background-color: #dbeafe !important;
+  background-color: #bfdbfe !important;
   color: #3b82f6 !important;
 }
 
@@ -965,34 +1013,34 @@ function CollegeLayout({ children }) {
 
 /* Admissions (B2C) Dropdown - Pink Color */
 .nav-item.has-sub.dropdown-sales > a {
-  background-color: #fef2f2 !important;
+  background-color: #fee2e2 !important;
   border-left: 2px solid #fc2b5a;
 }
 
 .nav-item.has-sub.dropdown-sales > a:hover {
-  background-color: #fee2e2 !important;
+  background-color: #fecaca !important;
   border-left-color: #ef4444;
 }
 
 .nav-item.has-sub.dropdown-sales.open > a {
-  background-color: #fee2e2 !important;
+  background-color: #fecaca !important;
   border-left-color: #ef4444;
   color: #dc2626 !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-sales .menu-content {
-  background-color: #fef2f2 !important;
+  background-color: #fee2e2 !important;
   border-left: 2px solid #fc2b5a;
 }
 
 .nav-item.has-sub.dropdown-sales .menu-content .nav-item > a {
-  background-color: #fef2f2 !important;
+  background-color: #fee2e2 !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-sales .menu-content .nav-item > a:hover {
-  background-color: #fee2e2 !important;
+  background-color: #fecaca !important;
   color: #fc2b5a !important;
 }
 
@@ -1003,34 +1051,34 @@ function CollegeLayout({ children }) {
 
 /* Admissions (B2B) Dropdown - Green Color */
 .nav-item.has-sub.dropdown-salesb2b > a {
-  background-color: #f0fdf4 !important;
+  background-color: #dcfce7 !important;
   border-left: 2px solid #10b981;
 }
 
 .nav-item.has-sub.dropdown-salesb2b > a:hover {
-  background-color: #dcfce7 !important;
+  background-color: #bbf7d0 !important;
   border-left-color: #059669;
 }
 
 .nav-item.has-sub.dropdown-salesb2b.open > a {
-  background-color: #dcfce7 !important;
+  background-color: #bbf7d0 !important;
   border-left-color: #059669;
   color: #047857 !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-salesb2b .menu-content {
-  background-color: #f0fdf4 !important;
+  background-color: #dcfce7 !important;
   border-left: 2px solid #10b981;
 }
 
 .nav-item.has-sub.dropdown-salesb2b .menu-content .nav-item > a {
-  background-color: #f0fdf4 !important;
+  background-color: #dcfce7 !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-salesb2b .menu-content .nav-item > a:hover {
-  background-color: #dcfce7 !important;
+  background-color: #bbf7d0 !important;
   color: #10b981 !important;
 }
 
@@ -1041,34 +1089,34 @@ function CollegeLayout({ children }) {
 
 /* Placements Dropdown - Orange Color */
 .nav-item.has-sub.dropdown-placements > a {
-  background-color: #fff7ed !important;
+  background-color: #ffedd5 !important;
   border-left: 2px solid #f59e0b;
 }
 
 .nav-item.has-sub.dropdown-placements > a:hover {
-  background-color: #ffedd5 !important;
+  background-color: #fed7aa !important;
   border-left-color: #d97706;
 }
 
 .nav-item.has-sub.dropdown-placements.open > a {
-  background-color: #ffedd5 !important;
+  background-color: #fed7aa !important;
   border-left-color: #d97706;
   color: #b45309 !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-placements .menu-content {
-  background-color: #fff7ed !important;
+  background-color: #ffedd5 !important;
   border-left: 2px solid #f59e0b;
 }
 
 .nav-item.has-sub.dropdown-placements .menu-content .nav-item > a {
-  background-color: #fff7ed !important;
+  background-color: #ffedd5 !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-placements .menu-content .nav-item > a:hover {
-  background-color: #ffedd5 !important;
+  background-color: #fed7aa !important;
   color: #f59e0b !important;
 }
 
@@ -1079,34 +1127,34 @@ function CollegeLayout({ children }) {
 
 /* Events Dropdown - Purple Color */
 .nav-item.has-sub.dropdown-events > a {
-  background-color: #faf5ff !important;
+  background-color: #f3e8ff !important;
   border-left: 2px solid #8b5cf6;
 }
 
 .nav-item.has-sub.dropdown-events > a:hover {
-  background-color: #f3e8ff !important;
+  background-color: #e9d5ff !important;
   border-left-color: #7c3aed;
 }
 
 .nav-item.has-sub.dropdown-events.open > a {
-  background-color: #f3e8ff !important;
+  background-color: #e9d5ff !important;
   border-left-color: #7c3aed;
   color: #6d28d9 !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-events .menu-content {
-  background-color: #faf5ff !important;
+  background-color: #f3e8ff !important;
   border-left: 2px solid #8b5cf6;
 }
 
 .nav-item.has-sub.dropdown-events .menu-content .nav-item > a {
-  background-color: #faf5ff !important;
+  background-color: #f3e8ff !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-events .menu-content .nav-item > a:hover {
-  background-color: #f3e8ff !important;
+  background-color: #e9d5ff !important;
   color: #8b5cf6 !important;
 }
 
@@ -1117,34 +1165,34 @@ function CollegeLayout({ children }) {
 
 /* Settings Dropdown - Gray Color */
 .nav-item.has-sub.dropdown-settings > a {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
   border-left: 2px solid #6b7280;
 }
 
 .nav-item.has-sub.dropdown-settings > a:hover {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   border-left-color: #4b5563;
 }
 
 .nav-item.has-sub.dropdown-settings.open > a {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   border-left-color: #4b5563;
   color: #374151 !important;
   font-weight: 600;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
   border-left: 2px solid #6b7280;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .nav-item > a {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
   color: #555 !important;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .nav-item > a:hover {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   color: #6b7280 !important;
 }
 
@@ -1155,32 +1203,32 @@ function CollegeLayout({ children }) {
 
 /* Nested dropdown inside settings */
 .nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
   border-left: 3px solid #6b7280;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a:hover {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   border-left-color: #4b5563;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub.open > a {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   border-left-color: #4b5563;
   color: #374151 !important;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
   border-left: 2px solid #6b7280;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a {
-  background-color: #f9fafb !important;
+  background-color: #f3f4f6 !important;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a:hover {
-  background-color: #f3f4f6 !important;
+  background-color: #e5e7eb !important;
   color: #6b7280 !important;
 }
 

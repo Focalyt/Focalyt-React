@@ -878,7 +878,7 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Profile */}
-              <li className={`nav-item has-sub ${openSubmenu.profile ? 'open' : ''} ${location.pathname === '/candidate/myprofile' ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-profile ${openSubmenu.profile ? 'open' : ''} ${location.pathname === '/candidate/myprofile' ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('profile')}>
                   <FontAwesomeIcon icon={faUser} />
                   <span className="menu-title">Profile</span>
@@ -915,7 +915,7 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Courses */}
-              <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
                   <FontAwesomeIcon icon={farUser} />
                   <span className="menu-title">Courses</span>
@@ -958,7 +958,7 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Jobs */}
-              <li className={`nav-item has-sub ${openSubmenu.jobs ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-jobs ${openSubmenu.jobs ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('jobs')}>
                   <FontAwesomeIcon icon={faClipboardList} />
                   <span className="menu-title">Jobs</span>
@@ -1019,7 +1019,7 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Wallet */}
-              <li className={`nav-item has-sub ${openSubmenu.wallet ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-wallet ${openSubmenu.wallet ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('wallet')}>
                   <FontAwesomeIcon icon={faWallet} />
                   <span className="menu-title">Wallet</span>
@@ -1068,7 +1068,7 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Events */}
-              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-events ${openSubmenu.events ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('events')}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Events</span>
@@ -1208,6 +1208,196 @@ function CandidateLayout({ children }) {
             overflow: hidden;
             transition: max-height 0.3s ease-in-out;
           }
+
+/* Profile Dropdown - Pink Color */
+.nav-item.has-sub.dropdown-profile > a {
+  background-color: #fee2e2 !important;
+  border-left: 2px solid #fc2b5a;
+}
+
+.nav-item.has-sub.dropdown-profile > a:hover {
+  background-color: #fecaca !important;
+  border-left-color: #ef4444;
+}
+
+.nav-item.has-sub.dropdown-profile.open > a {
+  background-color: #fecaca !important;
+  border-left-color: #ef4444;
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-profile .menu-content {
+  background-color: #fee2e2 !important;
+  border-left: 2px solid #fc2b5a;
+}
+
+.nav-item.has-sub.dropdown-profile .menu-content .nav-item > a {
+  background-color: #fee2e2 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-profile .menu-content .nav-item > a:hover {
+  background-color: #fecaca !important;
+  color: #fc2b5a !important;
+}
+
+.nav-item.has-sub.dropdown-profile .menu-content .nav-item.active > a {
+  background-color: #fc2b5a !important;
+  color: #fff !important;
+}
+
+/* Courses Dropdown - Blue Color */
+.nav-item.has-sub.dropdown-courses > a {
+  background-color: #dbeafe !important;
+  border-left: 2px solid #3b82f6;
+}
+
+.nav-item.has-sub.dropdown-courses > a:hover {
+  background-color: #bfdbfe !important;
+  border-left-color: #2563eb;
+}
+
+.nav-item.has-sub.dropdown-courses.open > a {
+  background-color: #bfdbfe !important;
+  border-left-color: #2563eb;
+  color: #1e40af !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content {
+  background-color: #dbeafe !important;
+  border-left: 2px solid #3b82f6;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item > a {
+  background-color: #dbeafe !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item > a:hover {
+  background-color: #bfdbfe !important;
+  color: #3b82f6 !important;
+}
+
+.nav-item.has-sub.dropdown-courses .menu-content .nav-item.active > a {
+  background-color: #fc2b5a !important;
+  color: #fff !important;
+}
+
+/* Jobs Dropdown - Green Color */
+.nav-item.has-sub.dropdown-jobs > a {
+  background-color: #dcfce7 !important;
+  border-left: 2px solid #10b981;
+}
+
+.nav-item.has-sub.dropdown-jobs > a:hover {
+  background-color: #bbf7d0 !important;
+  border-left-color: #059669;
+}
+
+.nav-item.has-sub.dropdown-jobs.open > a {
+  background-color: #bbf7d0 !important;
+  border-left-color: #059669;
+  color: #047857 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-jobs .menu-content {
+  background-color: #dcfce7 !important;
+  border-left: 2px solid #10b981;
+}
+
+.nav-item.has-sub.dropdown-jobs .menu-content .nav-item > a {
+  background-color: #dcfce7 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-jobs .menu-content .nav-item > a:hover {
+  background-color: #bbf7d0 !important;
+  color: #10b981 !important;
+}
+
+.nav-item.has-sub.dropdown-jobs .menu-content .nav-item.active > a {
+  background-color: #fc2b5a !important;
+  color: #fff !important;
+}
+
+/* Wallet Dropdown - Orange Color */
+.nav-item.has-sub.dropdown-wallet > a {
+  background-color: #ffedd5 !important;
+  border-left: 2px solid #f59e0b;
+}
+
+.nav-item.has-sub.dropdown-wallet > a:hover {
+  background-color: #fed7aa !important;
+  border-left-color: #d97706;
+}
+
+.nav-item.has-sub.dropdown-wallet.open > a {
+  background-color: #fed7aa !important;
+  border-left-color: #d97706;
+  color: #b45309 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-wallet .menu-content {
+  background-color: #ffedd5 !important;
+  border-left: 2px solid #f59e0b;
+}
+
+.nav-item.has-sub.dropdown-wallet .menu-content .nav-item > a {
+  background-color: #ffedd5 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-wallet .menu-content .nav-item > a:hover {
+  background-color: #fed7aa !important;
+  color: #f59e0b !important;
+}
+
+.nav-item.has-sub.dropdown-wallet .menu-content .nav-item.active > a {
+  background-color: #fc2b5a !important;
+  color: #fff !important;
+}
+
+/* Events Dropdown - Purple Color */
+.nav-item.has-sub.dropdown-events > a {
+  background-color: #f3e8ff !important;
+  border-left: 2px solid #8b5cf6;
+}
+
+.nav-item.has-sub.dropdown-events > a:hover {
+  background-color: #e9d5ff !important;
+  border-left-color: #7c3aed;
+}
+
+.nav-item.has-sub.dropdown-events.open > a {
+  background-color: #e9d5ff !important;
+  border-left-color: #7c3aed;
+  color: #6d28d9 !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content {
+  background-color: #f3e8ff !important;
+  border-left: 2px solid #8b5cf6;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item > a {
+  background-color: #f3e8ff !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item > a:hover {
+  background-color: #e9d5ff !important;
+  color: #8b5cf6 !important;
+}
+
+.nav-item.has-sub.dropdown-events .menu-content .nav-item.active > a {
+  background-color: #fc2b5a !important;
+  color: #fff !important;
+}
           
           /* Add popup styles */
           .profile-form-popup {

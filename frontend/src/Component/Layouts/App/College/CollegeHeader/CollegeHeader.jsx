@@ -218,12 +218,12 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                   </a>
 
                   <div className="dropdown-menu dropdown-menu-right" id="logout-div">
-                    <a className="dropdown-item" href="/institute/myProfile">
-                      <i className="feather icon-user"></i> Edit Profile
+                    <a className="dropdown-item" href="/institute/myProfile" style={{display: "flex", alignItems: "center", gap: "8px"}}>
+                      <i className="fa-solid fa-user-pen" style={{width: "16px"}}></i> Edit Profile
                     </a>
                     <div className="dropdown-divider"></div>
-                    <a className="dropdown-item" href="#" onClick={logout}>
-                      <i className="feather icon-power"></i> Logout
+                    <a className="dropdown-item" href="#" onClick={logout} style={{cursor: "pointer", color: "#dc3545", display: "flex", alignItems: "center", gap: "8px"}}>
+                      <i className="fa-solid fa-power-off" style={{width: "16px"}}></i> Logout
                     </a>
                   </div>
                 </li>
@@ -267,6 +267,26 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
     display: block;
     background: linear-gradient(rgba(248, 248, 248, 0.95) 44%, rgba(248, 248, 248, 0.46) 73%, rgba(255, 255, 255, 0)) repeat;
 }
+
+    #logout-div .dropdown-item {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #333;
+    text-decoration: none;
+    transition: background-color 0.2s;
+    }
+
+    #logout-div .dropdown-item:hover {
+    background-color: #f5f5f5;
+    color: #333;
+    }
+
+    #logout-div .dropdown-item i {
+    width: 16px;
+    text-align: center;
+    }
           `
         }
       </style>
