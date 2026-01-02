@@ -51,6 +51,7 @@
 
                           <thead>
                             <tr>
+                              <th class="company-jd-head">Company Name</th>
                               <th class="company-jd-head">Title</th>
                               <th class="inyears">Experience (In Years)</th>
                               <th class="company-jd-head">Qualification</th>
@@ -67,6 +68,9 @@
                               <% jd.forEach((curr, i)=> {%>
                                 <%if(moment(curr.validity).utcOffset("+05:30") < moment().startOf("day")){%>
                                 <tr class="disable_button">
+                                  <td style="font-size:12.5px !important;color:#000;">
+                                    <%= (curr && curr.displayCompanyName) || 'NA' %>
+                                  </td>
                                   <td style="font-size:12.5px !important;color:#000;">
                                     <%= (curr && curr.title) || 'NA' %>
                                   </td>
@@ -119,6 +123,9 @@
                                 </tr> 
                                 <% } else { %>
                                   <tr>
+                                    <td>
+                                      <%= (curr && curr.displayCompanyName) || 'NA' %>
+                                    </td>
                                     <td>
                                       <%= (curr && curr.title) || 'NA' %>
                                     </td>

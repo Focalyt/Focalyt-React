@@ -1007,7 +1007,7 @@ router.get("/list/jobs", isCompany, async (req, res) => {
     }
 
     count = await Vacancy.find({ _company: company, validity: { $gte: moment().utcOffset('+05:30') } }).countDocuments()
-    jd = await Vacancy.find({ _company: company }).select("title experience _qualification createdAt status validity")
+    jd = await Vacancy.find({ _company: company }).select("title experience _qualification createdAt status validity displayCompanyName")
       .populate(populate)
       .sort({ createdAt: -1 })
       .skip(perPage * page - perPage)

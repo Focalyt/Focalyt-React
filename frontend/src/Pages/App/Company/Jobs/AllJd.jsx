@@ -251,6 +251,7 @@ const AllJd = () => {
                         <table className="table table-hover-animation mb-0 table-hover">
                           <thead>
                             <tr>
+                              <th className="company-jd-head">Company Name</th>
                               <th className="company-jd-head">Title</th>
                               <th className="inyears">Experience (In Years)</th>
                               <th className="company-jd-head">Qualification</th>
@@ -278,6 +279,9 @@ const AllJd = () => {
 
                                 return (
                                   <tr key={job._id} className={rowClass}>
+                                    <td style={textStyle}>
+                                      {job.displayCompanyName || 'NA'}
+                                    </td>
                                     <td style={textStyle}>
                                       {job.title || 'NA'}
                                     </td>
