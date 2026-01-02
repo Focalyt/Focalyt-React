@@ -130,8 +130,8 @@
                                       <option value="0" <% if(vacancy?.experience=='0' ) {%> selected <% } %> >0
                                       </option>
                                       <% for (var i=1; i <=25; i++ ) { %>
-                                        <option value="<%= i %>">
-                                          <%= i %>
+                                        <option value="<%= i %> - <%= i+1 %>">
+                                          <%= i %> - <%= i+1 %>
                                         </option>
                                         <% } %>
                                 </select>
@@ -661,7 +661,7 @@
                         <div class="card-content">
                           <div class="card-body">
                             <div class="row">
-                              <label for="job-public" class="px-1 h1 col-6">Do you want job public ?</label>
+                              <label for="job-public" class="px-1 h1 col-6">Do you want this job to be visible to the public?</label>
                               <div class="col-xl-12 col-lg-12 col-12">
                                 <div class="form-check-inline">
                                   <input type="radio" id="job-public-yes" name="isPublic" value="true"

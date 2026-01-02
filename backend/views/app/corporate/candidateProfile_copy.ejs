@@ -863,7 +863,7 @@
               offerId: offerId,
               amount: amount
             }
-            axios({ method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+            axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
               let options = {
                 "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
                 "amount": res.data.order.amount,
@@ -881,7 +881,7 @@
                     amount: amount,
                     code: code
                   }
-                  axios({ method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
+                  axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
                     window.location.reload()
                   }).catch(
                     (error) => {
@@ -918,7 +918,7 @@
                 offerId: offer
               }
               document.getElementById('codevalue').value = code
-              axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then((res) => {
                   if (res.data.status && res.data.amount > 0) {
                     $('#error-message').text('')
@@ -953,7 +953,7 @@
               offerId: offer
             }
             document.getElementById('codevalue').value = code
-            axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
               .then((res) => {
                 if (res.data.status) {
                   $('#error-message').text('')
@@ -989,14 +989,14 @@
           function maskUnmask(id) {
             const body = { userId: id };
             if ($('#maskunmask').hasClass('masked')) {
-              axios({ method: 'get', url: "/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+              axios({ method: 'get', url: "<%= process.env.MIPIE_BACKEND_URL %>/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
                 $('.mobile').html(res.data.mobile)
                 $('.email').html(res.data.email)
                 $('#maskunmask').hide()
                 $('#loader').removeClass('disabled')
                 $('#loader').removeAttr('disabled')
                 axios({
-                  method: 'get', url: '/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
+                  method: 'get', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
                 }).then((res) => {
                   let credit = res.data.credit
                   if (!credit) { credit = 0 }
@@ -1101,6 +1101,26 @@
             window.open(url, '_blank')
           }
 
+          function updateStatus(id) {
+            let status = document.getElementById('hiringStatus').value
+            let job = document.getElementById('hiringJob').value
+            let comment = document.getElementById('hiringComment').value
+            let eventDate = $('#eventDate').val()
+            let concernedPerson = $('#concernedPerson').val()
+            let body = {
+              candidate: id,
+              status: status,
+              job: job,
+              comment: comment,
+              eventDate: eventDate,
+              concernedPerson: concernedPerson
+            }
+
+            axios({ method: 'post', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/statusUpdate`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
+              .then(result => {
+                window.location.reload()
+              })
+          }
 
           function changeButton() {
             let hiringStatus = document.getElementById('hiringStatus').value
@@ -1137,7 +1157,7 @@
             document.getElementById('apply').innerHTML = `Pay ₹ ${amount}`
           }
           function getOffers() {
-            axios({ method: 'get', url: `/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'get', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
               .then(res => {
                 let offers = document.getElementById('offers');
                 let html = ''
