@@ -1306,6 +1306,7 @@ function CollegeLayout({ children }) {
     margin-left: 0px;
     transition: 300ms;
     background: #fc2b5a;
+    background: #ff6b8d;
     border-radius: 7px;
 }
 

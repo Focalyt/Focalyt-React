@@ -242,6 +242,35 @@ const CandidatesJobs = () => {
     }, 300); // delay to ensure modal is open
   };
 
+  // Share job function
+  const handleShareJob = async (jobId, jobTitle, companyName) => {
+    const jobUrl = `${window.location.origin}/candidate/job/${jobId}`;
+    const jobTitleText = jobTitle || 'Job Opportunity';
+    const companyText = companyName ? ` at ${companyName}` : '';
+    const shareText = `Check out this job opportunity${companyText}: ${jobTitleText}\n\n${jobUrl}\n\nनौकरी का मौका देखें${companyText}: ${jobTitleText}`;
+
+    // Try Web Share API first (works on mobile devices and modern browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: jobTitleText,
+          text: shareText,
+          url: jobUrl,
+        });
+        return;
+      } catch (error) {
+        // User cancelled or error occurred, fall through to WhatsApp
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+        }
+      }
+    }
+
+    // Fallback to WhatsApp sharing (common pattern in this codebase)
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
 
 
   // Parse query parameters on component mount
@@ -1013,10 +1042,28 @@ const CandidatesJobs = () => {
                                 className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
                                 to={`/candidate/job/${job._id}`}
                                 title="Apply for Job"
+                                style={{ fontWeight: 'bold' }}
                               >
                                 <i className="la la-paper-plane"></i>
                                 Apply for Job / नौकरी के लिए आवेदन
                               </Link>
+                            </div>
+                            <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 offset-xl-3 offset-lg-3 mt-3">
+                              <button
+                                className="apply-thisjob text-center px-1 apply-padding mb-0 mt-0 w-100"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleShareJob(
+                                    job._id,
+                                    job.title,
+                                    job.displayCompanyName || job._company?.[0]?.name
+                                  );
+                                }}
+                                title="Share Job"
+                              >
+                                <i className="la la-share"></i>
+                                Share
+                              </button>
                             </div>
                           </div>
                         </div>

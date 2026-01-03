@@ -5533,9 +5533,9 @@ console.log("response.data",response.data)
                                               <p className="mt-3 text-muted">Loading company jobs...</p>
                                             </div>
                                           ) : companyJobs?.length > 0 ? (
-                                            <div className="table-responsive">
+                                            <div className="table-responsive company-jobs-table-wrapper">
                                               <table className="table table-hover table-bordered company-jobs-table">
-                                                <thead className="table-light">
+                                                <thead className="table-light company-jobs-table-header">
                                                   <tr>
                                                     <th>S.No</th>
                                                     <th>Company Name</th>
@@ -5602,6 +5602,7 @@ console.log("response.data",response.data)
                                                             className="btn btn-sm btn-primary"
                                                             title="Send job offer to candidate"
                                                             onClick={() => handleOfferJob(placement, job)}
+                                                            style={{ whiteSpace: 'nowrap' }}
                                                             disabled={
                                                               (offeringJob && selectedPlacementForJob?._id === placement._id && (selectedJobForOffer?._id === job._id || selectedJobForOffer?._id === job._job?._id)) ||
                                                               sentJobOffers.has(`${placement._id}_${job._id || job._job?._id}`) ||
@@ -5621,13 +5622,45 @@ console.log("response.data",response.data)
                                                               return existingOffer && (existingOffer.status === 'offered' || existingOffer.status === 'active');
                                                             })()) ? (
                                                               <>
-                                                                <i className="fas fa-check me-1"></i> Sent Successfully
+                                                                <i className="fas fa-check me-1"></i> Sent 
                                                               </>
                                                             ) : (
                                                               <>
-                                                                <i className="fas fa-paper-plane me-1"></i> Send Application
+                                                                <i className="fas fa-paper-plane me-1"></i> Send Job
                                                               </>
                                                             )}
+                                                          </button>
+                                                          {/* WhatsApp Icon Button */}
+                                                          <button
+                                                            className="btn btn-sm btn-success"
+                                                            title="Open WhatsApp chat"
+                                                            onClick={() => {
+                                                              const mobileNumber = placement?._candidate?.mobile || placement?._student?.mobile || placement?.studentMobile || placement?.contactNumber;
+                                                              if (mobileNumber) {
+                                                                const cleanNumber = mobileNumber.replace(/[\s\-\(\)]/g, '');
+                                                                const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : (cleanNumber.startsWith('+91') ? cleanNumber.substring(1) : `91${cleanNumber}`);
+                                                                window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+                                                              } else {
+                                                                alert('Mobile number not found for this candidate');
+                                                              }
+                                                            }}
+                                                          >
+                                                            <i className="fab fa-whatsapp"></i>
+                                                          </button>
+                                                          {/* Email Icon Button */}
+                                                          <button
+                                                            className="btn btn-sm btn-info"
+                                                            title="Send email"
+                                                            onClick={() => {
+                                                              const email = placement?._candidate?.email || placement?._student?.email || placement?.studentEmail;
+                                                              if (email) {
+                                                                window.location.href = `mailto:${email}`;
+                                                              } else {
+                                                                alert('Email not found for this candidate');
+                                                              }
+                                                            }}
+                                                          >
+                                                            <i className="fas fa-envelope"></i>
                                                           </button>
                                                         </div>
                                                       </td>
@@ -7658,6 +7691,19 @@ console.log("response.data",response.data)
     margin-top: 10px;
   }
 
+  .company-jobs-table-wrapper {
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .company-jobs-table-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
   .job-history-table th,
   .course-history-table th,
   .company-jobs-table th {
@@ -7666,6 +7712,13 @@ console.log("response.data",response.data)
     padding: 12px;
     text-align: left;
     border-bottom: 2px solid #dee2e6;
+  }
+
+  .company-jobs-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f8f9fa !important;
   }
 
   .job-history-table td,

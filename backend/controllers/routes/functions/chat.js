@@ -102,7 +102,15 @@ commonRoutes.get("/courselist", async (req, res) => {
 		const { courseType } = req.query;
 		const COURSE_TYPES = ['coursejob', 'course'];
 
-		let query = { status: true };
+		let query = { 
+			status: true,
+			$or: [
+				{ lastDateForApply: { $gte: moment().utcOffset('+05:30').startOf('day').toDate() } },
+				{ lastDateForApply: { $exists: false } },
+				{ lastDateForApply: null },
+				{ lastDateForApply: '' }
+			]
+		};
 
 		if (courseType && COURSE_TYPES.includes(courseType)) {
 			query.courseType = courseType;

@@ -1058,12 +1058,12 @@ function CandidateLayout({ children }) {
                       <span className="menu-title">Refer & Earn</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/candidate/Coins' ? 'active' : ''}`}>
+                  {/* <li className={`nav-item ${location.pathname === '/candidate/Coins' ? 'active' : ''}`}>
                     <Link to="/candidate/Coins" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faCoins} />
                       <span className="menu-title">Coins</span>
                     </Link>
-                  </li>
+                  </li> */}
                 </ul>
               </li>
 

@@ -158,7 +158,7 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
                     <div className="user-nav d-sm-flex d-flex flex-column">
                       {/* <span className="user-name text-bold-600 text-white">{userName}</span> */}
                       <span className="user-name text-bold-600 text-white">{user.name}</span>
-                      <span className="text-white">Coins: <strong>{userCredit}</strong></span>
+                      {/* <span className="text-white">Coins: <strong>{userCredit}</strong></span> */}
                     </div>
                     <span className="text-center pl-1" >
                       <img id="profile-visibility-status" src={profileVisibility ? "/Assets/images/norconfirm.png" : "/Assets/images/confirm.png"} alt="profile-status" className="img-fluid" />

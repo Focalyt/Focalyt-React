@@ -406,7 +406,15 @@ router.post("/jobsearch", (req, res) => {
 	});
 });
 router.get("/courses", async (req, res) => {
-	let filter = { status: true }
+	let filter = { 
+		status: true,
+		$or: [
+			{ lastDateForApply: { $gte: moment().utcOffset('+05:30').startOf('day').toDate() } },
+			{ lastDateForApply: { $exists: false } },
+			{ lastDateForApply: null },
+			{ lastDateForApply: '' }
+		]
+	}
 
 	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
 

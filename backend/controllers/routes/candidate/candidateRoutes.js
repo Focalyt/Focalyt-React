@@ -1371,7 +1371,13 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     });
     const fields = {
       status: true,
-      isDeleted: false
+      isDeleted: false,
+      $or: [
+        { lastDateForApply: { $gte: moment().utcOffset('+05:30').startOf('day').toDate() } },
+        { lastDateForApply: { $exists: false } },
+        { lastDateForApply: null },
+        { lastDateForApply: '' }
+      ]
     }
     if (candidate?.appliedCourses?.length > 0) {
       fields._id = {

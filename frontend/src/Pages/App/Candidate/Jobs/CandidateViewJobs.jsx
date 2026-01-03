@@ -4242,7 +4242,24 @@ div#floating-apply {
     color: #444;
     transition: all .2s;
 }
-
+#popup-body {
+  background-image: url(/Assets/public/images/money-bg.jpg);
+  background-size: cover;
+}
+  #popup-body {
+    padding: 2rem 1rem 0rem 1rem;
+    line-height: 2rem;
+  }
+  #popup-body textarea[name="comment"] {
+    cursor: text;
+    color: #333;
+    caret-color: #333;
+  }
+  #popup-body textarea[name="comment"]:focus {
+    outline: 2px solid #28a745;
+    outline-offset: 2px;
+    caret-color: #333;
+  }
     `
   }
 </style>
