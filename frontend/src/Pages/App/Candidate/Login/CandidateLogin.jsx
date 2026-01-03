@@ -863,6 +863,7 @@ const CandidateLogin = () => {
 //   background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
     background-size: auto;
   background-size: contain!important;
+  height:100vh;
 }
 
 /* .blank-page {
