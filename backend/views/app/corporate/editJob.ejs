@@ -160,7 +160,7 @@
 
                             <div class="col-xl-2 mb-1">
                               <label>Cut Price</label>
-                              <input class="form-control" id="cutprice" type="number" value="<%=jd.cutprice%>">
+                              <input class="form-control" id="cutprice" type="number" value="<%=jd?.cutprice || ''%>">
 
                             </div>
 
@@ -704,7 +704,7 @@
                             </div>
                             <div class="col-12" id="contact-info" style="display: none;">
                               <div class="row">
-                                <input type="hidden" id="availService" value="<%= jd.isedited ? jd.isedited : false %>"
+                                <input type="hidden" id="availService" value="<%= jd?.isedited ? jd.isedited : false %>"
                                   name="isedited" class="form-control">
                                 <div class="col-xl-3 mb-1" id="jd-name" value="<%= jd?.radioEd%>">
                                   <label>Name</label><span class="mandatory"> </label>
@@ -822,11 +822,11 @@
                               <% if(jd?.jobVideo) { %>
                                 <div class="video-preview-container position-relative">
                                   <video style="max-height: 150px;width: 250px;" controls>
-                                    <source src="<%= jd.jobVideo %>" type="video/mp4">
+                                    <source src="<%= jd?.jobVideo %>" type="video/mp4">
                                     Your browser does not support the video tag.
                                   </video>
                                   <button type="button" class="btn btn-danger btn-sm remove-video-btn"
-                                    onclick="removeVideo('<%= jd.jobVideo %>')">
+                                    onclick="removeVideo('<%= jd?.jobVideo %>')">
                                     &#10006;
                                   </button>
                                 </div>
@@ -868,9 +868,9 @@
                               <% if(jd?.jobVideoThumbnail) { %>
                                 <div class="thumbnail-preview-container position-relative">
 
-                                  <img src="<%= jd.jobVideoThumbnail %>" alt="">
+                                  <img src="<%= jd?.jobVideoThumbnail %>" alt="">
                                   <button type="button" class="btn btn-danger btn-sm remove-video-btn"
-                                    onclick="removethumbnail('<%= jd.jobVideoThumbnail %>')">
+                                    onclick="removethumbnail('<%= jd?.jobVideoThumbnail %>')">
                                     &#10006;
                                   </button>
                                 </div>
@@ -1364,7 +1364,7 @@
             const creditsLeft = +("<%=company.creditLeft%>")
             const coinsRequired = +("<%=coinsRequired?.contactcoins %>")
             let isContactvalue = "<%= jd?.isContact %>";
-            let isEdit = "<%= jd.isedited %>"
+            let isEdit = "<%= jd?.isedited || false %>"
             if (creditsLeft < coinsRequired && isContactvalue === "false" && availService.value === 'true' && isEdit === 'false') {
               e.preventDefault();
               document.getElementById("sub-btn").setAttribute("data-toggle", "modal");
