@@ -1105,12 +1105,12 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Request Loan */}
-              <li className={`nav-item ${location.pathname === '/candidate/requestLoan' ? 'active' : ''}`}>
+              {/* <li className={`nav-item ${location.pathname === '/candidate/requestLoan' ? 'active' : ''}`}>
                 <Link to="/candidate/requestLoan" onClick={() => { handleSidebarClose(); }}>
                   <FontAwesomeIcon icon={farCircle} />
                   <span className="menu-title">Request Loan</span>
                 </Link>
-              </li>
+              </li> */}
 
               {/* Watch Videos */}
               <li className={`nav-item ${location.pathname === '/candidate/watchVideos' ? 'active' : ''}`}>
