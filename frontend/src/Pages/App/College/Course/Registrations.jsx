@@ -3205,13 +3205,6 @@ const CRMDashboard = () => {
     const profilesToSelect = allProfiles.slice(0, validNumValue).map(profile => profile._id);
     setSelectedProfiles(profilesToSelect);
 
-    // If bulk mode is 'whatsapp' and valid number is entered, open modal
-    if (bulkMode === 'whatsapp' && validNumValue >= 1 && validNumValue <= maxLeads && input1Value !== '') {
-      // Small delay to ensure profiles are selected first
-      setTimeout(() => {
-        setShowWhatsappModal(true);
-      }, 200);
-    }
   }, [input1Value, allProfiles, bulkMode]);
 
 

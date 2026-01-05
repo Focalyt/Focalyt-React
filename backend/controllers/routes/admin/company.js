@@ -14,7 +14,8 @@ const {
 	Vacancy,
 	HiringStatus,
 	Candidate,
-	CoinsAlgo
+	CoinsAlgo,
+	AppliedJobs
 } = require("../../models");
 
 const { generatePassword, sendMail, isAdmin ,isCo} = require("../../../helpers");
@@ -610,5 +611,124 @@ router.get('/backfill', async (req, res) => {
 		
 		})
 
+// Applied Jobs Route - Show all applied jobs from all candidates and companies
+router.route("/appliedJobs").get(async (req, res) => {
+	try {
+		let view = false;
+		if(req.session.user.role === 10){
+			view = true;
+		}
+		
+		const data = req.query;
+		let filter = {};
+		
+		// Status filter for archive checkbox (not used for filtering, just for UI state)
+		if (req.query.status == undefined) {
+			var isChecked = "false";
+		} else if (req.query.status.toString() == "true") {
+			var isChecked = "false";
+		} else if (req.query.status.toString() == "false") {
+			var isChecked = "true";
+		}
+		
+		// Build candidate filter query - Don't filter by status for applied jobs
+		// We want to show all applied jobs regardless of candidate status
+		let candidateFilter = {
+			isDeleted: false
+			// Removed status filter - show all applied jobs
+		};
+		
+		// Filter by candidate name/mobile/whatsapp
+		if(data.name){
+			candidateFilter.$or = [
+				{ name: { $regex: data.name, $options: "i" } },
+				{ mobile: { $regex: data.name, $options: "i" } },
+				{ whatsapp: { $regex: data.name, $options: "i" } }
+			];
+		}
+		
+		// Filter by profile completion
+		if(data.Profile && data.Profile !== 'All'){
+			candidateFilter.isProfileCompleted = data.Profile === 'true';
+		}
+		
+		// Filter by verified status
+		if(data.verified !== undefined && data.verified !== ''){
+			candidateFilter.verified = data.verified === 'true';
+		}
+		
+		// Get candidate IDs based on filters
+		const candidates = await Candidate.find(candidateFilter).select('_id');
+		const candidateIds = candidates.map(c => c._id);
+		
+		if(candidateIds.length > 0){
+			filter["_candidate"] = { $in: candidateIds };
+		} else if(data.name || (data.Profile && data.Profile !== 'All') || (data.verified !== undefined && data.verified !== '')){
+			// Only set empty array if there are active filters
+			filter["_candidate"] = { $in: [] }; // No matching candidates
+		}
+		// If no candidate filters, don't add _candidate filter - show all
+		
+		// Filter by date range
+		if(data.FromDate && data.ToDate){
+			let fdate = moment(data.FromDate).utcOffset("+05:30").startOf('day');
+			let tdate = moment(data.ToDate).utcOffset("+05:30").endOf('day');
+			filter["createdAt"] = {
+				$gte: fdate,
+				$lte: tdate
+			};
+		}
+		
+		const perPage = 20;
+		const p = parseInt(req.query.page, 10);
+		const page = p || 1;
+		
+		// Get total count
+		const count = await AppliedJobs.countDocuments(filter);
+		
+		// Get applied jobs with pagination, sorted by createdAt descending
+		// Remove populate match to show all applied jobs, even if candidate is deleted
+		const appliedJobs = await AppliedJobs.find(filter)
+			.populate({
+				path: "_candidate",
+				select: "name mobile whatsapp verified isProfileCompleted status visibility refCount cashbackDue cashbackPaid amountSpent"
+				// Removed match condition - show all applied jobs
+			})
+			.populate({
+				path: "_company",
+				select: "name"
+			})
+			.populate({
+				path: "_job",
+				select: "title description"
+			})
+			.sort({ createdAt: -1 }) // Sort by createdAt descending - fresh jobs at top
+			.skip(perPage * page - perPage)
+			.limit(perPage);
+		
+		// Show all applied jobs, even if candidate is deleted (will show as null/NA in view)
+		const validAppliedJobs = appliedJobs;
+		
+		const totalPages = Math.ceil(count / perPage);
+		
+		return res.render(`${req.vPath}/admin/company/appliedJobs`, {
+			appliedJobs: validAppliedJobs,
+			perPage,
+			totalPages,
+			page,
+			isChecked,
+			count,
+			data,
+			menu: 'company',
+			view,
+			sortingOrder: -1,
+			sortingValue: 'createdAt'
+		});
+	} catch (err) {
+		console.log('Error in appliedJobs route:', err);
+		req.flash("error", err.message || "Something went wrong!");
+		return res.redirect("back");
+	}
+});
 
 module.exports = router;
