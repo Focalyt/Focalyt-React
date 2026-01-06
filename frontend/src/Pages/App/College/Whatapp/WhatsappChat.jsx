@@ -8210,7 +8210,7 @@ const WhatsappChat = () => {
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                      <h4 className="fw-bold text-dark mb-0 me-3">Whatsapp Chat</h4>
                       <nav aria-label="breadcrumb">
                         <ol className="breadcrumb mb-0 small">
                           <li className="breadcrumb-item">

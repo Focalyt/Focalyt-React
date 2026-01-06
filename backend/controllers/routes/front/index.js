@@ -406,10 +406,12 @@ router.post("/jobsearch", (req, res) => {
 	});
 });
 router.get("/courses", async (req, res) => {
+	const todayDateString = moment().utcOffset('+05:30').startOf('day').format('YYYY-MM-DD');
+	
 	let filter = { 
 		status: true,
 		$or: [
-			{ lastDateForApply: { $gte: moment().utcOffset('+05:30').startOf('day').toDate() } },
+			{ lastDateForApply: { $gte: todayDateString } },
 			{ lastDateForApply: { $exists: false } },
 			{ lastDateForApply: null },
 			{ lastDateForApply: '' }
