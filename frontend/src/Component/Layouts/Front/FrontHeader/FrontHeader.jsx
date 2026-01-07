@@ -290,7 +290,7 @@ const FrontHeader = () => {
                         <ul className="dropdown-menu" id="loginDropdown">
                           <li>
                             <Link to={`${backendUrl}/company/login`} className="dropdown-item">
-                              Login as Corporate
+                              Login as Company
                             </Link>
                           </li>
                           <li>

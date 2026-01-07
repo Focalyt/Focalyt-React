@@ -1,6 +1,7 @@
 
 import React from 'react';  // This must be first
 import { useState,useEffect } from 'react';
+// import { HelmetProvider } from 'react-helmet-async';
 
 import Websocket from './utils/websocket'
 
@@ -14,6 +15,7 @@ import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
 import Course from './Pages/Front/Courses/Course';
 import Jobs from './Pages/Front/Jobs/Jobs';
+// import JobDetails from './Pages/Front/Jobs/JobDetails';
 import Contact from './Pages/Front/Contact/Contact';
 import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import EmployersTermsofService from './Pages/Front/EmpTerms/EmpTerms';
@@ -183,6 +185,7 @@ const Layout = () => {
         <Route exact path="/labs" element={<Labs />} />
         <Route exact path="/courses" element={<Course />} />
         <Route exact path="/joblisting" element={<Jobs />} />
+        {/* <Route exact path="/jobdetailsmore/:jobId" element={<JobDetails />} /> */}
         <Route exact path="/contact" element={<Contact />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/cmp/login" element={<CompanyLogin />} />
@@ -346,12 +349,11 @@ const Layout = () => {
 
 const App = () => {
   return (
-    <Router>
-      
-      <Layout />
-      
-      
-    </Router>
+    // <HelmetProvider>
+      <Router>
+        <Layout />
+      </Router>
+    // </HelmetProvider>
   );
 };
 

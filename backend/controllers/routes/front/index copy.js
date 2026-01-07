@@ -635,12 +635,12 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 		let jobId = req.params.jobId
 
 		if (!jobId) {
-			return res.status(400).json({ status: false, message: "Invalid Job Id" });
+			throw req.ykError("Invalid Job Id");
 		}
 		const populate = [
 			{
 				path: '_company',
-				select: "name description logo stateId cityId mediaGallery mediaGalaryVideo thumbnail"
+				select: "name description logo stateId cityId mediaGallery mediaGalaryVideo "
 			},
 			{
 				path: "_industry",
@@ -673,11 +673,6 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 
 		];
 		const job = await Vacancy.findOne({ _id: jobId }).populate(populate)
-		
-		if (!job) {
-			return res.status(404).json({ status: false, message: "Job not found" });
-		}
-
 		let state = '';
 		let city = '';
 		if (job._company?.stateId && job._company?.cityId) {
@@ -696,126 +691,12 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 
 		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 }).limit(10)
 
-		// Check if request is from social media crawler or browser (not API call)
-		const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
-		const userAgent = req.get('User-Agent') || '';
-		// Enhanced crawler detection - WhatsApp uses specific user agents
-		const isCrawler = /facebookexternalhit|WhatsApp|whatsapp|Twitter|LinkedIn|Slack|Telegram|Skype|Discord|bot|crawler|spider|facebook|Facebot|Googlebot/i.test(userAgent);
-		
-		// If explicitly requesting JSON (React app), return JSON. Otherwise return HTML with meta tags
-		// Always return HTML for crawlers, or if not explicitly requesting JSON
-		if (isCrawler || !acceptsJson) {
-			// Return HTML with meta tags for social media crawlers and browsers
-			const baseUrl = `${req.protocol}://${req.get('host')}`;
-			const jobUrl = `${baseUrl}/jobdetailsmore/${jobId}`;
-			const jobTitle = (job.title || job.name || 'Job Opening').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-			let jobDescription = job.jobDescription 
-				? job.jobDescription.substring(0, 200).replace(/\n/g, ' ').replace(/\r/g, ' ').trim()
-				: `Apply for ${jobTitle} at ${job._company?.name || 'Focalyt'}`;
-			jobDescription = jobDescription.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-			if (jobDescription.length > 197) {
-				jobDescription = jobDescription.substring(0, 197) + '...';
-			}
-			
-			// Get absolute image URL - MUST be absolute for social media
-			let thumbnailUrl = '';
-			if (job._company?.thumbnail) {
-				// Check if already absolute URL
-				if (job._company.thumbnail.startsWith('http://') || job._company.thumbnail.startsWith('https://')) {
-					thumbnailUrl = job._company.thumbnail;
-				} else {
-					// Use bucket URL (must be absolute)
-					if (process.env.MIPIE_BUCKET_URL) {
-						// Ensure bucket URL doesn't have trailing slash
-						const bucketUrl = process.env.MIPIE_BUCKET_URL.endsWith('/') 
-							? process.env.MIPIE_BUCKET_URL.slice(0, -1) 
-							: process.env.MIPIE_BUCKET_URL;
-						// Ensure thumbnail path doesn't start with slash
-						const thumbPath = job._company.thumbnail.startsWith('/') 
-							? job._company.thumbnail.slice(1) 
-							: job._company.thumbnail;
-						thumbnailUrl = `${bucketUrl}/${thumbPath}`;
-					} else {
-						// Fallback to base URL (ngrok URL)
-						const thumbPath = job._company.thumbnail.startsWith('/') 
-							? job._company.thumbnail.slice(1) 
-							: job._company.thumbnail;
-						thumbnailUrl = `${baseUrl}/${thumbPath}`;
-					}
-				}
-			} else {
-				// Default image - use absolute URL
-				thumbnailUrl = `${baseUrl}/Assets/public_assets/images/newjoblisting/banner1.jpg`;
-			}
 
-			const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	
-	<!-- Primary Meta Tags -->
-	<title>${jobTitle} - Focalyt</title>
-	<meta name="title" content="${jobTitle}">
-	<meta name="description" content="${jobDescription}">
-	
-	<!-- Open Graph / Facebook -->
-	<meta property="og:type" content="website">
-	<meta property="og:url" content="${jobUrl}">
-	<meta property="og:title" content="${jobTitle}">
-	<meta property="og:description" content="${jobDescription}">
-	<meta property="og:image" content="${thumbnailUrl}">
-	<meta property="og:image:width" content="1200">
-	<meta property="og:image:height" content="630">
-	<meta property="og:image:type" content="image/jpeg">
-	<meta property="og:site_name" content="Focalyt">
-	<meta property="og:locale" content="en_US">
-	
-	<!-- Twitter -->
-	<meta name="twitter:card" content="summary_large_image">
-	<meta name="twitter:url" content="${jobUrl}">
-	<meta name="twitter:title" content="${jobTitle}">
-	<meta name="twitter:description" content="${jobDescription}">
-	<meta name="twitter:image" content="${thumbnailUrl}">
-	
-	<!-- Additional Meta -->
-	<meta name="author" content="Focalyt">
-	<link rel="canonical" href="${jobUrl}">
-	
-	<!-- Redirect to React app only if not a crawler -->
-	${!isCrawler ? `<meta http-equiv="refresh" content="0;url=${baseUrl}/jobdetailsmore/${jobId}">
-	<script>
-		window.location.href = "${baseUrl}/jobdetailsmore/${jobId}";
-	</script>` : ''}
-</head>
-<body>
-	<div style="padding: 20px; font-family: Arial, sans-serif;">
-		<h1>${jobTitle}</h1>
-		<p>${jobDescription}</p>
-		<img src="${thumbnailUrl}" alt="${jobTitle}" style="max-width: 100%; height: auto;">
-		<p><a href="${baseUrl}/jobdetailsmore/${jobId}">View Job Details</a></p>
-	</div>
-</body>
-</html>`;
-
-			// Set proper headers for HTML response
-			res.setHeader('Content-Type', 'text/html; charset=utf-8');
-			res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-			return res.send(htmlContent);
-		}
-
-		// Return JSON for React app
-		return res.json({
-			status: true,
-			job,
-			recentJobs,
-			state,
-			city,
-			courses
+		rePath = res.render(`${req.vPath}/front/jobdetailmore`, {
+			job, recentJobs, state, city, courses
 		});
 	} catch (err) {
 		console.log(err, 'err>>>>>>>>>>>>')
-		return res.status(500).json({ status: false, message: err.message || "Failed to load job details" });
 	}
 });
 router.get("/contact", (req, res) => {

@@ -78,3 +78,4 @@ frontend/.env
 /frontend/src/Pages/App/Candidate/Earning/CoinsPage copy.jsx
 /frontend/src/Pages/App/College/UploadCandidates/UploadCandidates copy.jsx
 /frontend/src/Pages/App/College/Placements/DashboardPlacements copy.jsx
+/frontend/src/Pages/Front/Jobs/Jobs copy.jsx
