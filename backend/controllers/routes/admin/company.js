@@ -631,12 +631,8 @@ router.route("/appliedJobs").get(async (req, res) => {
 			var isChecked = "true";
 		}
 		
-		// Build candidate filter query - Don't filter by status for applied jobs
-		// We want to show all applied jobs regardless of candidate status
-		let candidateFilter = {
-			isDeleted: false
-			// Removed status filter - show all applied jobs
-		};
+		let candidateFilter = {};
+		let hasSearchFilters = false;
 		
 		// Filter by candidate name/mobile/whatsapp
 		if(data.name){
@@ -645,29 +641,35 @@ router.route("/appliedJobs").get(async (req, res) => {
 				{ mobile: { $regex: data.name, $options: "i" } },
 				{ whatsapp: { $regex: data.name, $options: "i" } }
 			];
+			hasSearchFilters = true;
 		}
 		
 		// Filter by profile completion
 		if(data.Profile && data.Profile !== 'All'){
 			candidateFilter.isProfileCompleted = data.Profile === 'true';
+			hasSearchFilters = true;
 		}
 		
 		// Filter by verified status
 		if(data.verified !== undefined && data.verified !== ''){
 			candidateFilter.verified = data.verified === 'true';
+			hasSearchFilters = true;
 		}
 		
-		// Get candidate IDs based on filters
-		const candidates = await Candidate.find(candidateFilter).select('_id');
-		const candidateIds = candidates.map(c => c._id);
-		
-		if(candidateIds.length > 0){
-			filter["_candidate"] = { $in: candidateIds };
-		} else if(data.name || (data.Profile && data.Profile !== 'All') || (data.verified !== undefined && data.verified !== '')){
-			// Only set empty array if there are active filters
-			filter["_candidate"] = { $in: [] }; // No matching candidates
+		if(hasSearchFilters){
+			// When searching, only show non-deleted candidates
+			candidateFilter.isDeleted = false;
+			const candidates = await Candidate.find(candidateFilter).select('_id');
+			const candidateIds = candidates.map(c => c._id);
+			
+			if(candidateIds.length > 0){
+				filter["_candidate"] = { $in: candidateIds };
+			} else {
+				// No matching candidates found
+				filter["_candidate"] = { $in: [] };
+			}
 		}
-		// If no candidate filters, don't add _candidate filter - show all
+		// If no search filters, don't add _candidate filter - show all applied jobs
 		
 		// Filter by date range
 		if(data.FromDate && data.ToDate){
