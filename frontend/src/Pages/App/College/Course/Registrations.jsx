@@ -708,6 +708,17 @@ const CRMDashboard = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
   const { messages, updates } = useWebsocket(userData._id || userData._id);
 
+  // Bulk WhatsApp delivery tracker (messageId -> recipient), so we can print who delivered/failed + totals
+  const bulkWhatsappTrackerRef = useRef({
+    messageIdToRecipient: {},
+    deliveredMessageIds: new Set(),
+    failedMessageIds: new Set(),
+    lastSummaryAt: 0
+  });
+
+  // Avoid re-processing the same socket status update repeatedly (updates[] is cumulative)
+  const processedWhatsappStatusUpdateKeysRef = useRef(new Set());
+
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -1078,11 +1089,27 @@ const CRMDashboard = () => {
 
     // Show notification (optional)
     if (data.status === 'delivered') {
-      console.log('✓✓ Message delivered');
+      console.log('✓✓ Message delivered', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id
+      });
     } else if (data.status === 'read') {
-      console.log('✓✓ Message read');
+      console.log('✓✓ Message read', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id
+      });
     } else if (data.status === 'failed') {
-      console.error('❌ Message failed:', data.to);
+      console.error('❌ Message failed:', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id,
+        errorMessage: data.errorMessage || data.errors?.[0]?.title
+      });
     }
   }, []);
 
@@ -1093,6 +1120,41 @@ const CRMDashboard = () => {
     if (updates && updates.length > 0) {
       updates.forEach(update => {
         // Only process new updates (not already processed)
+        const updateKey = `${update?.id || update?.messageId || 'noid'}:${update?.status || 'nostatus'}:${update?.timestamp || 'notime'}`;
+        if (processedWhatsappStatusUpdateKeysRef.current.has(updateKey)) return;
+        processedWhatsappStatusUpdateKeysRef.current.add(updateKey);
+
+        // Keep bulk counters + log who delivered/failed for current bulk session
+        const wamid = update?.id || update?.messageId;
+        if (wamid && bulkWhatsappTrackerRef.current.messageIdToRecipient[wamid]) {
+          const recipient = bulkWhatsappTrackerRef.current.messageIdToRecipient[wamid];
+          const candidateName = update?.candidateName || recipient?.candidateName || 'Unknown Candidate';
+          const to = update?.to || update?.recipient_id || recipient?.phone;
+
+          if (update.status === 'delivered' || update.status === 'read') {
+            if (!bulkWhatsappTrackerRef.current.deliveredMessageIds.has(wamid)) {
+              bulkWhatsappTrackerRef.current.deliveredMessageIds.add(wamid);
+              console.log(`📦 ✅ Delivered (bulk): ${candidateName} | to=${to} | messageId=${wamid}`);
+            }
+          } else if (update.status === 'failed') {
+            if (!bulkWhatsappTrackerRef.current.failedMessageIds.has(wamid)) {
+              bulkWhatsappTrackerRef.current.failedMessageIds.add(wamid);
+              console.error(`📦 ❌ Failed (bulk): ${candidateName} | to=${to} | messageId=${wamid} | reason=${update?.errorMessage || update?.errors?.[0]?.title || 'Message failed'}`);
+            }
+          }
+
+          // Throttle summary logs (once per ~2s)
+          const now = Date.now();
+          if (now - bulkWhatsappTrackerRef.current.lastSummaryAt > 2000) {
+            bulkWhatsappTrackerRef.current.lastSummaryAt = now;
+            console.log('📊 Bulk WhatsApp live totals =>', {
+              delivered: bulkWhatsappTrackerRef.current.deliveredMessageIds.size,
+              failed: bulkWhatsappTrackerRef.current.failedMessageIds.size,
+              tracked: Object.keys(bulkWhatsappTrackerRef.current.messageIdToRecipient).length
+            });
+          }
+        }
+
         handleMessageStatusUpdate(update);
       });
     }
@@ -3185,6 +3247,10 @@ const CRMDashboard = () => {
 
   // Auto-select profiles based on Input 1 value
   useEffect(() => {
+    if (bulkMode !== 'whatsapp') {
+      return;
+    }
+
     if (!allProfiles || allProfiles.length === 0) {
       return;
     }
@@ -3197,15 +3263,95 @@ const CRMDashboard = () => {
       return;
     }
 
-    // Ensure numValue doesn't exceed the number of leads
-    const maxLeads = allProfiles.length;
-    const validNumValue = Math.min(numValue, maxLeads);
+    // Get total available leads from CRM filter
+    const totalAvailableLeads = crmFilters[activeCrmFilter]?.count || allProfiles.length;
+    const validNumValue = Math.min(numValue, totalAvailableLeads);
 
-    // Select first N profiles where N = validNumValue
-    const profilesToSelect = allProfiles.slice(0, validNumValue).map(profile => profile._id);
-    setSelectedProfiles(profilesToSelect);
+    // If user wants more profiles than currently loaded, fetch them
+    if (validNumValue > allProfiles.length && validNumValue > 0) {
+      const fetchProfilesForSelection = async () => {
+        if (!token) return;
 
-  }, [input1Value, allProfiles, bulkMode]);
+        try {
+          const queryParams = new URLSearchParams({
+            page: '1',
+            limit: validNumValue.toString(),
+            leadStatus: crmFilters[activeCrmFilter]?._id || '',
+            ...(filterData.name && { name: filterData.name }),
+            ...(filterData.courseType && { courseType: filterData.courseType }),
+            ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
+            ...(filterData.sector && { sector: filterData.sector }),
+            ...(filterData.createdFromDate && { createdFromDate: filterData.createdFromDate.toISOString() }),
+            ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
+            ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
+            ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
+            ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
+            ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
+            ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+            ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+            ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+            ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+            ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+            ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+          });
+
+          const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+            headers: { 'x-auth': token }
+          });
+
+          if (response.data.success && response.data.data) {
+            const fetchedProfiles = response.data.data;
+            const selectedProfilesData = fetchedProfiles.slice(0, validNumValue);
+            const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+            setSelectedProfiles(profilesToSelect);
+            
+            // Console log: Show selected profiles count and names
+            // console.log(`✅ Selected ${profilesToSelect.length} profiles:`);
+            // selectedProfilesData.forEach((profile, index) => {
+            //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+            //   const profileId = profile._id;
+            //   console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+            // });
+          }
+        } catch (error) {
+          console.error('Error fetching profiles for selection:', error);
+          // Fallback: select from current allProfiles
+          const selectedProfilesData = allProfiles.slice(0, Math.min(validNumValue, allProfiles.length));
+          const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+          setSelectedProfiles(profilesToSelect);
+          
+          // Console log: Show selected profiles count and names (fallback)
+          // console.log(`⚠️ Using fallback - Selected ${profilesToSelect.length} profiles from current page:`);
+          selectedProfilesData.forEach((profile, index) => {
+            const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+            const profileId = profile._id;
+            console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+          });
+        }
+      };
+
+      // Debounce: wait 300ms after user stops typing
+      const timeoutId = setTimeout(() => {
+        fetchProfilesForSelection();
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Use current allProfiles if we have enough
+      const selectedProfilesData = allProfiles.slice(0, validNumValue);
+      const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+      setSelectedProfiles(profilesToSelect);
+      
+      // Console log: Show selected profiles count and names
+      // console.log(`✅ Selected ${profilesToSelect.length} profiles from current page:`);
+      selectedProfilesData.forEach((profile, index) => {
+        const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+        const profileId = profile._id;
+        // console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+      });
+    }
+
+  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData]);
 
 
 
@@ -5320,13 +5466,62 @@ const CRMDashboard = () => {
     setIsSendingBulkWhatsapp(true);
 
     try {
-      const profilesToSend = allProfiles.length > 0 ? allProfiles : [];
+      // Fetch all profiles matching current filters (not just current page)
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '10000', // Fetch up to 10000 profiles
+        leadStatus: crmFilters[activeCrmFilter]?._id || '',
+        ...(filterData.name && { name: filterData.name }),
+        ...(filterData.courseType && { courseType: filterData.courseType }),
+        ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
+        ...(filterData.sector && { sector: filterData.sector }),
+        ...(filterData.createdFromDate && { createdFromDate: filterData.createdFromDate.toISOString() }),
+        ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
+        ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
+        ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
+        ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
+        ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
+        ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+
+      const allProfilesResponse = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      let allMatchingProfiles = [];
+      if (allProfilesResponse.data.success && allProfilesResponse.data.data) {
+        allMatchingProfiles = allProfilesResponse.data.data;
+      }
+
+      // If profiles are selected, use only selected ones; otherwise use all matching profiles
+      let profilesToSend = [];
+      if (selectedProfiles && selectedProfiles.length > 0) {
+        profilesToSend = allMatchingProfiles.filter(profile => 
+          selectedProfiles.includes(profile._id)
+        );
+      } else {
+        profilesToSend = allMatchingProfiles;
+      }
       
       if (profilesToSend.length === 0) {
         alert('No profiles found to send messages');
         setIsSendingBulkWhatsapp(false);
         return;
       }
+
+      // Console log: Show profiles that will receive messages
+      // console.log(`📤 Preparing to send messages to ${profilesToSend.length} profiles:`);
+      // profilesToSend.forEach((profile, index) => {
+      //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+      //   const mobile = profile._candidate?.mobile || profile.candidate?.mobile || 'N/A';
+      //   const profileId = profile._id;
+      //   console.log(`  ${index + 1}. ${candidateName} (Mobile: ${mobile}, ID: ${profileId})`);
+      // });
 
       const recipients = [];
       
@@ -5380,8 +5575,16 @@ const CRMDashboard = () => {
         return;
       }
 
-      let successCount = 0;
-      let failCount = 0;
+      // Reset bulk tracker for this send session
+      bulkWhatsappTrackerRef.current = {
+        messageIdToRecipient: {},
+        deliveredMessageIds: new Set(),
+        failedMessageIds: new Set(),
+        lastSummaryAt: 0
+      };
+
+      const sentMessageIds = []; // Store WhatsApp message IDs
+      const recipientMap = {}; // Map messageId -> recipient info
       const errors = [];
 
       for (let i = 0; i < recipients.length; i++) {
@@ -5395,7 +5598,6 @@ const CRMDashboard = () => {
             
             if (!template) {
               errors.push(`${recipient.phone}: Template not found`);
-              failCount++;
               continue;
             }
 
@@ -5467,11 +5669,22 @@ const CRMDashboard = () => {
               headers: { 'x-auth': token }
             });
 
-            if (response.data.success) {
-              successCount++;
+            // Check if response is truly successful: must have HTTP 200, success=true AND messageId
+            if (response.status === 200 && response.data.success && response.data.data && response.data.data.messageId) {
+              const messageId = response.data.data.messageId;
+              sentMessageIds.push(messageId);
+              recipientMap[messageId] = recipient;
+              bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
+              console.log(`✅ Successfully sent template to ${recipient.phone}, messageId: ${messageId}`);
             } else {
-              failCount++;
-              errors.push(`${recipient.phone}: ${response.data.message || 'Failed'}`);
+              const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
+              errors.push(`${recipient.phone}: ${errorMsg}`);
+              console.error(`❌ Failed to send template to ${recipient.phone}:`, {
+                status: response.status,
+                success: response.data.success,
+                hasMessageId: !!(response.data.data && response.data.data.messageId),
+                data: response.data
+              });
             }
           } else {
             const response = await axios.post(`${backendUrl}/college/whatsapp/send-message`, {
@@ -5483,28 +5696,155 @@ const CRMDashboard = () => {
               headers: { 'x-auth': token }
             });
 
-            if (response.data.success) {
-              successCount++;
+            // Check if response is truly successful: must have HTTP 200, success=true AND messageId
+            if (response.status === 200 && response.data.success && response.data.data && response.data.data.messageId) {
+              const messageId = response.data.data.messageId;
+              sentMessageIds.push(messageId);
+              recipientMap[messageId] = recipient;
+              bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
+              console.log(`✅ Successfully sent message to ${recipient.phone}, messageId: ${messageId}`);
             } else {
-              failCount++;
-              errors.push(`${recipient.phone}: ${response.data.message || 'Failed'}`);
+              const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
+              errors.push(`${recipient.phone}: ${errorMsg}`);
+              console.error(`❌ Failed to send message to ${recipient.phone}:`, {
+                status: response.status,
+                success: response.data.success,
+                hasMessageId: !!(response.data.data && response.data.data.messageId),
+                data: response.data
+              });
             }
           }
           if (i < recipients.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
         } catch (error) {
-          failCount++;
-          errors.push(`${recipient.phone}: ${error.response?.data?.message || error.message || 'Failed'}`);
-          console.error(`Error sending to ${recipient.phone}:`, error);
+          let errorMessage = 'Failed to send message';
+          
+          if (error.response) {
+            errorMessage = error.response.data?.message || 
+                          error.response.data?.error?.message || 
+                          error.response.data?.error || 
+                          `HTTP ${error.response.status}: ${error.response.statusText}`;
+          } else if (error.request) {
+            errorMessage = 'No response from server. Network error or server timeout.';
+          } else {
+            errorMessage = error.message || 'Unknown error occurred';
+          }
+          
+          errors.push(`${recipient.phone}: ${errorMessage}`);
+          console.error(`❌ Error sending to ${recipient.phone}:`, {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          });
+        }
+      }
+
+      // Wait a bit for status updates from WhatsApp webhook
+      if (sentMessageIds.length > 0) {
+        console.log(`⏳ Waiting 3 seconds for status updates... (${sentMessageIds.length} messages sent)`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+
+      // Query database to get actual statuses
+      let successCount = 0;
+      let failCount = errors.length; // Start with API errors
+      const failedMessages = [...errors];
+
+      if (sentMessageIds.length > 0) {
+        try {
+          const statusResponse = await axios.post(`${backendUrl}/college/whatsapp/message-statuses`, {
+            messageIds: sentMessageIds
+          }, {
+            headers: { 'x-auth': token }
+          });
+
+          if (statusResponse.data.success && statusResponse.data.data) {
+            const statusMap = statusResponse.data.data;
+
+            const deliveredList = [];
+            const failedList = [];
+            const pendingList = [];
+            
+            // Count based on database status
+            sentMessageIds.forEach(messageId => {
+              const statusInfo = statusMap[messageId];
+              const recipient = recipientMap[messageId];
+              const candidateName = recipient?.candidateName || 'Unknown Candidate';
+              
+              if (statusInfo) {
+                // Check actual status from database
+                if (statusInfo.status === 'failed') {
+                  failCount++;
+                  failedMessages.push(`${recipient.phone}: ${statusInfo.errorMessage || 'Message failed'}`);
+                  failedList.push({
+                    candidateName,
+                    to: recipient?.phone,
+                    messageId,
+                    reason: statusInfo.errorMessage || 'Message failed'
+                  });
+                  console.error(`📦 ❌ Failed (DB status): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | reason=${statusInfo.errorMessage || 'No error message'}`);
+                } else {
+                  // Status is 'sent', 'delivered', 'read', 'sending', 'received' - all considered success
+                  successCount++;
+                  if (statusInfo.status === 'delivered' || statusInfo.status === 'read') {
+                    deliveredList.push({
+                      candidateName,
+                      to: recipient?.phone,
+                      messageId,
+                      status: statusInfo.status
+                    });
+                  } else {
+                    pendingList.push({
+                      candidateName,
+                      to: recipient?.phone,
+                      messageId,
+                      status: statusInfo.status
+                    });
+                  }
+                  console.log(`📦 ✅ Status (DB): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | status=${statusInfo.status}`);
+                }
+              } else {
+                // Message not found in database - might still be processing
+                console.warn(`⚠️ Message ${messageId} not found in database yet`);
+                // Count as success for now (might be delayed)
+                successCount++;
+                pendingList.push({
+                  candidateName,
+                  to: recipient?.phone,
+                  messageId,
+                  status: 'not_found_yet'
+                });
+              }
+            });
+
+            // High-signal summary for bulk run (frontend console)
+            console.log('📊 Bulk WhatsApp summary (DB snapshot) =>', {
+              deliveredOrRead: deliveredList.length,
+              failed: failedList.length,
+              pendingOrSent: pendingList.length,
+              totalSent: sentMessageIds.length
+            });
+            if (deliveredList.length) console.log('✅ Delivered/Read candidates =>', deliveredList);
+            if (failedList.length) console.log('❌ Failed candidates =>', failedList);
+            if (pendingList.length) console.log('⏳ Pending/Sent candidates =>', pendingList);
+          } else {
+            console.error('Failed to fetch message statuses from database');
+            // Fallback: count all sent messages as success
+            successCount = sentMessageIds.length;
+          }
+        } catch (statusError) {
+          console.error('Error fetching message statuses:', statusError);
+          // Fallback: count all sent messages as success
+          successCount = sentMessageIds.length;
         }
       }
 
       let resultMessage = `Messages sent: ${successCount} successful, ${failCount} failed`;
-      if (errors.length > 0 && errors.length <= 10) {
-        resultMessage += `\n\nErrors:\n${errors.join('\n')}`;
-      } else if (errors.length > 10) {
-        resultMessage += `\n\nFirst 10 errors:\n${errors.slice(0, 10).join('\n')}`;
+      if (failedMessages.length > 0 && failedMessages.length <= 10) {
+        resultMessage += `\n\nErrors:\n${failedMessages.join('\n')}`;
+      } else if (failedMessages.length > 10) {
+        resultMessage += `\n\nFirst 10 errors:\n${failedMessages.slice(0, 10).join('\n')}`;
       }
       
       alert(resultMessage);
@@ -8869,14 +9209,15 @@ const CRMDashboard = () => {
                           if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                             e.preventDefault();
                             const numValue = parseInt(input1Value, 10);
-                            const maxValue = allProfiles?.length || 0;
+                            const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                             if (numValue >= 1 && numValue <= maxValue) {
                               setShowWhatsappModal(true);
                             }
                           }
                         }}
                         onChange={(e) => {
-                          const maxValue = allProfiles?.length || 0;
+                          // Get total available leads from CRM filter (shows total count like )
+                          const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                           let inputValue = e.target.value.replace(/[^0-9]/g, '');
                           
                           // Allow empty string for clearing the input
@@ -8892,8 +9233,8 @@ const CRMDashboard = () => {
                           if (numValue < 1 || isNaN(numValue)) {
                             inputValue = '1';
                           }
-                          // Prevent values greater than max (number of leads)
-                          else if (numValue > maxValue && maxValue > 0) {
+                          // Restrict maximum to total available candidates
+                          else if (numValue > maxValue) {
                             inputValue = maxValue.toString();
                           }
                           
