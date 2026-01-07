@@ -3066,11 +3066,11 @@ router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
 		const mobileWithoutCode = mobileStr.startsWith('91') ? mobileStr.substring(2) : mobileStr;
 		const mobileWithoutCodeNumber = parseInt(mobileWithoutCode);
 		
-		console.log('🔍 Debug: Searching candidate');
-		console.log('   - Input:', mobileString);
-		console.log('   - Cleaned:', mobileStr);
-		console.log('   - With country code:', mobile);
-		console.log('   - Without country code:', mobileWithoutCodeNumber);
+		// console.log('🔍 Debug: Searching candidate');
+		// console.log('   - Input:', mobileString);
+		// console.log('   - Cleaned:', mobileStr);
+		// console.log('   - With country code:', mobile);
+		// console.log('   - Without country code:', mobileWithoutCodeNumber);
 		
 		// Try finding with multiple formats
 		const candidate = await Candidate.findOne({
@@ -3143,14 +3143,14 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 		const mobileWith91 = `91${mobileWithoutCode}`;
 		const mobilePlus = `+${mobileStr}`;
 		
-		console.log('🔍 Checking session window from WhatsAppMessage collection');
-		console.log('   - Mobile formats to search:', {
-			withPlus91: mobileWithPlus91,
-			with91: mobileWith91,
-			withPlus: mobilePlus,
-			original: mobileStr,
-			withoutCode: mobileWithoutCode
-		});
+		// console.log('🔍 Checking session window from WhatsAppMessage collection');
+		// console.log('   - Mobile formats to search:', {
+		// 	withPlus91: mobileWithPlus91,
+		// 	with91: mobileWith91,
+		// 	withPlus: mobilePlus,
+		// 	original: mobileStr,
+		// 	withoutCode: mobileWithoutCode
+		// });
 		
 		// Find last incoming message from this mobile number (try multiple formats)
 		const lastIncomingMessage = await WhatsAppMessage.findOne({
@@ -3182,12 +3182,12 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 				remainingTimeMs = expiresAt - now;
 			}
 			
-			console.log('📊 Session Window Check (from WhatsAppMessage):');
-			console.log('   - Last incoming message at:', lastIncomingMessageAt.toISOString());
-			console.log('   - Window expires at:', expiresAt.toISOString());
-			console.log('   - Current time:', now.toISOString());
-			console.log('   - Is window open?', isSessionWindowOpen);
-			console.log('   - Remaining time (hours):', (remainingTimeMs / (1000 * 60 * 60)).toFixed(2));
+			// console.log('📊 Session Window Check (from WhatsAppMessage):');
+			// console.log('   - Last incoming message at:', lastIncomingMessageAt.toISOString());
+			// console.log('   - Window expires at:', expiresAt.toISOString());
+			// console.log('   - Current time:', now.toISOString());
+			// console.log('   - Is window open?', isSessionWindowOpen);
+			// console.log('   - Remaining time (hours):', (remainingTimeMs / (1000 * 60 * 60)).toFixed(2));
 		} else {
 			console.log('📊 Session Window Check:');
 			console.log('   - ⚠️ No incoming messages found - window closed');

@@ -938,49 +938,117 @@ const WhatsappChat = () => {
   const [isSendingBulkWhatsapp, setIsSendingBulkWhatsapp] = useState(false);
 
   const [unreadMessageCounts, setUnreadMessageCounts] = useState({});
+  const [lastMessageTime, setLastMessageTime] = useState({}); // Track last message time for each profile
+  
+  // Normalize phone number for comparison
+  const normalizePhone = useCallback((phone) => {
+    if (!phone) return '';
+    // Remove all non-digits
+    let normalized = String(phone).replace(/\D/g, '');
+    // Remove leading country code 91 if present and number starts with it
+    if (normalized.startsWith('91') && normalized.length > 10) {
+      normalized = normalized.substring(2);
+    }
+    // Take last 10 digits if longer
+    if (normalized.length > 10) {
+      normalized = normalized.slice(-10);
+    }
+    return normalized;
+  }, []);
+
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
     console.log('📬 Processing incoming message:', data);
+    console.log('📬 Full message data:', JSON.stringify(data, null, 2));
 
-    // Find which profile this message belongs to by matching phone number
-    const incomingFrom = String(data.from).replace(/\D/g, '');
+    // Normalize incoming phone number
+    const incomingFrom = normalizePhone(data.from);
+    console.log('📬 Normalized incoming phone:', incomingFrom);
+    
     let messageProfileId = null;
     let isForCurrentChat = false;
+    const messageTimestamp = data.sentAt ? new Date(data.sentAt).getTime() : Date.now();
 
     // Check if message is for currently opened chat
     if (selectedProfile?._candidate?.mobile) {
-      const currentChatPhone = String(selectedProfile._candidate.mobile).replace(/\D/g, '');
-      if (incomingFrom.includes(currentChatPhone) || currentChatPhone.includes(incomingFrom)) {
+      const currentChatPhone = normalizePhone(selectedProfile._candidate.mobile);
+      console.log('📬 Current chat phone:', currentChatPhone);
+      if (incomingFrom === currentChatPhone) {
         isForCurrentChat = true;
         messageProfileId = selectedProfile._id;
+        console.log('✅ Message is for currently opened chat');
       }
     }
 
     // If not for current chat, find the profile in allProfiles
     if (!isForCurrentChat) {
-      const matchingProfile = allProfiles.find(profile => {
-        const profilePhone = String(profile._candidate?.mobile || '').replace(/\D/g, '');
-        return profilePhone && (incomingFrom.includes(profilePhone) || profilePhone.includes(incomingFrom));
+      // Use setState callback to access latest allProfiles
+      setAllProfiles(prevProfiles => {
+        const matchingProfile = prevProfiles.find(profile => {
+          const profilePhone = normalizePhone(profile._candidate?.mobile);
+          console.log('🔍 Comparing:', { incoming: incomingFrom, profile: profilePhone, profileId: profile._id });
+          return profilePhone && profilePhone === incomingFrom;
+        });
+        
+        if (matchingProfile) {
+          messageProfileId = matchingProfile._id;
+          
+          console.log('✅ Found matching profile:', {
+            profileId: messageProfileId,
+            candidateName: matchingProfile._candidate?.name,
+            incomingPhone: incomingFrom,
+            profilePhone: normalizePhone(matchingProfile._candidate?.mobile)
+          });
+          
+          // Increment unread count and update last message time
+          setUnreadMessageCounts(prev => {
+            const newCount = (prev[messageProfileId] || 0) + 1;
+            console.log('📬 Updating unread count:', { profileId: messageProfileId, newCount });
+            return {
+              ...prev,
+              [messageProfileId]: newCount
+            };
+          });
+          
+          // Update last message time for sorting
+          setLastMessageTime(prev => ({
+            ...prev,
+            [messageProfileId]: messageTimestamp
+          }));
+          
+          // Move profile to top of current page
+          const profileIndex = prevProfiles.findIndex(p => p._id === messageProfileId);
+          if (profileIndex !== -1 && profileIndex > 0) {
+            // Create new array with profile moved to top
+            const updatedProfiles = [...prevProfiles];
+            const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+            console.log('⬆️ Moving profile to top:', movedProfile._candidate?.name);
+            return [movedProfile, ...updatedProfiles];
+          }
+          return prevProfiles;
+        } else {
+          console.log('⚠️ No matching profile found for message from:', incomingFrom);
+          console.log('⚠️ Available profiles:', prevProfiles.map(p => ({
+            id: p._id,
+            name: p._candidate?.name,
+            phone: normalizePhone(p._candidate?.mobile)
+          })));
+        }
+        return prevProfiles;
       });
       
-      if (matchingProfile) {
-        messageProfileId = matchingProfile._id;
-        
-        // Increment unread count for this profile
-        setUnreadMessageCounts(prev => ({
-          ...prev,
-          [messageProfileId]: (prev[messageProfileId] || 0) + 1
-        }));
-        console.log('📬 New message from candidate, unread count updated:', {
-          profileId: messageProfileId,
-          candidateName: matchingProfile._candidate?.name,
-          unreadCount: (unreadMessageCounts[messageProfileId] || 0) + 1
-        });
+      if (messageProfileId) {
         return; // Don't add to messages if chat is not open
-      } else {
-        console.log('⚠️ No matching profile found for message from:', incomingFrom);
-        return;
       }
+    }
+    
+    // For current chat, also update last message time but don't increment unread
+    if (isForCurrentChat && messageProfileId) {
+      setLastMessageTime(prev => ({
+        ...prev,
+        [messageProfileId]: messageTimestamp
+      }));
+      console.log('✅ Updated last message time for current chat');
     }
 
     // Add incoming message to chat
@@ -1041,7 +1109,7 @@ const WhatsappChat = () => {
         icon: '/whatsapp-icon.png'
       });
     }
-  }, [selectedProfile, allProfiles]);
+  }, [selectedProfile, normalizePhone]);
 
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
@@ -1127,15 +1195,45 @@ const WhatsappChat = () => {
   }, [updates]);
 
   // Handle incoming messages from users
+  // Track processed message IDs to avoid duplicates
+  const processedMessageIds = useRef(new Set());
+  
+  // Handle incoming messages from users
   useEffect(() => {
-    console.log('📬 WhatsApp incoming messages:', messages);
+    console.log('📬 WhatsApp incoming messages array:', messages);
+    console.log('📬 Messages length:', messages?.length);
 
     if (messages && messages.length > 0) {
+      // Process all new messages that haven't been processed yet
       messages.forEach(message => {
-        handleIncomingMessage(message);
+        // Create unique ID for this message
+        const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
+        
+        // Skip if already processed
+        if (processedMessageIds.current.has(messageId)) {
+          console.log('⏭️ Skipping already processed message:', messageId);
+          return;
+        }
+        
+        // Mark as processed
+        processedMessageIds.current.add(messageId);
+        
+        console.log('📬 Processing new message:', {
+          messageId,
+          from: message.from,
+          direction: message.direction,
+          message: message.message?.substring(0, 50)
+        });
+        
+        // Check if this is a WhatsApp incoming message
+        if (message && (message.direction === 'incoming' || message.from)) {
+          handleIncomingMessage(message);
+        } else {
+          console.log('⚠️ Message is not an incoming message or missing from field:', message);
+        }
       });
     }
-  }, [messages]);
+  }, [messages, handleIncomingMessage]);
 
 
   // Fetch filter options from backend API on mount
@@ -2897,9 +2995,30 @@ const WhatsappChat = () => {
       if (response.data.success && response.data.data) {
         const data = response.data;
         // Sirf ek state me data set karo - paginated data
-        setAllProfiles(data.data);
+        const profiles = data.data;
+        setAllProfiles(profiles);
         setTotalPages(data.totalPages);
         setPageSize(data.limit);
+        
+        // Initialize last message times from profile data if available
+        if (profiles && profiles.length > 0) {
+          profiles.forEach(profile => {
+            // If backend provides lastMessageTime, use it
+            if (profile.lastMessageTime) {
+              setLastMessageTime(prev => ({
+                ...prev,
+                [profile._id]: new Date(profile.lastMessageTime).getTime()
+              }));
+            }
+            // If backend provides unreadCount, use it
+            if (profile.unreadMessageCount && profile.unreadMessageCount > 0) {
+              setUnreadMessageCounts(prev => ({
+                ...prev,
+                [profile._id]: profile.unreadMessageCount
+              }));
+            }
+          });
+        }
 
         // Update CRM filter counts from backend
         // if (data.crmFilterCounts) {
@@ -3475,10 +3594,41 @@ const WhatsappChat = () => {
           wamid: m.wamid,
           whatsappMessageId: m.whatsappMessageId,
           text: m.text?.substring(0, 30),
-          status: m.status
+          status: m.status,
+          sender: m.sender,
+          timestamp: m.timestamp
         })));
 
         setWhatsappMessages(formattedMessages);
+        
+        // Initialize last message time from chat history
+        if (selectedProfile?._id && formattedMessages.length > 0) {
+          // Sort messages by timestamp to get the most recent
+          const sortedMessages = [...formattedMessages].sort((a, b) => {
+            const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return timeB - timeA; // Descending order (newest first)
+          });
+          
+          const lastMessage = sortedMessages[0];
+          const lastMsgTimestamp = lastMessage.timestamp 
+            ? new Date(lastMessage.timestamp).getTime() 
+            : Date.now();
+          
+          setLastMessageTime(prev => ({
+            ...prev,
+            [selectedProfile._id]: lastMsgTimestamp
+          }));
+          
+          console.log('📥 Chat history loaded:', {
+            profileId: selectedProfile._id,
+            candidateName: selectedProfile._candidate?.name,
+            totalMessages: formattedMessages.length,
+            lastMessageTime: new Date(lastMsgTimestamp).toISOString(),
+            lastMessageSender: lastMessage.sender,
+            lastMessageText: lastMessage.text?.substring(0, 30)
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error fetching chat history:', error.response?.data || error.message);
@@ -4153,6 +4303,27 @@ const WhatsappChat = () => {
         );
 
         console.log('✅ Message sent successfully:', response.data);
+        
+        // Update last message time for sorting and move to top
+        if (selectedProfile?._id) {
+          const now = Date.now();
+          setLastMessageTime(prev => ({
+            ...prev,
+            [selectedProfile._id]: now
+          }));
+          
+          // Move profile to top of current page
+          setAllProfiles(prevProfiles => {
+            const profileIndex = prevProfiles.findIndex(p => p._id === selectedProfile._id);
+            if (profileIndex !== -1 && profileIndex > 0) {
+              const updatedProfiles = [...prevProfiles];
+              const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+              console.log('⬆️ Moving profile to top after sending message:', movedProfile._candidate?.name);
+              return [movedProfile, ...updatedProfiles];
+            }
+            return prevProfiles;
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error sending message:', error);
@@ -4298,6 +4469,27 @@ const WhatsappChat = () => {
         );
 
         console.log(`✅ ${fileType} sent successfully:`, response.data);
+        
+        // Update last message time for sorting and move to top
+        if (selectedProfile?._id) {
+          const now = Date.now();
+          setLastMessageTime(prev => ({
+            ...prev,
+            [selectedProfile._id]: now
+          }));
+          
+          // Move profile to top of current page
+          setAllProfiles(prevProfiles => {
+            const profileIndex = prevProfiles.findIndex(p => p._id === selectedProfile._id);
+            if (profileIndex !== -1 && profileIndex > 0) {
+              const updatedProfiles = [...prevProfiles];
+              const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+              console.log('⬆️ Moving profile to top after sending file:', movedProfile._candidate?.name);
+              return [movedProfile, ...updatedProfiles];
+            }
+            return prevProfiles;
+          });
+        }
       }
     } catch (error) {
       console.error(`❌ Error sending ${fileType}:`, error);
@@ -5235,6 +5427,27 @@ const WhatsappChat = () => {
         });
 
         setWhatsappMessages([...whatsappMessages, templateMessage]);
+        
+        // Update last message time for sorting and move to top
+        if (selectedProfile?._id) {
+          const now = Date.now();
+          setLastMessageTime(prev => ({
+            ...prev,
+            [selectedProfile._id]: now
+          }));
+          
+          // Move profile to top of current page
+          setAllProfiles(prevProfiles => {
+            const profileIndex = prevProfiles.findIndex(p => p._id === selectedProfile._id);
+            if (profileIndex !== -1 && profileIndex > 0) {
+              const updatedProfiles = [...prevProfiles];
+              const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+              console.log('⬆️ Moving profile to top after sending template:', movedProfile._candidate?.name);
+              return [movedProfile, ...updatedProfiles];
+            }
+            return prevProfiles;
+          });
+        }
 
         // ✅ Close the template preview
         setSelectedWhatsappTemplate(null);
@@ -8210,7 +8423,7 @@ const WhatsappChat = () => {
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                      <h4 className="fw-bold text-dark mb-0 me-3">Whatsapp Chat</h4>
                       <nav aria-label="breadcrumb">
                         <ol className="breadcrumb mb-0 small">
                           <li className="breadcrumb-item">
@@ -9082,7 +9295,33 @@ const WhatsappChat = () => {
                         )}
 
                         {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
+                        {!isLoadingProfiles && allProfiles && (() => {
+                          // Sort profiles: unread messages first, then by last message time
+                          const sortedProfiles = [...allProfiles].sort((a, b) => {
+                            const aUnread = unreadMessageCounts[a._id] || 0;
+                            const bUnread = unreadMessageCounts[b._id] || 0;
+                            const aLastMsgTime = lastMessageTime[a._id] || 0;
+                            const bLastMsgTime = lastMessageTime[b._id] || 0;
+                            
+                            // First priority: Profiles with unread messages
+                            if (aUnread > 0 && bUnread === 0) return -1;
+                            if (aUnread === 0 && bUnread > 0) return 1;
+                            
+                            // Second priority: Among unread, sort by last message time (newest first)
+                            if (aUnread > 0 && bUnread > 0) {
+                              return bLastMsgTime - aLastMsgTime;
+                            }
+                            
+                            // Third priority: Among no unread, sort by last message time (newest first)
+                            if (aLastMsgTime !== bLastMsgTime) {
+                              return bLastMsgTime - aLastMsgTime;
+                            }
+                            
+                            // Default: Keep original order
+                            return 0;
+                          });
+                          
+                          return sortedProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
                             {/* Profile Header Card */}
@@ -9136,7 +9375,7 @@ const WhatsappChat = () => {
                                           title="WhatsApp"
                                         >
                                           <i className="fab fa-whatsapp"></i>
-                                          {unreadMessageCounts[profile._id] > 0 && (
+                                          {(unreadMessageCounts[profile._id] > 0) && (
                                             <span
                                               className="badge bg-danger"
                                               style={{
@@ -9151,7 +9390,8 @@ const WhatsappChat = () => {
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontWeight: '600'
+                                                fontWeight: '600',
+                                                zIndex: 10
                                               }}
                                             >
                                               {unreadMessageCounts[profile._id] > 99 ? '99+' : unreadMessageCounts[profile._id]}
@@ -10947,8 +11187,8 @@ const WhatsappChat = () => {
                           </div>
 
 
-                        ))}
-
+                        ));
+                        })()}
 
 
 
