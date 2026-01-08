@@ -771,43 +771,28 @@ const WhatsappChat = () => {
     // Fetch data with current filters to get latest unread counts from backend
     // This ensures that when user navigates from another route, they see the latest data
     if (token) {
-      fetchProfileData();
+      const fetchAndProcess = async () => {
+        await fetchProfileData();
+        // After fetching data, process any pending messages from context
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          if (contextMessages && contextMessages.length > 0) {
+            console.log('📬 [WhatsappChat] Processing pending messages from context:', contextMessages.length);
+            contextMessages.forEach(message => {
+              const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
+              if (!processedMessageIds.current.has(messageId)) {
+                processedMessageIds.current.add(messageId);
+                if (message && (message.direction === 'incoming' || message.from)) {
+                  handleIncomingMessage(message);
+                }
+              }
+            });
+          }
+        }, 500);
+      };
+      fetchAndProcess();
     }
   }, []); // Only run once on mount
-
-  // Process pending messages after allProfiles are loaded
-  useEffect(() => {
-    // Only process if profiles are loaded and we have pending messages
-    if (allProfiles.length > 0 && whatsAppContext?.messages && whatsAppContext.messages.length > 0) {
-      const pendingMessages = whatsAppContext.messages.filter(message => {
-        const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
-        return !processedMessageIds.current.has(messageId) && 
-               (message.direction === 'incoming' || message.from);
-      });
-
-      if (pendingMessages.length > 0) {
-        console.log('📬 [WhatsappChat] Processing pending messages after profiles loaded:', pendingMessages.length);
-        
-        // Process messages one by one
-        pendingMessages.forEach((message, index) => {
-          const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
-          
-          // Mark as processed
-          processedMessageIds.current.add(messageId);
-          
-          // Process with a small delay to ensure state updates properly
-          setTimeout(() => {
-            console.log('📬 Processing pending message:', {
-              messageId,
-              from: message.from,
-              message: message.message?.substring(0, 50)
-            });
-            handleIncomingMessage(message);
-          }, index * 200); // Stagger messages to avoid race conditions
-        });
-      }
-    }
-  }, [allProfiles.length, whatsAppContext?.messages]); // Run when profiles are loaded or new messages arrive
 
 
   const handleSaveCV = async () => {
@@ -1017,6 +1002,31 @@ const WhatsappChat = () => {
     return normalized;
   }, []);
 
+  // Helper function to sort profiles by last message time and unread count
+  // This ensures proper ordering: unread messages first, then by last message time (newest first)
+  const sortProfilesByMessageTime = useCallback((profiles, unreadCounts, lastMsgTimes) => {
+    if (!profiles || profiles.length === 0) return profiles;
+    
+    return [...profiles].sort((a, b) => {
+      const aUnread = unreadCounts[a._id] || 0;
+      const bUnread = unreadCounts[b._id] || 0;
+      const aLastMsgTime = lastMsgTimes[a._id] || 0;
+      const bLastMsgTime = lastMsgTimes[b._id] || 0;
+      
+      // First priority: Profiles with unread messages come first
+      if (aUnread > 0 && bUnread === 0) return -1;
+      if (aUnread === 0 && bUnread > 0) return 1;
+      
+      // Second priority: Among profiles with same unread status, sort by last message time (newest first)
+      if (bLastMsgTime !== aLastMsgTime) {
+        return bLastMsgTime - aLastMsgTime; // Descending order (newest first)
+      }
+      
+      // If same last message time and same unread status, maintain original order
+      return 0;
+    });
+  }, []);
+
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
     console.log('📬 Processing incoming message:', data);
@@ -1071,37 +1081,33 @@ const WhatsappChat = () => {
             };
           });
           
-          // Update last message time for sorting
+          // Update last message time for sorting (this will trigger re-sort via useEffect)
           setLastMessageTime(prev => ({
             ...prev,
             [messageProfileId]: messageTimestamp
           }));
           
-          // Always switch to page 1 and move profile to top
+          // Check if profile is on current page
+          const profileIndex = prevProfiles.findIndex(p => p._id === messageProfileId);
+          const isProfileOnCurrentPage = profileIndex !== -1;
+          
+          // Always switch to page 1 to show the message sender at top
           setCurrentPage(prevPage => {
             if (prevPage !== 1) {
               console.log('📄 Switching to page 1 to show message sender');
               // Store profile ID to move after page 1 loads
               profileToMoveToTop.current = messageProfileId;
-              // Fetch page 1 data
+              // Fetch page 1 data - backend should return sorted by lastMessageTime
               fetchProfileData(filterData, 1);
               return 1;
             } else {
-              // Already on page 1, move profile to top immediately
-              profileToMoveToTop.current = messageProfileId;
+              // Already on page 1 - sorting useEffect will handle moving to top
+              console.log('✅ Profile on page 1, sorting will move it to top');
             }
             return prevPage;
           });
           
-          // Move profile to top of current page (if already on page 1)
-          const profileIndex = prevProfiles.findIndex(p => p._id === messageProfileId);
-          if (profileIndex !== -1 && profileIndex > 0) {
-            // Create new array with profile moved to top
-            const updatedProfiles = [...prevProfiles];
-            const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
-            console.log('⬆️ Moving profile to top of page 1:', movedProfile._candidate?.name);
-            return [movedProfile, ...updatedProfiles];
-          }
+          // Don't manually move here - let the sorting useEffect handle it
           return prevProfiles;
         } else {
           console.log('⚠️ No matching profile found for message from:', incomingFrom);
@@ -1163,38 +1169,33 @@ const WhatsappChat = () => {
                   return updated;
                 });
                 
-                // Update last message time
+                // Update last message time (will trigger sorting)
                 setLastMessageTime(prev => ({
                   ...prev,
                   [foundProfileId]: messageTimestamp
                 }));
                 
-                // Restore original filters and fetch data, then add this profile to top
+                // Switch to page 1 and restore original filters
+                setCurrentPage(1);
                 fetchProfileData(filterData, 1).then(() => {
-                  // After restoring filters, add profile to top if it's in the results
+                  // After restoring filters, check if profile is in results
+                  // If not in current filter results, add it to the list (sorting will handle position)
                   setAllProfiles(prevProfiles => {
                     const profileIndex = prevProfiles.findIndex(p => p._id === foundProfileId);
-                    if (profileIndex !== -1 && profileIndex > 0) {
-                      const updatedProfiles = [...prevProfiles];
-                      const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
-                      console.log('⬆️ Moving profile to top after restoring filters:', movedProfile._candidate?.name);
-                      profileToMoveToTop.current = null;
-                      return [movedProfile, ...updatedProfiles];
-                    } else if (profileIndex === 0) {
-                      profileToMoveToTop.current = null;
-                    } else {
-                      // Profile not in current filter results, add it to top anyway with updated unread count
-                      console.log('⬆️ Profile not in filter results, adding to top:', foundProfileCopy._candidate?.name);
-                      // Update the profile with calculated unread count
+                    if (profileIndex === -1) {
+                      // Profile not in current filter results, add it to the list
+                      // Sorting useEffect will place it in correct position
+                      console.log('⬆️ Profile not in filter results, adding to list:', foundProfileCopy._candidate?.name);
                       const profileWithCount = {
                         ...foundProfileCopy,
                         unreadMessageCount: finalCount
                       };
-                      profileToMoveToTop.current = null;
                       return [profileWithCount, ...prevProfiles];
                     }
+                    // Profile is in results - sorting will handle position
                     return prevProfiles;
                   });
+                  profileToMoveToTop.current = null;
                 });
                 
                 return prevProfiles;
@@ -1512,6 +1513,63 @@ const WhatsappChat = () => {
     }
   }, [allProfiles, currentPage, normalizePhone]);
 
+  // Re-sort profiles whenever lastMessageTime or unreadMessageCounts change
+  // This ensures profiles are always sorted by latest message time
+  useEffect(() => {
+    setAllProfiles(prevProfiles => {
+      if (prevProfiles.length === 0) return prevProfiles;
+      
+      const sorted = sortProfilesByMessageTime(prevProfiles, unreadMessageCounts, lastMessageTime);
+      
+      // Only update if order actually changed to avoid infinite loops
+      const orderChanged = sorted.some((profile, index) => 
+        prevProfiles[index]?._id !== profile._id
+      );
+      
+      if (orderChanged) {
+        console.log('🔄 Re-sorting profiles based on last message time and unread counts');
+        return sorted;
+      }
+      
+      return prevProfiles;
+    });
+  }, [lastMessageTime, unreadMessageCounts, sortProfilesByMessageTime]); // Only depend on these, not allProfiles
+
+  // Re-sort profiles after fetchProfileData completes (when loading stops)
+  // This ensures newly fetched profiles are sorted even if lastMessageTime/unreadMessageCounts didn't change
+  // Use ref to track previous loading state to only sort when loading transitions from true to false
+  const prevLoadingRef = useRef(isLoadingProfiles);
+  
+  useEffect(() => {
+    // Only sort when loading transitions from true to false (fetch just completed)
+    if (prevLoadingRef.current && !isLoadingProfiles && allProfiles.length > 0) {
+      // Small delay to ensure all state updates from fetchProfileData are complete
+      const timeoutId = setTimeout(() => {
+        setAllProfiles(prevProfiles => {
+          if (prevProfiles.length === 0) return prevProfiles;
+          
+          const sorted = sortProfilesByMessageTime(prevProfiles, unreadMessageCounts, lastMessageTime);
+          
+          // Only update if order changed
+          const orderChanged = sorted.some((profile, index) => 
+            prevProfiles[index]?._id !== profile._id
+          );
+          
+          if (orderChanged) {
+            console.log('🔄 Re-sorting profiles after fetch completes');
+            return sorted;
+          }
+          
+          return prevProfiles;
+        });
+      }, 100);
+      
+      prevLoadingRef.current = isLoadingProfiles;
+      return () => clearTimeout(timeoutId);
+    } else {
+      prevLoadingRef.current = isLoadingProfiles;
+    }
+  }, [isLoadingProfiles, allProfiles.length, unreadMessageCounts, lastMessageTime, sortProfilesByMessageTime]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -3273,88 +3331,72 @@ const WhatsappChat = () => {
         const data = response.data;
         // Sirf ek state me data set karo - paginated data
         const profiles = data.data;
+        setAllProfiles(profiles);
+        setTotalPages(data.totalPages);
+        setPageSize(data.limit);
         
-        // Initialize last message times and unread counts from profile data
-        const lastMsgTimeMap = {};
-        const unreadCountMap = {};
-        
+        // Initialize last message times from profile data if available
         if (profiles && profiles.length > 0) {
           profiles.forEach(profile => {
             // If backend provides lastMessageTime, use it
             if (profile.lastMessageTime) {
-              lastMsgTimeMap[profile._id] = new Date(profile.lastMessageTime).getTime();
+              setLastMessageTime(prev => ({
+                ...prev,
+                [profile._id]: new Date(profile.lastMessageTime).getTime()
+              }));
             }
             
             // Handle unread count - backend count is source of truth
             const profilePhone = normalizePhone(profile._candidate?.mobile);
-            const backendCount = profile.unreadMessageCount || 0;
-            
-            if (profilePhone && backendCount > 0) {
-              console.log('📬 Mapping unread count from backend to profile:', {
-                phone: profilePhone,
-                profileId: profile._id,
-                backendCount
+            if (profilePhone) {
+              const phoneKey = `phone_${profilePhone}`;
+              
+              setUnreadMessageCounts(prev => {
+                // Get temporary count tracked by phone number (if any)
+                const tempCount = prev[phoneKey] || 0;
+                
+                // Backend count is the source of truth (includes all unread messages)
+                const backendCount = profile.unreadMessageCount || 0;
+                
+                // Use backend count if available, otherwise use temp count
+                // Backend count should always be >= temp count, so prefer backend
+                const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0);
+                
+                if (finalCount > 0) {
+                  console.log('📬 Mapping unread count from phone to profile:', {
+                    phone: profilePhone,
+                    profileId: profile._id,
+                    tempCount,
+                    backendCount,
+                    finalCount
+                  });
+                  
+                  // Remove phone-based key and set profile-based count
+                  const updated = { ...prev };
+                  delete updated[phoneKey];
+                  updated[profile._id] = finalCount;
+                  return updated;
+                }
+                
+                // If no count, just remove phone key if exists
+                if (tempCount > 0) {
+                  const updated = { ...prev };
+                  delete updated[phoneKey];
+                  return updated;
+                }
+                
+                return prev;
               });
-              unreadCountMap[profile._id] = backendCount;
-            } else if (backendCount > 0) {
+            } else if (profile.unreadMessageCount && profile.unreadMessageCount > 0) {
               // Fallback: if no phone number, just use backend count
-              unreadCountMap[profile._id] = backendCount;
+              setUnreadMessageCounts(prev => ({
+                ...prev,
+                [profile._id]: profile.unreadMessageCount
+              }));
             }
           });
           
-          // Sort profiles based on unread count and last message time (same logic as render)
-          const sortedProfiles = [...profiles].sort((a, b) => {
-            const aUnread = unreadCountMap[a._id] || 0;
-            const bUnread = unreadCountMap[b._id] || 0;
-            const aLastMsgTime = lastMsgTimeMap[a._id] || 0;
-            const bLastMsgTime = lastMsgTimeMap[b._id] || 0;
-            
-            // First priority: Profiles with unread messages
-            if (aUnread > 0 && bUnread === 0) return -1;
-            if (aUnread === 0 && bUnread > 0) return 1;
-            
-            // Second priority: Among unread, sort by last message time (newest first)
-            if (aUnread > 0 && bUnread > 0) {
-              return bLastMsgTime - aLastMsgTime;
-            }
-            
-            // Third priority: Among no unread, sort by last message time (newest first)
-            if (aLastMsgTime !== bLastMsgTime) {
-              return bLastMsgTime - aLastMsgTime;
-            }
-            
-            // Default: Keep original order
-            return 0;
-          });
-          
-          // Set sorted profiles
-          setAllProfiles(sortedProfiles);
-          
-          // Update last message times state
-          setLastMessageTime(prev => ({
-            ...prev,
-            ...lastMsgTimeMap
-          }));
-          
-          // Update unread counts state (remove phone keys and set profile keys)
-          setUnreadMessageCounts(prev => {
-            const updated = { ...prev };
-            // Remove all phone-based keys
-            Object.keys(updated).forEach(key => {
-              if (key.startsWith('phone_')) {
-                delete updated[key];
-              }
-            });
-            // Add profile-based counts from backend (source of truth)
-            Object.assign(updated, unreadCountMap);
-            return updated;
-          });
-        } else {
-          setAllProfiles(profiles);
         }
-        
-        setTotalPages(data.totalPages);
-        setPageSize(data.limit);
 
         // Update CRM filter counts from backend
         // if (data.crmFilterCounts) {
