@@ -1050,28 +1050,129 @@ const WhatsappChat = () => {
             phone: normalizePhone(p._candidate?.mobile)
           })));
           
-          // Profile not found in current page - still update unread count by phone number
-          // We'll map it to profile ID once profile is loaded
-          console.log('📬 Profile not in allProfiles, tracking unread count by phone:', incomingFrom);
+          // Profile not found - search for it by phone number immediately
+          console.log('📬 Profile not in allProfiles, searching by phone:', incomingFrom);
           
-          // Store phone number to find profile after page 1 loads
+          // Store phone number to find profile
           profileToMoveToTop.current = { phone: incomingFrom, timestamp: messageTimestamp };
           
-          // Update unread count temporarily using phone number as key
-          // This will be mapped to profile ID when profile is found
+          // Search for profile by phone number (try without filters first to find profile)
+          // First try searching with phone as name filter
+          const searchFilters = { ...filterData, name: incomingFrom };
+          fetchProfileData(searchFilters, 1).then(() => {
+            // After fetch, check if profile was found and update count
+            setAllProfiles(prevProfiles => {
+              const matchingProfile = prevProfiles.find(profile => {
+                const profilePhone = normalizePhone(profile._candidate?.mobile);
+                return profilePhone && profilePhone === incomingFrom;
+              });
+              
+              if (matchingProfile) {
+                const foundProfileId = matchingProfile._id;
+                const phoneKey = `phone_${incomingFrom}`;
+                
+                // Get temp count and update by profile ID
+                setUnreadMessageCounts(prev => {
+                  const tempCount = prev[phoneKey] || 0;
+                  const backendCount = matchingProfile.unreadMessageCount || 0;
+                  // Use backend count if available (it includes all unread), otherwise use temp count
+                  // Backend count is source of truth, but tempCount might be higher if backend hasn't updated yet
+                  const finalCount = Math.max(backendCount, tempCount);
+                  
+                  console.log('📬 Found profile, updating unread count:', {
+                    profileId: foundProfileId,
+                    phone: incomingFrom,
+                    tempCount,
+                    backendCount,
+                    finalCount
+                  });
+                  
+                  const updated = { ...prev };
+                  delete updated[phoneKey];
+                  updated[foundProfileId] = finalCount;
+                  return updated;
+                });
+                
+                // Update last message time
+                setLastMessageTime(prev => ({
+                  ...prev,
+                  [foundProfileId]: messageTimestamp
+                }));
+                
+                // Move profile to top
+                const profileIndex = prevProfiles.findIndex(p => p._id === foundProfileId);
+                if (profileIndex !== -1 && profileIndex > 0) {
+                  const updatedProfiles = [...prevProfiles];
+                  const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+                  console.log('⬆️ Moving profile to top after search:', movedProfile._candidate?.name);
+                  profileToMoveToTop.current = null;
+                  return [movedProfile, ...updatedProfiles];
+                } else if (profileIndex === 0) {
+                  // Already at top
+                  profileToMoveToTop.current = null;
+                }
+              } else {
+                // Profile still not found after search - try searching without filters
+                console.log('⚠️ Profile not found with filters, trying without filters');
+                const noFilterSearch = { name: incomingFrom };
+                fetchProfileData(noFilterSearch, 1).then(() => {
+                  setAllProfiles(prevProfiles => {
+                    const matchingProfile = prevProfiles.find(profile => {
+                      const profilePhone = normalizePhone(profile._candidate?.mobile);
+                      return profilePhone && profilePhone === incomingFrom;
+                    });
+                    
+                    if (matchingProfile) {
+                      const foundProfileId = matchingProfile._id;
+                      const phoneKey = `phone_${incomingFrom}`;
+                      
+                      setUnreadMessageCounts(prev => {
+                        const tempCount = prev[phoneKey] || 0;
+                        const backendCount = matchingProfile.unreadMessageCount || 0;
+                        const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 1);
+                        
+                        const updated = { ...prev };
+                        delete updated[phoneKey];
+                        updated[foundProfileId] = finalCount;
+                        return updated;
+                      });
+                      
+                      setLastMessageTime(prev => ({
+                        ...prev,
+                        [foundProfileId]: messageTimestamp
+                      }));
+                      
+                      const profileIndex = prevProfiles.findIndex(p => p._id === foundProfileId);
+                      if (profileIndex !== -1 && profileIndex > 0) {
+                        const updatedProfiles = [...prevProfiles];
+                        const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+                        console.log('⬆️ Moving profile to top after no-filter search:', movedProfile._candidate?.name);
+                        profileToMoveToTop.current = null;
+                        return [movedProfile, ...updatedProfiles];
+                      }
+                      profileToMoveToTop.current = null;
+                    }
+                    return prevProfiles;
+                  });
+                });
+              }
+              
+              return prevProfiles;
+            });
+          }).catch(error => {
+            console.error('Error searching for profile:', error);
+          });
+          
+          // Update unread count temporarily by phone key (will be mapped when profile found)
           setUnreadMessageCounts(prev => {
             const phoneKey = `phone_${incomingFrom}`;
             const newCount = (prev[phoneKey] || 0) + 1;
-            console.log('📬 Updating unread count by phone:', { phone: incomingFrom, newCount });
+            console.log('📬 Updating unread count by phone (temporary):', { phone: incomingFrom, newCount });
             return {
               ...prev,
               [phoneKey]: newCount
             };
           });
-          
-          setCurrentPage(1);
-          // Fetch page 1 to find the profile
-          fetchProfileData(filterData, 1);
         }
         return prevProfiles;
       });
@@ -9519,29 +9620,34 @@ const WhatsappChat = () => {
                                           title="WhatsApp"
                                         >
                                           <i className="fab fa-whatsapp"></i>
-                                          {(unreadMessageCounts[profile._id] > 0) && (
-                                            <span
-                                              className="badge bg-danger"
-                                              style={{
-                                                position: 'absolute',
-                                                top: '-5px',
-                                                right: '-5px',
-                                                fontSize: unreadMessageCounts[profile._id] > 99 ? '9px' : '10px',
-                                                padding: unreadMessageCounts[profile._id] > 99 ? '2px 5px' : '2px 6px',
-                                                borderRadius: '10px',
-                                                minWidth: '18px',
-                                                height: '18px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontWeight: '600',
-                                                zIndex: 10,
-                                                whiteSpace: 'nowrap'
-                                              }}
-                                            >
-                                              {unreadMessageCounts[profile._id]}
-                                            </span>
-                                          )}
+                                          {(() => {
+                                            const profilePhone = normalizePhone(profile._candidate?.mobile);
+                                            const phoneKey = profilePhone ? `phone_${profilePhone}` : null;
+                                            const unreadCount = unreadMessageCounts[profile._id] || (phoneKey ? unreadMessageCounts[phoneKey] : 0) || 0;
+                                            return unreadCount > 0 ? (
+                                              <span
+                                                className="badge bg-danger"
+                                                style={{
+                                                  position: 'absolute',
+                                                  top: '-5px',
+                                                  right: '-5px',
+                                                  fontSize: unreadCount > 99 ? '9px' : '10px',
+                                                  padding: unreadCount > 99 ? '2px 5px' : '2px 6px',
+                                                  borderRadius: '10px',
+                                                  minWidth: '18px',
+                                                  height: '18px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontWeight: '600',
+                                                  zIndex: 10,
+                                                  whiteSpace: 'nowrap'
+                                                }}
+                                              >
+                                                {unreadCount}
+                                              </span>
+                                            ) : null;
+                                          })()}
                                         </a>
                                       </div>
                                     </div>
