@@ -2013,98 +2013,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const totalCount = totalCountResult[0]?.total || 0;
 
-		// Get WhatsApp message data (unread counts and last message times) for all candidates
-		// Helper function to normalize phone numbers (remove +, spaces, and keep only digits)
-		const normalizePhone = (phone) => {
-			if (!phone || phone === 'N/A') return null;
-			// Remove all non-digit characters
-			const normalized = phone.replace(/\D/g, '');
-			return normalized.length > 0 ? normalized : null;
-		};
-
-		// Create a map of normalized phones to original candidate data
-		const phoneToCandidateMap = {};
-		results.forEach(doc => {
-			const originalPhone = doc._candidate?.mobile;
-			const normalized = normalizePhone(originalPhone);
-			if (normalized) {
-				phoneToCandidateMap[normalized] = {
-					originalPhone,
-					normalizedPhone: normalized,
-					appliedCourseId: doc._id
-				};
-			}
-		});
-
-		const candidatePhones = Object.keys(phoneToCandidateMap);
-
-		let messageDataMap = {};
-		if (candidatePhones.length > 0 && college?._id) {
-			try {
-				// Get all messages for these phone numbers (both incoming and outgoing)
-				// We'll normalize phone numbers in the query and in processing
-				const allMessages = await WhatsAppMessage.find({
-					collegeId: college._id,
-					$or: [
-						{ from: { $in: candidatePhones } },
-						{ to: { $in: candidatePhones } }
-					]
-				}).lean();
-
-				// Process messages to calculate unread counts and last message times
-				allMessages.forEach(msg => {
-					// Determine which phone number this message belongs to
-					let phone = null;
-					if (msg.direction === 'incoming' && msg.from) {
-						phone = normalizePhone(msg.from);
-					} else if (msg.direction === 'outgoing' && msg.to) {
-						phone = normalizePhone(msg.to);
-					}
-
-					// Find matching candidate phone (exact match or ends with)
-					let matchedPhone = null;
-					if (phone) {
-						// Try exact match first
-						if (candidatePhones.includes(phone)) {
-							matchedPhone = phone;
-						} else {
-							// Try to find phone that ends with this number (for country code variations)
-							matchedPhone = candidatePhones.find(cp => phone.endsWith(cp) || cp.endsWith(phone));
-						}
-					}
-
-					if (!matchedPhone) return;
-
-					// Initialize if not exists
-					if (!messageDataMap[matchedPhone]) {
-						messageDataMap[matchedPhone] = {
-							unreadCount: 0,
-							lastMessageTime: null
-						};
-					}
-
-					// Count unread incoming messages (only from candidate to college)
-					if (msg.direction === 'incoming' && !msg.readAt) {
-						messageDataMap[matchedPhone].unreadCount = (messageDataMap[matchedPhone].unreadCount || 0) + 1;
-					}
-
-					// Update last message time (most recent message, both incoming and outgoing)
-					if (msg.sentAt) {
-						const msgTime = new Date(msg.sentAt).getTime();
-						const currentTime = messageDataMap[matchedPhone].lastMessageTime 
-							? new Date(messageDataMap[matchedPhone].lastMessageTime).getTime() 
-							: 0;
-						if (msgTime > currentTime) {
-							messageDataMap[matchedPhone].lastMessageTime = msg.sentAt;
-						}
-					}
-				});
-			} catch (messageError) {
-				console.error('Error fetching WhatsApp message data:', messageError);
-				// Continue without message data if there's an error
-			}
-		}
-
 		// Process results - sirf essential fields return karenge
 		const processedResults = results.map(doc => {
 			// Calculate doc counts
@@ -2120,12 +2028,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					sub => sub._id.toString() === doc._leadSubStatus.toString()
 				);
 			}
-
-			// Get WhatsApp message data for this candidate
-			const candidateMobile = doc._candidate?.mobile;
-			const normalizedPhone = normalizePhone(candidateMobile);
-			
-			const messageData = normalizedPhone ? (messageDataMap[normalizedPhone] || { unreadCount: 0, lastMessageTime: null }) : { unreadCount: 0, lastMessageTime: null };
 
 			return {
 				_id: doc._id,
@@ -2147,9 +2049,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 				},
-				docCounts,
-				unreadMessageCount: messageData.unreadCount || 0,
-				lastMessageTime: messageData.lastMessageTime || null
+				docCounts
 			};
 		});
 
