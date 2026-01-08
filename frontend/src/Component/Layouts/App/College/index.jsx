@@ -81,6 +81,21 @@ function CollegeLayout({ children }) {
     }
   }, [location.pathname]);
 
+  // Listen for messages read event from WhatsApp chat page
+  useEffect(() => {
+    const handleMessagesRead = () => {
+      // Refresh unread count when messages are marked as read
+      setTimeout(() => {
+        fetchUnreadCount();
+      }, 500);
+    };
+
+    window.addEventListener('whatsappMessagesRead', handleMessagesRead);
+    return () => {
+      window.removeEventListener('whatsappMessagesRead', handleMessagesRead);
+    };
+  }, []);
+
   // Listen for logo updates from profile page
   useEffect(() => {
     const handleStorageChange = () => {

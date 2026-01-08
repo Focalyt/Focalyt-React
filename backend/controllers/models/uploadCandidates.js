@@ -38,6 +38,10 @@ collegeName:{
     required: true,
     trim: true
 },
+batchId:{
+    type: String,
+    trim: true
+},
 contactNumber:{
     type: String,
     trim: true

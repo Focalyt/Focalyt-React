@@ -2314,6 +2314,73 @@ router.route("/whatsappUnreadCount").get(isCollege, async (req, res) => {
 	}
 });
 
+// API endpoint to mark WhatsApp messages as read for a specific phone number
+router.route("/markWhatsAppMessagesAsRead").post(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+		if (!college) {
+			return res.status(404).json({
+				success: false,
+				message: "College not found"
+			});
+		}
+
+		const { phoneNumber } = req.body;
+
+		if (!phoneNumber) {
+			return res.status(400).json({
+				success: false,
+				message: "Phone number is required"
+			});
+		}
+
+		// Normalize phone number for matching (remove +91, 91, keep only digits)
+		const cleanPhone = String(phoneNumber).replace(/^\+?91?/, '').replace(/\s/g, '');
+		const phoneMatches = [
+			phoneNumber,
+			cleanPhone,
+			`+91${cleanPhone}`,
+			`91${cleanPhone}`,
+			`+${cleanPhone}`
+		];
+
+		// Mark all unread incoming messages as read for this phone number
+		const result = await WhatsAppMessage.updateMany(
+			{
+				collegeId: college._id,
+				direction: 'incoming',
+				from: { $in: phoneMatches },
+				$or: [
+					{ readAt: null },
+					{ readAt: { $exists: false } }
+				]
+			},
+			{
+				$set: {
+					readAt: new Date()
+				}
+			}
+		);
+
+		res.status(200).json({
+			success: true,
+			message: "Messages marked as read",
+			updatedCount: result.modifiedCount || 0
+		});
+
+	} catch (err) {
+		console.error('Error marking messages as read:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
 	let baseMatch = {};
@@ -4933,6 +5000,8 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					columnMap['session'] = index;
 				} else if (normalized.includes('collegename') || normalized === 'college') {
 					columnMap['collegeName'] = index;
+				} else if (normalized.includes('batchid') || normalized.includes('batch') || normalized === 'batchid') {
+					columnMap['batchId'] = index;
 				}
 			});
 			
@@ -4968,7 +5037,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			await fs.promises.unlink("public/" + filename).catch(() => {});
 			return res.status(400).json({ 
 				status: false, 
-				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester, College (optional). " +
+				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester, College Name (optional), Batch Id (optional). " +
 					(actualHeadersFound.length > 0 ? `Found columns: ${actualHeadersFound.join(', ')}` : '')
 			});
 		} else {
@@ -5013,6 +5082,9 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					if (!collegeName && college && college.name) {
 						collegeName = college.name;
 					}
+					
+					// Read batchId from Excel
+					let batchId = columnMap['batchId'] !== undefined && rows[columnMap['batchId']] ? rows[columnMap['batchId']].toString().trim() : '';
 
 					// Validation for required fields
 					if (!name) {
@@ -5183,6 +5255,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							session: session,
 							college: college._id,
 							collegeName: collegeName,
+							batchId: batchId || undefined,
 							status: candidateStatus, // 'active' if user exists, else 'inactive'
 						};
 						
@@ -5689,15 +5762,19 @@ router.route("/single").get(isCollege, function (req, res) {
 		
 		// Define headers matching the table structure
 		const headers = [
+			'College Name',
+			'Batch Id',
 			'Candidate Name',
 			'Father Name',
 			'Course',
+			'Session/Semester',
 			'Year (1st/2nd/3rd/4th)',
 			'Contact Number',
 			'Email',
 			'Gender',
 			'DOB',
-			'Session/Semester'
+			
+			
 		];
 		
 		// Create worksheet data with headers only (sample template)

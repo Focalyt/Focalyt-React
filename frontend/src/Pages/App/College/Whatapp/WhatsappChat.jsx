@@ -1239,7 +1239,37 @@ const WhatsappChat = () => {
         ...prev,
         [messageProfileId]: messageTimestamp
       }));
-      console.log('✅ Updated last message time for current chat');
+      
+      // Ensure unread count stays at 0 for currently open chat
+      // This prevents badge from appearing even if message comes in during chat
+      setUnreadMessageCounts(prev => {
+        const updated = { ...prev };
+        updated[messageProfileId] = 0; // Always set to 0 for open chat
+        
+        // Also clear phoneKey if it exists
+        const profilePhone = normalizePhone(selectedProfile?._candidate?.mobile);
+        if (profilePhone) {
+          const phoneKey = `phone_${profilePhone}`;
+          updated[phoneKey] = 0;
+        }
+        
+        return updated;
+      });
+      
+      // Automatically mark message as read in backend since chat is open
+      // This ensures badge stays cleared even after page refresh
+      if (selectedProfile?._candidate?.mobile && data.messageId) {
+        const token = localStorage.getItem('token');
+        axios.post(`${backendUrl}/college/markWhatsAppMessagesAsRead`, 
+          { phoneNumber: selectedProfile._candidate.mobile },
+          { headers: { 'x-auth': token } }
+        ).catch(error => {
+          console.error('Error auto-marking message as read:', error);
+          // Silent fail - badge is already cleared locally
+        });
+      }
+      
+      console.log('✅ Updated last message time for current chat, ensured badge is 0');
     }
 
     // Add incoming message to chat
@@ -3873,17 +3903,83 @@ const WhatsappChat = () => {
       setSelectedProfile(profile);
       setShowPanel('Whatsapp');
 
-      // Clear unread message count for this profile when chat is opened
-      if (profile?._id) {
-        setUnreadMessageCounts(prev => {
-          const updated = { ...prev };
-          delete updated[profile._id];
-          return updated;
-        });
-      }
-
       // Use profile parameter directly instead of selectedProfile state
       if (profile?._candidate?.mobile) {
+        // Clear unread message count IMMEDIATELY when chat opens (before API call)
+        // This ensures badge is removed instantly, even if API call is slow
+        if (profile?._id) {
+          setUnreadMessageCounts(prev => {
+            const updated = { ...prev };
+            updated[profile._id] = 0; // Set to 0 instead of deleting
+            
+            // Also clear phoneKey if it exists
+            const profilePhone = normalizePhone(profile._candidate?.mobile);
+            if (profilePhone) {
+              const phoneKey = `phone_${profilePhone}`;
+              updated[phoneKey] = 0;
+            }
+            
+            return updated;
+          });
+          
+          // Update the profile's unreadMessageCount in allProfiles immediately
+          setAllProfiles(prevProfiles => 
+            prevProfiles.map(p => 
+              p._id === profile._id 
+                ? { ...p, unreadMessageCount: 0 }
+                : p
+            )
+          );
+        }
+
+        // Mark messages as read in backend when chat is opened
+        try {
+          await axios.post(`${backendUrl}/college/markWhatsAppMessagesAsRead`, 
+            { phoneNumber: profile._candidate.mobile },
+            { headers: { 'x-auth': token } }
+          );
+          
+          // Double-check badge is cleared after API call (in case of race conditions)
+          if (profile?._id) {
+            setUnreadMessageCounts(prev => {
+              const updated = { ...prev };
+              updated[profile._id] = 0;
+              
+              const profilePhone = normalizePhone(profile._candidate?.mobile);
+              if (profilePhone) {
+                const phoneKey = `phone_${profilePhone}`;
+                updated[phoneKey] = 0;
+              }
+              
+              return updated;
+            });
+            
+            setAllProfiles(prevProfiles => 
+              prevProfiles.map(p => 
+                p._id === profile._id 
+                  ? { ...p, unreadMessageCount: 0 }
+                  : p
+              )
+            );
+          }
+
+          // Notify sidebar to refresh unread count
+          window.dispatchEvent(new CustomEvent('whatsappMessagesRead', {
+            detail: { phoneNumber: profile._candidate.mobile }
+          }));
+
+          // Refresh profile data to get updated unread counts from backend
+          // This ensures that when page is refreshed, correct counts are shown
+          // Commented out to prevent page refresh when opening WhatsApp panel
+          // setTimeout(() => {
+          //   fetchProfileData(filterData, currentPage);
+          // }, 500);
+        } catch (error) {
+          console.error('Error marking messages as read:', error);
+          // Even if API call fails, keep badge cleared locally
+          // User experience: badge stays cleared, backend will sync later
+        }
+
         await fetchWhatsappHistory(profile._candidate.mobile);
         await checkSessionWindow(profile._candidate.mobile);
       } else {
@@ -3953,7 +4049,7 @@ const WhatsappChat = () => {
 
 
   const openWhatsappPanel = async () => {
-    setShowPanel('whatsapp');
+    setShowPanel('Whatsapp');
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -9785,9 +9881,15 @@ const WhatsappChat = () => {
                                         >
                                           <i className="fab fa-whatsapp"></i>
                                         </a> */}
-                                        <a
+                                        <button
+                                          type="button"
                                           className="btn btn-outline-success btn-sm border-0"
-                                          onClick={() => openPanel(profile, 'whatsapp')}
+                                          onClick={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.nativeEvent.stopImmediatePropagation();
+                                            await openPanel(profile, 'whatsapp');
+                                          }}
                                           style={{ fontSize: '20px', position: 'relative' }}
                                           title="WhatsApp"
                                         >
@@ -9820,7 +9922,7 @@ const WhatsappChat = () => {
                                               </span>
                                             ) : null;
                                           })()}
-                                        </a>
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
