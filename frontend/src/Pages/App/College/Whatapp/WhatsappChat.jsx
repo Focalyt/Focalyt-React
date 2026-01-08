@@ -771,28 +771,43 @@ const WhatsappChat = () => {
     // Fetch data with current filters to get latest unread counts from backend
     // This ensures that when user navigates from another route, they see the latest data
     if (token) {
-      const fetchAndProcess = async () => {
-        await fetchProfileData();
-        // After fetching data, process any pending messages from context
-        // Small delay to ensure state is updated
-        setTimeout(() => {
-          if (contextMessages && contextMessages.length > 0) {
-            console.log('📬 [WhatsappChat] Processing pending messages from context:', contextMessages.length);
-            contextMessages.forEach(message => {
-              const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
-              if (!processedMessageIds.current.has(messageId)) {
-                processedMessageIds.current.add(messageId);
-                if (message && (message.direction === 'incoming' || message.from)) {
-                  handleIncomingMessage(message);
-                }
-              }
-            });
-          }
-        }, 500);
-      };
-      fetchAndProcess();
+      fetchProfileData();
     }
   }, []); // Only run once on mount
+
+  // Process pending messages after allProfiles are loaded
+  useEffect(() => {
+    // Only process if profiles are loaded and we have pending messages
+    if (allProfiles.length > 0 && whatsAppContext?.messages && whatsAppContext.messages.length > 0) {
+      const pendingMessages = whatsAppContext.messages.filter(message => {
+        const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
+        return !processedMessageIds.current.has(messageId) && 
+               (message.direction === 'incoming' || message.from);
+      });
+
+      if (pendingMessages.length > 0) {
+        console.log('📬 [WhatsappChat] Processing pending messages after profiles loaded:', pendingMessages.length);
+        
+        // Process messages one by one
+        pendingMessages.forEach((message, index) => {
+          const messageId = message.whatsappMessageId || message.messageId || message.id || `${message.from}-${message.sentAt || Date.now()}`;
+          
+          // Mark as processed
+          processedMessageIds.current.add(messageId);
+          
+          // Process with a small delay to ensure state updates properly
+          setTimeout(() => {
+            console.log('📬 Processing pending message:', {
+              messageId,
+              from: message.from,
+              message: message.message?.substring(0, 50)
+            });
+            handleIncomingMessage(message);
+          }, index * 200); // Stagger messages to avoid race conditions
+        });
+      }
+    }
+  }, [allProfiles.length, whatsAppContext?.messages]); // Run when profiles are loaded or new messages arrive
 
 
   const handleSaveCV = async () => {
@@ -3258,71 +3273,88 @@ const WhatsappChat = () => {
         const data = response.data;
         // Sirf ek state me data set karo - paginated data
         const profiles = data.data;
-        setAllProfiles(profiles);
-        setTotalPages(data.totalPages);
-        setPageSize(data.limit);
         
-        // Initialize last message times from profile data if available
+        // Initialize last message times and unread counts from profile data
+        const lastMsgTimeMap = {};
+        const unreadCountMap = {};
+        
         if (profiles && profiles.length > 0) {
           profiles.forEach(profile => {
             // If backend provides lastMessageTime, use it
             if (profile.lastMessageTime) {
-              setLastMessageTime(prev => ({
-                ...prev,
-                [profile._id]: new Date(profile.lastMessageTime).getTime()
-              }));
+              lastMsgTimeMap[profile._id] = new Date(profile.lastMessageTime).getTime();
             }
             
             // Handle unread count - backend count is source of truth
             const profilePhone = normalizePhone(profile._candidate?.mobile);
-            if (profilePhone) {
-              const phoneKey = `phone_${profilePhone}`;
-              
-              setUnreadMessageCounts(prev => {
-                // Get temporary count tracked by phone number (if any)
-                const tempCount = prev[phoneKey] || 0;
-                
-                // Backend count is the source of truth (includes all unread messages)
-                const backendCount = profile.unreadMessageCount || 0;
-                
-                // Use backend count if available, otherwise use temp count
-                // Backend count should always be >= temp count, so prefer backend
-                const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0);
-                
-                if (finalCount > 0) {
-                  console.log('📬 Mapping unread count from phone to profile:', {
-                    phone: profilePhone,
-                    profileId: profile._id,
-                    tempCount,
-                    backendCount,
-                    finalCount
-                  });
-                  
-                  // Remove phone-based key and set profile-based count
-                  const updated = { ...prev };
-                  delete updated[phoneKey];
-                  updated[profile._id] = finalCount;
-                  return updated;
-                }
-                
-                // If no count, just remove phone key if exists
-                if (tempCount > 0) {
-                  const updated = { ...prev };
-                  delete updated[phoneKey];
-                  return updated;
-                }
-                
-                return prev;
+            const backendCount = profile.unreadMessageCount || 0;
+            
+            if (profilePhone && backendCount > 0) {
+              console.log('📬 Mapping unread count from backend to profile:', {
+                phone: profilePhone,
+                profileId: profile._id,
+                backendCount
               });
-            } else if (profile.unreadMessageCount && profile.unreadMessageCount > 0) {
+              unreadCountMap[profile._id] = backendCount;
+            } else if (backendCount > 0) {
               // Fallback: if no phone number, just use backend count
-              setUnreadMessageCounts(prev => ({
-                ...prev,
-                [profile._id]: profile.unreadMessageCount
-              }));
+              unreadCountMap[profile._id] = backendCount;
             }
           });
+          
+          // Sort profiles based on unread count and last message time (same logic as render)
+          const sortedProfiles = [...profiles].sort((a, b) => {
+            const aUnread = unreadCountMap[a._id] || 0;
+            const bUnread = unreadCountMap[b._id] || 0;
+            const aLastMsgTime = lastMsgTimeMap[a._id] || 0;
+            const bLastMsgTime = lastMsgTimeMap[b._id] || 0;
+            
+            // First priority: Profiles with unread messages
+            if (aUnread > 0 && bUnread === 0) return -1;
+            if (aUnread === 0 && bUnread > 0) return 1;
+            
+            // Second priority: Among unread, sort by last message time (newest first)
+            if (aUnread > 0 && bUnread > 0) {
+              return bLastMsgTime - aLastMsgTime;
+            }
+            
+            // Third priority: Among no unread, sort by last message time (newest first)
+            if (aLastMsgTime !== bLastMsgTime) {
+              return bLastMsgTime - aLastMsgTime;
+            }
+            
+            // Default: Keep original order
+            return 0;
+          });
+          
+          // Set sorted profiles
+          setAllProfiles(sortedProfiles);
+          
+          // Update last message times state
+          setLastMessageTime(prev => ({
+            ...prev,
+            ...lastMsgTimeMap
+          }));
+          
+          // Update unread counts state (remove phone keys and set profile keys)
+          setUnreadMessageCounts(prev => {
+            const updated = { ...prev };
+            // Remove all phone-based keys
+            Object.keys(updated).forEach(key => {
+              if (key.startsWith('phone_')) {
+                delete updated[key];
+              }
+            });
+            // Add profile-based counts from backend (source of truth)
+            Object.assign(updated, unreadCountMap);
+            return updated;
+          });
+        } else {
+          setAllProfiles(profiles);
         }
+        
+        setTotalPages(data.totalPages);
+        setPageSize(data.limit);
 
         // Update CRM filter counts from backend
         // if (data.crmFilterCounts) {
