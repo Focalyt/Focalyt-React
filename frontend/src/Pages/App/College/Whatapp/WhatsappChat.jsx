@@ -3362,7 +3362,7 @@ const WhatsappChat = () => {
 
       // console.log('API counselor:', formData.counselor.values);
 
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+      const response = await axios.get(`${backendUrl}/college/appliedCandidatesWithWhatsApp?${queryParams}`, {
         headers: { 'x-auth': token }
       });
 

@@ -2073,6 +2073,164 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 	}
 });
 
+// New API endpoint for WhatsApp chat page with unread message counts
+router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 20;
+		const skip = (page - 1) * limit;
+
+		// Extract filter parameters
+		const {
+			name, courseType, status, leadStatus,
+			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
+			nextActionFromDate, nextActionToDate,
+			projects, verticals, course, center, counselor, subStatuses
+		} = req.query;
+
+		// Parse multi-select filters
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		// Get team members
+		let teamMembers = [req.user._id];
+
+		if (projectsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (verticalsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (courseArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+		if (name && name.trim() !== '') {
+			teamMembers = [];
+		}
+		if (counselorArray.length > 0) {
+			teamMembers = counselorArray;
+		}
+
+
+		let teamMemberIds = [];
+		if (teamMembers?.length > 0) {
+			teamMemberIds = teamMembers.map(member =>
+				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+			);
+		}
+
+
+		// Build optimized pipeline with WhatsApp message counts
+		const pipeline = buildSimplifiedPipelineWithWhatsApp({
+			teamMemberIds,
+			college,
+			filters: {
+				name, courseType, status, leadStatus,
+				createdFromDate, createdToDate,
+				modifiedFromDate, modifiedToDate,
+				nextActionFromDate, nextActionToDate,
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+			},
+			pagination: { skip, limit }
+		});
+
+
+		// Execute queries in parallel
+		const [results, totalCountResult] = await Promise.all([
+			AppliedCourses.aggregate(pipeline),
+			AppliedCourses.aggregate([
+				...pipeline.slice(0, -2), // Remove sort and pagination
+				{ $count: "total" }
+			])
+		]);
+
+		const totalCount = totalCountResult[0]?.total || 0;
+
+		// Process results with WhatsApp message counts
+		const processedResults = results.map(doc => {
+			// Calculate doc counts
+			const docCounts = calculateSimpleDocCounts(
+				doc._course?.docsRequired || [],
+				doc.uploadedDocs || []
+			);
+
+			// Get substatus
+			let selectedSubstatus = null;
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			return {
+				_id: doc._id,
+				_candidate: {
+					_id: (doc._candidate && doc._candidate._id) ? doc._candidate._id : null,
+					mobile: (doc._candidate && doc._candidate.mobile) ? doc._candidate.mobile : 'N/A',
+					name: (doc._candidate && doc._candidate.name) ? doc._candidate.name : 'N/A',
+					email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A'
+				},
+				_leadStatus: {
+					_id: doc._leadStatus?._id || null,
+					title: doc._leadStatus?.title || 'No Status'
+				},
+				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : null,
+				selectedSubstatus: {
+					_id: selectedSubstatus ? selectedSubstatus._id : null,
+					title: selectedSubstatus ? selectedSubstatus.title : 'No Sub Status',
+					hasAttachment: selectedSubstatus ? selectedSubstatus.hasAttachment : false,
+					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
+					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
+				},
+				docCounts,
+				unreadMessageCount: doc.unreadMessageCount || 0,
+				lastMessageTime: doc.lastMessageTime || null
+			};
+		});
+
+		res.status(200).json({
+			success: true,
+			count: processedResults.length,
+			totalCount,
+			page,
+			limit,
+			totalPages: Math.ceil(totalCount / limit),
+			data: processedResults,
+		});
+
+	} catch (err) {
+		console.error('API Error:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
 	let baseMatch = {};
@@ -2272,6 +2430,327 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	// Sort and pagination
 	pipeline.push(
 		{ $sort: { updatedAt: -1 } },
+		{ $skip: pagination.skip },
+		{ $limit: pagination.limit }
+	);
+
+	return pipeline;
+}
+
+// New pipeline function with WhatsApp message lookups
+function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, pagination }) {
+	const pipeline = [];
+	let baseMatch = {};
+	filters.leadStatus = String(filters.leadStatus);
+	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
+		baseMatch = {
+			kycStage: { $in: [true] },
+		};
+	}
+
+	else {
+		// Base match with essential filters
+		baseMatch = {
+			kycStage: { $ne: true },
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+		};
+	}
+
+
+
+
+	if (teamMemberIds && teamMemberIds.length > 0) {
+		baseMatch.$or = [
+			{ registeredBy: { $in: teamMemberIds } },
+			{ counsellor: { $in: teamMemberIds } }
+		];
+	}
+
+
+	// Add date filters
+	if (filters.createdFromDate || filters.createdToDate) {
+		baseMatch.createdAt = {};
+		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
+		if (filters.createdToDate) {
+			const toDate = new Date(filters.createdToDate);
+			// Add 1 day (24 hours) to the date
+			toDate.setDate(toDate.getDate() + 1);
+			// Set time to 18:30:00.000 (6:30 PM)
+			// Use this modified 'toDate' as the upper limit in the filter
+			baseMatch.createdAt.$lte = toDate;
+		}
+	}
+
+	if (filters.modifiedFromDate || filters.modifiedToDate) {
+		baseMatch.updatedAt = {};
+		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
+		if (filters.modifiedToDate) {
+			const toDate = new Date(filters.modifiedToDate);
+			toDate.setDate(toDate.getDate() + 1);
+
+			baseMatch.updatedAt.$lte = toDate;
+		}
+	}
+
+	if (filters.nextActionFromDate || filters.nextActionToDate) {
+		baseMatch.followupDate = {};
+		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
+		if (filters.nextActionToDate) {
+			const toDate = new Date(filters.nextActionToDate);
+			toDate.setDate(toDate.getDate() + 1);
+
+			baseMatch.followupDate.$lte = toDate;
+		}
+	}
+
+
+	if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
+		// Only set _leadStatus if it's a valid ObjectId string
+		if (mongoose.Types.ObjectId.isValid(filters.leadStatus)) {
+			baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
+		} else {
+			console.log('Invalid leadStatus:', filters.leadStatus);
+		}
+	}
+	if (filters.subStatuses && filters.subStatuses !== 'undefined') {
+
+		baseMatch._leadSubStatus = new mongoose.Types.ObjectId(filters.subStatuses);
+
+	}
+
+	pipeline.push({ $match: baseMatch });
+
+	// Essential lookups only - get minimal required data
+	pipeline.push(
+		// Course lookup with college filter
+		{
+			$lookup: {
+				from: 'courses',
+				localField: '_course',
+				foreignField: '_id',
+				as: '_course',
+				pipeline: [
+					{ $match: { college: college._id } },
+					{
+						$project: {
+							courseFeeType: 1,
+							college: 1,
+							project: 1,
+							vertical: 1,
+							docsRequired: 1 // Only for doc counts
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: '$_course' },
+
+		// Candidate lookup - only essential fields
+		{
+			$lookup: {
+				from: 'candidateprofiles',
+				localField: '_candidate',
+				foreignField: '_id',
+				as: '_candidate',
+				pipeline: [
+					{
+						$project: {
+							_id: 1,
+							name: 1,
+							email: 1,
+							mobile: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+		// Status lookup - only title and milestone
+		{
+			$lookup: {
+				from: 'status',
+				localField: '_leadStatus',
+				foreignField: '_id',
+				as: '_leadStatus',
+				pipeline: [
+					{
+						$project: {
+							title: 1,
+							milestone: 1,
+							substatuses: 1
+						}
+					}
+				]
+			}
+		},
+		{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
+	);
+
+	// Apply additional filters
+	const additionalFilters = {};
+
+	if (filters.courseType) {
+		additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
+	}
+	if (filters.projectsArray.length > 0) {
+		additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.verticalsArray.length > 0) {
+		additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.courseArray.length > 0) {
+		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+
+	// Name search
+	if (filters.name && filters.name.trim()) {
+		const searchTerm = filters.name.trim();
+		const searchRegex = new RegExp(filters.name.trim(), 'i');
+		additionalFilters.$or = [
+			{ '_candidate.name': searchRegex },
+			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
+			{ '_candidate.email': searchRegex }
+		];
+	}
+
+	if (Object.keys(additionalFilters).length > 0) {
+		pipeline.push({ $match: additionalFilters });
+	}
+
+	// Add lookup for unread message count and last message time
+	// Match phone numbers in different formats: +91XXXXXXXXXX, 91XXXXXXXXXX, XXXXXXXXXX
+	pipeline.push({
+		$lookup: {
+			from: 'whatsappmessages',
+			let: { 
+				candidateMobile: { $ifNull: ['$_candidate.mobile', ''] },
+				candidateMobileStr: { $toString: { $ifNull: ['$_candidate.mobile', ''] } },
+				collegeId: college._id
+			},
+			pipeline: [
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $eq: ['$direction', 'incoming'] },
+								{ $eq: ['$collegeId', '$$collegeId'] },
+								{
+									$or: [
+										{ $eq: ['$from', '$$candidateMobileStr'] },
+										{ $eq: ['$from', { $concat: ['+91', '$$candidateMobileStr'] }] },
+										{ $eq: ['$from', { $concat: ['91', '$$candidateMobileStr'] }] },
+										{ $eq: ['$from', { $concat: ['+', '$$candidateMobileStr'] }] },
+										{ $eq: [{ $toString: '$from' }, '$$candidateMobileStr'] },
+										{ $eq: [{ $toString: '$from' }, { $concat: ['+91', '$$candidateMobileStr'] }] },
+										{ $eq: [{ $toString: '$from' }, { $concat: ['91', '$$candidateMobileStr'] }] }
+									]
+								},
+								{ $or: [{ $eq: ['$readAt', null] }, { $eq: [{ $type: '$readAt' }, 'missing'] }] }
+							]
+						}
+					}
+				},
+				{
+					$group: {
+						_id: null,
+						unreadCount: { $sum: 1 },
+						lastMessageTime: { $max: '$sentAt' }
+					}
+				}
+			],
+			as: 'whatsappStats'
+		}
+	});
+
+	// Add lookup for last message time (including read messages for sorting)
+	pipeline.push({
+		$lookup: {
+			from: 'whatsappmessages',
+			let: { 
+				candidateMobileStr: { $toString: { $ifNull: ['$_candidate.mobile', ''] } },
+				collegeId: college._id
+			},
+			pipeline: [
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $eq: ['$direction', 'incoming'] },
+								{ $eq: ['$collegeId', '$$collegeId'] },
+								{
+									$or: [
+										{ $eq: ['$from', '$$candidateMobileStr'] },
+										{ $eq: ['$from', { $concat: ['+91', '$$candidateMobileStr'] }] },
+										{ $eq: ['$from', { $concat: ['91', '$$candidateMobileStr'] }] },
+										{ $eq: ['$from', { $concat: ['+', '$$candidateMobileStr'] }] },
+										{ $eq: [{ $toString: '$from' }, '$$candidateMobileStr'] },
+										{ $eq: [{ $toString: '$from' }, { $concat: ['+91', '$$candidateMobileStr'] }] },
+										{ $eq: [{ $toString: '$from' }, { $concat: ['91', '$$candidateMobileStr'] }] }
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					$sort: { sentAt: -1 }
+				},
+				{
+					$limit: 1
+				},
+				{
+					$project: {
+						sentAt: 1
+					}
+				}
+			],
+			as: 'lastMessage'
+		}
+	});
+
+	// Add fields for unread count and last message time
+	pipeline.push({
+		$addFields: {
+			unreadMessageCount: {
+				$ifNull: [{ $arrayElemAt: ['$whatsappStats.unreadCount', 0] }, 0]
+			},
+			lastMessageTime: {
+				$ifNull: [
+					{ $arrayElemAt: ['$lastMessage.sentAt', 0] },
+					{ $arrayElemAt: ['$whatsappStats.lastMessageTime', 0] }
+				]
+			}
+		}
+	});
+
+	// Project only essential fields
+	pipeline.push({
+		$project: {
+			_id: 1,
+			_candidate: 1,
+			_leadStatus: 1,
+			_leadSubStatus: 1,
+			'_course.docsRequired': 1,
+			uploadedDocs: 1,
+			createdAt: 1,
+			updatedAt: 1,
+			unreadMessageCount: 1,
+			lastMessageTime: 1
+		}
+	});
+
+	// Sort by last message time (most recent first), then by updatedAt
+	pipeline.push({
+		$sort: {
+			lastMessageTime: -1,
+			updatedAt: -1
+		}
+	});
+
+	// Pagination
+	pipeline.push(
 		{ $skip: pagination.skip },
 		{ $limit: pagination.limit }
 	);
