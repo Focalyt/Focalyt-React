@@ -4,6 +4,7 @@ import { useState,useEffect } from 'react';
 // import { HelmetProvider } from 'react-helmet-async';
 
 import Websocket from './utils/websocket'
+import { WhatsAppProvider } from './contexts/WhatsAppContext';
 
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -350,9 +351,11 @@ const Layout = () => {
 const App = () => {
   return (
     // <HelmetProvider>
-      <Router>
-        <Layout />
-      </Router>
+      <WhatsAppProvider>
+        <Router>
+          <Layout />
+        </Router>
+      </WhatsAppProvider>
     // </HelmetProvider>
   );
 };
