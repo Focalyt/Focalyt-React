@@ -1017,8 +1017,13 @@ const WhatsappChat = () => {
       if (aUnread > 0 && bUnread === 0) return -1;
       if (aUnread === 0 && bUnread > 0) return 1;
       
-      // Second priority: Among profiles with same unread status, sort by last message time (newest first)
-      if (bLastMsgTime !== aLastMsgTime) {
+      // Second priority: Among unread messages, sort by last message time (newest first)
+      if (aUnread > 0 && bUnread > 0) {
+        return bLastMsgTime - aLastMsgTime; // Descending order (newest first)
+      }
+      
+      // Third priority: Among no unread, sort by last message time (newest first)
+      if (aLastMsgTime !== bLastMsgTime) {
         return bLastMsgTime - aLastMsgTime; // Descending order (newest first)
       }
       
@@ -1570,6 +1575,40 @@ const WhatsappChat = () => {
       prevLoadingRef.current = isLoadingProfiles;
     }
   }, [isLoadingProfiles, allProfiles.length, unreadMessageCounts, lastMessageTime, sortProfilesByMessageTime]);
+
+  // Immediately re-sort profiles when unread counts or last message times change (for real-time updates)
+  useEffect(() => {
+    // Only sort if not currently loading and we have profiles
+    if (!isLoadingProfiles && allProfiles.length > 0) {
+      // Use a small delay to batch state updates and ensure unread counts are updated
+      const timeoutId = setTimeout(() => {
+        setAllProfiles(prevProfiles => {
+          if (prevProfiles.length === 0) return prevProfiles;
+          
+          const sorted = sortProfilesByMessageTime(prevProfiles, unreadMessageCounts, lastMessageTime);
+          
+          // Only update if order changed
+          const orderChanged = sorted.some((profile, index) => 
+            prevProfiles[index]?._id !== profile._id
+          );
+          
+          if (orderChanged) {
+            console.log('🔄 Re-sorting profiles due to unread count or message time change', {
+              sortedOrder: sorted.slice(0, 3).map(p => ({ 
+                name: p._candidate?.name, 
+                unread: unreadMessageCounts[p._id] || 0 
+              }))
+            });
+            return sorted;
+          }
+          
+          return prevProfiles;
+        });
+      }, 100); // Slightly longer delay to ensure state updates are complete
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [unreadMessageCounts, lastMessageTime, isLoadingProfiles, sortProfilesByMessageTime]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
