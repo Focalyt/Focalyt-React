@@ -1050,10 +1050,25 @@ const WhatsappChat = () => {
             phone: normalizePhone(p._candidate?.mobile)
           })));
           
-          // Profile not found in current page - switch to page 1 and fetch
-          console.log('📄 Profile not on current page, switching to page 1 to find profile');
+          // Profile not found in current page - still update unread count by phone number
+          // We'll map it to profile ID once profile is loaded
+          console.log('📬 Profile not in allProfiles, tracking unread count by phone:', incomingFrom);
+          
           // Store phone number to find profile after page 1 loads
           profileToMoveToTop.current = { phone: incomingFrom, timestamp: messageTimestamp };
+          
+          // Update unread count temporarily using phone number as key
+          // This will be mapped to profile ID when profile is found
+          setUnreadMessageCounts(prev => {
+            const phoneKey = `phone_${incomingFrom}`;
+            const newCount = (prev[phoneKey] || 0) + 1;
+            console.log('📬 Updating unread count by phone:', { phone: incomingFrom, newCount });
+            return {
+              ...prev,
+              [phoneKey]: newCount
+            };
+          });
+          
           setCurrentPage(1);
           // Fetch page 1 to find the profile
           fetchProfileData(filterData, 1);
@@ -1296,14 +1311,9 @@ const WhatsappChat = () => {
             const profileIndex = prevProfiles.findIndex(p => p._id === foundProfileId);
             
             if (profileIndex !== -1 && profileIndex > 0) {
-              // Update unread count
-              setUnreadMessageCounts(prev => {
-                const newCount = (prev[foundProfileId] || 0) + 1;
-                return {
-                  ...prev,
-                  [foundProfileId]: newCount
-                };
-              });
+              // Unread count should already be set from fetchProfileData (backend count)
+              // But if profile has unreadMessageCount from backend, it's already set
+              // We don't need to increment here because backend count is the source of truth
               
               // Update last message time
               if (profileToMoveToTop.current.timestamp) {
@@ -3102,8 +3112,50 @@ const WhatsappChat = () => {
                 [profile._id]: new Date(profile.lastMessageTime).getTime()
               }));
             }
-            // If backend provides unreadCount, use it
-            if (profile.unreadMessageCount && profile.unreadMessageCount > 0) {
+            
+            // Handle unread count - backend count is source of truth
+            const profilePhone = normalizePhone(profile._candidate?.mobile);
+            if (profilePhone) {
+              const phoneKey = `phone_${profilePhone}`;
+              
+              setUnreadMessageCounts(prev => {
+                // Get temporary count tracked by phone number (if any)
+                const tempCount = prev[phoneKey] || 0;
+                
+                // Backend count is the source of truth (includes all unread messages)
+                const backendCount = profile.unreadMessageCount || 0;
+                
+                // Use backend count if available, otherwise use temp count
+                // Backend count should always be >= temp count, so prefer backend
+                const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0);
+                
+                if (finalCount > 0) {
+                  console.log('📬 Mapping unread count from phone to profile:', {
+                    phone: profilePhone,
+                    profileId: profile._id,
+                    tempCount,
+                    backendCount,
+                    finalCount
+                  });
+                  
+                  // Remove phone-based key and set profile-based count
+                  const updated = { ...prev };
+                  delete updated[phoneKey];
+                  updated[profile._id] = finalCount;
+                  return updated;
+                }
+                
+                // If no count, just remove phone key if exists
+                if (tempCount > 0) {
+                  const updated = { ...prev };
+                  delete updated[phoneKey];
+                  return updated;
+                }
+                
+                return prev;
+              });
+            } else if (profile.unreadMessageCount && profile.unreadMessageCount > 0) {
+              // Fallback: if no phone number, just use backend count
               setUnreadMessageCounts(prev => ({
                 ...prev,
                 [profile._id]: profile.unreadMessageCount
