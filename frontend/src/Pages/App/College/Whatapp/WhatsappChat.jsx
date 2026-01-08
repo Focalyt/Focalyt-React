@@ -1016,13 +1016,29 @@ const WhatsappChat = () => {
             [messageProfileId]: messageTimestamp
           }));
           
-          // Move profile to top of current page
+          // Always switch to page 1 and move profile to top
+          setCurrentPage(prevPage => {
+            if (prevPage !== 1) {
+              console.log('📄 Switching to page 1 to show message sender');
+              // Store profile ID to move after page 1 loads
+              profileToMoveToTop.current = messageProfileId;
+              // Fetch page 1 data
+              fetchProfileData(filterData, 1);
+              return 1;
+            } else {
+              // Already on page 1, move profile to top immediately
+              profileToMoveToTop.current = messageProfileId;
+            }
+            return prevPage;
+          });
+          
+          // Move profile to top of current page (if already on page 1)
           const profileIndex = prevProfiles.findIndex(p => p._id === messageProfileId);
           if (profileIndex !== -1 && profileIndex > 0) {
             // Create new array with profile moved to top
             const updatedProfiles = [...prevProfiles];
             const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
-            console.log('⬆️ Moving profile to top:', movedProfile._candidate?.name);
+            console.log('⬆️ Moving profile to top of page 1:', movedProfile._candidate?.name);
             return [movedProfile, ...updatedProfiles];
           }
           return prevProfiles;
@@ -1033,6 +1049,14 @@ const WhatsappChat = () => {
             name: p._candidate?.name,
             phone: normalizePhone(p._candidate?.mobile)
           })));
+          
+          // Profile not found in current page - switch to page 1 and fetch
+          console.log('📄 Profile not on current page, switching to page 1 to find profile');
+          // Store phone number to find profile after page 1 loads
+          profileToMoveToTop.current = { phone: incomingFrom, timestamp: messageTimestamp };
+          setCurrentPage(1);
+          // Fetch page 1 to find the profile
+          fetchProfileData(filterData, 1);
         }
         return prevProfiles;
       });
@@ -1197,6 +1221,7 @@ const WhatsappChat = () => {
   // Handle incoming messages from users
   // Track processed message IDs to avoid duplicates
   const processedMessageIds = useRef(new Set());
+  const profileToMoveToTop = useRef(null); // Store profile ID that needs to be moved to top after page 1 loads
   
   // Handle incoming messages from users
   useEffect(() => {
@@ -1234,6 +1259,73 @@ const WhatsappChat = () => {
       });
     }
   }, [messages, handleIncomingMessage]);
+
+  // Move profile to top of page 1 after page loads
+  useEffect(() => {
+    if (currentPage === 1 && profileToMoveToTop.current && allProfiles.length > 0) {
+      const profileIdToMove = typeof profileToMoveToTop.current === 'string' 
+        ? profileToMoveToTop.current 
+        : null;
+      const phoneToFind = typeof profileToMoveToTop.current === 'object' 
+        ? profileToMoveToTop.current.phone 
+        : null;
+      
+      if (profileIdToMove) {
+        // Profile ID is known, move it to top
+        setAllProfiles(prevProfiles => {
+          const profileIndex = prevProfiles.findIndex(p => p._id === profileIdToMove);
+          if (profileIndex !== -1 && profileIndex > 0) {
+            const updatedProfiles = [...prevProfiles];
+            const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+            console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
+            profileToMoveToTop.current = null; // Clear after moving
+            return [movedProfile, ...updatedProfiles];
+          }
+          return prevProfiles;
+        });
+      } else if (phoneToFind) {
+        // Need to find profile by phone number
+        setAllProfiles(prevProfiles => {
+          const matchingProfile = prevProfiles.find(profile => {
+            const profilePhone = normalizePhone(profile._candidate?.mobile);
+            return profilePhone && profilePhone === normalizePhone(phoneToFind);
+          });
+          
+          if (matchingProfile) {
+            const foundProfileId = matchingProfile._id;
+            const profileIndex = prevProfiles.findIndex(p => p._id === foundProfileId);
+            
+            if (profileIndex !== -1 && profileIndex > 0) {
+              // Update unread count
+              setUnreadMessageCounts(prev => {
+                const newCount = (prev[foundProfileId] || 0) + 1;
+                return {
+                  ...prev,
+                  [foundProfileId]: newCount
+                };
+              });
+              
+              // Update last message time
+              if (profileToMoveToTop.current.timestamp) {
+                setLastMessageTime(prev => ({
+                  ...prev,
+                  [foundProfileId]: profileToMoveToTop.current.timestamp
+                }));
+              }
+              
+              // Move to top
+              const updatedProfiles = [...prevProfiles];
+              const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
+              console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
+              profileToMoveToTop.current = null; // Clear after moving
+              return [movedProfile, ...updatedProfiles];
+            }
+          }
+          return prevProfiles;
+        });
+      }
+    }
+  }, [allProfiles, currentPage, normalizePhone]);
 
 
   // Fetch filter options from backend API on mount
