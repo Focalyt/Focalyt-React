@@ -1115,15 +1115,15 @@ const WhatsappChat = () => {
           // Don't manually move here - let the sorting useEffect handle it
           return prevProfiles;
         } else {
-          console.log('⚠️ No matching profile found for message from:', incomingFrom);
-          console.log('⚠️ Available profiles:', prevProfiles.map(p => ({
-            id: p._id,
-            name: p._candidate?.name,
-            phone: normalizePhone(p._candidate?.mobile)
-          })));
+          // console.log('⚠️ No matching profile found for message from:', incomingFrom);
+          // console.log('⚠️ Available profiles:', prevProfiles.map(p => ({
+          //   id: p._id,
+          //   name: p._candidate?.name,
+          //   phone: normalizePhone(p._candidate?.mobile)
+          // })));
           
           // Profile not found - search for it by phone number immediately
-          console.log('📬 Profile not in allProfiles, searching by phone:', incomingFrom);
+          // console.log('📬 Profile not in allProfiles, searching by  phone:', incomingFrom);
           
           // Store phone number to find profile
           profileToMoveToTop.current = { phone: incomingFrom, timestamp: messageTimestamp };
@@ -1159,14 +1159,14 @@ const WhatsappChat = () => {
                   const backendCountVal = matchingProfile.unreadMessageCount || 0;
                   const finalCountVal = Math.max(backendCountVal, tempCount);
                   
-                  console.log('📬 Found profile, updating unread count:', {
-                    profileId: foundProfileId,
-                    phone: incomingFrom,
-                    savedTempCount,
-                    tempCount,
-                    backendCountVal,
-                    finalCountVal
-                  });
+                  // console.log('📬 Found profile, updating unread count:', {
+                  //   profileId: foundProfileId,
+                  //   phone: incomingFrom,
+                  //   savedTempCount,
+                  //   tempCount,
+                  //   backendCountVal,
+                  //   finalCountVal
+                  // });
                   
                   const updated = { ...prev };
                   delete updated[phoneKey];
@@ -1190,7 +1190,7 @@ const WhatsappChat = () => {
                     if (profileIndex === -1) {
                       // Profile not in current filter results, add it to the list
                       // Sorting useEffect will place it in correct position
-                      console.log('⬆️ Profile not in filter results, adding to list:', foundProfileCopy._candidate?.name);
+                      // console.log('⬆️ Profile not in filter results, adding to list:', foundProfileCopy._candidate?.name);
                       const profileWithCount = {
                         ...foundProfileCopy,
                         unreadMessageCount: finalCount
@@ -1218,7 +1218,7 @@ const WhatsappChat = () => {
           setUnreadMessageCounts(prev => {
             const phoneKey = `phone_${incomingFrom}`;
             const newCount = (prev[phoneKey] || 0) + 1;
-            console.log('📬 Updating unread count by phone (temporary):', { phone: incomingFrom, newCount });
+            // console.log('📬 Updating unread count by phone (temporary):', { phone: incomingFrom, newCount });
             return {
               ...prev,
               [phoneKey]: newCount
@@ -1271,11 +1271,11 @@ const WhatsappChat = () => {
         timestamp: data.sentAt
       };
 
-      console.log('✅ Adding incoming message to chat:', {
-        from: data.from,
-        type: data.messageType,
-        text: data.message.substring(0, 50)
-      });
+      // console.log('✅ Adding incoming message to chat:', {
+      //   from: data.from,
+      //   type: data.messageType,
+      //   text: data.message.substring(0, 50)
+      // });
 
       return [...prevMessages, newMessage];
     });
@@ -1304,7 +1304,7 @@ const WhatsappChat = () => {
 
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
-    console.log('📩 Received status update:', data);
+    // console.log('📩 Received status update:', data);
 
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
@@ -1320,13 +1320,13 @@ const WhatsappChat = () => {
         const isMatchingMessage = matchById || matchByText;
 
         if (isMatchingMessage && msg.sender === 'agent') {
-          console.log('✅ Updating message status:', {
-            messageId: msg.id,
-            wamid: msg.wamid,
-            matchedWith: data.id,
-            oldStatus: msg.status,
-            newStatus: data.status
-          });
+          // console.log('✅ Updating message status:', {
+          //   messageId: msg.id,
+          //   wamid: msg.wamid,
+          //   matchedWith: data.id,
+          //   oldStatus: msg.status,
+          //   newStatus: data.status
+          // });
 
           return {
             ...msg,
@@ -1341,24 +1341,24 @@ const WhatsappChat = () => {
 
       // Log if no message was updated
       const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
-      if (!wasUpdated) {
-        console.warn('⚠️ No message found to update');
-        console.log('📨 Received data:', {
-          id: data.id,
-          wamid: data.wamid,
-          messageId: data.messageId,
-          status: data.status,
-          recipient_id: data.recipient_id
-        });
-        console.log('💬 Current messages:', prevMessages.map(m => ({
-          id: m.id,
-          dbId: m.dbId,
-          wamid: m.wamid,
-          whatsappMessageId: m.whatsappMessageId,
-          text: m.text?.substring(0, 30),
-          status: m.status
-        })));
-      }
+      // if (!wasUpdated) {
+      //   console.warn('⚠️ No message found to update');
+      //   console.log('📨 Received data:', {
+      //     id: data.id,
+      //     wamid: data.wamid,
+      //     messageId: data.messageId,
+      //     status: data.status,
+      //     recipient_id: data.recipient_id
+      //   });
+      //   console.log('💬 Current messages:', prevMessages.map(m => ({
+      //     id: m.id,
+      //     dbId: m.dbId,
+      //     wamid: m.wamid,
+      //     whatsappMessageId: m.whatsappMessageId,
+      //     text: m.text?.substring(0, 30),
+      //     status: m.status
+      //   })));
+      // }
 
       return updatedMessages;
     });
@@ -1374,7 +1374,7 @@ const WhatsappChat = () => {
   }, []);
 
   useEffect(() => {
-    console.log('📩 WhatsApp message status updates:', updates);
+    // console.log('📩 WhatsApp message status updates:', updates);
 
     // Process each update individually (updates is an array)
     if (updates && updates.length > 0) {
@@ -1399,7 +1399,7 @@ const WhatsappChat = () => {
 
     // Register listener for incoming messages
     const unsubscribeMessage = onMessage((message) => {
-      console.log('📬 [WhatsappChat] Received message via context:', message);
+      // console.log('📬 [WhatsappChat] Received message via context:', message);
       // Process message immediately
       if (message && (message.direction === 'incoming' || message.from)) {
         handleIncomingMessage(message);
@@ -1421,8 +1421,8 @@ const WhatsappChat = () => {
   
   // Handle incoming messages from users (fallback for local messages)
   useEffect(() => {
-    console.log('📬 WhatsApp incoming messages array:', messages);
-    console.log('📬 Messages length:', messages?.length);
+    // console.log('📬 WhatsApp incoming messages array:', messages);
+    // console.log('📬 Messages length:', messages?.length);
 
     if (messages && messages.length > 0) {
       // Process all new messages that haven't been processed yet
@@ -1439,12 +1439,12 @@ const WhatsappChat = () => {
         // Mark as processed
         processedMessageIds.current.add(messageId);
         
-        console.log('📬 Processing new message:', {
-          messageId,
-          from: message.from,
-          direction: message.direction,
-          message: message.message?.substring(0, 50)
-        });
+        // console.log('📬 Processing new message:', {
+        //   messageId,
+        //   from: message.from,
+        //   direction: message.direction,
+        //   message: message.message?.substring(0, 50)
+        // });
         
         // Check if this is a WhatsApp incoming message
         if (message && (message.direction === 'incoming' || message.from)) {
@@ -1473,7 +1473,7 @@ const WhatsappChat = () => {
           if (profileIndex !== -1 && profileIndex > 0) {
             const updatedProfiles = [...prevProfiles];
             const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
-            console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
+            // console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
             profileToMoveToTop.current = null; // Clear after moving
             return [movedProfile, ...updatedProfiles];
           }
@@ -1507,7 +1507,7 @@ const WhatsappChat = () => {
               // Move to top
               const updatedProfiles = [...prevProfiles];
               const [movedProfile] = updatedProfiles.splice(profileIndex, 1);
-              console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
+              // console.log('⬆️ Moving profile to top of page 1 after fetch:', movedProfile._candidate?.name);
               profileToMoveToTop.current = null; // Clear after moving
               return [movedProfile, ...updatedProfiles];
             }
@@ -3402,13 +3402,13 @@ const WhatsappChat = () => {
                 const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0);
                 
                 if (finalCount > 0) {
-                  console.log('📬 Mapping unread count from phone to profile:', {
-                    phone: profilePhone,
-                    profileId: profile._id,
-                    tempCount,
-                    backendCount,
-                    finalCount
-                  });
+                  // console.log('📬 Mapping unread count from phone to profile:', {
+                  //   phone: profilePhone,
+                  //   profileId: profile._id,
+                  //   tempCount,
+                  //   backendCount,
+                  //   finalCount
+                  // });
                   
                   // Remove phone-based key and set profile-based count
                   const updated = { ...prev };

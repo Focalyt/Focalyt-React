@@ -2231,6 +2231,89 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 	}
 });
 
+// API endpoint to get count of unique candidates who have replied (sent messages) on WhatsApp
+router.route("/whatsappUnreadCount").get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+		if (!college) {
+			return res.status(404).json({
+				success: false,
+				message: "College not found"
+			});
+		}
+
+		// Get all applied courses for this college
+		const appliedCourses = await AppliedCourses.find({
+			$or: [
+				{ registeredBy: user._id },
+				{ counsellor: user._id }
+			]
+		}).populate('_candidate', 'mobile').select('_candidate').lean();
+
+		// Extract all candidate mobile numbers
+		const candidateMobiles = appliedCourses
+			.map(ac => ac._candidate?.mobile)
+			.filter(Boolean)
+			.map(mobile => String(mobile));
+
+		if (candidateMobiles.length === 0) {
+			return res.status(200).json({
+				success: true,
+				totalUnreadCount: 0
+			});
+		}
+
+		// Create phone number patterns for matching
+		const phoneMatches = candidateMobiles.flatMap(mobile => {
+			const cleanMobile = String(mobile).replace(/^\+?91?/, '');
+			return [
+				mobile,
+				`+91${cleanMobile}`,
+				`91${cleanMobile}`,
+				`+${cleanMobile}`,
+				cleanMobile
+			];
+		});
+
+		// Get distinct phone numbers (candidates) who have sent unread messages
+		const uniqueCandidates = await WhatsAppMessage.distinct('from', {
+			collegeId: college._id,
+			direction: 'incoming',
+			$and: [
+				{
+					$or: [
+						{ readAt: null },
+						{ readAt: { $exists: false } }
+					]
+				},
+				{
+					from: { $in: phoneMatches }
+				}
+			]
+		});
+
+		// Count unique candidates
+		const candidateCount = uniqueCandidates.length || 0;
+
+		res.status(200).json({
+			success: true,
+			totalUnreadCount: candidateCount
+		});
+
+	} catch (err) {
+		console.error('Error fetching unread count:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error",
+			totalUnreadCount: 0
+		});
+	}
+});
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
 	let baseMatch = {};

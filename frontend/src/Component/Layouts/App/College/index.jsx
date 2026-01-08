@@ -5,6 +5,7 @@ import CollegeFooter from './CollegeFooter/CollegeFooter';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios';
+import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
@@ -25,15 +26,60 @@ function CollegeLayout({ children }) {
   const [permissions, setPermissions] = useState();
   const [user, setUser] = useState();
   const [collegeLogo, setCollegeLogo] = useState(null);
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const location = useLocation();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const token = userData.token;
+  const whatsAppContext = useWhatsAppContext();
   
   useEffect(() => {
     updatedPermission();
     fetchCollegeLogo();
+    fetchUnreadCount();
   }, []);
+
+  // Fetch unread message count
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/whatsappUnreadCount`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data.success) {
+        setTotalUnreadCount(response.data.totalUnreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      setTotalUnreadCount(0);
+    }
+  };
+
+  // Listen to incoming WhatsApp messages and update count
+  useEffect(() => {
+    if (!whatsAppContext) return;
+
+    const unsubscribe = whatsAppContext.onMessage((message) => {
+      // Only count incoming messages
+      if (message && message.direction === 'incoming') {
+        setTotalUnreadCount(prev => prev + 1);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [whatsAppContext]);
+
+  // Refresh count when navigating to WhatsApp chat page (messages might be read)
+  useEffect(() => {
+    if (location.pathname === '/institute/whatsappchat') {
+      // Small delay to allow messages to be marked as read
+      const timer = setTimeout(() => {
+        fetchUnreadCount();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname]);
 
   // Listen for logo updates from profile page
   useEffect(() => {
@@ -457,6 +503,17 @@ function CollegeLayout({ children }) {
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
                         <span className="menu-title">Admission Cycle Post</span>
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/whatsappchat' ? 'active' : ''}`}>
+                      <Link to="/institute/whatsappchat" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faWhatsapp} />
+                        <span className="menu-title">Whatsapp Chat</span>
+                        {totalUnreadCount > 0 && (
+                          <span className="badge bg-danger rounded-pill ms-2" style={{ fontSize: '0.75rem', minWidth: '20px', padding: '2px 6px' , position: 'absolute', top: '3px', left: '43px'}}>
+                            {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
