@@ -8429,7 +8429,7 @@ const WhatsappChat = () => {
                           <li className="breadcrumb-item">
                             <a href="/institute/dashboard" className="text-decoration-none">Home</a>
                           </li>
-                          <li className="breadcrumb-item active">Admission Cycle</li>
+                          <li className="breadcrumb-item active">Whatsapp Chat</li>
                         </ol>
                       </nav>
                     </div>
@@ -9382,8 +9382,8 @@ const WhatsappChat = () => {
                                                 position: 'absolute',
                                                 top: '-5px',
                                                 right: '-5px',
-                                                fontSize: '10px',
-                                                padding: '2px 6px',
+                                                fontSize: unreadMessageCounts[profile._id] > 99 ? '9px' : '10px',
+                                                padding: unreadMessageCounts[profile._id] > 99 ? '2px 5px' : '2px 6px',
                                                 borderRadius: '10px',
                                                 minWidth: '18px',
                                                 height: '18px',
@@ -9391,10 +9391,11 @@ const WhatsappChat = () => {
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 fontWeight: '600',
-                                                zIndex: 10
+                                                zIndex: 10,
+                                                whiteSpace: 'nowrap'
                                               }}
                                             >
-                                              {unreadMessageCounts[profile._id] > 99 ? '99+' : unreadMessageCounts[profile._id]}
+                                              {unreadMessageCounts[profile._id]}
                                             </span>
                                           )}
                                         </a>
