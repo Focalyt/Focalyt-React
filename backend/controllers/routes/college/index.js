@@ -5037,7 +5037,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			await fs.promises.unlink("public/" + filename).catch(() => {});
 			return res.status(400).json({ 
 				status: false, 
-				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester, College Name (optional), Batch Id (optional). " +
+				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester. " +
 					(actualHeadersFound.length > 0 ? `Found columns: ${actualHeadersFound.join(', ')}` : '')
 			});
 		} else {
@@ -5276,7 +5276,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						if (contactNumber && contactNumber.trim() && candidateStatus === 'inactive') {
 							try {
 								const sendTemplateData = {
-									templateName: 'registration_link',
+									templateName: 'registration_link_',
 									to: contactNumber,
 									collegeId: college._id.toString(),
 									variableValues: []
@@ -5410,7 +5410,8 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 			{ $match: matchCondition },
 			{ $sort: { createdAt: -1 } }, // Sort by creation date (newest first)
 			{ $skip: perPage * page - perPage },
-			{ $limit: perPage }
+			{ $limit: perPage },
+			{ $project: { collegeName: 0, batchId: 0 } } // Exclude collegeName and batchId from response
 		]);
 
 		let count = await UploadCandidates.countDocuments(matchCondition);
@@ -5762,8 +5763,6 @@ router.route("/single").get(isCollege, function (req, res) {
 		
 		// Define headers matching the table structure
 		const headers = [
-			'College Name',
-			'Batch Id',
 			'Candidate Name',
 			'Father Name',
 			'Course',
