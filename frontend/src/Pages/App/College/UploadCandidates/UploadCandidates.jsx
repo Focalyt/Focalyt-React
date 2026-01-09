@@ -1067,6 +1067,8 @@ const UploadCandidates = () => {
                                         <thead>
                                           <tr>
                                             <th>Sr. No.</th>
+                                            <th>College Name</th>
+                                            <th>Batch Id</th>
                                             <th>Candidate Name</th>
                                             <th>Father Name</th>
                                             <th>Course</th>
@@ -1083,6 +1085,8 @@ const UploadCandidates = () => {
                                           {uploadedCandidates.map((candidate, index) => (
                                             <tr key={candidate._id}>
                                               <td>{(candidatesPage - 1) * 50 + index + 1}</td>
+                                              <td className="text-capitalize">{candidate.collegeName || 'N/A'}</td>
+                                              <td>{candidate.batchId || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.name || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
                                               <td>{candidate.course || 'N/A'}</td>
@@ -1119,6 +1123,8 @@ const UploadCandidates = () => {
                                         <thead>
                                           <tr>
                                             <th>Sr. No.</th>
+                                            <th>College Name</th>
+                                            <th>Batch Id</th>
                                             <th>Candidate Name</th>
                                             <th>Father Name</th>
                                             <th>Contact Number</th>
@@ -1135,6 +1141,8 @@ const UploadCandidates = () => {
                                           {activeCandidates.map((candidate, index) => (
                                             <tr key={candidate._id}>
                                               <td>{(activePage - 1) * 50 + index + 1}</td>
+                                              <td className="text-capitalize">{candidate.collegeName || 'N/A'}</td>
+                                              <td>{candidate.batchId || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.name || 'N/A'}</td>
                                               <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
                                               <td>{candidate.contactNumber || 'N/A'}</td>

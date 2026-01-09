@@ -2939,7 +2939,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		};
 
-		console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
+		// console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
 
 		const response = await axios.post(url, messageData, {
 			headers: {
@@ -3208,11 +3208,11 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 			}
 		};
 		
-		console.log('✅ Returning response:', {
-			isOpen: response.sessionWindow.isOpen,
-			canSendManualMessages: response.messaging.canSendManualMessages,
-			requiresTemplate: response.messaging.requiresTemplate
-		});
+		// console.log('✅ Returning response:', {
+		// 	isOpen: response.sessionWindow.isOpen,
+		// 	canSendManualMessages: response.messaging.canSendManualMessages,
+		// 	requiresTemplate: response.messaging.requiresTemplate
+		// });
 		
 		res.json(response);
 	} catch (error) {

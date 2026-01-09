@@ -90,7 +90,7 @@ router.get('/templates', [isCollege], async (req, res) => {
 					});
 					
 					if (dbTemplate) {
-						console.log(`Found database media for template: ${template.name}`);
+						// console.log(`Found database media for template: ${template.name}`);
 						
 						// Add variable mappings to template
 						if (dbTemplate.variableMappings && dbTemplate.variableMappings.length > 0) {
@@ -2894,12 +2894,12 @@ router.post('/send-message', isCollege, async (req, res) => {
 		// Get college ID from authenticated user
 		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
 
-		console.log('📤 Sending free text message:', { 
-			to, 
-			message: message.substring(0, 50), 
-			candidateId,
-			collegeId 
-		});
+		// console.log('📤 Sending free text message:', { 
+		// 	to, 
+		// 	message: message.substring(0, 50), 
+		// 	candidateId,
+		// 	collegeId 
+		// });
 
 		// Validation
 		if (!to || !message) {
@@ -2939,7 +2939,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 			}
 		};
 
-		console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
+		// console.log('📡 Calling WhatsApp API:', { url, to: formattedPhone });
 
 		const response = await axios.post(url, messageData, {
 			headers: {
@@ -3032,9 +3032,9 @@ router.get('/chat-history/:phone', [isCollege], async (req, res) => {
 			]
 		}).sort({ sentAt: 1 });
 		
-		console.log(`📥 Fetched ${messages.length} messages for ${formattedPhone}`);
-		console.log(`   - Sent: ${messages.filter(m => m.direction !== 'incoming').length}`);
-		console.log(`   - Received: ${messages.filter(m => m.direction === 'incoming').length}`);
+		// console.log(`📥 Fetched ${messages.length} messages for ${formattedPhone}`);
+		// console.log(`   - Sent: ${messages.filter(m => m.direction !== 'incoming').length}`);
+		// console.log(`   - Received: ${messages.filter(m => m.direction === 'incoming').length}`);
 		
 		res.json({
 			success: true,
@@ -3208,11 +3208,11 @@ router.get('/session-window/:mobile', [isCollege], async (req, res) => {
 			}
 		};
 		
-		console.log('✅ Returning response:', {
-			isOpen: response.sessionWindow.isOpen,
-			canSendManualMessages: response.messaging.canSendManualMessages,
-			requiresTemplate: response.messaging.requiresTemplate
-		});
+		// console.log('✅ Returning response:', {
+		// 	isOpen: response.sessionWindow.isOpen,
+		// 	canSendManualMessages: response.messaging.canSendManualMessages,
+		// 	requiresTemplate: response.messaging.requiresTemplate
+		// });
 		
 		res.json(response);
 	} catch (error) {
