@@ -723,6 +723,7 @@ const Placements = () => {
   const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
   const whatsappMessagesEndRef = useRef(null);
   const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
   const [sessionWindow, setSessionWindow] = useState({
     isOpen: false,
@@ -2216,15 +2217,41 @@ console.log("response.data",response.data)
             headers: { 'x-auth': token }
           });
           if (response.data.success) {
-            setWhatsappTemplates(response.data.templates || []);
+            setWhatsappTemplates(response.data.data || []);
           }
         } catch (error) {
           console.error('Error fetching templates:', error);
+          setWhatsappTemplates([]);
         }
       }
     };
     fetchTemplates();
   }, [showPanel, token]);
+
+  // Fetch templates when template menu is opened
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (showWhatsappTemplateMenu && token && showPanel === 'Whatsapp') {
+        setIsLoadingTemplates(true);
+        try {
+          const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+            headers: { 'x-auth': token }
+          });
+          if (response.data.success) {
+            setWhatsappTemplates(response.data.data || []);
+          } else {
+            setWhatsappTemplates([]);
+          }
+        } catch (error) {
+          console.error('Error fetching templates:', error);
+          setWhatsappTemplates([]);
+        } finally {
+          setIsLoadingTemplates(false);
+        }
+      }
+    };
+    fetchTemplates();
+  }, [showWhatsappTemplateMenu, token, showPanel]);
 
   // Session countdown timer
   useEffect(() => {
@@ -3170,12 +3197,16 @@ console.log("response.data",response.data)
                     <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
                   </div>
 
-                  {whatsappTemplates.length === 0 ? (
+                  {isLoadingTemplates ? (
                     <div className="p-4 text-center">
                       <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
                         <span className="visually-hidden">Loading...</span>
                       </div>
                       <p className="mb-0 small text-muted">Loading templates...</p>
+                    </div>
+                  ) : whatsappTemplates.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <p className="mb-0 small text-muted">No templates found</p>
                     </div>
                   ) : (
                     whatsappTemplates.map(template => (

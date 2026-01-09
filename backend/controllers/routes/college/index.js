@@ -5006,7 +5006,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			});
 			
 			// Required headers (College is optional - will use logged-in college if not provided)
-			const requiredHeaders = ['name', 'fatherName', 'course', 'session'];
+			const requiredHeaders = ['name', 'fatherName', 'course'];
 			
 			// Check if minimum required headers are present
 			let headersMatch = true;
@@ -5096,9 +5096,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					if (!course) {
 						message += `Course `
 					}
-					if (!session) {
-						message += `Session `
-					}
 
 					if (message) {
 						message += `not populated for row ${index + 2}` // +2 because index is 0-based and we removed header
@@ -5155,27 +5152,97 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						}
 					}
 
-					// Check for duplicate candidate (name + fatherName + college combination)
-					let isExistCandidate = await UploadCandidates.findOne({
-						name: name,
-						fatherName: fatherName,
-						college: college._id
-					});
+					// Check for duplicate candidate - prioritize contact number or email, then fall back to name + fatherName
+					let isExistCandidate = null;
+					let duplicateReason = '';
+					
+					// First check by contact number (most unique identifier)
+					if (contactNumber && contactNumber.trim()) {
+						const cleanMobile = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+						
+						if (cleanMobile.length >= 10) {
+							// Try to find by exact match first
+							isExistCandidate = await UploadCandidates.findOne({
+								college: college._id,
+								$or: [
+									{ contactNumber: cleanMobile },
+									{ contactNumber: `+91${cleanMobile}` },
+									{ contactNumber: `91${cleanMobile}` },
+									{ contactNumber: contactNumber.trim() }
+								]
+							});
+							
+							// If not found, check with regex (for partial matches with different formatting)
+							if (!isExistCandidate) {
+								const allCandidates = await UploadCandidates.find({
+									college: college._id,
+									contactNumber: { $exists: true, $ne: null, $ne: '' }
+								}).lean();
+								
+								isExistCandidate = allCandidates.find(candidate => {
+									if (!candidate.contactNumber) return false;
+									const storedMobile = String(candidate.contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+									return storedMobile === cleanMobile;
+								});
+							}
+							
+							if (isExistCandidate) {
+								duplicateReason = `Contact Number "${contactNumber}"`;
+							}
+						}
+					}
+					
+					// If not found by contact number, check by email
+					if (!isExistCandidate && email && email.trim()) {
+						const cleanEmail = email.toLowerCase().trim();
+						isExistCandidate = await UploadCandidates.findOne({
+							email: cleanEmail,
+							college: college._id
+						});
+						
+						if (isExistCandidate) {
+							duplicateReason = `Email "${email}"`;
+						}
+					}
+					
+					// If still not found, check by name + fatherName + college (fallback)
+					if (!isExistCandidate) {
+						isExistCandidate = await UploadCandidates.findOne({
+							name: name,
+							fatherName: fatherName,
+							college: college._id
+						});
+						
+						if (isExistCandidate) {
+							duplicateReason = `Name "${name}" and Father Name "${fatherName}"`;
+						}
+					}
 
 					if (isExistCandidate) {
-						errorMessages.push(`Candidate with Name "${name}" and Father Name "${fatherName}" already exists for row ${index + 2}.`)
+						errorMessages.push(`Candidate with ${duplicateReason} already exists for row ${index + 2}.`)
 						continue;
 					}
 
 					// Check for duplicate in current upload batch
-					let dup = allRows.find(can => 
-						can.name.toLowerCase() === name.toLowerCase() && 
-						can.fatherName.toLowerCase() === fatherName.toLowerCase() && 
-						can.collegeName.toLowerCase() === collegeName.toLowerCase()
-					);
+					let dup = allRows.find(can => {
+						// Check by contact number first (most unique)
+						if (contactNumber && contactNumber.trim() && can.contactNumber) {
+							const cleanMobile1 = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							const cleanMobile2 = String(can.contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							if (cleanMobile1.length >= 10 && cleanMobile2.length >= 10 && cleanMobile1 === cleanMobile2) return true;
+						}
+						// Check by email (second most unique)
+						if (email && email.trim() && can.email) {
+							if (email.toLowerCase().trim() === can.email.toLowerCase().trim()) return true;
+						}
+						// Fallback to name + father name + college (least unique, but still important)
+						return can.name.toLowerCase() === name.toLowerCase() && 
+						       can.fatherName.toLowerCase() === fatherName.toLowerCase() && 
+						       can.collegeName.toLowerCase() === collegeName.toLowerCase();
+					});
 
 					if (!isExistCandidate && !dup) {
-						allRows.push({ name, fatherName, collegeName })
+						allRows.push({ name, fatherName, collegeName, contactNumber, email })
 						
 						// Check if user account already exists (role 3 - student/candidate)
 						let existingUser = null;
@@ -5192,7 +5259,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 								// Try to find user - check both Number and String format for role (as used in candidateRoutes.js)
 								existingUser = await User.findOne({
 									mobile: mobileNumber,
-									role: 3  // Try Number format first
+									role: 3  
 								});
 								
 								// If not found, try String format (as used in candidateRoutes.js)
@@ -5252,7 +5319,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							email: email || undefined,
 							gender: gender || undefined,
 							dob: dobDate || undefined,
-							session: session,
+							session: session || undefined,
 							college: college._id,
 							collegeName: collegeName,
 							batchId: batchId || undefined,

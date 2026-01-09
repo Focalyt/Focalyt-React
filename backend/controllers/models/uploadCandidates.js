@@ -21,7 +21,6 @@ course:{
 },
 session:{
     type: String,
-    required: true,
     trim: true
 },
 year:{
