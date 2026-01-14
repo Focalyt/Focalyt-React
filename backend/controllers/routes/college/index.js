@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -5340,10 +5340,85 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							continue;
 						}
 						
+						// Create Placement record with "Untouch Leads" status for uploaded candidate
+						try {
+							// Find "Untouch Leads" status (it should already exist)
+							let untouchLeadsStatus = await PlacementStatus.findOne({
+								title: { $regex: /^untouch\s*leads$/i },
+								$or: [
+									{ college: college._id },
+									{ college: null }
+								]
+							});
+							
+							// If status doesn't exist, create it with "Untouch Lead" substatus
+							if (!untouchLeadsStatus) {
+								// Get the highest index for this college
+								const highestIndexStatus = await PlacementStatus.findOne({
+									$or: [
+										{ college: college._id },
+										{ college: null }
+									]
+								}).sort('-index').exec();
+								const newIndex = highestIndexStatus ? highestIndexStatus.index + 1 : 0;
+								
+								untouchLeadsStatus = await PlacementStatus.create({
+									title: 'Untouch Leads',
+									description: 'Candidates uploaded but not yet contacted',
+									index: newIndex,
+									college: college._id,
+									substatuses: [{
+										title: 'Untouch Lead',
+										description: 'Candidate uploaded but not yet contacted',
+										hasRemarks: false,
+										hasFollowup: false,
+										hasAttachment: false
+									}]
+								});
+							}
+							
+							// Find "Untouch Lead" substatus from existing status (it should already be there)
+							let untouchSubstatus = null;
+							if (untouchLeadsStatus && untouchLeadsStatus.substatuses && untouchLeadsStatus.substatuses.length > 0) {
+								untouchSubstatus = untouchLeadsStatus.substatuses.find(sub => 
+									sub.title && (sub.title.toLowerCase() === 'untouch lead' || sub.title.toLowerCase() === 'untouch leads')
+								);
+							}
+							
+							// Check if placement already exists for this upload candidate
+							const existingPlacement = await Placement.findOne({
+								uploadCandidate: uploadCandidate._id,
+								college: college._id
+							});
+							
+							// Create placement record if it doesn't exist
+							if (!existingPlacement) {
+								await Placement.create({
+									companyName: 'Not Assigned',
+									dateOfJoining: new Date(),
+									location: 'Not Assigned',
+									college: college._id,
+									uploadCandidate: uploadCandidate._id,
+									status: untouchLeadsStatus._id,
+									subStatus: untouchSubstatus ? untouchSubstatus._id : null,
+									addedBy: req.user._id,
+									logs: [{
+										user: req.user._id,
+										timestamp: new Date(),
+										action: 'Candidate Uploaded',
+										remarks: 'Candidate uploaded via bulk upload and automatically added to Untouch Leads'
+									}]
+								});
+							}
+						} catch (placementError) {
+							// Log error but don't fail the upload
+							console.error(`Error creating placement for uploaded candidate ${uploadCandidate._id}:`, placementError);
+						}
+						
 						if (contactNumber && contactNumber.trim() && candidateStatus === 'inactive') {
 							try {
 								const sendTemplateData = {
-									templateName: 'registration_link_',
+									templateName: 'registration_link_copy_copy',
 									to: contactNumber,
 									collegeId: college._id.toString(),
 									variableValues: []

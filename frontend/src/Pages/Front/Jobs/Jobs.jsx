@@ -6,7 +6,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import FrontLayout from '../../../Component/Layouts/Front';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
-
+import CompanyPartners from '../CompanyPartners/CompanyPartners';
 function Jobs() {
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -369,6 +369,7 @@ function Jobs() {
                     </div>
                   </div>
 
+{/* <CompanyPartners/> */}
                   {/* Selected Sector Display */}
                   <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
                     <div className='sector--select'>
@@ -1223,6 +1224,9 @@ button.close span {
   }
 }
 @media(max-width:768px){
+.bg-img img.digi {
+    object-fit: fill;
+  }
   .mobileJobs{
     justify-content: center;
   }

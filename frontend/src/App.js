@@ -58,6 +58,8 @@ import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCours
 import Curriculums from './Pages/App/Candidate/EnrolledCourses/Curriculums';
 import Assignments from './Pages/App/Candidate/Assignment/Assignment';
 import JobOffer from './Pages/App/Candidate/JobOffer/jobOffer';
+import CompanyPartners from './Pages/Front/CompanyPartners/CompanyPartners';
+import CandidateReview from './Pages/Front/CandidateReview/CandidateReview';
 
 import Registration from './Pages/Front/StudentRegistration/Registration';
 import CollegeLayout from './Component/Layouts/App/College';
@@ -182,6 +184,8 @@ const Layout = () => {
 
         <Route exact path="/" element={<HomePage />} />
         <Route exact path="/about" element={<About />} />
+        <Route exact path="/company-partners" element={<CompanyPartners />} />
+        <Route exact path="/candidate-review" element={<CandidateReview />} />
         {/* <Route exact path="/about_us" element={<About />} /> */}
         <Route exact path="/labs" element={<Labs />} />
         <Route exact path="/courses" element={<Course />} />

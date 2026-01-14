@@ -876,7 +876,7 @@ const CompanyProfile = () => {
             <div className="col-xl-12 col-lg-12">
               <div className="card">
                 <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Company Executive</h4>
+                  <h4 className="card-title pb-1">Add Your HR Team</h4>
                 </div>
                 <div className="card-content">
                   <div className="card-body">

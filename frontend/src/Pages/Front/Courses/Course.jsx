@@ -1180,6 +1180,11 @@ button.close span {
     width: 100%!important;
   }
 }
+@media (max-width:768px){
+  .bg-img img.digi {
+    object-fit: fill;
+  }
+}
             `
           }
         </style>

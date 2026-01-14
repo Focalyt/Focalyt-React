@@ -5,7 +5,7 @@ import 'slick-carousel';
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import TechnologySlider from '../../../Component/Layouts/Front/TechnologySlider/TechnologySlider';
-
+import CompanyPartners from '../CompanyPartners/CompanyPartners';
 
 const HomePage = () => {
 
@@ -1193,6 +1193,21 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+
+      {/* our partners */}
+      {/* <section id="partners">
+        
+        <div className="section-padding-120">
+          <div className="container">
+            <div className="row">
+              <div className="col-md-12">
+                
+                <CompanyPartners />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section> */}
 
       {/* reach us  */}
 

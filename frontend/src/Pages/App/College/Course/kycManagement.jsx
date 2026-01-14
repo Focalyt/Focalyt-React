@@ -3234,7 +3234,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                   </div>
 
                   {/* Search and Filter Controls - Mobile */}
-                  <div className="d-flex flex-column gap-2">
+                  <div className="d-flex justify-content-end align-items-center gap-2">
                     <div className="input-group">
                       <input
                         type="text"

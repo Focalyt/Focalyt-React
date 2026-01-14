@@ -485,7 +485,7 @@ function CollegeLayout({ children }) {
                 <li className={`nav-item has-sub dropdown-sales ${openSubmenu.sales ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('sales')}>
                     <FontAwesomeIcon icon={faShoppingCart} />
-                    <span className="menu-title">Admissions (B2C)</span>
+                    <span className="menu-title">Sales (B2C)</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -558,7 +558,7 @@ function CollegeLayout({ children }) {
                 <li className={`nav-item has-sub dropdown-salesb2b ${openSubmenu.salesb2b ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
                     <FontAwesomeIcon icon={faHandshake} />
-                    <span className="menu-title">Admissions (B2B)</span>
+                    <span className="menu-title">Sales (B2B)</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -753,24 +753,24 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Access Management</span>
                     </Link>
                   </li>
-                  {/* <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
+                  <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faSitemap} />
                       <span className="menu-title">Status Design (B2B)</span>
                     </Link>
-                  </li> */}
-                  {/* <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesignb2c" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
                       <span className="menu-title">Status Design (B2C)</span>
                     </Link>
-                  </li> */}
-                  {/* <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
                     <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
                       <span className="menu-title">Status Design (Placements)</span>
                     </Link>
-                  </li> */}
+                  </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
                     <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWhatsapp} />

@@ -77,10 +77,44 @@ router.get('/status-count', isCollege, async (req, res) => {
     ];
 
     const totalResult = await AppliedCourses.aggregate(totalPlacementsPipeline);
-    const totalPlacements = totalResult[0]?.total || 0;
+    let totalPlacements = totalResult[0]?.total || 0;
+
+    // Also count placements from UploadCandidates (only count if they actually exist and have valid status)
+    // Only count if the UploadCandidate still exists (not deleted)
+    const uploadCandidatePlacementsCountPipeline = [
+      {
+        $match: {
+          college: new mongoose.Types.ObjectId(college._id),
+          uploadCandidate: { $exists: true, $ne: null },
+          status: { $exists: true, $ne: null } // Only count if status exists
+        }
+      },
+      {
+        $lookup: {
+          from: 'uploadcandidates',
+          localField: 'uploadCandidate',
+          foreignField: '_id',
+          as: 'uploadCandidateData'
+        }
+      },
+      {
+        $match: {
+          'uploadCandidateData.0': { $exists: true } // Only count if UploadCandidate still exists
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ];
+    
+    const uploadCandidatePlacementsCountResult = await Placement.aggregate(uploadCandidatePlacementsCountPipeline);
+    const uploadCandidatePlacementsCount = uploadCandidatePlacementsCountResult[0]?.total || 0;
+
+    totalPlacements += uploadCandidatePlacementsCount;
 
     const statusCounts = await Promise.all(
       statuses.map(async (status) => {
+        // Count from AppliedCourses
         const countPipeline = [
           {
             $match: {
@@ -125,7 +159,45 @@ router.get('/status-count', isCollege, async (req, res) => {
         ];
 
         const result = await AppliedCourses.aggregate(countPipeline);
-        const count = result[0]?.total || 0;
+        let count = result[0]?.total || 0;
+
+        // Also count placements from UploadCandidates with this status
+        // Only count if the UploadCandidate still exists (not deleted)
+        const uploadCandidateCountPipeline = [
+          {
+            $match: {
+              college: new mongoose.Types.ObjectId(college._id),
+              uploadCandidate: { $exists: true, $ne: null },
+              status: new mongoose.Types.ObjectId(status._id)
+            }
+          },
+          {
+            $lookup: {
+              from: 'uploadcandidates',
+              localField: 'uploadCandidate',
+              foreignField: '_id',
+              as: 'uploadCandidateData'
+            }
+          },
+          {
+            $match: {
+              'uploadCandidateData.0': { $exists: true } // Only count if UploadCandidate still exists
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ];
+        
+        const uploadCandidateCountResult = await Placement.aggregate(uploadCandidateCountPipeline);
+        const uploadCandidateCount = uploadCandidateCountResult[0]?.total || 0;
+        
+        // Debug logging
+        if (status.title && status.title.toLowerCase().includes('untouch')) {
+          // console.log(`Status: ${status.title}, Status ID: ${status._id}, UploadCandidate Count: ${uploadCandidateCount}`);
+        }
+
+        count += uploadCandidateCount;
 
         return {
           statusId: status._id,
@@ -688,10 +760,12 @@ router.get('/candidates', isCollege, async (req, res) => {
       }
     });
 
-    if (placementStatus) {
+    // Apply status filter (can be from status or placementStatus parameter)
+    const statusFilterForAppliedCourses = status || placementStatus;
+    if (statusFilterForAppliedCourses) {
       aggregationPipeline.push({
         $match: {
-          'placementRecord.status': new mongoose.Types.ObjectId(placementStatus)
+          'placementRecord.status': new mongoose.Types.ObjectId(statusFilterForAppliedCourses)
         }
       });
     }
@@ -724,30 +798,106 @@ router.get('/candidates', isCollege, async (req, res) => {
 
     const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
 
-    // Fetch active UploadCandidates for this college
-    // Only include upload candidates if no placementStatus filter is applied
-    // (since upload candidates don't have placement records yet)
     let activeUploadCandidates = [];
-    if (!placementStatus) {
-      const uploadCandidatesQuery = {
-        college: new mongoose.Types.ObjectId(college._id),
-        status: 'active'
-      };
+    
+    // Build query for UploadCandidates
+    const uploadCandidatesQuery = {
+      college: new mongoose.Types.ObjectId(college._id)
+    };
 
-      // Apply search filter to UploadCandidates if provided
-      if (search) {
-        const searchRegex = new RegExp(search, 'i');
-        uploadCandidatesQuery.$or = [
-          { name: searchRegex },
-          { email: searchRegex },
-          { contactNumber: searchRegex }
-        ];
+    // Apply search filter to UploadCandidates if provided
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      uploadCandidatesQuery.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { contactNumber: searchRegex }
+      ];
+    }
+
+    // If status filter is applied (from status parameter or placementStatus), only get UploadCandidates that have placements with that status
+    // Only get placements where UploadCandidate still exists (not deleted)
+    const statusFilter = status || placementStatus;
+    if (statusFilter) {
+      const placementsWithStatus = await Placement.aggregate([
+        {
+          $match: {
+            college: new mongoose.Types.ObjectId(college._id),
+            uploadCandidate: { $exists: true, $ne: null },
+            status: new mongoose.Types.ObjectId(statusFilter)
+          }
+        },
+        {
+          $lookup: {
+            from: 'uploadcandidates',
+            localField: 'uploadCandidate',
+            foreignField: '_id',
+            as: 'uploadCandidateData'
+          }
+        },
+        {
+          $match: {
+            'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
+          }
+        },
+        {
+          $project: {
+            uploadCandidate: 1
+          }
+        }
+      ]);
+      
+      const uploadCandidateIds = placementsWithStatus
+        .map(p => p.uploadCandidate)
+        .filter(Boolean);
+      
+      if (uploadCandidateIds.length > 0) {
+        uploadCandidatesQuery._id = { $in: uploadCandidateIds };
+        activeUploadCandidates = await UploadCandidates.find(uploadCandidatesQuery)
+          .populate('user', 'name email mobile')
+          .sort({ createdAt: -1 })
+          .lean();
       }
-
-      activeUploadCandidates = await UploadCandidates.find(uploadCandidatesQuery)
-      .populate('user', 'name email mobile')
-      .sort({ createdAt: -1 })
-      .lean();
+    } else {
+      // If no status filter, get all UploadCandidates that have placement records and still exist
+      const placementsWithUploadCandidates = await Placement.aggregate([
+        {
+          $match: {
+            college: new mongoose.Types.ObjectId(college._id),
+            uploadCandidate: { $exists: true, $ne: null }
+          }
+        },
+        {
+          $lookup: {
+            from: 'uploadcandidates',
+            localField: 'uploadCandidate',
+            foreignField: '_id',
+            as: 'uploadCandidateData'
+          }
+        },
+        {
+          $match: {
+            'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
+          }
+        },
+        {
+          $project: {
+            uploadCandidate: 1
+          }
+        }
+      ]);
+      
+      const uploadCandidateIds = placementsWithUploadCandidates
+        .map(p => p.uploadCandidate)
+        .filter(Boolean);
+      
+      if (uploadCandidateIds.length > 0) {
+        uploadCandidatesQuery._id = { $in: uploadCandidateIds };
+        activeUploadCandidates = await UploadCandidates.find(uploadCandidatesQuery)
+          .populate('user', 'name email mobile')
+          .sort({ createdAt: -1 })
+          .lean();
+      }
     }
 
     // Convert UploadCandidates to placement format
@@ -755,7 +905,8 @@ router.get('/candidates', isCollege, async (req, res) => {
       activeUploadCandidates.map(async (uploadCandidate) => {
         // ✅ Check if Placement record already exists for this UploadCandidate
         let placementRecord = await Placement.findOne({ 
-          uploadCandidate: uploadCandidate._id 
+          uploadCandidate: uploadCandidate._id,
+          college: new mongoose.Types.ObjectId(college._id)
         }).lean();
 
         // ✅ If Placement record doesn't exist, create one
@@ -804,13 +955,24 @@ router.get('/candidates', isCollege, async (req, res) => {
 
         // Get placement status
         let placementStatus = null;
-        if (placementRecord.status) {
+        if (placementRecord && placementRecord.status) {
           placementStatus = await PlacementStatus.findById(placementRecord.status).lean();
         }
         if (!placementStatus) {
           placementStatus = await PlacementStatus.findOne({ 
             college: new mongoose.Types.ObjectId(college._id) 
           }).sort({ index: 1 }).lean();
+        }
+        
+        // Get substatus if exists - find it from the status's substatuses array
+        let subStatusObj = null;
+        if (placementRecord && placementRecord.subStatus && placementStatus && placementStatus.substatuses) {
+          subStatusObj = placementStatus.substatuses.find(sub => {
+            // substatuses are subdocuments, so we need to compare _id
+            const subId = sub._id ? sub._id.toString() : null;
+            const recordSubId = placementRecord.subStatus ? placementRecord.subStatus.toString() : null;
+            return subId && recordSubId && subId === recordSubId;
+          });
         }
 
         // Get job offers for this placement
@@ -861,7 +1023,14 @@ router.get('/candidates', isCollege, async (req, res) => {
             title: placementStatus.title,
             substatuses: placementStatus.substatuses || []
           } : null,
-          subStatus: placementRecord.subStatus || null,
+          subStatus: subStatusObj ? {
+            _id: subStatusObj._id,
+            title: subStatusObj.title,
+            description: subStatusObj.description,
+            hasRemarks: subStatusObj.hasRemarks,
+            hasFollowup: subStatusObj.hasFollowup,
+            hasAttachment: subStatusObj.hasAttachment
+          } : (placementRecord.subStatus || null),
           appliedCourseId: null,
           companyName: placementRecord.companyName || null,
           employerName: placementRecord.employerName || null,
@@ -1002,24 +1171,65 @@ router.get('/candidates', isCollege, async (req, res) => {
       const dateB = new Date(b.createdAt || 0);
       return dateB - dateA;
     });
+    
+    // Debug logging (can be removed in production)
+    if (statusFilter) {
+      console.log(`Status filter applied: ${statusFilter}`);
+      console.log(`UploadCandidates found: ${activeUploadCandidates.length}`);
+      console.log(`UploadCandidates placements created: ${uploadCandidatesPlacements.length}`);
+      console.log(`Total placements: ${allPlacements.length}`);
+    }
 
-    // Calculate total count including upload candidates (only if no placementStatus filter)
+    // Calculate total count including upload candidates with placements
+    // Only count if UploadCandidate still exists (not deleted)
     let totalUploadCandidates = 0;
-    if (!placementStatus) {
-      totalUploadCandidates = await UploadCandidates.countDocuments(
-        search ? {
+    const placementsWithUploadCandidates = await Placement.aggregate([
+      {
+        $match: {
           college: new mongoose.Types.ObjectId(college._id),
-          status: 'active',
-          $or: [
-            { name: new RegExp(search, 'i') },
-            { email: new RegExp(search, 'i') },
-            { contactNumber: new RegExp(search, 'i') }
-          ]
-        } : {
-          college: new mongoose.Types.ObjectId(college._id),
-          status: 'active'
+          uploadCandidate: { $exists: true, $ne: null }
         }
-      );
+      },
+      {
+        $lookup: {
+          from: 'uploadcandidates',
+          localField: 'uploadCandidate',
+          foreignField: '_id',
+          as: 'uploadCandidateData'
+        }
+      },
+      {
+        $match: {
+          'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
+        }
+      },
+      {
+        $project: {
+          uploadCandidate: 1
+        }
+      }
+    ]);
+    
+    const uploadCandidateIds = placementsWithUploadCandidates
+      .map(p => p.uploadCandidate)
+      .filter(Boolean);
+    
+    if (uploadCandidateIds.length > 0) {
+      const uploadCandidatesQuery = {
+        college: new mongoose.Types.ObjectId(college._id),
+        _id: { $in: uploadCandidateIds }
+      };
+      
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        uploadCandidatesQuery.$or = [
+          { name: searchRegex },
+          { email: searchRegex },
+          { contactNumber: searchRegex }
+        ];
+      }
+      
+      totalUploadCandidates = await UploadCandidates.countDocuments(uploadCandidatesQuery);
     }
 
     const totalAllPlacements = totalPlacements + totalUploadCandidates;

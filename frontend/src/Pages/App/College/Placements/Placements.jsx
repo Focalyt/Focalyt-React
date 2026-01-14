@@ -713,6 +713,7 @@ const Placements = () => {
   const [bulkJobInputValue, setBulkJobInputValue] = useState(''); 
   const [selectedBulkJob, setSelectedBulkJob] = useState(null);
   const [sendingBulkJobs, setSendingBulkJobs] = useState(false);
+  const [allLeadsForBulk, setAllLeadsForBulk] = useState([]);
 
   // WhatsApp Panel states
   const [showPanel, setShowPanel] = useState('');
@@ -1090,17 +1091,17 @@ const Placements = () => {
 
 
   useEffect(() => {
-    if (bulkJobInputValue && leads && leads.length > 0) {
+    if (showBulkJobMode && bulkJobInputValue && allLeadsForBulk && allLeadsForBulk.length > 0) {
       const numCandidates = parseInt(bulkJobInputValue, 10);
       if (!isNaN(numCandidates) && numCandidates > 0) {
-        const maxCount = Math.min(numCandidates, leads.length);
-        const firstNIds = leads.slice(0, maxCount).map(placement => placement._id).filter(Boolean);
+        const maxCount = Math.min(numCandidates, allLeadsForBulk.length);
+        const firstNIds = allLeadsForBulk.slice(0, maxCount).map(placement => placement._id).filter(Boolean);
         setSelectedProfiles(firstNIds);
       }
     } else if (!bulkJobInputValue || bulkJobInputValue === '') {
       setSelectedProfiles([]);
     }
-  }, [bulkJobInputValue, leads]);
+  }, [bulkJobInputValue, allLeadsForBulk, showBulkJobMode]);
   const [filters, setFilters] = useState({
     search: '',
     placementStatus: '',
@@ -1189,12 +1190,20 @@ const Placements = () => {
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
     fetchLeads(statusId, 1);
+    // If bulk mode is open, refresh all leads for bulk
+    if (showBulkJobMode) {
+      fetchAllLeadsForBulk();
+    }
   };
 
   const handleTotalCardClick = () => {
     setSelectedStatusFilter(null);
     setCurrentPage(1);
     fetchLeads(null, 1);
+    // If bulk mode is open, refresh all leads for bulk
+    if (showBulkJobMode) {
+      fetchAllLeadsForBulk();
+    }
   };
 
   const handleFilterChange = (key, value) => {
@@ -1217,6 +1226,10 @@ const Placements = () => {
   const applyFilters = () => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
+    // If bulk mode is open, refresh all leads for bulk
+    if (showBulkJobMode) {
+      fetchAllLeadsForBulk();
+    }
   };
 
   const clearFilters = () => {
@@ -3703,7 +3716,7 @@ console.log("response.data",response.data)
     }
 
     const numCandidates = parseInt(bulkJobInputValue, 10);
-    const totalCandidates = leads?.length || 0;
+    const totalCandidates = allLeadsForBulk?.length || 0;
 
     if (!numCandidates || numCandidates < 1) {
       alert('Please enter a valid number of candidates');
@@ -3729,7 +3742,7 @@ console.log("response.data",response.data)
 
     try {
       setSendingBulkJobs(true);
-      const candidatesToSend = leads.slice(0, numCandidates);
+      const candidatesToSend = allLeadsForBulk.slice(0, numCandidates);
       let successCount = 0;
       let failCount = 0;
 
@@ -3760,7 +3773,7 @@ console.log("response.data",response.data)
         }
       }
 
-      alert(`Bulk job offer completed!`);
+      alert(`Bulk job offer completed! Success: ${successCount}, Failed: ${failCount}`);
       
       // Refresh placements
       fetchLeads(selectedStatusFilter, currentPage);
@@ -3768,6 +3781,7 @@ console.log("response.data",response.data)
       // Reset bulk mode
       setBulkJobInputValue('');
       setShowBulkJobMode(false);
+      setAllLeadsForBulk([]);
     } catch (error) {
       console.error('Error in bulk job offer:', error);
       alert('Error sending bulk job offers. Please try again.');
@@ -3776,11 +3790,58 @@ console.log("response.data",response.data)
     }
   };
 
+  // Fetch all leads for bulk operations (without pagination)
+  const fetchAllLeadsForBulk = async () => {
+    try {
+      const params = {
+        page: 1,
+        limit: 10000, // Large limit to get all leads
+      };
+
+      if (selectedStatusFilter) {
+        params.status = selectedStatusFilter;
+      }
+
+      if (filters.search) {
+        params.search = filters.search;
+      }
+      if (filters.placementStatus) {
+        params.placementStatus = filters.placementStatus;
+      }
+      if (filters.placementDateRange.start) {
+        params.placementStartDate = filters.placementDateRange.start;
+      }
+      if (filters.placementDateRange.end) {
+        params.placementEndDate = filters.placementDateRange.end;
+      }
+
+      const response = await axios.get(`${backendUrl}/college/placementStatus/candidates`, {
+        headers: { 'x-auth': token },
+        params: params
+      });
+
+      if (response.data.status) {
+        const placements = response.data.data.placements || [];
+        setAllLeadsForBulk(placements);
+        return placements;
+      } else {
+        console.error('Failed to fetch all leads:', response.data.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching all leads for bulk:', error);
+      return [];
+    }
+  };
+
   // Open bulk job mode
   const handleOpenBulkJobMode = async () => {
     setShowBulkJobMode(true);
     setBulkJobInputValue('');
     setSelectedBulkJob(null);
+    
+    // Fetch all leads for bulk operations
+    await fetchAllLeadsForBulk();
     
     // Fetch company jobs if not already loaded
     if (companyJobs.length === 0) {
@@ -4043,11 +4104,12 @@ console.log("response.data",response.data)
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '5px' }}
+            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: isMobile ? '8px' : '5px' }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
-                  <div className="col-md-6 d-md-block d-sm-none">
+                  {/* Desktop Title and Breadcrumb */}
+                  <div className="col-md-6 d-md-block d-none">
                     <div className="d-flex align-items-center">
                       <h5 className="fw-bold text-dark mb-0 me-3" style={{ fontSize: '1.1rem' }}>Placements</h5>
                       <nav aria-label="breadcrumb">
@@ -4061,15 +4123,31 @@ console.log("response.data",response.data)
                     </div>
                   </div>
 
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
+                  {/* Mobile Title */}
+                  <div className={`${isMobile ? 'col-12' : 'col-12 d-md-none'} ${isMobile ? 'mb-2' : 'mb-2'}`}>
+                    <div className="d-flex align-items-center justify-content-between">
+                      <h5 className="fw-bold text-dark mb-0" style={{ fontSize: isMobile ? '0.95rem' : '1rem' }}>Placements</h5>
+                      <nav aria-label="breadcrumb" className={isMobile ? 'd-none' : 'd-none d-sm-block'}>
+                        <ol className="breadcrumb mb-0 small">
+                          <li className="breadcrumb-item">
+                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                          </li>
+                          <li className="breadcrumb-item active">Placements</li>
+                        </ol>
+                      </nav>
+                    </div>
+                  </div>
+
+                  {/* Search and Filter Section */}
+                  <div className="col-md-6 col-12">
+                    <div className={`d-flex ${isMobile ? 'flex-column gap-2' : 'justify-content-end align-items-center gap-2'}`}>
                       {/* Quick Search */}
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="position-relative">
+                      <div className={`d-flex align-items-center ${isMobile ? 'w-100' : 'gap-2'}`} style={isMobile ? { gap: '8px' } : {}}>
+                        <div className="position-relative" style={isMobile ? { flex: 1, minWidth: 0 } : {}}>
                           <input
                             type="text"
                             className="form-control form-control-sm"
-                            placeholder="Quick search..."
+                            placeholder={isMobile ? "Search..." : "Quick search..."}
                             value={filters.search}
                             onChange={(e) => handleFilterChange('search', e.target.value)}
                             onKeyPress={(e) => {
@@ -4078,87 +4156,107 @@ console.log("response.data",response.data)
                               }
                             }}
                             style={{
-                              width: '200px',
-                              paddingRight: '30px',
-                              paddingLeft: '12px',
-                              paddingTop: '8px',
-                              paddingBottom: '8px',
+                              width: isMobile ? '100%' : '200px',
+                              paddingRight: filters.search ? (isMobile ? '35px' : '30px') : (isMobile ? '12px' : '12px'),
+                              paddingLeft: isMobile ? '10px' : '12px',
+                              paddingTop: isMobile ? '10px' : '8px',
+                              paddingBottom: isMobile ? '10px' : '8px',
                               backgroundColor: '#ffffff',
                               border: '1.5px solid #ced4da',
                               color: '#212529',
-                              fontSize: '13px',
+                              fontSize: isMobile ? '14px' : '13px',
                               borderRadius: '6px',
                               boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                               transition: 'all 0.2s ease'
                             }}
                           />
-                          {filters.search && (
-                            <button
-                              type="button"
-                              className="btn btn-sm position-absolute"
-                              onClick={() => {
-                                handleFilterChange('search', '');
-                                applyFilters();
-                              }}
-                              style={{
-                                right: '2px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                padding: '2px 6px',
-                                backgroundColor: '#dc3545',
-                                border: 'none',
-                                color: 'white',
-                                borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
-                            </button>
-                          )}
+                         
                         </div>
+                        {!isMobile && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={applyFilters}
+                            style={{
+                              backgroundColor: '#007bff',
+                              borderColor: '#007bff',
+                              color: 'white',
+                              fontWeight: '500',
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                              transition: 'all 0.2s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                            <span>Search</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {isMobile && (
+                        <div className="d-flex gap-2 w-100">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary flex-fill"
+                            onClick={applyFilters}
+                            style={{
+                              backgroundColor: '#007bff',
+                              borderColor: '#007bff',
+                              color: 'white',
+                              fontWeight: '500',
+                              padding: '10px 12px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                            <span>Search</span>
+                          </button>
+                          <button
+                            className={`btn btn-sm flex-fill ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                            onClick={() => setShowFilters(!showFilters)}
+                            style={{
+                              backgroundColor: showFilters ? '#007bff' : '#ffffff',
+                              color: showFilters ? '#ffffff' : '#6c757d',
+                              fontWeight: '500',
+                              padding: '10px 12px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              transition: 'all 0.2s ease',
+                              borderWidth: '1.5px'
+                            }}
+                          >
+                            <i className="fas fa-filter me-1"></i>
+                            <span>Filter</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {!isMobile && (
                         <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          onClick={applyFilters}
-                          disabled={!filters.search}
+                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          onClick={() => setShowFilters(!showFilters)}
                           style={{
-                            backgroundColor: '#007bff',
-                            borderColor: '#007bff',
-                            color: 'white',
+                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
+                            color: showFilters ? '#ffffff' : '#6c757d',
                             fontWeight: '500',
                             padding: '8px 16px',
                             borderRadius: '6px',
                             fontSize: '13px',
-                            boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            borderWidth: '1.5px',
+                            whiteSpace: 'nowrap'
                           }}
                         >
-                          <i className="fas fa-search me-1"></i>
-
+                          <i className="fas fa-filter me-1"></i>
+                          <span>Filter</span>
                         </button>
-                      </div>
-
-                      <button
-                        className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        onClick={() => setShowFilters(!showFilters)}
-                        style={{
-                          backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                          color: showFilters ? '#ffffff' : '#6c757d',
-                          fontWeight: '500',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          transition: 'all 0.2s ease',
-                          borderWidth: '1.5px'
-                        }}
-                      >
-                        <i className="fas fa-filter me-1"></i>
-
-                      </button>
+                      )}
                       {/* {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
  
                       <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
@@ -4172,12 +4270,27 @@ console.log("response.data",response.data)
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-1">
-                    <div className="d-flex flex-wrap gap-1 align-items-center">
+                    <div 
+                      className={`d-flex ${isMobile ? 'flex-nowrap overflow-x-auto' : 'flex-wrap'} gap-1 align-items-center`}
+                      style={isMobile ? {
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'thin',
+                        paddingBottom: '4px'
+                      } : {}}
+                    >
                       {/* Status Count Cards */}
                       {loadingStatusCounts ? (
-                        <div className="d-flex gap-2">
+                        <div className={`d-flex ${isMobile ? 'flex-nowrap' : 'flex-wrap'} gap-2`}>
                           {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
+                            <div 
+                              key={i} 
+                              className="card border-0 shadow-sm" 
+                              style={{ 
+                                minWidth: isMobile ? '100px' : '110px', 
+                                height: '45px',
+                                flexShrink: isMobile ? 0 : 1
+                              }}
+                            >
                               <div className="card-body d-flex align-items-center justify-content-center">
                                 <div className="spinner-border spinner-border-sm text-primary" role="status">
                                   <span className="visually-hidden">Loading...</span>
@@ -4192,10 +4305,11 @@ console.log("response.data",response.data)
                           <div
                             className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
                             style={{
-                              minWidth: '110px',
+                              minWidth: isMobile ? '100px' : '110px',
                               height: '45px',
                               cursor: 'pointer',
-                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
+                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent',
+                              flexShrink: isMobile ? 0 : 1
                             }}
                             onClick={handleTotalCardClick}
                             title="Click to view all placements"
@@ -4219,11 +4333,12 @@ console.log("response.data",response.data)
                               <div
                                 className={`card border-0 shadow-sm status-count-card status ${isPlacedSelected ? 'selected' : ''}`}
                                 style={{
-                                  minWidth: '110px',
+                                  minWidth: isMobile ? '100px' : '110px',
                                   height: '45px',
                                   cursor: 'pointer',
                                   border: isPlacedSelected ? '2px solid #28a745' : '1px solid transparent',
-                                  backgroundColor: isPlacedSelected ? '#f0f9f0' : 'white'
+                                  backgroundColor: isPlacedSelected ? '#f0f9f0' : 'white',
+                                  flexShrink: isMobile ? 0 : 1
                                 }}
                                 onClick={() => {
                                   handleStatusCardClick(placedStatus.statusId);
@@ -4252,11 +4367,12 @@ console.log("response.data",response.data)
                               <div
                                 className={`card border-0 shadow-sm status-count-card status ${isUnplacedSelected ? 'selected' : ''}`}
                                 style={{
-                                  minWidth: '110px',
+                                  minWidth: isMobile ? '100px' : '110px',
                                   height: '45px',
                                   cursor: 'pointer',
                                   border: isUnplacedSelected ? '2px solid #dc3545' : '1px solid transparent',
-                                  backgroundColor: isUnplacedSelected ? '#fff5f5' : 'white'
+                                  backgroundColor: isUnplacedSelected ? '#fff5f5' : 'white',
+                                  flexShrink: isMobile ? 0 : 1
                                 }}
                                 onClick={() => {
                                   handleStatusCardClick(unplacedStatus.statusId);
@@ -4289,21 +4405,22 @@ console.log("response.data",response.data)
                                   key={status.statusId || index}
                                   className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
                                   style={{
-                                    minWidth: '110px',
+                                    minWidth: isMobile ? '100px' : '110px',
                                     height: '45px',
                                     cursor: 'pointer',
                                     border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                    backgroundColor: isSelected ? '#f8f9ff' : 'white'
+                                    backgroundColor: isSelected ? '#f8f9ff' : 'white',
+                                    flexShrink: isMobile ? 0 : 1
                                   }}
                                   onClick={() => handleStatusCardClick(status.statusId)}
                                   title={`Click to view ${status.statusName} placements`}
                                 >
                                   <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                                     <div className="d-flex align-items-center">
-                                      <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
+                                      <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: isMobile ? '11px' : '12px' }}></i>
                                       <div>
-                                        <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                                        <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                                        <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: isMobile ? '10px' : '11px' }}>{status.statusName}</h6>
+                                        <small style={{ color: '#6c757d', fontSize: isMobile ? '8px' : '9px' }}>{status.count} leads</small>
                                       </div>
                                     </div>
                                   </div>
@@ -4362,15 +4479,17 @@ console.log("response.data",response.data)
                     <div style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px"
+                      gap: isMobile ? "4px" : "8px",
+                      flexWrap: isMobile ? "wrap" : "nowrap"
                     }}>
                       {/* Job Selection Dropdown */}
                       <select
                         className="form-select form-select-sm"
                         style={{
-                          width: "200px",
-                          fontSize: "12px",
-                          padding: "4px 8px"
+                          width: isMobile ? "100%" : "200px",
+                          fontSize: isMobile ? "13px" : "12px",
+                          padding: isMobile ? "6px 10px" : "4px 8px",
+                          minWidth: isMobile ? "0" : "200px"
                         }}
                         value={selectedBulkJob?._id || selectedBulkJob?._job?._id || ''}
                         onChange={(e) => {
@@ -4395,9 +4514,10 @@ console.log("response.data",response.data)
                         borderRadius: "4px",
                         backgroundColor: "#fff",
                         overflow: "hidden",
-                        width: "200px",
-                        height: "32px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                        width: isMobile ? "100%" : "200px",
+                        height: isMobile ? "36px" : "32px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        minWidth: isMobile ? "0" : "200px"
                       }}>
                         <input
                           type="text"
@@ -4413,7 +4533,7 @@ console.log("response.data",response.data)
                             }
                           }}
                           onChange={(e) => {
-                            const maxValue = leads?.length || 0;
+                            const maxValue = allLeadsForBulk?.length || 0;
                             let inputValue = e.target.value.replace(/[^0-9]/g, '');
                             
                             // Convert to number for validation
@@ -4435,8 +4555,8 @@ console.log("response.data",response.data)
                             border: "none",
                             borderRight: "1px solid #dee2e6",
                             outline: "none",
-                            padding: "4px 10px",
-                            fontSize: "12px",
+                            padding: isMobile ? "6px 10px" : "4px 10px",
+                            fontSize: isMobile ? "13px" : "12px",
                             backgroundColor: "transparent",
                             height: "100%",
                             boxSizing: "border-box"
@@ -4444,15 +4564,15 @@ console.log("response.data",response.data)
                         />
                         <input
                           type="text"
-                          value={leads?.length || 0}
+                          value={allLeadsForBulk?.length || 0}
                           readOnly
                           placeholder="Total"
                           style={{
                             width: "50%",
                             border: "none",
                             outline: "none",
-                            padding: "4px 10px",
-                            fontSize: "12px",
+                            padding: isMobile ? "6px 10px" : "4px 10px",
+                            fontSize: isMobile ? "13px" : "12px",
                             backgroundColor: "#f8f9fa",
                             height: "100%",
                             boxSizing: "border-box",
@@ -4470,23 +4590,25 @@ console.log("response.data",response.data)
                         onClick={handleBulkJobOffer}
                         disabled={!selectedBulkJob || !bulkJobInputValue || sendingBulkJobs}
                         style={{
-                          padding: "6px 12px",
-                          fontSize: "11px",
+                          padding: isMobile ? "8px 12px" : "6px 12px",
+                          fontSize: isMobile ? "12px" : "11px",
                           fontWeight: "600",
                           display: "flex",
                           alignItems: "center",
-                          gap: "4px"
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                          flex: isMobile ? "1 1 auto" : "0 0 auto"
                         }}
                       >
                         {sendingBulkJobs ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            Sending...
+                            {isMobile ? "Sending..." : "Sending..."}
                           </>
                         ) : (
                           <>
-                            <i className="fas fa-paper-plane" style={{ fontSize: "10px" }}></i>
-                            Send
+                            <i className="fas fa-paper-plane" style={{ fontSize: isMobile ? "11px" : "10px" }}></i>
+                            {isMobile ? "Send" : "Send"}
                           </>
                         )}
                       </button>
@@ -4500,9 +4622,10 @@ console.log("response.data",response.data)
                           setSelectedBulkJob(null);
                         }}
                         style={{
-                          padding: "6px 12px",
-                          fontSize: "11px",
-                          fontWeight: "600"
+                          padding: isMobile ? "8px 12px" : "6px 12px",
+                          fontSize: isMobile ? "12px" : "11px",
+                          fontWeight: "600",
+                          flex: isMobile ? "0 0 auto" : "0 0 auto"
                         }}
                       >
                         <i className="fas fa-times"></i>
@@ -4569,64 +4692,68 @@ console.log("response.data",response.data)
                               <div className="card border-0 shadow-sm mb-0 mt-2">
                                 <div className="card-body px-1 py-0 my-2">
                                   <div className="row align-items-center justify-content-around">
-                                    <div className="col-md-7">
-                                      <div className="d-flex align-items-center">
-                                        <div className="form-check me-md-3 me-sm-1 me-1">
-                                          <input
-                                            onChange={(e) => handleCheckboxChange(placement, e.target.checked)}
-                                            checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(placement._id) : false}
-                                            className="form-check-input"
-                                            type="checkbox"
-                                          />
-                                        </div>
-                                        <div className="me-md-3 me-sm-1 me-1">
-                                          {/* Placeholder for circular progress - can be customized for placements */}
-                                          <div className="circular-progress-container" data-percent="NA">
-                                            <svg width="40" height="40">
-                                              <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                              <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                            </svg>
-                                            <div className="progress-text"></div>
+                                    <div className={`${isMobile ? 'col-12' : 'col-md-7'}`}>
+                                      <div className={`d-flex ${isMobile ? 'flex-column' : 'align-items-center'}`}>
+                                        <div className={`d-flex align-items-center ${isMobile ? 'w-100 mb-2' : ''}`}>
+                                          <div className={`form-check ${isMobile ? 'me-2' : 'me-md-3 me-sm-1 me-1'}`}>
+                                            <input
+                                              onChange={(e) => handleCheckboxChange(placement, e.target.checked)}
+                                              checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(placement._id) : false}
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              style={isMobile ? { width: '18px', height: '18px' } : {}}
+                                            />
                                           </div>
-                                        </div>
-                                        <div className="d-flex flex-column">
-                                          <h6 className="mb-0 fw-bold">{placement._candidate?.name || placement._student?.name || placement.studentName || 'Student Name'}</h6>
-                                          <small className="text-muted">{placement._candidate?.email || placement._student?.email || placement.studentEmail || 'Email'}</small>
-                                          <small className="text-muted">{placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || 'Mobile Number'}</small>
-                                        </div>
-                                        <div className='whatsappbutton'>
-                                          <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                            <a href={`tel:${placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || placement.contactNumber}`} target="_blank" rel="noopener noreferrer">
-                                              <i className="fas fa-phone"></i>
+                                          <div className={`${isMobile ? 'me-2' : 'me-md-3 me-sm-1 me-1'}`}>
+                                            {/* Placeholder for circular progress - can be customized for placements */}
+                                            <div className="circular-progress-container" data-percent="NA">
+                                              <svg width={isMobile ? "35" : "40"} height={isMobile ? "35" : "40"}>
+                                                <circle className="circle-bg" cx={isMobile ? "17.5" : "20"} cy={isMobile ? "17.5" : "20"} r={isMobile ? "14" : "16"}></circle>
+                                                <circle className="circle-progress" cx={isMobile ? "17.5" : "20"} cy={isMobile ? "17.5" : "20"} r={isMobile ? "14" : "16"}></circle>
+                                              </svg>
+                                              <div className="progress-text"></div>
+                                            </div>
+                                          </div>
+                                          <div className={`d-flex flex-column ${isMobile ? 'flex-grow-1' : ''}`} style={isMobile ? { minWidth: 0 } : {}}>
+                                            <h6 className={`mb-0 fw-bold ${isMobile ? 'text-truncate' : ''}`} style={isMobile ? { fontSize: '14px' } : {}}>{placement._candidate?.name || placement._student?.name || placement.studentName || 'Student Name'}</h6>
+                                            <small className={`text-muted ${isMobile ? 'text-truncate' : ''}`} style={isMobile ? { fontSize: '11px' } : {}}>{placement._candidate?.email || placement._student?.email || placement.studentEmail || 'Email'}</small>
+                                            <small className={`text-muted ${isMobile ? 'text-truncate' : ''}`} style={isMobile ? { fontSize: '11px' } : {}}>{placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || 'Mobile Number'}</small>
+                                          </div>
+                                          <div className={`whatsappbutton ${isMobile ? 'ms-auto' : ''}`}>
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: isMobile ? '18px' : '20px', padding: isMobile ? '4px 8px' : '' }}>
+                                              <a href={`tel:${placement._candidate?.mobile || placement._student?.mobile || placement.studentMobile || placement.contactNumber}`} target="_blank" rel="noopener noreferrer">
+                                                <i className="fas fa-phone"></i>
+                                              </a>
+                                            </button>
+                                            <a
+                                              className="btn btn-outline-success btn-sm border-0"
+                                              onClick={() => openWhatsappPanel(placement)}
+                                              style={{ fontSize: isMobile ? '18px' : '20px', cursor: 'pointer', padding: isMobile ? '4px 8px' : '' }}
+                                              title="WhatsApp"
+                                            >
+                                              <i className="fab fa-whatsapp"></i>
                                             </a>
-                                          </button>
-                                          <a
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          onClick={() => openWhatsappPanel(placement)}
-                                          style={{ fontSize: '20px', cursor: 'pointer' }}
-                                          title="WhatsApp"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </a>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
 
-                                    <div className="col-md-3 mt-3">
-                                      <div className="d-flex gap-2">
-                                        <div className="flex-grow-1">
+                                    <div className={`${isMobile ? 'col-12 mt-2' : 'col-md-3 mt-3'}`}>
+                                      <div className={`d-flex ${isMobile ? 'flex-column' : 'gap-2'}`}>
+                                        <div className={isMobile ? 'w-100' : 'flex-grow-1'}>
                                           <input
                                             type="text"
                                             className="form-control form-control-sm m-0"
                                             style={{
                                               cursor: 'pointer',
                                               border: '1px solid #ddd',
-                                              borderRadius: '0px',
+                                              borderRadius: isMobile ? '5px 5px 0px 0px' : '0px',
                                               borderTopRightRadius: '5px',
                                               borderTopLeftRadius: '5px',
-                                              width: '145px',
-                                              height: '20px',
-                                              fontSize: '10px'
+                                              width: isMobile ? '100%' : '145px',
+                                              height: isMobile ? '32px' : '20px',
+                                              fontSize: isMobile ? '12px' : '10px',
+                                              padding: isMobile ? '6px 10px' : '2px 5px'
                                             }}
                                             value={placement.status?.title || 'No Status'}
                                             readOnly
@@ -4668,12 +4795,13 @@ console.log("response.data",response.data)
                                             style={{
                                               cursor: 'pointer',
                                               border: '1px solid #ddd',
-                                              borderRadius: '0px',
+                                              borderRadius: isMobile ? '0px 0px 5px 5px' : '0px',
                                               borderBottomRightRadius: '5px',
                                               borderBottomLeftRadius: '5px',
-                                              width: '145px',
-                                              height: '20px',
-                                              fontSize: '10px'
+                                              width: isMobile ? '100%' : '145px',
+                                              height: isMobile ? '32px' : '20px',
+                                              fontSize: isMobile ? '12px' : '10px',
+                                              padding: isMobile ? '6px 10px' : '2px 5px'
                                             }}
                                             readOnly
                                             onClick={() => {
