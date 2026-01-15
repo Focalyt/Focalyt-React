@@ -5272,28 +5272,28 @@ console.log("response.data",response.data)
                                               </div>
                                             </div>
 
-                                            <div className="col-xl-3 col-3">
+                                            {/* <div className="col-xl-3 col-3">
                                               <div className="info-group">
                                                 <div className="info-label">COMPANY NAME</div>
                                                 <div className="info-value">{placement.companyName || 'N/A'}</div>
                                               </div>
-                                            </div>
+                                            </div> */}
 
-                                            <div className="col-xl-3 col-3">
+                                            {/* <div className="col-xl-3 col-3">
                                               <div className="info-group">
                                                 <div className="info-label">HR NAME</div>
                                                 <div className="info-value">{placement.employerName || 'N/A'}</div>
                                               </div>
-                                            </div>
+                                            </div> */}
 
-                                            <div className="col-xl-3 col-3">
+                                            {/* <div className="col-xl-3 col-3">
                                               <div className="info-group">
                                                 <div className="info-label">CONTACT NUMBER</div>
                                                 <div className="info-value">{placement.contactNumber || 'N/A'}</div>
                                               </div>
-                                            </div>
+                                            </div> */}
 
-                                            <div className="col-xl-3 col-3">
+                                            {/* <div className="col-xl-3 col-3">
                                               <div className="info-group">
                                                 <div className="info-label">DATE OF JOINING</div>
                                                 <div className="info-value">
@@ -5308,14 +5308,14 @@ console.log("response.data",response.data)
                                                   })() : 'N/A'}
                                                 </div>
                                               </div>
-                                            </div>
+                                            </div> */}
 
-                                            <div className="col-xl-3 col-3">
+                                            {/* <div className="col-xl-3 col-3">
                                               <div className="info-group">
                                                 <div className="info-label">LOCATION</div>
                                                 <div className="info-value">{placement.location || 'N/A'}</div>
                                               </div>
-                                            </div>
+                                            </div> */}
                                           </div>
                                         </div>
                                       </div>

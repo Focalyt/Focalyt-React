@@ -32,8 +32,8 @@ const CandidateLogin = () => {
     const [pincode, setPC] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
-    const [fatherName, setFatherName] = useState('');
-    const [motherName, setMotherName] = useState('');
+    // const [fatherName, setFatherName] = useState('');
+    // const [motherName, setMotherName] = useState('');
 
     const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
     const [isNewUser, setIsNewUser] = useState(false);
@@ -127,46 +127,46 @@ const CandidateLogin = () => {
                             longitude: coordinates[0]
                         });
 
-                        if (sameAddress) {
-                            setPermanentAddress(addressData.fullAddress);
-                            setPermanentCity(addressData.city);
-                            setPermanentState(addressData.state);
-                            setPermanentPincode(addressData.pincode);
-                            setPermanentLat(coordinates[1]);
-                            setPermanentLng(coordinates[0]);
-                        }
+                        // if (sameAddress) {
+                        //     setPermanentAddress(addressData.fullAddress);
+                        //     setPermanentCity(addressData.city);
+                        //     setPermanentState(addressData.state);
+                        //     setPermanentPincode(addressData.pincode);
+                        //     setPermanentLat(coordinates[1]);
+                        //     setPermanentLng(coordinates[0]);
+                        // }
                     });
                 }
 
-                const permanentInput = document.getElementById('permanent-location');
-                if (permanentInput && !sameAddress) {
-                    const autocompletePermanent = new window.google.maps.places.Autocomplete(permanentInput, {
-                        types: ['geocode'],
-                        componentRestrictions: { country: 'in' },
-                    });
+                // const permanentInput = document.getElementById('permanent-location');
+                // if (permanentInput && !sameAddress) {
+                //     const autocompletePermanent = new window.google.maps.places.Autocomplete(permanentInput, {
+                //         types: ['geocode'],
+                //         componentRestrictions: { country: 'in' },
+                //     });
 
-                    autocompletePermanent.addListener('place_changed', () => {
-                        const place = autocompletePermanent.getPlace();
-                        if (!isValidPlace(place)) return;
+                //     autocompletePermanent.addListener('place_changed', () => {
+                //         const place = autocompletePermanent.getPlace();
+                //         if (!isValidPlace(place)) return;
 
-                        const coordinates = getCoordinates(place);
-                        const addressData = parseAddressComponents(place);
+                //         const coordinates = getCoordinates(place);
+                //         const addressData = parseAddressComponents(place);
 
-                        setPermanentAddress(addressData.fullAddress);
-                        setPermanentLat(coordinates[1]); // latitude
-                        setPermanentLng(coordinates[0]); // longitude
-                        setPermanentCity(addressData.city);
-                        setPermanentState(addressData.state);
-                        setPermanentPincode(addressData.pincode);
-                    });
-                }
+                //         setPermanentAddress(addressData.fullAddress);
+                //         setPermanentLat(coordinates[1]); // latitude
+                //         setPermanentLng(coordinates[0]); // longitude
+                //         setPermanentCity(addressData.city);
+                //         setPermanentState(addressData.state);
+                //         setPermanentPincode(addressData.pincode);
+                //     });
+                // }
             } else {
                 setTimeout(waitForGoogle, 100);
             }
         };
 
         waitForGoogle();
-    }, [showExtraFields, sameAddress]);
+    }, [showExtraFields]); // removed sameAddress from dependencies since permanent address is commented out
 
     const validateMobile = () => {
         const phoneRegex = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
@@ -226,11 +226,23 @@ const CandidateLogin = () => {
                 startResendTimer();
                 console.log("response from backend", res);
             } else {
-                setErrorMessage(res.data.message || 'Failed to resend OTP');
+                // Ensure error message is always a string
+                const errorMsg = res.data.message;
+                setErrorMessage(
+                    typeof errorMsg === 'string' 
+                        ? errorMsg 
+                        : 'Failed to resend OTP'
+                );
                 console.log("response from backend", res);
             }
         } catch (error) {
-            setErrorMessage('Error resending OTP');
+            // Ensure error message is always a string
+            const errorMsg = error.response?.data?.message || error.message;
+            setErrorMessage(
+                typeof errorMsg === 'string' 
+                    ? errorMsg 
+                    : 'Error resending OTP'
+            );
             console.error("Error resending OTP:", error);
         }
     };
@@ -281,8 +293,8 @@ const CandidateLogin = () => {
                         name: fullName,
                         mobile: mobileNumber,
                         sex: gender,
-                        fatherName: fatherName,
-                        motherName: motherName,
+                        // fatherName: fatherName,
+                        // motherName: motherName,
                         personalInfo: {
                             currentAddress: {
                                 type: "Point",
@@ -296,13 +308,24 @@ const CandidateLogin = () => {
                             },
                             permanentAddress: {
                                 type: "Point",
-                                coordinates: [parseFloat(permanentLng) || 0, parseFloat(permanentLat) || 0], // [lng, lat] for MongoDB
-                                fullAddress: permanentAddress,
-                                latitude: String(permanentLat),
-                                longitude: String(permanentLng),
-                                city: permanentCity,
-                                state: permanentState,
+                                coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0], // [lng, lat] for MongoDB - using current address since permanent address field is commented out
+                                fullAddress: address || '',
+                                latitude: String(latitude),
+                                longitude: String(longitude),
+                                city: city || '',
+                                state: state || '',
                             }
+                            // Note: Using current address for permanent address since permanent address field is commented out
+                            // Original permanent address code (commented):
+                            // permanentAddress: {
+                            //     type: "Point",
+                            //     coordinates: [parseFloat(permanentLng) || 0, parseFloat(permanentLat) || 0],
+                            //     fullAddress: permanentAddress,
+                            //     latitude: String(permanentLat),
+                            //     longitude: String(permanentLng),
+                            //     city: permanentCity,
+                            //     state: permanentState,
+                            // }
                         }
                     };
 
@@ -368,11 +391,23 @@ const CandidateLogin = () => {
                             setErrorMessage('Login failed after registration');
                         }
                     } else {
-                        setErrorMessage(registerRes.data.error || 'Registration failed');
+                        // Ensure error message is always a string
+                        const errorMsg = registerRes.data.error;
+                        setErrorMessage(
+                            typeof errorMsg === 'string' 
+                                ? errorMsg 
+                                : errorMsg?.message || JSON.stringify(errorMsg) || 'Registration failed'
+                        );
                     }
                 }
             } catch (err) {
-                setErrorMessage('Something went wrong during registration');
+                // Ensure error message is always a string
+                const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+                setErrorMessage(
+                    typeof errorMsg === 'string' 
+                        ? errorMsg 
+                        : 'Something went wrong during registration'
+                );
             }
         } else {
             if (!otp || otp.length !== 4) {
@@ -463,18 +498,18 @@ const CandidateLogin = () => {
                                         1366: { slidesPerView: 2 },
                                     }}
                                 >
-                                    <SwiperSlide>
+                                    {/* <SwiperSlide>
                                         <img src="/Assets/images/logo/cashback-login.png" className="img-fluid login-border" alt="cashback" />
-                                    </SwiperSlide>
+                                    </SwiperSlide> */}
                                     <SwiperSlide>
                                         <img src="/Assets/images/logo/near-login.png" className="img-fluid login-border" alt="near you" />
                                     </SwiperSlide>
                                     <SwiperSlide>
                                         <img src="/Assets/images/logo/verified-login.png" className="img-fluid login-border" alt="verified" />
                                     </SwiperSlide>
-                                    <SwiperSlide>
+                                    {/* <SwiperSlide>
                                         <img src="/Assets/images/logo/getloan.png" className="img-fluid login-border" alt="loan" />
-                                    </SwiperSlide>
+                                    </SwiperSlide> */}
                                 </Swiper>
                             </div>
 
@@ -559,7 +594,7 @@ const CandidateLogin = () => {
                                                 onChange={(e) => setFullName(e.target.value)}
                                             />
                                         </div>
-                                        <div className="mb-3">
+                                        {/* <div className="mb-3">
                                             <input
                                                 type="text"
                                                 className="form-control"
@@ -576,7 +611,7 @@ const CandidateLogin = () => {
                                                 value={motherName}
                                                 onChange={(e) => setMotherName(e.target.value)}
                                             />
-                                        </div>
+                                        </div> */}
 
                                         <div className="mb-3 datepicker-wrapper">
 
@@ -616,11 +651,11 @@ const CandidateLogin = () => {
                                                 value={address}
                                                 onChange={(e) => {
                                                     setAddress(e.target.value);
-                                                    if (sameAddress) setPermanentAddress(e.target.value);
+                                                    // if (sameAddress) setPermanentAddress(e.target.value);
                                                 }}
                                             />
                                         </div>
-                                        <div className="mb-3">
+                                        {/* <div className="mb-3">
                                             <input
                                                 type="text"
                                                 className="form-control"
@@ -652,7 +687,7 @@ const CandidateLogin = () => {
                                                     Same as Current Address
                                                 </label>
                                             </div>
-                                        </div>
+                                        </div> */}
 
                                         <div className="mb-3">
                                             <select
