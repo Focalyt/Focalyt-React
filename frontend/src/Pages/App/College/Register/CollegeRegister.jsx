@@ -445,7 +445,8 @@ const CollegeRegister = ({ embedded = false }) => {
                             <option value="School">School</option>
                             <option value="College">College</option>
                             <option value="Computer Center">Computer Center</option>
-                            <option value="university">University</option>
+                            <option value="University">University</option>
+                            <option value="Private University">Private University</option>
                         </select>
                         <div className="form-control-position input-icon" style={{ top: '50%' }}>
                             <i className="fa-solid fa-check" ></i>

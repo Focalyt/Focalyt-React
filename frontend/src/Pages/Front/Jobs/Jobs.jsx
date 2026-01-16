@@ -449,6 +449,13 @@ function Jobs() {
                                 }}
                                 className="pointer img-fluid"
                               >
+
+                                <div className="verified-badge-container" style={{position: "absolute", top: "10px", right: "10px", width: "60px", height: "60px", zIndex: "1000"}}>
+                                  <span className="wave-ring wave-1"></span>
+                                  <span className="wave-ring wave-2"></span>
+                                  <span className="wave-ring wave-3"></span>
+                                  <img src="/Assets/public_assets/images/verified.png" className="digi verified-badge" alt={course.name} />
+                                </div>
                                 <img
                                   src={course.jobVideoThumbnail ? `${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                                   className="digi"
@@ -1313,6 +1320,83 @@ button.close span {
     width: 8px;
     height: 8px;
     background: #ec4899;
+  }
+
+  /* Verified Badge Container and Animations */
+  .verified-badge-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .verified-badge {
+    width: 100%!important;
+    height: 100%!important;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+    z-index: 1002;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 15px rgba(76, 175, 80, 0.5);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+    object-fit: cover;
+  }
+
+  .wave-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid rgba(76, 175, 80, 0.6);
+    width: 60px;
+    height: 60px;
+    pointer-events: none;
+    z-index: 1001;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+    animation: wave-expand 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  }
+
+  .wave-ring.wave-1 {
+    animation-delay: 0s;
+    border-color: rgba(76, 175, 80, 0.6);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  }
+
+  .wave-ring.wave-2 {
+    animation-delay: 0.7s;
+    border-color: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+  }
+
+  .wave-ring.wave-3 {
+    animation-delay: 1.4s;
+    border-color: rgba(76, 175, 80, 0.3);
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.2);
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes wave-expand {
+    0% {
+      width: 60px;
+      height: 60px;
+      opacity: 0.7;
+      transform: translate(-50%, -50%) scale(1);
+      border-width: 2px;
+    }
+    100% {
+      width: 60px;
+      height: 60px;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(3);
+      border-width: 1px;
+    }
   }
 `
 

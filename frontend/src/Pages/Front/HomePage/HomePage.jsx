@@ -6,7 +6,7 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import TechnologySlider from '../../../Component/Layouts/Front/TechnologySlider/TechnologySlider';
 import CompanyPartners from '../CompanyPartners/CompanyPartners';
-
+import CandidateReview from '../CandidateReview/CandidateReview';
 const HomePage = () => {
 
   useEffect(() => {
@@ -1195,14 +1195,28 @@ const HomePage = () => {
       </section>
 
       {/* our partners */}
-      {/* <section id="partners">
+      <section id="partners">
         
-        <div className="section-padding-120">
+        <div className="">
           <div className="container">
             <div className="row">
               <div className="col-md-12">
                 
                 <CompanyPartners />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* <section id="candidateReview">
+        
+        <div className="">
+          <div className="container">
+            <div className="row">
+              <div className="col-md-12">
+                
+                <CandidateReview />
               </div>
             </div>
           </div>

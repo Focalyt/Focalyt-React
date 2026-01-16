@@ -560,12 +560,20 @@ router.route("/register")
 							error: "College user not created!",
 						});
 					}
-					let college = await College.create({
+					// Prepare college data
+					const collegeData = {
 						_concernPerson: [{ _id: user._id, defaultAdmin: true }],
 						name: collegeName,
 						type: type,
 						location
-					});
+					};
+
+					// If type is "Private University", set the concerned person as default trainer
+					if (type === 'Private University') {
+						collegeData.defaultTrainer = user._id;
+					}
+
+					let college = await College.create(collegeData);
 					if (!college) {
 						return res.send({ status: "failure", error: "College not created!" });
 					}

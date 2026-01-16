@@ -15,7 +15,10 @@ function TrainerManagement() {
         name: '',
         email: '',
         mobile: '',
-        designation: ''
+        designation: '',
+        trinerBriefSummary: '',
+        cv: null,
+        passportSizePhoto: null
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -59,7 +62,7 @@ function TrainerManagement() {
             setLoading(true);
     
             const response = await axios.get(
-                `${backendUrl}/college/trainer/trainers`,
+                `${backendUrl}/college/trainer/trainers?all=true`,
                 {
                     headers: {
                         'x-auth': token,
@@ -154,13 +157,31 @@ function TrainerManagement() {
             
             const method = isEditing ? 'PUT' : 'POST';
     
+            // Create FormData for file upload
+            const formDataToSend = new FormData();
+            formDataToSend.append('name', formData.name);
+            formDataToSend.append('email', formData.email);
+            formDataToSend.append('mobile', formData.mobile);
+            formDataToSend.append('designation', formData.designation || '');
+            formDataToSend.append('trainerBriefSummary', formData.trinerBriefSummary || formData.trainerBriefSummary || '');
+            
+            // Append CV file if it exists
+            if (formData.cv && formData.cv instanceof File) {
+                formDataToSend.append('cv', formData.cv);
+            }
+            
+            // Append Passport Size Photo if it exists
+            if (formData.passportSizePhoto && formData.passportSizePhoto instanceof File) {
+                formDataToSend.append('passportSizePhoto', formData.passportSizePhoto);
+            }
+    
             const response = await axios({
                 method,
                 url,
-                data: formData,
+                data: formDataToSend,
                 headers: {
                     'x-auth': token,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'multipart/form-data'
                 }
             });
     
@@ -175,7 +196,7 @@ function TrainerManagement() {
             }
         } catch (err) {
             console.error('Error:', err);
-            showAlert('Something went wrong while submitting the form', 'error');
+            showAlert(err?.response?.data?.message || 'Something went wrong while submitting the form', 'error');
         } finally {
             setLoading(false);
         }
@@ -189,7 +210,7 @@ function TrainerManagement() {
 
             const response = await axios.put(
                 `${backendUrl}/college/trainer/toggle-status/${trainerId}`,
-                { isDeleted: newStatus },
+                { status: newStatus },
                 {
                     headers: {
                         'x-auth': token,
@@ -204,7 +225,7 @@ function TrainerManagement() {
                 // Update local state
                 setTrainers(prev => prev.map(trainer =>
                     trainer._id === trainerId
-                        ? { ...trainer, isDeleted: newStatus }
+                        ? { ...trainer, status: newStatus }
                         : trainer
                 ));
                 showAlert('Status updated successfully!', 'success');
@@ -223,7 +244,10 @@ function TrainerManagement() {
             name: trainer.name || '',
             email: trainer.email || '',
             mobile: trainer.mobile || '',
-            designation: trainer.designation || ''
+            designation: trainer.designation || '',
+            trinerBriefSummary: trainer.trainerBriefSummary || '',
+            cv: trainer.cv || null,
+            passportSizePhoto: trainer.passportSizePhoto || null
         });
         setIsEditing(true);
         setEditingId(trainer._id);
@@ -231,7 +255,7 @@ function TrainerManagement() {
 
     // Reset form
     const resetForm = () => {
-        setFormData({ name: '', email: '', mobile: '', designation: '' });
+        setFormData({ name: '', email: '', mobile: '', designation: '', trinerBriefSummary: '', cv: null, passportSizePhoto: null });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -363,6 +387,71 @@ function TrainerManagement() {
 
                                                 </div>
 
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        Triner Brief Summary
+                                                    </label>
+                                                    <textarea
+                                                        className="form-control"
+                                                        name="trinerBriefSummary"
+                                                        value={formData.trinerBriefSummary}
+                                                        onChange={(e) => setFormData({ ...formData, trinerBriefSummary: e.target.value })}
+                                                        placeholder="Enter trainer brief summary"
+                                                        rows={3}
+                                                        maxLength={500}
+                                                        disabled={loading}
+                                                    />
+
+                                                </div>
+
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        Passport size Photo (JPG, PNG)
+                                                    </label>
+                                                    <input
+                                                        className="form-control"
+                                                        name="passportSizePhoto"
+                                                        type="file"
+                                                        accept=".jpg,.jpeg,.png"
+                                                        onChange={(e) => setFormData({ ...formData, passportSizePhoto: e.target.files[0] || null })}
+                                                        disabled={loading}
+                                                    />
+                                                    {formData.passportSizePhoto && typeof formData.passportSizePhoto === 'string' && (
+                                                        <small className="text-muted d-block mt-1">
+                                                            Current Photo: <a href={formData.passportSizePhoto} target="_blank" rel="noopener noreferrer">View Photo</a>
+                                                        </small>
+                                                    )}
+                                                    {formData.passportSizePhoto && formData.passportSizePhoto instanceof File && (
+                                                        <small className="text-success d-block mt-1">
+                                                            Selected: {formData.passportSizePhoto.name}
+                                                        </small>
+                                                    )}
+                                                </div>
+
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        CV (PDF, DOC, DOCX)
+                                                    </label>
+                                                    <input
+                                                        className="form-control"
+                                                        name="cv"
+                                                        type="file"
+                                                        accept=".pdf,.doc,.docx"
+                                                        onChange={(e) => setFormData({ ...formData, cv: e.target.files[0] || null })}
+                                                        disabled={loading}
+                                                    />
+                                                    {formData.cv && typeof formData.cv === 'string' && (
+                                                        <small className="text-muted d-block mt-1">
+                                                            Current CV: <a href={formData.cv} target="_blank" rel="noopener noreferrer">View CV</a>
+                                                        </small>
+                                                    )}
+                                                    {formData.cv && formData.cv instanceof File && (
+                                                        <small className="text-success d-block mt-1">
+                                                            Selected: {formData.cv.name}
+                                                        </small>
+                                                    )}
+                                                </div>
+
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
                                                     <button
                                                         type="button"
@@ -441,8 +530,8 @@ function TrainerManagement() {
                                                                         <input
                                                                             className="form-check-input"
                                                                             type="checkbox"
-                                                                            checked={!trainer.isDeleted}
-                                                                            onChange={() => handleStatusToggle(trainer._id, trainer.isDeleted)}
+                                                                            checked={trainer.status}
+                                                                            onChange={() => handleStatusToggle(trainer._id, trainer.status)}
                                                                         />
                                                                     </div>
                                                                 </td>

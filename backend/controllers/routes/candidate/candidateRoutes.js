@@ -80,6 +80,7 @@ const {
   getDistanceFromLatLonInKm,
   sendSms,
   isAdmin,
+  sendMail,
 } = require("../../../helpers");
 const router = express.Router();
 const {
@@ -2381,6 +2382,154 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
       , source: 'System'
     }
     await sendNotification(newData)
+    
+    // Send email to company when candidate applies
+    console.log('=== JOB APPLICATION EMAIL PROCESS START ===');
+    console.log('Company Details:', {
+      companyId: vacancy._company,
+      companyName: companyDetails?.name,
+      companyEmail: companyDetails?.email
+    });
+    console.log('Candidate Details:', {
+      candidateId: candidate._id,
+      candidateName: candidate.name,
+      candidateMobile: candidate.mobile,
+      candidateEmail: candidate.email
+    });
+    console.log('Job Details:', {
+      jobId: jobId,
+      jobTitle: vacancy.title,
+      companyName: vacancy.displayCompanyName || companyDetails?.name
+    });
+    
+    if (companyDetails && companyDetails.email) {
+      try {
+        const subject = `New Job Application - ${candidate.name} applied for ${vacancy.title}`;
+        console.log('📧 Preparing to send email...');
+        console.log('Email To:', companyDetails.email);
+        console.log('Email Subject:', subject);
+        const message = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+              .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+              .info-section { background-color: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }
+              .info-row { margin: 10px 0; }
+              .label { font-weight: bold; color: #555; }
+              .value { color: #333; }
+              .footer { text-align: center; padding: 20px; color: #777; font-size: 12px; }
+              .button { display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h2>New Job Application Received</h2>
+              </div>
+              <div class="content">
+                <p>Dear ${companyDetails.name},</p>
+                <p>You have received a new job application. Please find the details below:</p>
+                
+                <div class="info-section">
+                  <h3 style="margin-top: 0; color: #4CAF50;">Job Details</h3>
+                  <div class="info-row">
+                    <span class="label">Job Title:</span>
+                    <span class="value">${vacancy.title || 'N/A'}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Company:</span>
+                    <span class="value">${vacancy.displayCompanyName || companyDetails.name || 'N/A'}</span>
+                  </div>
+                </div>
+                
+                <div class="info-section">
+                  <h3 style="margin-top: 0; color: #4CAF50;">Candidate Details</h3>
+                  <div class="info-row">
+                    <span class="label">Name:</span>
+                    <span class="value">${candidate.name || 'N/A'}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Mobile:</span>
+                    <span class="value">${candidate.mobile || 'N/A'}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Email:</span>
+                    <span class="value">${candidate.email || 'N/A'}</span>
+                  </div>
+                  ${candidate.sex ? `<div class="info-row">
+                    <span class="label">Gender:</span>
+                    <span class="value">${candidate.sex}</span>
+                  </div>` : ''}
+                  ${candidate.dob ? `<div class="info-row">
+                    <span class="label">Date of Birth:</span>
+                    <span class="value">${moment(candidate.dob).format('DD MMM YYYY')}</span>
+                  </div>` : ''}
+                  ${candidate.state?.name ? `<div class="info-row">
+                    <span class="label">State:</span>
+                    <span class="value">${candidate.state.name}</span>
+                  </div>` : ''}
+                  ${candidate.city?.name ? `<div class="info-row">
+                    <span class="label">City:</span>
+                    <span class="value">${candidate.city.name}</span>
+                  </div>` : ''}
+                </div>
+                
+                <div class="info-section">
+                  <div class="info-row">
+                    <span class="label">Application Date:</span>
+                    <span class="value">${moment(appliedData.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm A')}</span>
+                  </div>
+                </div>
+                
+                <p style="margin-top: 20px;">
+                  <a href="${process.env.BASE_URL || 'https://focalyt.com'}/jobdetailsmore/${jobId}" class="button">View Job Details</a>
+                </p>
+                
+                <p style="margin-top: 20px;">Please review this application and take appropriate action.</p>
+              </div>
+              <div class="footer">
+                <p>This is an automated email from Focalyt Portal.</p>
+                <p>Please do not reply to this email.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+        
+        await sendMail(subject, message, companyDetails.email);
+        console.log('✅ Email sent successfully!');
+        console.log('Email Details:', {
+          to: companyDetails.email,
+          subject: subject,
+          candidateName: candidate.name,
+          jobTitle: vacancy.title,
+          timestamp: new Date().toISOString()
+        });
+        console.log('=== JOB APPLICATION EMAIL PROCESS END ===');
+      } catch (emailError) {
+        console.error('❌ Error sending email to company:', emailError);
+        console.error('Error Details:', {
+          companyEmail: companyDetails.email,
+          error: emailError.message,
+          stack: emailError.stack
+        });
+        // Don't fail the application if email fails
+      }
+    } else {
+      console.log('⚠️ Email not sent - Company email not found');
+      console.log('Company Details Check:', {
+        companyExists: !!companyDetails,
+        hasEmail: !!(companyDetails && companyDetails.email),
+        companyId: vacancy._company
+      });
+      console.log('=== JOB APPLICATION EMAIL PROCESS END (NO EMAIL) ===');
+    }
+    
     await checkCandidateCashBack(candidate)
     await candidateApplyCashBack(candidate)
   }

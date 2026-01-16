@@ -4,48 +4,34 @@ import FrontLayout from "../../../Component/Layouts/Front";
 
 const partners = [
   {
-    name: "Beetel",
-    img: "/Assets/public_assets/images/partners/beetel.png",
+    img: "/Assets/public_assets/images/review/review1.png",
   },
   {
-    name: "Colorplast",
-    img: "/Assets/public_assets/images/partners/colorplast.png",
+    img: "/Assets/public_assets/images/review/review2.png",
   },
   {
-    name: "EarlyJobs",
-    img: "/Assets/public_assets/images/partners/earlyjobs.png",
+    img: "/Assets/public_assets/images/review/review3.png",
   },
   {
-    name: "MoneySolutions",
-    img: "/Assets/public_assets/images/partners/moneysolutions.png",
+    img: "/Assets/public_assets/images/review/review4.png",
   },
   {
-    name: "Overdrive",
-    img: "/Assets/public_assets/images/partners/overdrive.png",
+    img: "/Assets/public_assets/images/review/review5.png",
   },
   {
-    name: "ShiningStar",
-    img: "/Assets/public_assets/images/partners/shiningstar.png",
-  },
-  {
-        name: "Juipter Laminators",
-    img: "/Assets/public_assets/images/partners/jupiterlaminators.png",
-  },
-  {
-    name: "Lava",
-    img: "/Assets/public_assets/images/partners/lava.png",
-  },
+    img: "/Assets/public_assets/images/review/review6.png",
+  }
 ]
 
 const firstRow = partners.slice(0, partners.length / 2)
-const secondRow = partners.slice(partners.length / 2)
+// const secondRow = partners.slice(partners.length / 2)
 
 const PartnerCard = ({ img, name }) => {
   return (
-    <figure className="partner-card">
-      <div className="partner-card-content">
-        <img className="partner-logo" alt={name} src={img} />
-        <figcaption className="partner-name">{name}</figcaption>
+    <figure className="candidate-reviews-partner-card">
+      <div className="candidate-reviews-partner-card-content">
+        <img className="candidate-reviews-partner-logo" alt={name} src={img} />
+        <figcaption className="candidate-reviews-partner-name">{name}</figcaption>
       </div>
     </figure>
   )
@@ -54,47 +40,44 @@ const PartnerCard = ({ img, name }) => {
 function CandidateReviews() {
     return (
         <>
-            <section className="section-padding-30 mt-4">
-                <h1 className="section-title">Company Partners</h1>
+            <section className="candidate-reviews-section section-padding30 mt-4">
+                <h1 className="candidate-reviews-section-title">Candidate Reviews</h1>
                 
-                <div className="marquee-container">
-                    <div className="marquee-wrapper">
-                        <div className="marquee-content animate-marquee" style={{'--duration': '30s', '--gap': '16px'}}>
+                <div className="candidate-reviews-marquee-container">
+                    <div className="candidate-reviews-marquee-wrapper">
+                        <div className="candidate-reviews-marquee-content candidate-reviews-animate-marquee" style={{'--duration': '30s', '--gap': '24px'}}>
                             {[...firstRow, ...firstRow, ...firstRow].map((partner, index) => (
                                 <PartnerCard key={`${partner.name}-${index}`} {...partner} />
                             ))}
                         </div>
                     </div>
                     
-                    <div className="marquee-wrapper">
-                        <div className="marquee-content animate-marquee-reverse" style={{'--duration': '30s', '--gap': '16px'}}>
+                    {/* <div className="candidate-reviews-marquee-wrapper">
+                        <div className="candidate-reviews-marquee-content candidate-reviews-animate-marquee-reverse" style={{'--duration': '30s', '--gap': '16px'}}>
                             {[...secondRow, ...secondRow, ...secondRow].map((partner, index) => (
                                 <PartnerCard key={`${partner.name}-${index}`} {...partner} />
                             ))}
                         </div>
-                    </div>
+                    </div> */}
                     
-                    <div className="marquee-fade marquee-fade-left"></div>
-                    <div className="marquee-fade marquee-fade-right"></div>
+                    <div className="candidate-reviews-marquee-fade candidate-reviews-marquee-fade-left"></div>
+                    <div className="candidate-reviews-marquee-fade candidate-reviews-marquee-fade-right"></div>
                 </div>
             </section>
 
             <style>
                 {`
-                :root {
-                    --gap: 20px;
-                    --color-primary: #FC2B5A;
-                    --color-primary-rgb: 252, 43, 90;
-                    --color-secondary: #FFD542;
-                    --color-purple: #9747FF;
-                    --color-purple-rgb: 151, 71, 255;
-                    --color-dark: #121212;
-                }
-                .section-padding-30 {
-                    padding-block: 60px;
+                .candidate-reviews-section {
+                    --candidate-reviews-gap: 20px;
+                    --candidate-reviews-color-primary: #FC2B5A;
+                    --candidate-reviews-color-primary-rgb: 252, 43, 90;
+                    --candidate-reviews-color-secondary: #FFD542;
+                    --candidate-reviews-color-purple: #9747FF;
+                    --candidate-reviews-color-purple-rgb: 151, 71, 255;
+                    --candidate-reviews-color-dark: #121212;
                 }
 
-                .section-title {
+                .candidate-reviews-section-title {
                     font-size: 2.5rem;
                     font-weight: 700;
                     text-align: center;
@@ -105,41 +88,43 @@ function CandidateReviews() {
                     background-clip: text;
                 }
 
-                .marquee-container {
+                .candidate-reviews-marquee-container {
                     position: relative;
                     width: 100%;
                     overflow: hidden;
                     margin-top: 40px;
                 }
 
-                .marquee-wrapper {
+                .candidate-reviews-marquee-wrapper {
                     display: flex;
                     width: 100%;
                     overflow: hidden;
                     margin-bottom: 24px;
-                    padding: 12px 0;
+                    padding: 16px 0;
+                    align-items: center;
+                    min-height: 320px;
                 }
 
-                .marquee-content {
+                .candidate-reviews-marquee-content {
                     display: flex;
-                    gap: var(--gap, 16px);
+                    gap: var(--gap, 24px);
                     width: max-content;
                     will-change: transform;
                 }
 
-                .animate-marquee {
-                    animation: marquee var(--duration, 30s) infinite linear;
+                .candidate-reviews-animate-marquee {
+                    animation: candidate-reviews-marquee var(--duration, 30s) infinite linear;
                 }
 
-                .animate-marquee-reverse {
-                    animation: marquee-reverse var(--duration, 30s) infinite linear;
+                .candidate-reviews-animate-marquee-reverse {
+                    animation: candidate-reviews-marquee-reverse var(--duration, 30s) infinite linear;
                 }
 
-                .marquee-wrapper:hover .marquee-content {
+                .candidate-reviews-marquee-wrapper:hover .candidate-reviews-marquee-content {
                     animation-play-state: paused;
                 }
 
-                @keyframes marquee {
+                @keyframes candidate-reviews-marquee {
                     0% {
                         transform: translateX(0);
                     }
@@ -148,7 +133,7 @@ function CandidateReviews() {
                     }
                 }
 
-                @keyframes marquee-reverse {
+                @keyframes candidate-reviews-marquee-reverse {
                     0% {
                         transform: translateX(calc(-100% / 3));
                     }
@@ -157,28 +142,24 @@ function CandidateReviews() {
                     }
                 }
 
-                .partner-card {
+                .candidate-reviews-partner-card {
                     position: relative;
                     height: 100%;
-                    width: 200px;
-                    min-width: 200px;
+                    width: 280px;
+                    min-width: 280px;
+                    min-height: 280px;
                     cursor: pointer;
                     overflow: hidden;
                     border-radius: 24px;
-                    // border: 2px solid rgba(252, 43, 90, 0.15);
-                    padding: 32px 24px;
-                    // background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+                    padding: 48px 36px;
                     backdrop-filter: blur(10px);
-                    // box-shadow: 0 4px 20px rgba(252, 43, 90, 0.1),
-                    //             0 2px 8px rgba(0, 0, 0, 0.05),
-                    //             inset 0 1px 0 rgba(255, 255, 255, 0.8);
                     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                 }
 
-                .partner-card::before {
+                .candidate-reviews-partner-card::before {
                     content: '';
                     position: absolute;
                     top: 0;
@@ -195,45 +176,41 @@ function CandidateReviews() {
                     transition: opacity 0.4s ease;
                 }
 
-                .partner-card:hover {
+                .candidate-reviews-partner-card:hover {
                     transform: scale(1.05);
-                    // background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.95) 100%);
-                    // box-shadow: 0 12px 40px rgba(252, 43, 90, 0.2),
-                    //             0 4px 16px rgba(151, 71, 255, 0.15),
-                    //             inset 0 1px 0 rgba(255, 255, 255, 1);
                     border-color: rgba(252, 43, 90, 0.3);
                 }
 
-                .partner-card:hover::before {
+                .candidate-reviews-partner-card:hover::before {
                     opacity: 1;
                 }
 
-                .partner-card-content {
+                .candidate-reviews-partner-card-content {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    gap: 16px;
+                    gap: 24px;
                     width: 100%;
                     position: relative;
                     z-index: 1;
                 }
 
-                .partner-logo {
+                .candidate-reviews-partner-logo {
                     max-width: 100%;
-                    max-height: 100px;
+                    max-height: 160px;
                     object-fit: contain;
                     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
                     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
 
-                .partner-card:hover .partner-logo {
+                .candidate-reviews-partner-card:hover .candidate-reviews-partner-logo {
                     transform: scale(1.1) rotate(2deg);
                     filter: drop-shadow(0 4px 12px rgba(252, 43, 90, 0.3));
                 }
 
-                .partner-name {
-                    font-size: 15px;
+                .candidate-reviews-partner-name {
+                    font-size: 18px;
                     font-weight: 600;
                     color: #4a5568;
                     margin: 0;
@@ -243,11 +220,11 @@ function CandidateReviews() {
                     position: relative;
                 }
 
-                .partner-card:hover .partner-name {
-                    color: var(--color-primary);
+                .candidate-reviews-partner-card:hover .candidate-reviews-partner-name {
+                    color: var(--candidate-reviews-color-primary);
                 }
 
-                .partner-name::after {
+                .candidate-reviews-partner-name::after {
                     content: '';
                     position: absolute;
                     bottom: -4px;
@@ -260,11 +237,11 @@ function CandidateReviews() {
                     transition: transform 0.3s ease;
                 }
 
-                .partner-card:hover .partner-name::after {
+                .candidate-reviews-partner-card:hover .candidate-reviews-partner-name::after {
                     transform: translateX(-50%) scaleX(1);
                 }
 
-                .marquee-fade {
+                .candidate-reviews-marquee-fade {
                     position: absolute;
                     top: 0;
                     bottom: 0;
@@ -273,26 +250,26 @@ function CandidateReviews() {
                     z-index: 1;
                 }
 
-                .marquee-fade-left {
+                .candidate-reviews-marquee-fade-left {
                     left: 0;
                     background: linear-gradient(to right, rgba(255, 255, 255, 1), transparent);
                 }
 
-                .marquee-fade-right {
+                .candidate-reviews-marquee-fade-right {
                     right: 0;
                     background: linear-gradient(to left, rgba(255, 255, 255, 1), transparent);
                 }
 
                 /* Dark mode support */
                 @media (prefers-color-scheme: dark) {
-                    .section-title {
+                    .candidate-reviews-section-title {
                         background: linear-gradient(135deg, rgba(151, 71, 255, 1) 0%, rgba(252, 43, 90, 1) 100%);
                         -webkit-background-clip: text;
                         -webkit-text-fill-color: transparent;
                         background-clip: text;
                     }
 
-                    .partner-card {
+                    .candidate-reviews-partner-card {
                         border-color: rgba(252, 43, 90, 0.2);
                         background: linear-gradient(135deg, rgba(30, 30, 40, 0.9) 0%, rgba(40, 40, 55, 0.8) 100%);
                         box-shadow: 0 4px 20px rgba(252, 43, 90, 0.15),
@@ -300,27 +277,23 @@ function CandidateReviews() {
                                     inset 0 1px 0 rgba(255, 255, 255, 0.1);
                     }
 
-                    .partner-card:hover {
-                        // background: linear-gradient(135deg, rgba(40, 40, 55, 1) 0%, rgba(50, 50, 65, 0.95) 100%);
-                        // box-shadow: 0 12px 40px rgba(252, 43, 90, 0.25),
-                        //             0 4px 16px rgba(252, 43, 90, 0.2),
-                        //             inset 0 1px 0 rgba(255, 255, 255, 0.15);
+                    .candidate-reviews-partner-card:hover {
                         border-color: rgba(252, 43, 90, 0.4);
                     }
 
-                    .partner-name {
+                    .candidate-reviews-partner-name {
                         color: #e2e8f0;
                     }
 
-                    .partner-card:hover .partner-name {
+                    .candidate-reviews-partner-card:hover .candidate-reviews-partner-name {
                         color: #FC2B5A;
                     }
 
-                    .marquee-fade-left {
+                    .candidate-reviews-marquee-fade-left {
                         background: linear-gradient(to right, rgba(15, 15, 20, 1), transparent);
                     }
 
-                    .marquee-fade-right {
+                    .candidate-reviews-marquee-fade-right {
                         background: linear-gradient(to left, rgba(15, 15, 20, 1), transparent);
                     }
                 }

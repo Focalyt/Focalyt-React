@@ -12,13 +12,14 @@ const collegeSchema = new Schema({
        type: ObjectId, ref: 'User' 
     }
   ],
+  defaultTrainer: { type: ObjectId, ref: 'User' },
 
   _courses: [{ type: ObjectId, ref: 'courses' }],
   _branches: [{ type: ObjectId, ref: 'Center' }],
   _qualification: [{ type: ObjectId, ref: 'Qualification' }],
   _university: { type: ObjectId, ref: 'University' },
   name: { type: String, trim: true },
-  type: { type: String, enum: ['School', 'College', 'Computer Center', 'University'] },
+  type: { type: String, enum: ['School', 'College', 'Computer Center', 'University', 'Private University'] },
   website: {
     type: String, lowercase: true, trim: true,
   },

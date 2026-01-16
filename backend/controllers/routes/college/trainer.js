@@ -55,6 +55,19 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage }).single('file');
+const uploadTrainerFiles = multer({ 
+    storage: multer.diskStorage({
+        destination,
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname);
+            const basename = path.basename(file.originalname, ext);
+            cb(null, `${basename}-${Date.now()}${ext}`);
+        },
+    })
+}).fields([
+    { name: 'cv', maxCount: 1 },
+    { name: 'passportSizePhoto', maxCount: 1 }
+]);
 
 router.post('/trinerValidation' ,isTrainer,  async(req, res)=>{
 
@@ -62,9 +75,9 @@ router.post('/trinerValidation' ,isTrainer,  async(req, res)=>{
 })
 
 
-router.post('/addTrainer', isCollege, async (req, res) => {
+router.post('/addTrainer', isCollege, uploadTrainerFiles, async (req, res) => {
     try {
-        const { name, email, mobile, designation } = req.body;
+        const { name, email, mobile, designation, trainerBriefSummary } = req.body;
         
         if (!name || !email || !mobile) {
             return res.status(400).json({
@@ -101,11 +114,71 @@ router.post('/addTrainer', isCollege, async (req, res) => {
 
         const currentUserId =  req.user ? req.user.id : null;
 
+        // Helper function to upload file to S3
+        const uploadFileToS3 = async (file, folder, allowedExtensions) => {
+            const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+            
+            if (!allowedExtensions.includes(ext)) {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+                throw new Error(`File type not supported. Allowed: ${allowedExtensions.join(', ')}`);
+            }
+
+            const fileContent = fs.readFileSync(file.path);
+            const key = `Trainers/${folder}/${currentUserId || 'trainers'}/${uuid()}-${file.originalname}`;
+            
+            const params = {
+                Bucket: bucketName,
+                Key: key,
+                Body: fileContent,
+                ContentType: file.mimetype,
+            };
+
+            const uploadResult = await s3.upload(params).promise();
+            
+            // Delete temp file after upload
+            if (fs.existsSync(file.path)) {
+                fs.unlinkSync(file.path);
+            }
+            
+            return uploadResult.Location;
+        };
+
+        // Upload CV if provided
+        let cvUrl = null;
+        if (req.files && req.files.cv && req.files.cv[0]) {
+            try {
+                cvUrl = await uploadFileToS3(req.files.cv[0], 'CV', ['pdf', 'doc', 'docx']);
+            } catch (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message || 'Failed to upload CV file'
+                });
+            }
+        }
+
+        // Upload Passport Size Photo if provided
+        let passportPhotoUrl = null;
+        if (req.files && req.files.passportSizePhoto && req.files.passportSizePhoto[0]) {
+            try {
+                passportPhotoUrl = await uploadFileToS3(req.files.passportSizePhoto[0], 'PassportPhoto', ['jpg', 'jpeg', 'png']);
+            } catch (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message || 'Failed to upload passport photo'
+                });
+            }
+        }
+
         const newUser = new User({
             name: name.trim(),
             email: email.toLowerCase().trim(),
             mobile: parseInt(mobile),
-            designation: designation ,
+            designation: designation || '',
+            trainerBriefSummary: trainerBriefSummary || '',
+            cv: cvUrl,
+            passportSizePhoto: passportPhotoUrl,
             role: 4,
             status: true,
             password: 'Focalyt',
@@ -117,9 +190,20 @@ router.post('/addTrainer', isCollege, async (req, res) => {
         
        
         if (req.college && req.college._id) {
+            // Get college details to check type
+            const college = await College.findById(req.college._id);
+            
+            // Update college with new trainer
+            const updateData = { $addToSet: { trainers: savedUser._id } };
+            
+            // If college type is "Private University" and no default trainer is set, set this trainer as default
+            if (college && college.type === 'Private University' && !college.defaultTrainer) {
+                updateData.$set = { defaultTrainer: savedUser._id };
+            }
+            
             await College.findByIdAndUpdate(
                 req.college._id,
-                { $addToSet: { trainers: savedUser._id } },
+                updateData,
                 { new: true }
             );
         }
@@ -130,6 +214,9 @@ router.post('/addTrainer', isCollege, async (req, res) => {
             email: savedUser.email,
             mobile: savedUser.mobile,
             designation: savedUser.designation,
+            trainerBriefSummary: savedUser.trainerBriefSummary,
+            cv: savedUser.cv,
+            passportSizePhoto: savedUser.passportSizePhoto,
             role: savedUser.role,
             status: savedUser.status,
             created_at: savedUser.createdAt
@@ -149,10 +236,10 @@ router.post('/addTrainer', isCollege, async (req, res) => {
 
         }
 })
-router.put('/update/:id', isCollege, async (req, res) => {
+router.put('/update/:id', isCollege, uploadTrainerFiles, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, mobile, designation } = req.body;
+        const { name, email, mobile, designation, trainerBriefSummary } = req.body;
         
         if (!name || !email || !mobile) {
             return res.status(400).json({
@@ -205,16 +292,86 @@ router.put('/update/:id', isCollege, async (req, res) => {
             });
         }
 
+        // Helper function to upload file to S3
+        const uploadFileToS3 = async (file, folder, allowedExtensions) => {
+            const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+            
+            if (!allowedExtensions.includes(ext)) {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+                throw new Error(`File type not supported. Allowed: ${allowedExtensions.join(', ')}`);
+            }
+
+            const fileContent = fs.readFileSync(file.path);
+            const key = `Trainers/${folder}/${id}/${uuid()}-${file.originalname}`;
+            
+            const params = {
+                Bucket: bucketName,
+                Key: key,
+                Body: fileContent,
+                ContentType: file.mimetype,
+            };
+
+            const uploadResult = await s3.upload(params).promise();
+            
+            // Delete temp file after upload
+            if (fs.existsSync(file.path)) {
+                fs.unlinkSync(file.path);
+            }
+            
+            return uploadResult.Location;
+        };
+
+        // Upload CV if provided
+        let cvUrl = existingTrainer.cv; // Keep existing CV if no new file
+        if (req.files && req.files.cv && req.files.cv[0]) {
+            try {
+                cvUrl = await uploadFileToS3(req.files.cv[0], 'CV', ['pdf', 'doc', 'docx']);
+            } catch (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message || 'Failed to upload CV file'
+                });
+            }
+        }
+
+        // Upload Passport Size Photo if provided
+        let passportPhotoUrl = existingTrainer.passportSizePhoto; // Keep existing photo if no new file
+        if (req.files && req.files.passportSizePhoto && req.files.passportSizePhoto[0]) {
+            try {
+                passportPhotoUrl = await uploadFileToS3(req.files.passportSizePhoto[0], 'PassportPhoto', ['jpg', 'jpeg', 'png']);
+            } catch (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message || 'Failed to upload passport photo'
+                });
+            }
+        }
+
         // Update the trainer
+        const updateData = {
+            name: name.trim(),
+            email: email.toLowerCase().trim(),
+            mobile: parseInt(mobile),
+            designation: designation || '',
+            trainerBriefSummary: trainerBriefSummary || '',
+            updatedAt: new Date()
+        };
+
+        // Only update CV if new file was uploaded
+        if (cvUrl !== existingTrainer.cv) {
+            updateData.cv = cvUrl;
+        }
+
+        // Only update passport photo if new file was uploaded
+        if (passportPhotoUrl !== existingTrainer.passportSizePhoto) {
+            updateData.passportSizePhoto = passportPhotoUrl;
+        }
+
         const updatedTrainer = await User.findByIdAndUpdate(
             id,
-            {
-                name: name.trim(),
-                email: email.toLowerCase().trim(),
-                mobile: parseInt(mobile),
-                designation: designation,
-                updatedAt: new Date()
-            },
+            updateData,
             { new: true }
         );
 
@@ -224,6 +381,9 @@ router.put('/update/:id', isCollege, async (req, res) => {
             email: updatedTrainer.email,
             mobile: updatedTrainer.mobile,
             designation: updatedTrainer.designation,
+            trainerBriefSummary: updatedTrainer.trainerBriefSummary,
+            cv: updatedTrainer.cv,
+            passportSizePhoto: updatedTrainer.passportSizePhoto,
             role: updatedTrainer.role,
             status: updatedTrainer.status,
             updated_at: updatedTrainer.updatedAt
@@ -248,11 +408,14 @@ router.put('/update/:id', isCollege, async (req, res) => {
 router.get('/trainers', isCollege ,async (req, res) => {
     try {
         const user = req.user;
-        // console.log("user" , user)
+        const { all } = req.query;
+        
+        const query = { role: 4 };
+        if (all !== 'true') {
+            query.status = true;
+        }
        
-        const trainers = await User.find({
-            role: 4
-        })
+        const trainers = await User.find(query)
         
         res.status(200).json({
             status: true,
@@ -274,7 +437,7 @@ router.get('/trainers', isCollege ,async (req, res) => {
 router.put('/toggle-status/:id', isCollege, async (req, res) => {
     try {
         const { id } = req.params;
-        const { isDeleted } = req.body;
+        const { status } = req.body; // Changed from isDeleted to status
         const trainer = await User.findOne({
             _id: id,
             role: 4
@@ -287,18 +450,18 @@ router.put('/toggle-status/:id', isCollege, async (req, res) => {
             });
         }
 
-        trainer.isDeleted = isDeleted;
+        trainer.status = status !== undefined ? status : !trainer.status; // Toggle if status not provided
         trainer.updatedAt = new Date();
         await trainer.save();
 
         res.status(200).json({
             status: true,
-            message: `Trainer status updated to ${isDeleted ? 'Inactive' : 'Active'}`,
+            message: `Trainer status updated to ${trainer.status ? 'Active' : 'Inactive'}`,
             data: {
                 id: trainer._id,
                 name: trainer.name,
                 email: trainer.email,
-                isDeleted: trainer.isDeleted
+                status: trainer.status
             }
         });
 

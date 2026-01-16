@@ -207,7 +207,8 @@ function CollegeLayout({ children }) {
     salesb2b: false,
     dropdown: false,
     events: false,
-    placements: false
+    placements: false,
+    trainerManagement: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -282,7 +283,8 @@ function CollegeLayout({ children }) {
     salesb2b: useRef(null),
     dropdown: useRef(null),
     events: useRef(null),
-    placements: useRef(null)
+    placements: useRef(null),
+    trainerManagement: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -300,7 +302,8 @@ function CollegeLayout({ children }) {
     salesb2b: '0px',
     dropdown: '0px',
     events: '0px',
-    placements: '0px'
+    placements: '0px',
+    trainerManagement: '0px'
   });
 
   useLayoutEffect(() => {
@@ -456,7 +459,8 @@ function CollegeLayout({ children }) {
                   style={{
                     maxHeight: submenuMaxHeight.courses,
                     overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.courses === '0px' ? 0 : 1
                   }}
                 >
                   <li className={`nav-item ${location.pathname === '/institute/addcourse' ? 'active' : ''}`}>
@@ -499,7 +503,8 @@ function CollegeLayout({ children }) {
                     style={{
                       maxHeight: submenuMaxHeight.sales,
                       overflow: 'hidden',
-                      transition: 'max-height 0.3s ease-in-out'
+                      transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                      opacity: submenuMaxHeight.sales === '0px' ? 0 : 1
                     }}
                   >
                     <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
@@ -572,7 +577,8 @@ function CollegeLayout({ children }) {
                     style={{
                       maxHeight: submenuMaxHeight.salesb2b,
                       overflow: 'hidden',
-                      transition: 'max-height 0.3s ease-in-out'
+                      transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                      opacity: submenuMaxHeight.salesb2b === '0px' ? 0 : 1
                     }}
                   >
                     <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
@@ -619,7 +625,8 @@ function CollegeLayout({ children }) {
                   style={{
                     maxHeight: submenuMaxHeight.placements,
                     overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.placements === '0px' ? 0 : 1
                   }}
                 >
                   <li className={`nav-item ${location.pathname === '/institute/dashboardplacements' ? 'active' : ''}`}>
@@ -649,12 +656,48 @@ function CollegeLayout({ children }) {
                 </ul>
               </li>
               {/* Training management */}
-              <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
+              <li className={`nav-item has-sub dropdown-training ${openSubmenu.trainerManagement ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('trainerManagement')}>
+                  <FontAwesomeIcon icon={faHandshake} />
+                  <span className="menu-title">Training</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.trainerManagement ? 'rotate-90' : ''}`}
+                    />
+                  </span>
+                </a>
+                <ul
+                  ref={menuRefs.trainerManagement}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.trainerManagement,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.trainerManagement === '0px' ? 0 : 1
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
                 <a href="/institute/candidatemanagment" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faTasks} />
                   <span className="menu-title">Training management</span>
                 </a>
               </li>
+              <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
+                    <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faUserTie} />
+                      <span className="menu-title">Add Trainer</span>
+                    </Link>
+                  </li>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
+                    <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faCalendarAlt} />
+                      <span className="menu-title">Calendar Follow-up</span>
+                    </Link>
+                  </li> */}
+                </ul>
+              </li>
+              
 
               {/* Upload Candidates */}
               <li className={`nav-item ${location.pathname === '/institute/uploadCandidates' ? 'active' : ''}`}>
@@ -706,7 +749,8 @@ function CollegeLayout({ children }) {
                   style={{
                     maxHeight: submenuMaxHeight.events,
                     overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.events === '0px' ? 0 : 1
                   }}
                 >
                   <li className={`nav-item ${location.pathname === '/institute/viewEvent' ? 'active' : ''}`}>
@@ -744,7 +788,8 @@ function CollegeLayout({ children }) {
                   style={{
                     maxHeight: submenuMaxHeight.settings,
                     overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.settings === '0px' ? 0 : 1
                   }}
                 >
                   <li className={`nav-item ${location.pathname === '/institute/accessManagement' ? 'active' : ''}`}>
@@ -789,12 +834,7 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Whatsapp Wallet</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
-                    <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faUserTie} />
-                      <span className="menu-title">Trainer Management</span>
-                    </Link>
-                  </li>
+                 
                   <li className={`nav-item has-sub ${openSubmenu.dropdown ? 'open' : ''}`}>
                     <a href="#" onClick={() => toggleSubmenu('dropdown')}>
                       <FontAwesomeIcon icon={faCaretDown} />
@@ -812,7 +852,8 @@ function CollegeLayout({ children }) {
                       style={{
                         maxHeight: openSubmenu.dropdown ? '700px' : '0px',
                         overflow: 'hidden',
-                        transition: 'max-height 0.3s ease-in-out'
+                        transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                        opacity: openSubmenu.dropdown ? 1 : 0
                       }}
                     >
                       <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
@@ -954,9 +995,13 @@ function CollegeLayout({ children }) {
         
         .menu-content {
           overflow: hidden;
-          transition: max-height 0.3s ease-in-out;
+          transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out;
           width: 100% !important;
           -webkit-width: 100% !important;
+          opacity: 1;
+          will-change: max-height, opacity;
+          transform: translateZ(0);
+          -webkit-transform: translateZ(0);
         }
 
 .card{
@@ -996,16 +1041,20 @@ function CollegeLayout({ children }) {
 .dropdown-arrow {
   position: absolute;
   right: 15px;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .chevron-icon {
   font-size: 12px!important;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .rotate-90 {
-  transform: rotate(90deg);
+  transform: rotate(90deg) translateZ(0);
+  -webkit-transform: rotate(90deg) translateZ(0);
 }
 
 /* Differentiate menu items with dropdowns/submenus - Base Styles */
@@ -1231,6 +1280,44 @@ function CollegeLayout({ children }) {
 }
 
 .nav-item.has-sub.dropdown-events .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Training Dropdown - Teal/Cyan Color */
+.nav-item.has-sub.dropdown-training > a {
+  background-color: #ccfbf1 !important;
+  border-left: 2px solid #14b8a6;
+}
+
+.nav-item.has-sub.dropdown-training > a:hover {
+  background-color: #99f6e4 !important;
+  border-left-color: #0d9488;
+}
+
+.nav-item.has-sub.dropdown-training.open > a {
+  background-color: #99f6e4 !important;
+  border-left-color: #0d9488;
+  color: #0f766e !important;
+  font-weight: 600;
+}
+
+.nav-item.has-sub.dropdown-training .menu-content {
+  background-color: #ccfbf1 !important;
+  border-left: 2px solid #14b8a6;
+}
+
+.nav-item.has-sub.dropdown-training .menu-content .nav-item > a {
+  background-color: #ccfbf1 !important;
+  color: #555 !important;
+}
+
+.nav-item.has-sub.dropdown-training .menu-content .nav-item > a:hover {
+  background-color: #99f6e4 !important;
+  color: #14b8a6 !important;
+}
+
+.nav-item.has-sub.dropdown-training .menu-content .nav-item.active > a {
   background-color: #ff3366 !important;
   color: #fff !important;
 }
