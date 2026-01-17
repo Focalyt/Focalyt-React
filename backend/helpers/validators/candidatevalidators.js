@@ -7,9 +7,9 @@ module.exports = {
             motherName: Joi.string().trim().max(30).optional(),
             mobile: Joi.string().trim().length(10).pattern(/^[0-9]+$/).required(),
             sex: Joi.string().trim().required(),
-            email: Joi.string().trim().required(),
-            dob: Joi.string().trim().required(),
-            highestQualification: Joi.string().trim().required(),
+            email: Joi.string().trim().email().optional().allow(''),
+            dob: Joi.string().trim().optional().allow(''),
+            highestQualification: Joi.string().trim().optional().allow(''),
             isExperienced: Joi.boolean().optional(),            
             personalInfo: Joi.object({
                 currentAddress: Joi.object({

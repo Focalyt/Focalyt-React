@@ -4034,6 +4034,9 @@ input.star:checked ~ .rev-box {
   border-radius: 8px;
 }
 @media (max-width: 767px) {
+.course_dtl{
+padding-bottom: 0px!important;
+}
   .swiper-slide {
     width: 50%;
   }
@@ -4051,6 +4054,35 @@ input.star:checked ~ .rev-box {
     min-width: auto;
     margin-bottom: 5px;
     display: block;
+  }
+
+  /* Floating buttons for mobile view - full width, positioned above footer */
+  .viewjob-apply,
+  .call-div-field {
+    position: fixed;
+    right: 0;
+    z-index: 998; /* Below buttons but above footer (footer z-index: 9) */
+    margin: 0 !important;
+    border-radius: 0 !important;
+    width: 50% !important;
+  }
+
+  .viewjob-apply {
+    bottom: 200px; /* Position above Call button and footer (footer ~60-80px) */
+  }
+
+  .call-div-field {
+    bottom: 130px; /* Position above footer (footer is typically 60-80px) */
+  }
+
+  /* Add bottom padding to prevent content from being hidden behind floating buttons and footer */
+  .course_dtl {
+    padding-bottom: 220px;
+  }
+
+  /* Row direct children width auto for mobile devices only on this page */
+  .row > * {
+    width: auto;
   }
 }
 

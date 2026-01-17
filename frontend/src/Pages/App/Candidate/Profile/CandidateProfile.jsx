@@ -104,17 +104,19 @@ const CandidateProfile = () => {
   const [updateNumber, setUpdateNumber] = useState(false);
   const viewResume = () => {
     try {
-      // Get the resume URL from local storage or from your state
-      const resumeKey = localStorage.getItem('resume');
-
-      if (!resumeKey) {
+      // Get the resume URL from state array (profileData.personalInfo.resume)
+      // Resume is stored as an array of objects with 'url' property
+      const resumeArray = resume.length > 0 ? resume : (profileData?.personalInfo?.resume || []);
+      
+      if (!resumeArray || resumeArray.length === 0 || !resumeArray[0]?.url) {
         alert("Resume not found. Please upload it again.");
         return;
       }
 
-      // Construct the URL to view the resume
-      // This assumes your bucket URL is already set in environment variables
-      const url = `${bucketUrl}/${resumeKey}`;
+      // Get the latest resume URL
+      const latestResume = resumeArray[resumeArray.length - 1];
+      const url = latestResume.url;
+      
       setResumeUrl(url);
       setShowResumeViewer(true);
     } catch (error) {
@@ -1287,8 +1289,43 @@ const CandidateProfile = () => {
           console.log("Profile data fetched:", response.data.data);
           const data = response.data.data;
           console.log("Candidate Profile Data: ", data);
-          // Set education options
-          setEducationList(data.educations || []);
+          // Set education options - sort by class level (ascending order: 1-5, 6-9, 10, 12, then higher)
+          const getClassLevel = (name) => {
+            const nameLower = (name || '').toLowerCase();
+            // Extract numeric class from name
+            const upto5Match = nameLower.match(/upto?\s*5/i);
+            if (upto5Match) return 1; // Upto 5th class
+            
+            const class69Match = nameLower.match(/6th?\s*[-–]\s*9th/i);
+            if (class69Match) return 2; // 6th - 9th class
+            
+            const class10Match = nameLower.match(/10th?/i);
+            if (class10Match) return 3; // 10th class
+            
+            const class12Match = nameLower.match(/12th?/i);
+            if (class12Match) return 4; // 12th class
+            
+            // Higher education (Diploma, UG, PG, etc.)
+            if (nameLower.includes('diploma')) return 5;
+            if (nameLower.includes('undergraduate') || nameLower.includes('ug')) return 6;
+            if (nameLower.includes('postgraduate') || nameLower.includes('pg')) return 7;
+            
+            // Default for other education levels
+            return 99;
+          };
+          
+          const sortedEducations = (data.educations || []).sort((a, b) => {
+            const levelA = getClassLevel(a.name);
+            const levelB = getClassLevel(b.name);
+            if (levelA !== levelB) {
+              return levelA - levelB; // Sort by class level
+            }
+            // If same level, sort alphabetically
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setEducationList(sortedEducations);
 
           // Set candidate data
           const candidate = data.candidate;
@@ -1553,7 +1590,7 @@ const CandidateProfile = () => {
                     })} */}
                     <span><strong>Phone Number:</strong> {profileData?.mobile || 'N/A'}</span>
 
-                    <button
+                    {/* <button
                       type="button"
                       className="border-0 bg-transparent"
                       onClick={openPhoneModal}
@@ -1563,7 +1600,7 @@ const CandidateProfile = () => {
                         style={{ cursor: 'pointer', color: '#fc2b5a' }}
                         title="Edit"
                       ></i>
-                    </button>
+                    </button> */}
 
                   </div>
                   <div className="contact-item">

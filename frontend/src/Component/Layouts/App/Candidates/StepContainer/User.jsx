@@ -3,7 +3,18 @@ import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 
 
-const User = ({handleSaveCV}) => {
+const User = ({handleSaveCV, onCloseModal}) => {
+  // Initial option state - check localStorage first to see if user already chose an option
+  const [showInitialOption, setShowInitialOption] = useState(() => {
+    // Check if resume was already uploaded or build option was selected
+    const hasResumeUploaded = localStorage.getItem('resumeUploaded') === 'true';
+    const resumeOptionSelected = localStorage.getItem('resumeOptionSelected');
+    return !hasResumeUploaded && !resumeOptionSelected;
+  });
+  const [selectedOption, setSelectedOption] = useState(() => {
+    return localStorage.getItem('resumeOptionSelected') || null;
+  }); // 'upload' or 'build'
+  
   // Current step state
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
@@ -125,7 +136,43 @@ const User = ({handleSaveCV}) => {
       try {
         const response = await axios.get(`${backendUrl}/api/educationlist`);
         if (response.data?.status && response.data.data?.educationlist) {
-          setEducationList(response.data.data.educationlist);
+          // Sort education list by class level (ascending order: 1-5, 6-9, 10, 12, then higher)
+          const getClassLevel = (name) => {
+            const nameLower = (name || '').toLowerCase();
+            // Extract numeric class from name
+            const upto5Match = nameLower.match(/upto?\s*5/i);
+            if (upto5Match) return 1; // Upto 5th class
+            
+            const class69Match = nameLower.match(/6th?\s*[-–]\s*9th/i);
+            if (class69Match) return 2; // 6th - 9th class
+            
+            const class10Match = nameLower.match(/10th?/i);
+            if (class10Match) return 3; // 10th class
+            
+            const class12Match = nameLower.match(/12th?/i);
+            if (class12Match) return 4; // 12th class
+            
+            // Higher education (Diploma, UG, PG, etc.)
+            if (nameLower.includes('diploma')) return 5;
+            if (nameLower.includes('undergraduate') || nameLower.includes('ug')) return 6;
+            if (nameLower.includes('postgraduate') || nameLower.includes('pg')) return 7;
+            
+            // Default for other education levels
+            return 99;
+          };
+          
+          const sortedEducations = (response.data.data.educationlist || []).sort((a, b) => {
+            const levelA = getClassLevel(a.name);
+            const levelB = getClassLevel(b.name);
+            if (levelA !== levelB) {
+              return levelA - levelB; // Sort by class level
+            }
+            // If same level, sort alphabetically
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setEducationList(sortedEducations);
         } else {
           console.error("Education API error:", response.data.message);
         }
@@ -388,6 +435,31 @@ const User = ({handleSaveCV}) => {
           }
         }));
 
+        // Close modal if resume was uploaded directly - same pattern as Build Resume steps
+        if (schemaFieldName === 'resume') {
+          // Close modal immediately in frontend first (same as Build Resume's finally block does)
+          if (onCloseModal) {
+            onCloseModal();
+          }
+          
+          // Update backend to set showProfileForm: true so modal doesn't show after reload
+          // Note: showProfileForm: true means modal is closed (modal shows when showProfileForm is false)
+          // Use saveProfile endpoint with minimal data just to update showProfileForm
+          try {
+            const updateShowProfileRes = await axios.post(`${backendUrl}/candidate/saveProfile`, {
+              showProfileForm: true
+            }, {
+              headers: { 'x-auth': token }
+            });
+            console.log('showProfileForm updated:', updateShowProfileRes.data);
+          } catch (updateErr) {
+            console.error('Error updating showProfileForm:', updateErr);
+            // Continue anyway - modal is already closed in frontend
+          }
+          
+          return; // Don't reload here, modal is already closed
+        }
+
         window.location.reload();
 
       }
@@ -432,10 +504,11 @@ const User = ({handleSaveCV}) => {
 
         await updateFileInProfile(uploadeddata, filename);
 
-        window.location.reload();
+        // Note: reload and modal close are handled in updateFileInProfile
       }
     } catch (err) {
       console.error("Upload failed:", err);
+      alert('Failed to upload resume. Please try again.');
     }
   };
 
@@ -1007,6 +1080,16 @@ const User = ({handleSaveCV}) => {
 
 
   // Navigation functions
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    } else if (currentStep === 1) {
+      // If on step 1, go back to initial option screen
+      setShowInitialOption(true);
+      setSelectedOption(null);
+    }
+  };
+
   const handleContinue = () => {
     if (currentStep === 1) {
       // Validate work experience details
@@ -1027,7 +1110,7 @@ const User = ({handleSaveCV}) => {
     } else if (currentStep === 4) {
       // Submit form
       setFormData(prev => ({ ...prev, additional: { completed: true } }));
-      handleSaveCV(profileData, skills, certificates, languages, projects, interests, experiences, isExperienced);
+      handleSaveCV(profileData, skills, certificates, languages, projects, interests, experiences, isExperienced, educations);
     }
   };
 
@@ -1062,8 +1145,43 @@ const User = ({handleSaveCV}) => {
           console.log("Profile data fetched:", response.data.data);
           const data = response.data.data;
 
-          // Set education options
-          setEducationList(data.educations || []);
+          // Set education options - sort by class level (ascending order: 1-5, 6-9, 10, 12, then higher)
+          const getClassLevel = (name) => {
+            const nameLower = (name || '').toLowerCase();
+            // Extract numeric class from name
+            const upto5Match = nameLower.match(/upto?\s*5/i);
+            if (upto5Match) return 1; // Upto 5th class
+            
+            const class69Match = nameLower.match(/6th?\s*[-–]\s*9th/i);
+            if (class69Match) return 2; // 6th - 9th class
+            
+            const class10Match = nameLower.match(/10th?/i);
+            if (class10Match) return 3; // 10th class
+            
+            const class12Match = nameLower.match(/12th?/i);
+            if (class12Match) return 4; // 12th class
+            
+            // Higher education (Diploma, UG, PG, etc.)
+            if (nameLower.includes('diploma')) return 5;
+            if (nameLower.includes('undergraduate') || nameLower.includes('ug')) return 6;
+            if (nameLower.includes('postgraduate') || nameLower.includes('pg')) return 7;
+            
+            // Default for other education levels
+            return 99;
+          };
+          
+          const sortedEducations = (data.educations || []).sort((a, b) => {
+            const levelA = getClassLevel(a.name);
+            const levelB = getClassLevel(b.name);
+            if (levelA !== levelB) {
+              return levelA - levelB; // Sort by class level
+            }
+            // If same level, sort alphabetically
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setEducationList(sortedEducations);
 
           // Set candidate data
           const candidate = data.candidate;
@@ -1113,6 +1231,15 @@ const User = ({handleSaveCV}) => {
             // Check experience status
             setIsExperienced(candidate.isExperienced);
 
+            // Check if resume already exists - if yes, hide initial option screen
+            const hasResume = Array.isArray(candidate.personalInfo?.resume) && candidate.personalInfo.resume.length > 0;
+            if (hasResume) {
+              localStorage.setItem('resumeUploaded', 'true');
+              localStorage.setItem('resumeOptionSelected', 'upload');
+              setShowInitialOption(false);
+              setSelectedOption('upload');
+            }
+
             // Update form completion status
             setFormData({
               workExperience: { completed: true },
@@ -1130,86 +1257,186 @@ const User = ({handleSaveCV}) => {
     fetchProfile();
   }, [backendUrl]);
 
+  // Handle option selection
+  const handleOptionSelect = (option) => {
+    setSelectedOption(option);
+    setShowInitialOption(false);
+    localStorage.setItem('resumeOptionSelected', option);
+  };
+
+  // Handle resume upload directly
+  const handleDirectResumeUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fileType = file.name;
+    const fileSize = file.size;
+
+    // Validate file type and size
+    const allowedExtensions = /\.(docx?|pdf|jpg|jpeg|png)$/i;
+    if (!allowedExtensions.test(fileType)) {
+      alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format");
+      e.target.value = '';
+      return;
+    }
+
+    if (fileSize > 5 * 1024 * 1024) {
+      alert("Uploaded CV size should be less than 5MB");
+      e.target.value = '';
+      return;
+    }
+
+    setSelectedOption('upload');
+    // Set localStorage flags before upload
+    localStorage.setItem('resumeUploaded', 'true');
+    localStorage.setItem('resumeOptionSelected', 'upload');
+    setShowInitialOption(false);
+    
+    try {
+      await uploadCV(file, 'resume');
+      // Note: Success alert is shown in updateFileInProfile, no need to show here
+      // Page will reload after upload, and localStorage flags will persist
+    } catch (error) {
+      console.error('Resume upload error:', error);
+      alert('Failed to upload resume. Please try again.');
+      // On error, remove flags so user can try again
+      localStorage.removeItem('resumeUploaded');
+      localStorage.removeItem('resumeOptionSelected');
+      setShowInitialOption(true);
+      setSelectedOption(null);
+    }
+  };
+
   return (
     <>
 
       <div className="user-container">
-        {/* Step Progress Bar */}
-        <div className="step-progress-container">
-          <div className="newloader">
-            <div
-              className="bar"
-              style={{
-                width: currentStep === 1 ? '0%' :
-                  currentStep === 2 ? '33%' :
-                    currentStep === 3 ? '66%' : '100%'
-              }}
-            ></div>
-            <div className="check-bar-container">
-              <div
-                className={`check ${formData.workExperience.completed ? 'completed' : currentStep === 1 ? 'active' : ''}`}
-                onClick={() => goToStep(1)}
-              >
-                {formData.workExperience.completed ? (
-                  <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
-                    <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
-                  </svg>
-                ) : (
-                  <span>1</span>
-                )}
-              </div>
-              <div
-                className={`check ${formData.education.completed ? 'completed' : currentStep === 2 ? 'active' : ''}`}
-                onClick={() => goToStep(2)}
-              >
-                {formData.education.completed ? (
-                  <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
-                    <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
-                  </svg>
-                ) : (
-                  <span>2</span>
-                )}
-              </div>
-              <div
-                className={`check ${formData.certificates.completed ? 'completed' : currentStep === 3 ? 'active' : ''}`}
-                onClick={() => goToStep(3)}
-              >
-                {formData.certificates.completed ? (
-                  <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
-                    <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
-                  </svg>
-                ) : (
-                  <span>3</span>
-                )}
-              </div>
-              <div
-                className={`check ${formData.additional.completed ? 'completed' : currentStep === 4 ? 'active' : ''}`}
-                onClick={() => goToStep(4)}
-              >
-                {formData.additional.completed ? (
-                  <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
-                    <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
-                  </svg>
-                ) : (
-                  <span>4</span>
-                )}
+        {/* Initial Option Screen */}
+        {showInitialOption && (
+          <div className="initial-option-screen">
+            <div className="option-card">
+              <h2 className="option-title">Choose Your Resume Option</h2>
+              <p className="option-subtitle">Select how you'd like to proceed with your resume</p>
+              
+              <div className="option-buttons">
+                <button
+                  className="option-btn upload-option-btn"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
+                    input.onchange = (e) => {
+                      handleDirectResumeUpload(e);
+                      setShowInitialOption(false);
+                    };
+                    input.click();
+                  }}
+                >
+                  <i className="bi bi-upload"></i>
+                  <span>Upload Your Resume</span>
+                  <small>Upload your existing resume file</small>
+                </button>
+
+                <button
+                  className="option-btn build-option-btn"
+                  onClick={() => handleOptionSelect('build')}
+                >
+                  <i className="bi bi-file-earmark-text"></i>
+                  <span>Build Your Resume</span>
+                  <small>Create your resume step by step</small>
+                </button>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="step-labels">
-            <div className={`step-label ${currentStep === 1 ? 'active' : ''}`}>Work Experience</div>
-            <div className={`step-label ${currentStep === 2 ? 'active' : ''}`}>Education</div>
-            <div className={`step-label ${currentStep === 3 ? 'active' : ''}`}>Certificates</div>
-            <div className={`step-label ${currentStep === 4 ? 'active' : ''}`}>Additional</div>
-          </div>
-        </div>
+        {/* Header Text and Back Button - Only show if build option is selected */}
+        {!showInitialOption && selectedOption === 'build' && (
+          <>
+            <div className="step-header-container">
+              <div className="StepHeader"> 
+                Your Complete Profile will help you to select the best job for you.
+              </div>
+              <button className="top-back-btn" onClick={handleBack}>
+                <i className="bi bi-arrow-left"></i> Back
+              </button>
+            </div>
+            
+            <div className="step-progress-container">
+              <div className="newloader">
+                <div
+                  className="bar"
+                  style={{
+                    width: currentStep === 1 ? '0%' :
+                      currentStep === 2 ? '33%' :
+                        currentStep === 3 ? '66%' : '100%'
+                  }}
+                ></div>
+                <div className="check-bar-container">
+                  <div
+                    className={`check ${formData.workExperience.completed ? 'completed' : currentStep === 1 ? 'active' : ''}`}
+                    onClick={() => goToStep(1)}
+                  >
+                    {formData.workExperience.completed ? (
+                      <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
+                        <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
+                      </svg>
+                    ) : (
+                      <span>1</span>
+                    )}
+                  </div>
+                  <div
+                    className={`check ${formData.education.completed ? 'completed' : currentStep === 2 ? 'active' : ''}`}
+                    onClick={() => goToStep(2)}
+                  >
+                    {formData.education.completed ? (
+                      <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
+                        <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
+                      </svg>
+                    ) : (
+                      <span>2</span>
+                    )}
+                  </div>
+                  <div
+                    className={`check ${formData.certificates.completed ? 'completed' : currentStep === 3 ? 'active' : ''}`}
+                    onClick={() => goToStep(3)}
+                  >
+                    {formData.certificates.completed ? (
+                      <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
+                        <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
+                      </svg>
+                    ) : (
+                      <span>3</span>
+                    )}
+                  </div>
+                  <div
+                    className={`check ${formData.additional.completed ? 'completed' : currentStep === 4 ? 'active' : ''}`}
+                    onClick={() => goToStep(4)}
+                  >
+                    {formData.additional.completed ? (
+                      <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
+                        <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
+                      </svg>
+                    ) : (
+                      <span>4</span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-        {/* Form Content */}
-        <div className="form-container">
-          {/* Work Experience Step */}
-          {currentStep === 1 && (
-            <div className="step-content">
+              <div className="step-labels">
+                <div className={`step-label ${currentStep === 1 ? 'active' : ''}`}>Work Experience</div>
+                <div className={`step-label ${currentStep === 2 ? 'active' : ''}`}>Education</div>
+                <div className={`step-label ${currentStep === 3 ? 'active' : ''}`}>Certificates</div>
+                <div className={`step-label ${currentStep === 4 ? 'active' : ''}`}>Additional</div>
+              </div>
+            </div>
+
+            {/* Form Content */}
+            <div className="form-container">
+              {/* Work Experience Step */}
+              {currentStep === 1 && (
+                <div className="step-content">
               <h2>Work Experience</h2>
               <p className="form-description">Tell us about your work history</p>
 
@@ -1393,8 +1620,8 @@ const User = ({handleSaveCV}) => {
             </div>
           )}
 
-          {/* Education Step */}
-          {currentStep === 2 && (
+              {/* Education Step */}
+              {currentStep === 2 && (
             <div className="step-content">
               <h2>Education</h2>
               <p className="form-description">Tell us about your educational background</p>
@@ -1477,8 +1704,8 @@ const User = ({handleSaveCV}) => {
             </div>
           )}
 
-          {/* Certificates Step */}
-          {currentStep === 3 && (
+              {/* Certificates Step */}
+              {currentStep === 3 && (
             <div className="step-content">
               <h2>Certifications</h2>
               <p className="form-description">Add your certifications and professional qualifications</p>
@@ -1597,8 +1824,8 @@ const User = ({handleSaveCV}) => {
             </div>
           )}
 
-          {/* Additional Info Step */}
-          {currentStep === 4 && (
+              {/* Additional Info Step */}
+              {currentStep === 4 && (
             <div className="step-content">
               <h2>Additional Information</h2>
               {/* <p className="form-description">Add skills, languages, and other relevant details</p> */}
@@ -1907,7 +2134,9 @@ const User = ({handleSaveCV}) => {
               }}>Save Profile</button>
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
 
         {/* Resume Preview Modal */}
         {showPreview && (
@@ -2378,8 +2607,161 @@ const User = ({handleSaveCV}) => {
           width:100%;
         }
         
+        /* Initial Option Screen */
+        .initial-option-screen {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 60vh;
+          padding: 40px 20px;
+        }
+        
+        .option-card {
+          background-color: #fff;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+          padding: 40px;
+          max-width: 600px;
+          width: 100%;
+          text-align: center;
+        }
+        
+        .option-title {
+          font-size: 28px;
+          font-weight: 700;
+          color: #333;
+          margin-bottom: 10px;
+        }
+        
+        .option-subtitle {
+          font-size: 16px;
+          color: #666;
+          margin-bottom: 40px;
+        }
+        
+        .option-buttons {
+          display: flex;
+          gap: 20px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+        
+        .option-btn {
+          flex: 1;
+          min-width: 200px;
+          padding: 30px 20px;
+          border: 2px solid #e0e0e0;
+          border-radius: 12px;
+          background-color: #fff;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+        }
+        
+        .option-btn:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .upload-option-btn {
+          border-color: #28a745;
+        }
+        
+        .upload-option-btn:hover {
+          background-color: #f0f9f4;
+          border-color: #28a745;
+        }
+        
+        .build-option-btn {
+          border-color: #FC2B5A;
+        }
+        
+        .build-option-btn:hover {
+          background-color: #fff9fa;
+          border-color: #FC2B5A;
+        }
+        
+        .option-btn i {
+          font-size: 48px;
+          margin-bottom: 10px;
+        }
+        
+        .upload-option-btn i {
+          color: #28a745;
+        }
+        
+        .build-option-btn i {
+          color: #FC2B5A;
+        }
+        
+        .option-btn span {
+          font-size: 20px;
+          font-weight: 600;
+          color: #333;
+        }
+        
+        .option-btn small {
+          font-size: 14px;
+          color: #666;
+          margin-top: 5px;
+        }
+        
+        @media (max-width: 768px) {
+          .option-buttons {
+            flex-direction: column;
+          }
+          
+          .option-btn {
+            min-width: 100%;
+          }
+          
+          .option-card {
+            padding: 30px 20px;
+          }
+        }
+        
         .step-progress-container {
           margin-bottom: 30px;
+        }
+        
+        .step-header-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          padding: 0 10px;
+        }
+        
+        .StepHeader {
+          text-align: center;
+          color: #666;
+          font-size: 1.2rem;
+          font-weight: 600;
+          flex: 1;
+          padding: 0 10px;
+        }
+        
+        .top-back-btn {
+          background-color: #f8f9fa;
+          color: #333;
+          padding: 8px 16px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+        
+        .top-back-btn:hover {
+          background-color: #e9ecef;
+          border-color: #bbb;
         }
         
         .newloader {
@@ -2388,6 +2770,7 @@ const User = ({handleSaveCV}) => {
           background-color: #f3f3f3;
           position: relative;
           margin-bottom: 30px;
+          margin-top: 0;
         }
         
         .bar {
@@ -2515,6 +2898,32 @@ const User = ({handleSaveCV}) => {
           margin-right: 8px;
         }
         
+        .step-navigation-buttons {
+          display: flex;
+          gap: 15px;
+          margin-top: 20px;
+          justify-content: space-between;
+        }
+        
+        .back-btn {
+          background-color: #f8f9fa;
+          color: #333;
+          padding: 10px 20px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 16px;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .back-btn:hover {
+          background-color: #e9ecef;
+          border-color: #bbb;
+        }
+        
         .continue-btn, .submit-btn {
           background-color: #FC2B5A;
           color: white;
@@ -2523,12 +2932,23 @@ const User = ({handleSaveCV}) => {
           border-radius: 4px;
           font-size: 16px;
           cursor: pointer;
-          margin-top: 20px;
           transition: background-color 0.3s;
+          margin-top: 20px;
+          width: 100%;
         }
         
         .continue-btn:hover, .submit-btn:hover {
           background-color: #e61e4d;
+        }
+        
+        @media (max-width: 768px) {
+          .step-navigation-buttons {
+            flex-direction: column;
+          }
+          
+          .continue-btn, .submit-btn, .back-btn {
+            width: 100%;
+          }
         }
         
         .add-button {

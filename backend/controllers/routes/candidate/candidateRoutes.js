@@ -514,12 +514,14 @@ router
         }
       }
       const dataCheck = await Candidate.findOne({ mobile: mobile });
-      const dataCheck1 = await Candidate.findOne({ email });
-      if (dataCheck1) {
-        return res.send({
-          status: "failure",
-          error: "Candidate email already exist!",
-        });
+      if (email && email.trim() !== '') {
+        const dataCheck1 = await Candidate.findOne({ email });
+        if (dataCheck1) {
+          return res.send({
+            status: "failure",
+            error: "Candidate email already exist!",
+          });
+        }
       }
       if (dataCheck) {
         return res.send({
@@ -529,7 +531,10 @@ router
       }
 
       const datacheck2 = await User.findOne({ mobile, role: "3" });
-      const datacheck3 = await User.findOne({ email, role: "3" });
+      let datacheck3 = null;
+      if (email && email.trim() !== '') {
+        datacheck3 = await User.findOne({ email, role: "3" });
+      }
 
       if (datacheck2 || datacheck3) {
         return res.send({
@@ -544,7 +549,7 @@ router
         name,
         sex,
         mobile,
-        email,
+        email: email && email.trim() !== '' ? email : undefined,
         role: 3,
       });
       if (!usr) {
@@ -555,8 +560,8 @@ router
       let coins = await CoinsAlgo.findOne();
       let candidateBody = {
         name,
-        email,
-        dob,
+        email: email && email.trim() !== '' ? email : undefined,
+        dob: dob && dob.trim() !== '' ? dob : undefined,
         sex,
         mobile,
         fatherName,
@@ -565,8 +570,8 @@ router
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,
         personalInfo,
-        highestQualification,
-        isExperienced
+        highestQualification: highestQualification && highestQualification.trim() !== '' ? highestQualification : undefined,
+        isExperienced: isExperienced !== undefined && isExperienced !== null ? isExperienced : undefined
         
       };
 

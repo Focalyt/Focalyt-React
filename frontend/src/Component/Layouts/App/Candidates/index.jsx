@@ -82,10 +82,18 @@ function CandidateLayout({ children }) {
           const data = response.data.data;
           const candidate = data.candidate;
 
-          if (candidate.showProfileForm) {
+          // Check if candidate has resume uploaded
+          const hasResume = Array.isArray(candidate.personalInfo?.resume) && candidate.personalInfo.resume.length > 0;
+          
+          // If resume exists, modal should not show (set showProfileForm = true)
+          if (hasResume) {
+            setShowProfileForm(true);
+          } else if (candidate.showProfileForm !== undefined) {
+            // Use backend value if available
             setShowProfileForm(candidate.showProfileForm);
           } else {
-            setShowProfileForm(false)
+            // Default: show modal if no resume and no showProfileForm value
+            setShowProfileForm(false);
           }
         }
       } catch (error) {
@@ -294,7 +302,7 @@ function CandidateLayout({ children }) {
     }
   };
 
-  const handleSaveCV = async (profileData, skills, certificates, languages, projects, interests, experiences, isExperienced) => {
+  const handleSaveCV = async (profileData, skills, certificates, languages, projects, interests, experiences, isExperienced, educations = [], setShowProfileFormValue = undefined) => {
     try {
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -321,7 +329,7 @@ function CandidateLayout({ children }) {
         sex: profileData?.sex || '',
         dob: profileData?.dob || '',
         whatsapp: profileData?.whatsapp || '',
-        showProfileForm: true,
+        showProfileForm: setShowProfileFormValue !== undefined ? setShowProfileFormValue : true,
         personalInfo: {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
@@ -1171,7 +1179,7 @@ function CandidateLayout({ children }) {
                               <div className="modal-content">
                                 
                                 <div className="modal-body">
-                                  <User handleSaveCV={handleSaveCV} />
+                                  <User handleSaveCV={handleSaveCV} onCloseModal={() => setShowProfileForm(true)} />
                                 </div>
                               </div>
                             </div>

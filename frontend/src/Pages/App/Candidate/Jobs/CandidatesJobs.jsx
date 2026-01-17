@@ -1799,6 +1799,11 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
   .act_btn .col-xl-6 {
     margin-bottom: 0.5rem;
   }
+
+  /* Row width auto for mobile devices only on this page */
+  .row {
+    width: auto;
+  }
 }
 
 /* Modal styles */
@@ -2948,6 +2953,11 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
 
   .act_btn .col-xl-6 {
     margin-bottom: 0.5rem;
+  }
+
+  /* Row width auto for mobile devices only on this page */
+  .row {
+    width: auto;
   }
 }
 

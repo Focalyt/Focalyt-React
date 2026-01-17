@@ -55,10 +55,10 @@ const CandidateLogin = () => {
     const [permanentCity, setPermanentCity] = useState('');
     const [permanentState, setPermanentState] = useState('');
     const [permanentPincode, setPermanentPincode] = useState('');
-    const [isExperienced, setIsExperience] = useState(null);
-    const [sameAddress, setSameAddress] = useState(false);
-    const [highestQualificationdata, sethighestQualificationdata] = useState([]);
-    const [highestQualification, setHighestQualification] = useState('');
+    // const [isExperienced, setIsExperience] = useState(null);
+    // const [sameAddress, setSameAddress] = useState(false);
+    // const [highestQualificationdata, sethighestQualificationdata] = useState([]);
+    // const [highestQualification, setHighestQualification] = useState('');
     const inputRef = useRef(null);
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
@@ -173,6 +173,14 @@ const CandidateLogin = () => {
         return phoneRegex.test(mobileNumber);
     };
 
+    const validateEmail = (email) => {
+        if (!email || email.trim() === '') {
+            return true; // Empty email is allowed (optional field)
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email.trim());
+    };
+
     const handleGenerateOTP = async () => {
         if (!validateMobile()) {
             setErrorMessage('Please enter the correct mobile number');
@@ -195,15 +203,16 @@ const CandidateLogin = () => {
                 setShowOtpField(false);
                 setShowLoginBtn(true);
 
-                try {
-                    const qualificationRes = await axios.get(`${backendUrl}/candidate/api/highestQualifications`);
-                    if (qualificationRes.data.status) {
-                        sethighestQualificationdata(qualificationRes.data.data || []);
-                    }
-                    console.log("higherQualificaitons :-", qualificationRes);
-                } catch (err) {
-                    console.error("Error fetching qualifications:", err);
-                }
+                // Commented out - fetching qualifications not needed for now
+                // try {
+                //     const qualificationRes = await axios.get(`${backendUrl}/candidate/api/highestQualifications`);
+                //     if (qualificationRes.data.status) {
+                //         sethighestQualificationdata(qualificationRes.data.data || []);
+                //     }
+                //     console.log("higherQualificaitons :-", qualificationRes);
+                // } catch (err) {
+                //     console.error("Error fetching qualifications:", err);
+                // }
             } else {
                 setIsNewUser(false);
                 setShowOtpField(true);
@@ -279,6 +288,12 @@ const CandidateLogin = () => {
                 return;
             }
 
+            // Validate email format if provided
+            if (Email && Email.trim() !== '' && !validateEmail(Email)) {
+                setErrorMessage('Please enter a valid email address (must contain @ symbol)');
+                return;
+            }
+
             try {
                 // First verify OTP
                 const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, {
@@ -339,20 +354,19 @@ const CandidateLogin = () => {
                         body.dob = dob.toISOString().split('T')[0]; // YYYY-MM-DD format
                     }
 
+                    // Commented out - highestQualification and isExperienced not required for new registration
                     // Only add highestQualification if it's not empty
-                    if (highestQualification && highestQualification.trim() !== '') {
-                        body.highestQualification = highestQualification.trim();
-                    }
+                    // if (highestQualification && highestQualification.trim() !== '') {
+                    //     body.highestQualification = highestQualification.trim();
+                    // }
 
-                    if (isExperienced !== undefined && isExperienced !== null) {
-                        if (typeof isExperienced === 'string') {
-                            body.isExperienced = isExperienced === 'true';
-                        } else if (typeof isExperienced === 'boolean') {
-                            body.isExperienced = isExperienced;
-                        }
-                    }
-
-
+                    // if (isExperienced !== undefined && isExperienced !== null) {
+                    //     if (typeof isExperienced === 'string') {
+                    //         body.isExperienced = isExperienced === 'true';
+                    //     } else if (typeof isExperienced === 'boolean') {
+                    //         body.isExperienced = isExperienced;
+                    //     }
+                    // }
 
                     if (refCode) {
                         body.refCode = refCode;
@@ -579,11 +593,24 @@ const CandidateLogin = () => {
                                         <div className="mb-3">
                                             <input
                                                 type="email"
-                                                className='form-control'
-                                                placeholder='Enter Email'
+                                                className={`form-control ${Email && Email.trim() !== '' && !validateEmail(Email) ? 'is-invalid' : ''}`}
+                                                placeholder='Enter Email '
                                                 value={Email}
-                                                onChange={(e) => setEmail(e.target.value)}
+                                                onChange={(e) => {
+                                                    setEmail(e.target.value);
+                                                    setErrorMessage(''); // Clear error on change
+                                                }}
+                                                onBlur={(e) => {
+                                                    if (e.target.value && e.target.value.trim() !== '' && !validateEmail(e.target.value)) {
+                                                        setErrorMessage('Please enter a valid email address (must contain @ symbol)');
+                                                    }
+                                                }}
                                             />
+                                            {Email && Email.trim() !== '' && !validateEmail(Email) && (
+                                                <div className="invalid-feedback">
+                                                    Please enter a valid email address (must contain @ symbol)
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="mb-3">
                                             <input
@@ -689,7 +716,7 @@ const CandidateLogin = () => {
                                             </div>
                                         </div> */}
 
-                                        <div className="mb-3">
+                                        {/* <div className="mb-3">
                                             <select
                                                 onChange={(e) => setHighestQualification(e.target.value)}
                                                 className="form-control"
@@ -712,7 +739,7 @@ const CandidateLogin = () => {
 
 
                                             </select>
-                                        </div>
+                                        </div> */}
 
                                         <div className="mb-3">
                                             <input
