@@ -725,12 +725,14 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 		// Check if request is from social media crawler or browser (not API call)
 		const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json');
 		const userAgent = req.get('User-Agent') || '';
-		// Enhanced crawler detection - WhatsApp uses specific user agents
-		const isCrawler = /facebookexternalhit|WhatsApp|whatsapp|Twitter|LinkedIn|Slack|Telegram|Skype|Discord|bot|crawler|spider|facebook|Facebot|Googlebot/i.test(userAgent);
+		// Enhanced crawler detection - WhatsApp uses Facebook's crawler (facebookexternalhit)
+		// Also check for WhatsApp-specific patterns and other social media bots
+		const isCrawler = /facebookexternalhit|WhatsApp|whatsapp|WhatsAppBot|Twitterbot|LinkedInBot|Slackbot|TelegramBot|SkypeUriPreview|Discordbot|bot|crawler|spider|facebook|Facebot|Googlebot|Applebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|Exabot|ia_archiver/i.test(userAgent);
 		
-		// console.log("🔍 Request Analysis:");
-		// console.log("   - Accepts JSON:", acceptsJson);
-		// console.log("   - Is Crawler:", isCrawler);
+		console.log("🔍 Request Analysis:");
+		console.log("   - User-Agent:", userAgent);
+		console.log("   - Accepts JSON:", acceptsJson);
+		console.log("   - Is Crawler:", isCrawler);
 		if (isCrawler) {
 			console.log("   🤖 Detected as Social Media Crawler (WhatsApp/Facebook/etc.)");
 		} else {
@@ -750,14 +752,24 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			// Return HTML with meta tags for social media crawlers and browsers
 			const baseUrl = `${req.protocol}://${req.get('host')}`;
 			const jobUrl = `${baseUrl}/jobdetailsmore/${jobId}`;
+			const companyName = job._company?.name || 'Focalyt';
 			const jobTitle = (job.title || job.name || 'Job Opening').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-			let jobDescription = job.jobDescription 
-				? job.jobDescription.substring(0, 200).replace(/\n/g, ' ').replace(/\r/g, ' ').trim()
-				: `Apply for ${jobTitle} at ${job._company?.name || 'Focalyt'}`;
+			// Create description with company name prominently
+			let jobDescription = '';
+			if (job.jobDescription) {
+				// Include company name at the start, then job description
+				const descText = job.jobDescription.substring(0, 150).replace(/\n/g, ' ').replace(/\r/g, ' ').trim();
+				jobDescription = `${companyName} - ${descText}`;
+			} else {
+				jobDescription = `Apply for ${jobTitle} at ${companyName}`;
+			}
 			jobDescription = jobDescription.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 			if (jobDescription.length > 197) {
 				jobDescription = jobDescription.substring(0, 197) + '...';
 			}
+			
+			// Create title with company name for better preview
+			const previewTitle = `${jobTitle} - ${companyName}`;
 			
 			// Get absolute image URL - MUST be absolute for social media
 			// Priority: jobVideoThumbnail > thumbnail > _company?.logo > default image
@@ -846,57 +858,56 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 
 			console.log("🖼️  Thumbnail URL for meta tags:", thumbnailUrl);
 			console.log("📝 Meta Tags Generated:");
-			console.log("   - og:title:", jobTitle);
+			console.log("   - og:title:", previewTitle);
+			console.log("   - Company Name:", companyName);
 			console.log("   - og:description:", jobDescription.substring(0, 50) + "...");
 			console.log("   - og:image:", thumbnailUrl);
 			console.log("   - og:url:", jobUrl);
 
 			const htmlContent = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: http://ogp.me/ns#">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	
 	<!-- Primary Meta Tags -->
-	<title>${jobTitle} - Focalyt</title>
-	<meta name="title" content="${jobTitle}">
+	<title>${previewTitle}</title>
+	<meta name="title" content="${previewTitle}">
 	<meta name="description" content="${jobDescription}">
 	
-	<!-- Open Graph / Facebook -->
+	<!-- Open Graph / Facebook / WhatsApp -->
 	<meta property="og:type" content="website">
 	<meta property="og:url" content="${jobUrl}">
-	<meta property="og:title" content="${jobTitle}">
+	<meta property="og:title" content="${previewTitle}">
 	<meta property="og:description" content="${jobDescription}">
 	<meta property="og:image" content="${thumbnailUrl}">
+	<meta property="og:image:secure_url" content="${thumbnailUrl}">
 	<meta property="og:image:width" content="1200">
 	<meta property="og:image:height" content="630">
 	<meta property="og:image:type" content="image/jpeg">
 	<meta property="og:site_name" content="Focalyt">
 	<meta property="og:locale" content="en_US">
 	
-	<!-- Twitter -->
+	<!-- Twitter Card -->
 	<meta name="twitter:card" content="summary_large_image">
 	<meta name="twitter:url" content="${jobUrl}">
-	<meta name="twitter:title" content="${jobTitle}">
+	<meta name="twitter:title" content="${previewTitle}">
 	<meta name="twitter:description" content="${jobDescription}">
 	<meta name="twitter:image" content="${thumbnailUrl}">
+	<meta name="twitter:image:src" content="${thumbnailUrl}">
 	
 	<!-- Additional Meta -->
 	<meta name="author" content="Focalyt">
 	<link rel="canonical" href="${jobUrl}">
 	
-	<!-- Redirect to React app only if not a crawler -->
-	${!isCrawler ? `<meta http-equiv="refresh" content="0;url=${baseUrl}/jobdetailsmore/${jobId}">
-	<script>
-		window.location.href = "${baseUrl}/jobdetailsmore/${jobId}";
-	</script>` : ''}
+	<!-- NO REDIRECT FOR CRAWLERS - They need to see the meta tags -->
 </head>
 <body>
-	<div style="padding: 20px; font-family: Arial, sans-serif;">
-		<h1>${jobTitle}</h1>
-		<p>${jobDescription}</p>
-		<img src="${thumbnailUrl}" alt="${jobTitle}" style="max-width: 100%; height: auto;">
-		<p><a href="${baseUrl}/jobdetailsmore/${jobId}">View Job Details</a></p>
+	<div style="padding: 20px; font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+		<h1 style="color: #333; margin-bottom: 10px;">${jobTitle}</h1>
+		<p style="color: #666; line-height: 1.6; margin-bottom: 20px;">${jobDescription}</p>
+		<img src="${thumbnailUrl}" alt="${jobTitle}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 20px;">
+		<p><a href="${jobUrl}" style="color: #FC2B5A; text-decoration: none; font-weight: 600;">View Job Details →</a></p>
 	</div>
 </body>
 </html>`;
