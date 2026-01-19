@@ -220,31 +220,112 @@ function Jobs() {
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
+  // Helper function to get thumbnail URL with priority: jobVideoThumbnail > thumbnail > _company?.logo > default
+  const getThumbnailUrl = (course) => {
+    if (course.jobVideoThumbnail) {
+      return course.jobVideoThumbnail;
+    }
+    if (course.thumbnail) {
+      // If thumbnail is relative path, make it absolute using bucketUrl
+      if (bucketUrl && !course.thumbnail.startsWith('http://') && !course.thumbnail.startsWith('https://')) {
+        const thumbPath = course.thumbnail.startsWith('/') ? course.thumbnail.slice(1) : course.thumbnail;
+        return `${bucketUrl}/${thumbPath}`;
+      }
+      return course.thumbnail;
+    }
+    if (course._company?.logo) {
+      // If company logo is relative path, make it absolute using bucketUrl
+      if (bucketUrl && !course._company.logo.startsWith('http://') && !course._company.logo.startsWith('https://')) {
+        const logoPath = course._company.logo.startsWith('/') ? course._company.logo.slice(1) : course._company.logo;
+        return `${bucketUrl}/${logoPath}`;
+      }
+      return course._company.logo;
+    }
+    // Default fallback
+    return "/Assets/public_assets/images/newjoblisting/course_img.svg";
+  };
+
   const handleShare = async (courseId, courseName, courseThumbnail) => {
-    const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: courseName,
-          text: `Check out this course: ${courseName}`,
-          url: courseUrl,
-        });
-        console.log("Shared successfully!");
-      } catch (error) {
-        console.error("Error sharing:", error);
-        fallbackCopyText(courseName, courseUrl);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("📤 SHARE BUTTON CLICKED - FRONTEND");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("Job ID:", courseId);
+    console.log("Job Title:", courseName);
+    console.log("Thumbnail Parameter:", courseThumbnail);
+    
+    // Find the course object to check all available fields
+    const courseObj = courses.find(c => c._id === courseId);
+    if (courseObj) {
+      console.log("📦 Full Course Object Fields:");
+      console.log("   - jobVideoThumbnail:", courseObj.jobVideoThumbnail);
+      console.log("   - thumbnail:", courseObj.thumbnail);
+      console.log("   - _company?.thumbnail:", courseObj._company?.thumbnail);
+      console.log("   - _company?.logo:", courseObj._company?.logo);
+      
+      // Priority: jobVideoThumbnail only (backend will use default if not available)
+      const finalThumbnail = courseObj.jobVideoThumbnail || null;
+      console.log("✅ Final Thumbnail Selected (jobVideoThumbnail only):", finalThumbnail);
+      
+      if (!finalThumbnail) {
+        console.log("ℹ️ jobVideoThumbnail not found - backend will use default image for rich preview");
+      }
+      
+      // Update courseThumbnail if it was undefined
+      if (!courseThumbnail && finalThumbnail) {
+        courseThumbnail = finalThumbnail;
+        console.log("🔄 Updated thumbnail from course object:", courseThumbnail);
       }
     } else {
-      fallbackCopyText(courseName, courseUrl);
+      console.warn("⚠️ Course object not found in courses array");
+    }
+    
+    // Use proper job details URL for rich preview (with Open Graph meta tags)
+    const jobUrl = `${window.location.origin}/jobdetailsmore/${courseId}`;
+    console.log("Share URL:", jobUrl);
+    console.log("Native Share API Available:", !!navigator.share);
+    
+    if (navigator.share) {
+      try {
+        const shareData = {
+          title: courseName,
+          text: `Check out this job: ${courseName}`,
+          url: jobUrl,
+        };
+        console.log("📋 Share Data:", shareData);
+        console.log("⏳ Opening native share dialog...");
+        
+        await navigator.share(shareData);
+        
+        console.log("✅ Share completed successfully!");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      } catch (error) {
+        // User cancelled share dialog - this is normal, not an error
+        if (error.name === 'AbortError') {
+          console.log("ℹ️ User cancelled the share dialog");
+        } else {
+          console.error("❌ Error sharing:", error);
+          console.log("🔄 Falling back to clipboard copy...");
+        }
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        fallbackCopyText(courseName, jobUrl);
+      }
+    } else {
+      console.log("⚠️ Native Share API not available - using clipboard fallback");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      fallbackCopyText(courseName, jobUrl);
     }
   }
 
-  function fallbackCopyText(courseName, courseUrl) {
-    const shareText = `Check out this course: ${courseName} - ${courseUrl}`;
+  function fallbackCopyText(courseName, jobUrl) {
+    console.log("📋 FALLBACK: Copying to clipboard");
+    const shareText = `Check out this job: ${courseName} - ${jobUrl}`;
+    console.log("Text to copy:", shareText);
+    
     navigator.clipboard.writeText(shareText).then(() => {
-      alert("Course link copied! You can paste it anywhere.");
+      console.log("✅ Link copied to clipboard successfully!");
+      alert("Job link copied! You can paste it anywhere.");
     }).catch(err => {
-      console.error("Clipboard copy failed:", err);
+      console.error("❌ Clipboard copy failed:", err);
     });
   }
 
@@ -458,6 +539,7 @@ function Jobs() {
                                 </div>
                                 <img
                                   src={course.jobVideoThumbnail ? `${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                                //  src={getThumbnailUrl(course)}
                                   className="digi"
                                   alt={course.name}
                                   onError={(e) => {
@@ -642,7 +724,16 @@ function Jobs() {
                                       </div> */}
                                       <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 text-center ms-2">
                                         <button
-                                          onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
+                                          onClick={() => {
+                                            // Priority: jobVideoThumbnail only (backend will handle default image)
+                                            const thumbnail = course.jobVideoThumbnail || null;
+                                            handleShare(
+                                              course._id, 
+                                              course.title || course.name, 
+                                              thumbnail
+                                            );
+                                          }} 
+                                          className="btn cta-callnow shr--width">
                                           {/* <Share2 size={16} className="mr-1" /> */}
                                           Share
                                         </button>

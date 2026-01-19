@@ -20,12 +20,15 @@ function JobDetails() {
         const fetchJobDetails = async () => {
             try {
                 setLoading(true);
+                console.log("📡 FRONTEND: Making API call to backend");
+                console.log("📡 URL:", `${backendUrl}/jobdetailsmore/${jobId}`);
                 // Try the API endpoint - if it returns JSON, use it; otherwise we may need a different endpoint
                 const response = await axios.get(`${backendUrl}/jobdetailsmore/${jobId}`, {
                     headers: {
                         'Accept': 'application/json'
                     }
                 });
+                console.log("✅ FRONTEND: API call successful, response received");
                 // Handle API response - backend now returns { status: true, job, ... }
                 if (response.data.status && response.data.job) {
                     setJob(response.data.job);
@@ -485,7 +488,7 @@ function JobDetails() {
                                                         <div className="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 className="fw-normal">
                                                                 <img
-                                                                    src="/Assets/public_assets/images/purple/English_level.png"
+                                                                    src="/Assets/public_assets/images/purple/payout_icon.png"
                                                                     className="img-fluid"
                                                                     draggable="false"
                                                                     alt="Requirement"
@@ -651,7 +654,7 @@ function JobDetails() {
                             <div className="col-xxl-8 col-xl-8 col-lg-8 col-md-12 col-sm-12 col-12 mx-auto text-center border-top pt-3 pb-5 mt-3">
                                 <div className="single-footer">
                                     <h3 className="color-pink text-center mb-3">JOB FEATURES</h3>
-                                    <ul className="contact-info">
+                                    <ul className="contact-info" style={{position: 'relative', color: '#fff'}}>
                                         {jobDescriptionArray.map((description, i) => (
                                             <li key={i}>
                                                 <img
@@ -1241,21 +1244,68 @@ header{
     position: relative !important;
     box-shadow: inset 0 0 0 1000px rgba(18, 18, 18, 0.92);
 }
-#job_theme a.btn.btn_cta_apply {
+#job_theme a.btn.btn_cta_apply,
+#job_theme button.btn.btn_cta_apply {
     color: #5c2b5a !important;
 }
 
-a.btn.btn_cta_apply {
+a.btn.btn_cta_apply,
+button.btn.btn_cta_apply {
     color: #FC2B5A;
     background: #fff;
     border-radius: 20px;
     font-weight: 600;
     padding: 5px 20px;
+    border: none;
+    cursor: pointer;
     /* width: 30%; */
     margin: 0 auto;
     display: inline-block;
     font-size: 20px;
     margin-bottom: 30px;
+    transition: all 0.3s ease, background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    transform: scale(1);
+}
+
+#job_theme a.btn.btn_cta_apply,
+#job_theme button.btn.btn_cta_apply {
+    transition: all 0.3s ease, background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+}
+
+button.btn.btn_cta_apply:hover,
+a.btn.btn_cta_apply:hover {
+    background: #FC2B5A;
+    color: #fff !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(252, 43, 90, 0.4);
+}
+
+#job_theme button.btn.btn_cta_apply:hover,
+#job_theme a.btn.btn_cta_apply:hover {
+    background: #FC2B5A !important;
+    color: #fff !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(252, 43, 90, 0.4);
+}
+
+button.btn.btn_cta_apply:active,
+a.btn.btn_cta_apply:active,
+button.btn.btn_cta_apply:focus,
+a.btn.btn_cta_apply:focus {
+    background: #FC2B5A;
+    color: #fff !important;
+    outline: none;
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(252, 43, 90, 0.3);
+    transition: all 0.1s ease;
+}
+
+#job_theme button.btn.btn_cta_apply:active,
+#job_theme a.btn.btn_cta_apply:active,
+#job_theme button.btn.btn_cta_apply:focus,
+#job_theme a.btn.btn_cta_apply:focus {
+    background: #FC2B5A !important;
+    color: #fff !important;
 }
 
 ul#pills-tab {

@@ -285,7 +285,7 @@ router.get("/joblisting", async (req, res) => {
 	let populate = [
 		{
 			path: '_company',
-			select: "name logo stateId cityId"
+			select: "name logo stateId cityId thumbnail"
 		},
 		{
 			path: "_industry",
@@ -633,10 +633,25 @@ router.get("/coursedetailmore", (req, res) => {
 	});
 });
 router.get("/jobdetailsmore/:jobId", async (req, res) => {
+	// Immediate log - should appear first when route is hit
+	// console.log("\n\n🚀🚀🚀 ========== ROUTE HIT: /jobdetailsmore/:jobId ========== 🚀🚀🚀");
+	// console.log("📅 Timestamp:", new Date().toISOString());
+	// console.log("🚀🚀🚀 ======================================================== 🚀🚀🚀\n");
 	try {
-		let jobId = req.params.jobId
+		// console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		// console.log("🌐 BACKEND: /jobdetailsmore/:jobId route accessed");
+		// console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		
+		let jobId = req.params.jobId;
+		// console.log("📋 Job ID:", jobId);
+		// console.log("📋 Job ID Type:", typeof jobId);
+		// console.log("🔗 Request URL:", req.protocol + "://" + req.get('host') + req.originalUrl);
+		// console.log("📍 Method:", req.method);
+		// console.log("👤 User-Agent:", req.get('User-Agent') || 'Not provided');
+		// console.log("📥 Accept Header:", req.headers.accept || 'Not provided');
 
 		if (!jobId) {
+			console.error("❌ Invalid Job ID provided");
 			return res.status(400).json({ status: false, message: "Invalid Job Id" });
 		}
 		const populate = [
@@ -677,8 +692,17 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 		const job = await Vacancy.findOne({ _id: jobId }).populate(populate)
 		
 		if (!job) {
+			console.error("❌ Job not found with ID:", jobId);
 			return res.status(404).json({ status: false, message: "Job not found" });
 		}
+		
+		// console.log("✅ Job found:");
+		// console.log("   - Title:", job.title || job.name || 'N/A');
+		// console.log("   - Company:", job._company?.name || 'N/A');
+		// console.log("   - Job Video Thumbnail:", job.jobVideoThumbnail || '❌ Not present');
+		// console.log("   - Thumbnail:", job.thumbnail || '❌ Not present');
+		// console.log("   - Company Logo:", job._company?.logo || '❌ Not present');
+		// console.log("   - Company Thumbnail:", job._company?.thumbnail || '❌ Not present');
 
 		let state = '';
 		let city = '';
@@ -704,9 +728,25 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 		// Enhanced crawler detection - WhatsApp uses specific user agents
 		const isCrawler = /facebookexternalhit|WhatsApp|whatsapp|Twitter|LinkedIn|Slack|Telegram|Skype|Discord|bot|crawler|spider|facebook|Facebot|Googlebot/i.test(userAgent);
 		
-		// If explicitly requesting JSON (React app), return JSON. Otherwise return HTML with meta tags
-		// Always return HTML for crawlers, or if not explicitly requesting JSON
-		if (isCrawler || !acceptsJson) {
+		// console.log("🔍 Request Analysis:");
+		// console.log("   - Accepts JSON:", acceptsJson);
+		// console.log("   - Is Crawler:", isCrawler);
+		if (isCrawler) {
+			console.log("   🤖 Detected as Social Media Crawler (WhatsApp/Facebook/etc.)");
+		} else {
+			console.log("   🌐 Detected as Regular Browser");
+		}
+		
+		// Get frontend URL from environment or default to localhost:3000
+		const frontendUrl = process.env.FRONTEND_URL || (process.env.BASE_URL ? process.env.BASE_URL.replace(':8080', ':3000').replace(':443', '').replace(':80', '') : 'http://localhost:3000');
+		
+		// Logic:
+		// 1. Social media crawler → HTML with meta tags (for rich preview card)
+		// 2. React app (JSON request) → JSON response
+		// 3. Regular browser (non-JSON, non-crawler) → Redirect to frontend joblisting page
+		if (isCrawler) {
+			// Social media crawler - serve HTML with meta tags for rich preview
+			console.log("📄 Serving HTML response with Open Graph meta tags (for social media rich preview)");
 			// Return HTML with meta tags for social media crawlers and browsers
 			const baseUrl = `${req.protocol}://${req.get('host')}`;
 			const jobUrl = `${baseUrl}/jobdetailsmore/${jobId}`;
@@ -720,35 +760,96 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			}
 			
 			// Get absolute image URL - MUST be absolute for social media
+			// Priority: jobVideoThumbnail > thumbnail > _company?.logo > default image
 			let thumbnailUrl = '';
-			if (job._company?.thumbnail) {
-				// Check if already absolute URL
-				if (job._company.thumbnail.startsWith('http://') || job._company.thumbnail.startsWith('https://')) {
-					thumbnailUrl = job._company.thumbnail;
+			if (job.jobVideoThumbnail) {
+				console.log("✅ Using jobVideoThumbnail for rich preview");
+				// jobVideoThumbnail is usually already an absolute URL from S3
+				if (job.jobVideoThumbnail.startsWith('http://') || job.jobVideoThumbnail.startsWith('https://')) {
+					thumbnailUrl = job.jobVideoThumbnail;
+					console.log("   - jobVideoThumbnail is already absolute URL");
 				} else {
-					// Use bucket URL (must be absolute)
+					// If relative, make it absolute using bucket URL
 					if (process.env.MIPIE_BUCKET_URL) {
-						// Ensure bucket URL doesn't have trailing slash
 						const bucketUrl = process.env.MIPIE_BUCKET_URL.endsWith('/') 
 							? process.env.MIPIE_BUCKET_URL.slice(0, -1) 
 							: process.env.MIPIE_BUCKET_URL;
-						// Ensure thumbnail path doesn't start with slash
-						const thumbPath = job._company.thumbnail.startsWith('/') 
-							? job._company.thumbnail.slice(1) 
-							: job._company.thumbnail;
+						const thumbPath = job.jobVideoThumbnail.startsWith('/') 
+							? job.jobVideoThumbnail.slice(1) 
+							: job.jobVideoThumbnail;
 						thumbnailUrl = `${bucketUrl}/${thumbPath}`;
+						console.log("   - Converted relative jobVideoThumbnail to absolute using bucket URL");
 					} else {
-						// Fallback to base URL (ngrok URL)
-						const thumbPath = job._company.thumbnail.startsWith('/') 
-							? job._company.thumbnail.slice(1) 
-							: job._company.thumbnail;
+						const thumbPath = job.jobVideoThumbnail.startsWith('/') 
+							? job.jobVideoThumbnail.slice(1) 
+							: job.jobVideoThumbnail;
 						thumbnailUrl = `${baseUrl}/${thumbPath}`;
+						console.log("   - Converted relative jobVideoThumbnail to absolute using base URL");
+					}
+				}
+			} else if (job.thumbnail) {
+				console.log("⚠️ jobVideoThumbnail not found, using thumbnail field");
+				// thumbnail might be absolute or relative
+				if (job.thumbnail.startsWith('http://') || job.thumbnail.startsWith('https://')) {
+					thumbnailUrl = job.thumbnail;
+					console.log("   - thumbnail is already absolute URL");
+				} else {
+					// If relative, make it absolute using bucket URL or base URL
+					if (process.env.MIPIE_BUCKET_URL) {
+						const bucketUrl = process.env.MIPIE_BUCKET_URL.endsWith('/') 
+							? process.env.MIPIE_BUCKET_URL.slice(0, -1) 
+							: process.env.MIPIE_BUCKET_URL;
+						const thumbPath = job.thumbnail.startsWith('/') 
+							? job.thumbnail.slice(1) 
+							: job.thumbnail;
+						thumbnailUrl = `${bucketUrl}/${thumbPath}`;
+						console.log("   - Converted relative thumbnail to absolute using bucket URL");
+					} else {
+						const thumbPath = job.thumbnail.startsWith('/') 
+							? job.thumbnail 
+							: `/${job.thumbnail}`;
+						thumbnailUrl = `${baseUrl}${thumbPath}`;
+						console.log("   - Converted relative thumbnail to absolute using base URL");
+					}
+				}
+			} else if (job._company?.logo) {
+				console.log("⚠️ jobVideoThumbnail and thumbnail not found, using company logo");
+				// company logo might be absolute or relative
+				if (job._company.logo.startsWith('http://') || job._company.logo.startsWith('https://')) {
+					thumbnailUrl = job._company.logo;
+					console.log("   - company logo is already absolute URL");
+				} else {
+					// If relative, make it absolute using bucket URL or base URL
+					if (process.env.MIPIE_BUCKET_URL) {
+						const bucketUrl = process.env.MIPIE_BUCKET_URL.endsWith('/') 
+							? process.env.MIPIE_BUCKET_URL.slice(0, -1) 
+							: process.env.MIPIE_BUCKET_URL;
+						const logoPath = job._company.logo.startsWith('/') 
+							? job._company.logo.slice(1) 
+							: job._company.logo;
+						thumbnailUrl = `${bucketUrl}/${logoPath}`;
+						console.log("   - Converted relative company logo to absolute using bucket URL");
+					} else {
+						const logoPath = job._company.logo.startsWith('/') 
+							? job._company.logo 
+							: `/${job._company.logo}`;
+						thumbnailUrl = `${baseUrl}${logoPath}`;
+						console.log("   - Converted relative company logo to absolute using base URL");
 					}
 				}
 			} else {
 				// Default image - use absolute URL
-				thumbnailUrl = `${baseUrl}/Assets/public_assets/images/newjoblisting/banner1.jpg`;
+				console.log("⚠️ jobVideoThumbnail, thumbnail, and company logo not found, using default image");
+				thumbnailUrl = `${baseUrl}/Assets/public_assets/images/newjoblisting/course_img.svg`;
+				console.log("   - Using default image: /Assets/public_assets/images/newjoblisting/course_img.svg");
 			}
+
+			console.log("🖼️  Thumbnail URL for meta tags:", thumbnailUrl);
+			console.log("📝 Meta Tags Generated:");
+			console.log("   - og:title:", jobTitle);
+			console.log("   - og:description:", jobDescription.substring(0, 50) + "...");
+			console.log("   - og:image:", thumbnailUrl);
+			console.log("   - og:url:", jobUrl);
 
 			const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -803,20 +904,51 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			// Set proper headers for HTML response
 			res.setHeader('Content-Type', 'text/html; charset=utf-8');
 			res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+			console.log("✅ Sending HTML response with meta tags");
+			console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 			return res.send(htmlContent);
+		} else if (acceptsJson) {
+			// React app requesting JSON - serve JSON response
+			console.log("📦 Serving JSON response for React app");
+			
+			// Log thumbnail info for debugging (even for JSON responses)
+			console.log("🖼️  Thumbnail Info for Frontend:");
+			if (job.jobVideoThumbnail) {
+				console.log("   ✅ Using: jobVideoThumbnail");
+				console.log("   📍 URL:", job.jobVideoThumbnail);
+			} else if (job.thumbnail) {
+				console.log("   ✅ Using: thumbnail");
+				console.log("   📍 URL:", job.thumbnail);
+			} else if (job._company?.logo) {
+				console.log("   ✅ Using: company logo");
+				console.log("   📍 URL:", job._company.logo);
+			} else {
+				console.log("   ⚠️  No thumbnail found - frontend will use default image");
+			}
+			
+			console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+			return res.json({
+				status: true,
+				job,
+				recentJobs,
+				state,
+				city,
+				courses
+			});
+		} else {
+			// Regular browser accessing backend URL directly - redirect to frontend joblisting page
+			console.log("🔄 Regular browser detected - redirecting to frontend joblisting page");
+			console.log("   Redirect URL:", `${frontendUrl}/joblisting`);
+			console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+			return res.redirect(302, `${frontendUrl}/joblisting`);
 		}
-
-		// Return JSON for React app
-		return res.json({
-			status: true,
-			job,
-			recentJobs,
-			state,
-			city,
-			courses
-		});
 	} catch (err) {
-		console.log(err, 'err>>>>>>>>>>>>')
+		console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		console.error("❌ ERROR in /jobdetailsmore/:jobId route");
+		console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		console.error("Error:", err.message);
+		console.error("Stack:", err.stack);
+		console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		return res.status(500).json({ status: false, message: err.message || "Failed to load job details" });
 	}
 });
