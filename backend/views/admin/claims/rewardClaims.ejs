@@ -1,0 +1,480 @@
+<% include ../partials/header %>
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-12 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-9">
+        <h3 class="content-header-title float-left mb-0">Reward Claims Management</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+            <li class="breadcrumb-item active">Reward Claims</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="content-body">
+  <% include ../partials/flash %>
+
+  <section class="list-view">
+    <div class="row">
+      <div class="col-12 rounded equal-height-2 coloumn-2">
+        <div class="card">
+          <!-- Statistics Cards -->
+          <div class="row mb-3 mt-2">
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="card bg-primary text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Total Claims</h5>
+                  <h2><%= stats.total || 0 %></h2>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="card bg-warning text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Pending</h5>
+                  <h2><%= stats.pending || 0 %></h2>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="card bg-success text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Approved</h5>
+                  <h2><%= stats.approved || 0 %></h2>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="card bg-danger text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Rejected</h5>
+                  <h2><%= stats.rejected || 0 %></h2>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="card-content">
+            <div class="row mb-2">
+              <div class="col-xl-12 col-lg-12">
+                <form method="GET" id="filterForm">
+                  <div class="row">
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
+                      <label>Status</label>
+                      <select class="form-control text-capitalize" name="status" id="status">
+                        <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>All Status</option>
+                        <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                        <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+                        <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+                      </select>
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
+                      <label>Reward Type</label>
+                      <select class="form-control text-capitalize" name="rewardType" id="rewardType">
+                        <option value="all" <%= filters.rewardType === 'all' ? 'selected' : '' %>>All Types</option>
+                        <option value="money" <%= filters.rewardType === 'money' ? 'selected' : '' %>>Money</option>
+                        <option value="gift" <%= filters.rewardType === 'gift' ? 'selected' : '' %>>Gift</option>
+                        <option value="trophy" <%= filters.rewardType === 'trophy' ? 'selected' : '' %>>Trophy</option>
+                        <option value="voucher" <%= filters.rewardType === 'voucher' ? 'selected' : '' %>>Voucher</option>
+                        <option value="other" <%= filters.rewardType === 'other' ? 'selected' : '' %>>Other</option>
+                      </select>
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
+                      <label>Candidate</label>
+                      <select class="form-control" name="candidateId" id="candidateId">
+                        <option value="">All Candidates</option>
+                        <% if (candidates && candidates.length > 0) { %>
+                          <% candidates.forEach((candidate) => { %>
+                            <option value="<%= candidate._id %>" <%= filters.candidateId === candidate._id.toString() ? 'selected' : '' %>>
+                              <%= candidate.name %> (<%= candidate.mobile %>)
+                            </option>
+                          <% }); %>
+                        <% } %>
+                      </select>
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1" style="margin-top: 2.5rem !important;">
+                      <button class="btn btn-success waves-effect waves-light text-white" type="submit">Filter</button>
+                      <a class="btn btn-danger waves-effect waves-light text-white ml-1" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims">Reset</a>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Claims Table -->
+            <div class="table-responsive">
+              <table class="table table-hover-animation mb-0 table-hover">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Reward</th>
+                    <th>Type</th>
+                    <th>Details</th>
+                    <th>Documents</th>
+                    <th>Claimed At</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (claims && claims.length > 0) { %>
+                    <% claims.forEach((claim) => { %>
+                      <tr>
+                        <td>
+                          <strong><%= claim.candidateName %></strong><br>
+                          <small><%= claim.candidateMobile %></small>
+                        </td>
+                        <td>
+                          <strong><%= claim.rewardTitle %></strong>
+                          <% if (claim.rewardDescription) { %>
+                            <br><small class="text-muted"><%= claim.rewardDescription.substring(0, 50) %>...</small>
+                          <% } %>
+                        </td>
+                        <td class="text-capitalize">
+                          <span class="badge badge-<%= claim.rewardType === 'money' ? 'success' : claim.rewardType === 'gift' ? 'info' : claim.rewardType === 'trophy' ? 'warning' : 'secondary' %>">
+                            <%= claim.rewardType %>
+                          </span>
+                        </td>
+                        <td>
+                          <% if (claim.rewardType === 'money') { %>
+                            <% if (claim.upiNumber) { %>
+                              <strong>UPI Number:</strong> <%= claim.upiNumber %><br>
+                            <% } %>
+                            <% if (claim.upiId) { %>
+                              <strong>UPI ID:</strong> <%= claim.upiId %><br>
+                            <% } %>
+                          <% } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') { %>
+                            <strong>Address:</strong><br>
+                            <small><%= claim.address ? (claim.address.length > 50 ? claim.address.substring(0, 50) + '...' : claim.address) : 'N/A' %></small>
+                          <% } %>
+                          <% if (claim.feedback) { %>
+                            <br><strong>Feedback:</strong><br>
+                            <small><%= claim.feedback.length > 30 ? claim.feedback.substring(0, 30) + '...' : claim.feedback %></small>
+                          <% } %>
+                        </td>
+                        <td>
+                          <% if (claim.documents && claim.documents.length > 0) { %>
+                            <% claim.documents.forEach((doc) => { %>
+                              <a href="<%= process.env.MIPIE_BUCKET_URL %>/<%= doc.documentKey %>" target="_blank" class="btn btn-sm btn-info mb-1">
+                                View <%= doc.documentName %>
+                              </a><br>
+                            <% }); %>
+                          <% } else { %>
+                            <span class="text-muted">No documents</span>
+                          <% } %>
+                        </td>
+                        <td><%= claim.claimedAtFormatted %></td>
+                        <td>
+                          <span class="badge badge-<%= claim.status === 'approved' ? 'success' : claim.status === 'rejected' ? 'danger' : 'warning' %> text-capitalize">
+                            <%= claim.status %>
+                          </span>
+                          <% if (claim.status === 'approved' && claim.approvedAtFormatted) { %>
+                            <br><small>Approved: <%= claim.approvedAtFormatted %></small>
+                          <% } %>
+                          <% if (claim.status === 'rejected' && claim.rejectedAtFormatted) { %>
+                            <br><small>Rejected: <%= claim.rejectedAtFormatted %></small>
+                          <% } %>
+                          <% if (claim.disbursedAtFormatted) { %>
+                            <br><small class="text-success">Disbursed: <%= claim.disbursedAtFormatted %></small>
+                          <% } %>
+                        </td>
+                        <td>
+                          <% if (claim.status === 'pending') { %>
+                            <button class="btn btn-success btn-sm text-white" onclick="approveClaim('<%= claim._id %>')">
+                              Approve
+                            </button>
+                            <button class="btn btn-danger btn-sm text-white" onclick="rejectClaim('<%= claim._id %>')">
+                              Reject
+                            </button>
+                          <% } else if (claim.status === 'approved' && !claim.disbursedAt) { %>
+                            <button class="btn btn-primary btn-sm text-white" onclick="disburseClaim('<%= claim._id %>')">
+                              Mark Disbursed
+                            </button>
+                          <% } else { %>
+                            <span class="text-muted">No action</span>
+                          <% } %>
+                          <button class="btn btn-info btn-sm text-white mt-1" onclick="viewClaimDetails('<%= claim._id %>')">
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  <% } else { %>
+                    <tr>
+                      <td colspan="8" class="text-center">No claims found</td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Approve Reward Claim</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to approve this reward claim?</p>
+        <div class="form-group">
+          <label>Admin Remarks (Optional)</label>
+          <textarea class="form-control" id="approveRemarks" rows="3" placeholder="Add any remarks..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="confirmApprove()">Approve</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reject Reward Claim</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to reject this reward claim?</p>
+        <div class="form-group">
+          <label>Admin Remarks <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="rejectRemarks" rows="3" placeholder="Please provide reason for rejection..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmReject()">Reject</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewDetailsModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Claim Details</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="claimDetailsContent">
+        <p>Loading...</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentClaimId = null;
+
+function approveClaim(claimId) {
+  currentClaimId = claimId;
+  $('#approveModal').modal('show');
+}
+
+function confirmApprove() {
+  const remarks = $('#approveRemarks').val();
+  
+  fetch(`/admin/rewardClaims/${currentClaimId}/approve`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ adminRemarks: remarks })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Claim approved successfully!');
+      location.reload();
+    } else {
+      alert('Error: ' + (data.message || 'Failed to approve claim'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error approving claim');
+  });
+}
+
+function rejectClaim(claimId) {
+  currentClaimId = claimId;
+  $('#rejectRemarks').val('');
+  $('#rejectModal').modal('show');
+}
+
+function confirmReject() {
+  const remarks = $('#rejectRemarks').val().trim();
+  
+  if (!remarks) {
+    alert('Please provide reason for rejection');
+    return;
+  }
+  
+  fetch(`/admin/rewardClaims/${currentClaimId}/reject`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ adminRemarks: remarks })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Claim rejected successfully!');
+      location.reload();
+    } else {
+      alert('Error: ' + (data.message || 'Failed to reject claim'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error rejecting claim');
+  });
+}
+
+function disburseClaim(claimId) {
+  if (!confirm('Mark this claim as disbursed?')) {
+    return;
+  }
+  
+  fetch(`/admin/rewardClaims/${claimId}/disburse`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Claim marked as disbursed successfully!');
+      location.reload();
+    } else {
+      alert('Error: ' + (data.message || 'Failed to mark as disbursed'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error marking claim as disbursed');
+  });
+}
+
+function viewClaimDetails(claimId) {
+  fetch(`/admin/rewardClaims/${claimId}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const claim = data.data;
+        let html = `
+          <div class="row">
+            <div class="col-md-6">
+              <h6>Candidate Information</h6>
+              <p><strong>Name:</strong> ${claim._candidate?.name || 'N/A'}</p>
+              <p><strong>Mobile:</strong> ${claim._candidate?.mobile || 'N/A'}</p>
+              <p><strong>Email:</strong> ${claim._candidate?.email || 'N/A'}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>Reward Information</h6>
+              <p><strong>Title:</strong> ${claim._rewardStatus?.title || 'N/A'}</p>
+              <p><strong>Type:</strong> ${claim.rewardType || 'N/A'}</p>
+              <p><strong>Description:</strong> ${claim._rewardStatus?.description || 'N/A'}</p>
+            </div>
+          </div>
+          <hr>
+          <div class="row">
+            <div class="col-md-12">
+              <h6>Claim Details</h6>
+        `;
+        
+        if (claim.rewardType === 'money') {
+          if (claim.upiNumber) html += `<p><strong>UPI Number:</strong> ${claim.upiNumber}</p>`;
+          if (claim.upiId) html += `<p><strong>UPI ID:</strong> ${claim.upiId}</p>`;
+        } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') {
+          html += `<p><strong>Address:</strong> ${claim.address || 'N/A'}</p>`;
+        }
+        
+        if (claim.feedback) {
+          html += `<p><strong>Feedback:</strong> ${claim.feedback}</p>`;
+        }
+        
+        html += `
+            </div>
+          </div>
+          <hr>
+          <div class="row">
+            <div class="col-md-12">
+              <h6>Documents</h6>
+        `;
+        
+        if (claim.documents && claim.documents.length > 0) {
+          claim.documents.forEach(doc => {
+            html += `
+              <p>
+                <strong>${doc.documentName}:</strong>
+                <a href="<%= process.env.MIPIE_BUCKET_URL %>/${doc.documentKey}" target="_blank" class="btn btn-sm btn-info ml-2">
+                  View Document
+                </a>
+              </p>
+            `;
+          });
+        } else {
+          html += `<p class="text-muted">No documents uploaded</p>`;
+        }
+        
+        html += `
+            </div>
+          </div>
+          <hr>
+          <div class="row">
+            <div class="col-md-12">
+              <h6>Status Information</h6>
+              <p><strong>Status:</strong> <span class="badge badge-${claim.status === 'approved' ? 'success' : claim.status === 'rejected' ? 'danger' : 'warning'}">${claim.status}</span></p>
+              <p><strong>Claimed At:</strong> ${new Date(claim.claimedAt).toLocaleString('en-IN')}</p>
+              ${claim.approvedAt ? `<p><strong>Approved At:</strong> ${new Date(claim.approvedAt).toLocaleString('en-IN')}</p>` : ''}
+              ${claim.rejectedAt ? `<p><strong>Rejected At:</strong> ${new Date(claim.rejectedAt).toLocaleString('en-IN')}</p>` : ''}
+              ${claim.disbursedAt ? `<p><strong>Disbursed At:</strong> ${new Date(claim.disbursedAt).toLocaleString('en-IN')}</p>` : ''}
+              ${claim.adminRemarks ? `<p><strong>Admin Remarks:</strong> ${claim.adminRemarks}</p>` : ''}
+            </div>
+          </div>
+        `;
+        
+        $('#claimDetailsContent').html(html);
+        $('#viewDetailsModal').modal('show');
+      } else {
+        alert('Error loading claim details');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error loading claim details');
+    });
+}
+</script>
+
+<% include ../partials/footer %>
+
+

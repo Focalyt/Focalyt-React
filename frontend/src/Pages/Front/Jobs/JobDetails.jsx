@@ -117,8 +117,44 @@ function JobDetails() {
 
     const mediaGallery = job._company?.mediaGallery || [];
     const videoUrl = job._company?.mediaGalaryVideo ? `${bucketUrl}/${job._company.mediaGalaryVideo}` : '';
-    // Note: thumbnail might not be in the populated fields, using default if not available
-    const thumbnailUrl = job._company?.thumbnail ? `${bucketUrl}/${job._company.thumbnail}` : '/Assets/public_assets/images/newjoblisting/banner1.jpg';
+
+    let thumbnailUrl = '';
+    if (job.jobVideoThumbnail) {
+        // jobVideoThumbnail is usually already an absolute URL from S3
+        if (job.jobVideoThumbnail.startsWith('http://') || job.jobVideoThumbnail.startsWith('https://')) {
+            thumbnailUrl = job.jobVideoThumbnail;
+        } else {
+            // If relative, make it absolute using bucketUrl
+            const thumbPath = job.jobVideoThumbnail.startsWith('/') 
+                ? job.jobVideoThumbnail.slice(1) 
+                : job.jobVideoThumbnail;
+            thumbnailUrl = bucketUrl ? `${bucketUrl}/${thumbPath}` : job.jobVideoThumbnail;
+        }
+    } else if (job.thumbnail) {
+        // thumbnail might be absolute or relative
+        if (job.thumbnail.startsWith('http://') || job.thumbnail.startsWith('https://')) {
+            thumbnailUrl = job.thumbnail;
+        } else {
+            const thumbPath = job.thumbnail.startsWith('/') 
+                ? job.thumbnail.slice(1) 
+                : job.thumbnail;
+            thumbnailUrl = bucketUrl ? `${bucketUrl}/${thumbPath}` : job.thumbnail;
+        }
+    } else if (job._company?.logo) {
+        // company logo might be absolute or relative
+        if (job._company.logo.startsWith('http://') || job._company.logo.startsWith('https://')) {
+            thumbnailUrl = job._company.logo;
+        } else {
+            const logoPath = job._company.logo.startsWith('/') 
+                ? job._company.logo.slice(1) 
+                : job._company.logo;
+            thumbnailUrl = bucketUrl ? `${bucketUrl}/${logoPath}` : job._company.logo;
+        }
+    } else {
+        // Default fallback
+        thumbnailUrl = '/Assets/public_assets/images/newjoblisting/course_img.svg';
+    }
+    
     const jobDescriptionArray = job.jobDescription ? job.jobDescription.split('\n').filter(item => item.trim()) : [];
     const dutiesArray = job.duties ? job.duties.split('\n').filter(item => item.trim()) : [];
     const remarksArray = job.remarks ? job.remarks.split('\n').filter(item => item.trim()) : [];
@@ -126,34 +162,44 @@ function JobDetails() {
 
     // Meta tags data for social sharing
     const jobTitle = job.title || job.name || 'Job Opening';
+    const companyName = job._company?.name || 'Focalyt';
     const jobDescription = job.jobDescription 
         ? job.jobDescription.substring(0, 200).replace(/\n/g, ' ').trim() + '...'
-        : `Apply for ${jobTitle} at ${job._company?.name || 'Focalyt'}`;
+        : `Apply for ${jobTitle} at ${companyName}`;
     const shareUrl = `${window.location.origin}/jobdetailsmore/${jobId}`;
-    const shareImage = thumbnailUrl.startsWith('http') ? thumbnailUrl : `${window.location.origin}${thumbnailUrl}`;
+    // Ensure shareImage is always an absolute URL for Open Graph meta tags
+    const shareImage = thumbnailUrl.startsWith('http') 
+        ? thumbnailUrl 
+        : `${window.location.origin}${thumbnailUrl.startsWith('/') ? thumbnailUrl : '/' + thumbnailUrl}`;
 
     return (
         <FrontLayout>
             <Helmet>
                 {/* Primary Meta Tags */}
-                <title>{jobTitle} - Focalyt</title>
-                <meta name="title" content={jobTitle} />
+                <title>{jobTitle} - {companyName} | Focalyt</title>
+                <meta name="title" content={`${jobTitle} - ${companyName}`} />
                 <meta name="description" content={jobDescription} />
                 
-                {/* Open Graph / Facebook */}
+                {/* Open Graph / Facebook / WhatsApp */}
                 <meta property="og:type" content="website" />
                 <meta property="og:url" content={shareUrl} />
-                <meta property="og:title" content={jobTitle} />
+                <meta property="og:title" content={`${jobTitle} - ${companyName}`} />
                 <meta property="og:description" content={jobDescription} />
                 <meta property="og:image" content={shareImage} />
+                <meta property="og:image:secure_url" content={shareImage} />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
+                <meta property="og:image:type" content="image/jpeg" />
                 <meta property="og:site_name" content="Focalyt" />
+                <meta property="og:locale" content="en_US" />
                 
-                {/* Twitter */}
+                {/* Twitter Card */}
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:url" content={shareUrl} />
-                <meta name="twitter:title" content={jobTitle} />
+                <meta name="twitter:title" content={`${jobTitle} - ${companyName}`} />
                 <meta name="twitter:description" content={jobDescription} />
                 <meta name="twitter:image" content={shareImage} />
+                <meta name="twitter:image:src" content={shareImage} />
             </Helmet>
             <section className="section-padding-120 mt-5">
                 <div className="container">

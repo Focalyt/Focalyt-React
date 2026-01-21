@@ -21,6 +21,9 @@ import Contact from './Pages/Front/Contact/Contact';
 import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import EmployersTermsofService from './Pages/Front/EmpTerms/EmpTerms';
 import UserAgreement from './Pages/Front/UserAgreement/UserAgreement';
+import MyAchievement from './Pages/App/Candidate/Earning/MyAchievement';
+
+
 import "./App.css";
 // import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
@@ -217,6 +220,7 @@ const Layout = () => {
           <Route path="appliedJobs" element={<CandidateAppliedJobs />} />
           <Route path="cashback" element={<CandidateWallet />} />
           <Route path="myEarnings" element={<CandidateEarning />} />
+          <Route path="myAchievement" element={<MyAchievement />} />
           <Route path="referral" element={<ReferAndEarn />} />
           <Route path="Coins" element={<CoinsPage />} />
           <Route path="requestLoan" element={<LoanApplicationPage />} />

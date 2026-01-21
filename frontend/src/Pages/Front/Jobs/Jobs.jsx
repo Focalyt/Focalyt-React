@@ -1149,7 +1149,7 @@ button.close span {
   
   .right_obj {
     position: absolute;
-    top: 10px;
+    top: 33px;
     background-color: #ec4899;
     color: white;
     padding: 5px 10px;
@@ -1420,8 +1420,8 @@ button.close span {
   }
 
   .verified-badge {
-    width: 100%!important;
-    height: 100%!important;
+    width: 50% !important;
+    height: 50% !important;
     border-radius: 50%;
     animation: pulse 2s ease-in-out infinite;
     z-index: 1002;
@@ -1429,12 +1429,15 @@ button.close span {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 15px rgba(76, 175, 80, 0.5);
     filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
     object-fit: cover;
+    right: -41px;
+    top: -10px;
+    transform-origin: center center;
   }
 
   .wave-ring {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 0%;
+    left: 100%;
     transform: translate(-50%, -50%);
     border-radius: 50%;
     border: 2px solid rgba(76, 175, 80, 0.6);
@@ -1467,9 +1470,11 @@ button.close span {
   @keyframes pulse {
     0%, 100% {
       transform: scale(1);
+      opacity: 1;
     }
     50% {
-      transform: scale(1.05);
+      transform: scale(1.1);
+      opacity: 0.9;
     }
   }
 

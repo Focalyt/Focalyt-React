@@ -72,6 +72,8 @@ const addControlRoutes = require('./autoControl');
 const statusB2BRoutes = require('./statusB2B');
 const statusB2CRoutes = require('./statusB2C');
 const placementStatusRoutes = require('./placementStatus');
+const rewardStatusRoutes = require('./rewardStatus');
+const rewardClaimsRoutes = require('./rewardClaims');
 
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
@@ -124,6 +126,8 @@ router.use('/eventType', eventTypeRoutes);
 router.use('/statusB2B', statusB2BRoutes);
 router.use('/statusB2C', statusB2CRoutes);
 router.use('/placementStatus', placementStatusRoutes);
+router.use('/rewardStatus', rewardStatusRoutes);
+router.use('/rewardClaims', rewardClaimsRoutes);
 
 const backendUrl = process.env.MIPIE_BACKEND_URL;
 

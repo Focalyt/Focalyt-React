@@ -22,8 +22,24 @@ const CandidateEarning = ({
 
   const [error, setError] = useState('');
   const [documentError, setDocumentError] = useState('');
-  const backendUrl = process.env.REACT_APP_BASE_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const [modalInstance, setModalInstance] = useState(null);
+  const [rewardStatuses, setRewardStatuses] = useState([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
+  const [selectedReward, setSelectedReward] = useState(null);
+  const [upiType, setUpiType] = useState('number'); // 'number' or 'id'
+  const [claimFormData, setClaimFormData] = useState({
+    upiNumber: '',
+    upiId: '',
+    address: '',
+    documents: {},
+    feedback: ''
+  });
+  const [uploadingDocs, setUploadingDocs] = useState({});
+  const [claimError, setClaimError] = useState('');
+  const [claimLoading, setClaimLoading] = useState(false);
 
   const requestCashback = () => {
     axios.post(`${backendUrl}/requestCashback`,
@@ -75,7 +91,7 @@ const CandidateEarning = ({
       const formDataObj = new FormData();
       formDataObj.append('file', file);
 
-      axios.post('/api/uploadSingleFile', formDataObj, {
+      axios.post(`${backendUrl}/api/uploadSingleFile`, formDataObj, {
         headers: {
           'x-auth': localStorage.getItem('token'),
           "Content-Type": "multipart/form-data"
@@ -148,6 +164,31 @@ const CandidateEarning = ({
     form.submit();
   };
 
+  // Fetch reward statuses from candidate endpoint
+  useEffect(() => {
+    const fetchRewardStatuses = async () => {
+      setLoadingStatuses(true);
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${backendUrl}/candidate/rewardStatuses`, {
+          headers: { "x-auth": token },
+        });
+        console.log("✅ Reward Statuses Fetched:", response);
+        if (response.data && response.data.success && response.data.data) {
+          setRewardStatuses(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching reward statuses:", error);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    if (backendUrl) {
+      fetchRewardStatuses();
+    }
+  }, [backendUrl]);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.document) {
       const kycModal = document.getElementById('kyc');
@@ -200,6 +241,199 @@ const CandidateEarning = ({
       } else {
         console.error("KYC Modal element not found in the DOM");
       }
+    }
+  };
+
+  const openClaimModal = (rewardStatus) => {
+    setSelectedReward(rewardStatus);
+    setUpiType('number'); // Reset to default
+    setClaimFormData({
+      upiNumber: '',
+      upiId: '',
+      address: '',
+      documents: {},
+      feedback: ''
+    });
+    setClaimError('');
+    setClaimModalOpen(true);
+  };
+
+  const closeClaimModal = () => {
+    setClaimModalOpen(false);
+    setSelectedReward(null);
+    setUpiType('number'); // Reset to default
+    setClaimFormData({
+      upiNumber: '',
+      upiId: '',
+      address: '',
+      documents: {},
+      feedback: ''
+    });
+    setClaimError('');
+  };
+
+  const handleClaimInputChange = (e) => {
+    const { name, value } = e.target;
+    setClaimFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleDocumentUpload = async (e, docName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type (matching Registrations.jsx pattern)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'];
+    
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      alert("Please upload file in .jpg, .jpeg, .png, .gif, .pdf, .doc, or .docx format");
+      e.target.value = '';
+      return;
+    }
+
+    // Check file size (max 10MB - matching Registrations.jsx)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert("File size should be less than 10MB");
+      e.target.value = '';
+      return;
+    }
+
+    setUploadingDocs(prev => ({ ...prev, [docName]: true }));
+
+    try {
+      const formDataObj = new FormData();
+      formDataObj.append('file', file);
+      
+      // Create filename for S3 organization (similar to Registrations.jsx pattern)
+      // Format: reward-claim-{statusId}-{docName}
+      const statusId = selectedReward?._id || 'general';
+      const sanitizedDocName = docName.replace(/\s+/g, '-').toLowerCase();
+      const filename = `reward-claim-${statusId}-${sanitizedDocName}`;
+      
+      // Send filename in URL parameter (URL-encoded for safety)
+      const encodedFilename = encodeURIComponent(filename);
+
+      const response = await axios.post(`${backendUrl}/api/uploadSingleFile/${encodedFilename}`, formDataObj, {
+        headers: {
+          'x-auth': localStorage.getItem('token'),
+          "Content-Type": "multipart/form-data"
+        }
+      });
+
+      if (response.data.status && response.data.data) {
+        // Response structure: { status: true, data: { Key: "...", Location: "..." } }
+        const documentKey = response.data.data.Key || response.data.data.key || response.data.data.Location;
+        
+        if (documentKey) {
+          setClaimFormData(prev => ({
+            ...prev,
+            documents: {
+              ...prev.documents,
+              [docName]: {
+                documentName: docName,
+                documentKey: documentKey,
+                uploadedAt: new Date().toISOString()
+              }
+            }
+          }));
+          // Success feedback (matching Registrations.jsx pattern)
+          console.log('Document uploaded successfully:', docName);
+        } else {
+          alert("There is some error while uploading the document. Please upload again.");
+          e.target.value = '';
+        }
+      } else {
+        const errorMsg = response.data.message || response.data.err || "Failed to upload file";
+        alert(errorMsg);
+        e.target.value = '';
+      }
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      const errorMsg = error.response?.data?.message || error.response?.data?.err || error.message || "Error uploading document. Please try again.";
+      alert(errorMsg);
+      e.target.value = '';
+    } finally {
+      setUploadingDocs(prev => ({ ...prev, [docName]: false }));
+    }
+  };
+
+  const handleClaimSubmit = async (e) => {
+    e.preventDefault();
+    setClaimError('');
+    
+    // Validate UPI fields for money reward
+    if (selectedReward.rewardType === 'money') {
+      if (upiType === 'number' && !claimFormData.upiNumber.trim()) {
+        setClaimError('Please enter UPI Number');
+        return;
+      }
+      if (upiType === 'id' && !claimFormData.upiId.trim()) {
+        setClaimError('Please enter UPI ID');
+        return;
+      }
+    }
+    
+    setClaimLoading(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      // Convert documents object to array with proper structure
+      const documentsArray = Object.values(claimFormData.documents).map(doc => ({
+        documentName: doc.documentName,
+        documentKey: doc.documentKey,
+        uploadedAt: doc.uploadedAt || new Date().toISOString()
+      }));
+
+      console.log('Submitting documents:', documentsArray); // Debug log
+
+      const payload = {
+        rewardStatusId: selectedReward._id,
+        documents: documentsArray,
+        feedback: selectedReward.requiresFeedback ? claimFormData.feedback : null
+      };
+
+      if (selectedReward.rewardType === 'money') {
+        // Only send the selected UPI type
+        if (upiType === 'number') {
+          payload.upiNumber = claimFormData.upiNumber.trim();
+          payload.upiId = null;
+        } else {
+          payload.upiId = claimFormData.upiId.trim();
+          payload.upiNumber = null;
+        }
+      }
+
+      if (selectedReward.rewardType === 'gift' || selectedReward.rewardType === 'trophy') {
+        payload.address = claimFormData.address;
+      }
+
+      const response = await axios.post(`${backendUrl}/candidate/claimReward`, payload, {
+        headers: { "x-auth": token }
+      });
+
+      if (response.data.success) {
+        alert("Reward claim submitted successfully!");
+        closeClaimModal();
+        // Refresh reward statuses
+        const statusResponse = await axios.get(`${backendUrl}/candidate/rewardStatuses`, {
+          headers: { "x-auth": token }
+        });
+        if (statusResponse.data.success && statusResponse.data.data) {
+          setRewardStatuses(statusResponse.data.data);
+        }
+      } else {
+        setClaimError(response.data.message || 'Failed to submit claim');
+      }
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      setClaimError(error.response?.data?.message || error.message || 'Failed to submit claim');
+    } finally {
+      setClaimLoading(false);
     }
   };
 
@@ -313,6 +547,111 @@ const CandidateEarning = ({
               </div>
             </div>
 
+            {/* Reward Statuses Section - Only show if rewards exist */}
+            {rewardStatuses.length > 0 && (
+              <div className="row mt-xl-5 mt-lg-2 mt-md-2 mt-sm-2 mt-2">
+                <div className="col-12">
+                  <div className="table-content shadow-cashback">
+                    <div className="tab_head font-weight-bolder py-1 px-1">Reward Achievement</div>
+                    <div className="tab_body bg-white p-3">
+                      <div className="row">
+                        {loadingStatuses ? (
+                          <div className="col-12 text-center py-3">
+                            <p>Loading reward statuses...</p>
+                          </div>
+                        ) : rewardStatuses.length > 0 ? (
+                        rewardStatuses.map((status, index) => {
+                          // Check if all previous rewards are claimed
+                          const previousRewardsClaimed = index === 0 || rewardStatuses.slice(0, index).every(prevStatus => prevStatus.isClaimed);
+                          const canClaim = !status.isClaimed && previousRewardsClaimed;
+                          
+                          return (
+                            <div key={status._id || index} className="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-3">
+                              <div className="card h-100" style={{ border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                                <div className="card-body">
+                                  <div className="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 className="card-title mb-0" style={{ fontWeight: 600 }}>
+                                      {status.title}
+                                    </h6>
+                                    <span 
+                                      className="badge" 
+                                      style={{ 
+                                        backgroundColor: '#3b82f6', 
+                                        color: 'white',
+                                        fontSize: '11px',
+                                        textTransform: 'capitalize'
+                                      }}
+                                    >
+                                      {status.rewardType || 'other'}
+                                    </span>
+                                  </div>
+                                  {status.description && (
+                                    <p className="card-text" style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
+                                      {status.description}
+                                    </p>
+                                  )}
+                                  {status.milestone && (
+                                    <p className="card-text" style={{ fontSize: '13px', color: '#059669', fontWeight: 500 }}>
+                                      {status.milestone}
+                                    </p>
+                                  )}
+                                  {status.rewardType === 'money' && (
+                                    <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
+                                      <strong>Note:</strong> Please provide your UPI details when claiming this reward
+                                    </div>
+                                  )}
+                                  {(status.rewardType === 'gift' || status.rewardType === 'trophy') && (
+                                    <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
+                                      <strong>Note:</strong> Please provide your delivery address when claiming this reward
+                                    </div>
+                                  )}
+                                  {status.substatuses && status.substatuses.length > 0 && (
+                                    <div className="mt-2">
+                                      <small style={{ color: '#6b7280', fontSize: '11px' }}>
+                                        {status.substatuses.length} Substatus{status.substatuses.length > 1 ? 'es' : ''}
+                                      </small>
+                                    </div>
+                                  )}
+                                  {!previousRewardsClaimed && !status.isClaimed && (
+                                    <div className="mt-2 mb-2">
+                                      <small style={{ color: '#dc3545', fontSize: '11px', fontStyle: 'italic' }}>
+                                        <i className="fas fa-info-circle mr-1"></i>
+                                        Complete previous rewards first
+                                      </small>
+                                    </div>
+                                  )}
+                                  <div className="mt-3">
+                                    {status.isClaimed ? (
+                                      <button className="btn btn-sm btn-secondary w-100" disabled>
+                                        {status.claimStatus === 'pending' ? 'Claim Pending' : 
+                                         status.claimStatus === 'approved' ? 'Claim Approved' :
+                                         status.claimStatus === 'rejected' ? 'Claim Rejected' :
+                                         status.claimStatus === 'disbursed' ? 'Disbursed' : 'Claimed'}
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        className={`btn btn-sm ${canClaim ? 'btn-primary' : 'btn-secondary'} w-100`}
+                                        onClick={() => canClaim && openClaimModal(status)}
+                                        disabled={!canClaim}
+                                        title={!canClaim ? 'Please claim previous rewards first' : 'Claim Reward'}
+                                      >
+                                        {canClaim ? 'Claim Reward' : 'Locked'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row mt-xl-5 mt-lg-2 mt-md-2 mt-sm-2 mt-2">
               <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 pl-xl-0 pr-xl-1 pl-lg-0 pr-lg-1 pl-md-0 pr-md-1 px-sm-0 px-0">
                 <div className="table-content shadow-cashback shadow-cashback">
@@ -396,7 +735,7 @@ const CandidateEarning = ({
         <div className="modal-dialog modal-dialog-centered" role="document">
           <div className="modal-content p-0">
             <div className="modal-header">
-              <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
+              <h5 className="modal-title text-black text-uppercase" id="exampleModalLongTitle">
                 Redeem Cashback
               </h5>
               <button type="button" className="close" data-dismiss="modal" aria-label="Close">
@@ -441,7 +780,7 @@ const CandidateEarning = ({
         <div className="modal-dialog modal-dialog-centered" role="document">
           <div className="modal-content p-0">
             <div className="modal-header">
-              <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
+              <h5 className="modal-title text-black text-uppercase" id="exampleModalLongTitle">
                 Upload KYC Document
               </h5>
               {/* <button type="button" className="close" data-dismiss="modal" aria-label="Close">
@@ -631,6 +970,218 @@ const CandidateEarning = ({
           </div>
         </div>
       </div>
+
+      {/* Reward Claim Modal */}
+      {claimModalOpen && selectedReward && (
+        <>
+          <div className="modal-backdrop fade show" onClick={closeClaimModal} style={{ zIndex: 1040 }}></div>
+          <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+            <div className="modal-dialog modal-dialog-centered modal-lg" role="document" style={{ zIndex: 1051 }}>
+              <div className="modal-content p-0">
+                <div className="modal-header">
+                  <h5 className="modal-title text-black text-uppercase">
+                    Claim Reward - {selectedReward.title}
+                  </h5>
+                  <button type="button" className="close text-white" onClick={closeClaimModal} aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </div>
+              <div className="modal-body pt-3">
+                <form onSubmit={handleClaimSubmit}>
+                  {selectedReward.rewardType === 'money' && (
+                    <>
+                      <div className="form-group mb-3">
+                        <label className="mb-2">Select UPI Type <span className="text-danger">*</span></label>
+                        <div className="d-flex gap-3 mb-3">
+                          <div className="form-check">
+                            <input
+                              className="form-check-input"
+                              type="radio"
+                              name="upiType"
+                              id="upiTypeNumber"
+                              value="number"
+                              checked={upiType === 'number'}
+                              onChange={(e) => {
+                                setUpiType('number');
+                                setClaimFormData(prev => ({ ...prev, upiId: '' })); // Clear UPI ID when switching
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor="upiTypeNumber">
+                              UPI Number
+                            </label>
+                          </div>
+                          <div className="form-check">
+                            <input
+                              className="form-check-input"
+                              type="radio"
+                              name="upiType"
+                              id="upiTypeId"
+                              value="id"
+                              checked={upiType === 'id'}
+                              onChange={(e) => {
+                                setUpiType('id');
+                                setClaimFormData(prev => ({ ...prev, upiNumber: '' })); // Clear UPI Number when switching
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor="upiTypeId">
+                              UPI ID
+                            </label>
+                          </div>
+                        </div>
+                        {upiType === 'number' ? (
+                          <div className="form-group mb-3">
+                            <label>UPI Number <span className="text-danger">*</span></label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="upiNumber"
+                              value={claimFormData.upiNumber}
+                              onChange={handleClaimInputChange}
+                              placeholder="Enter UPI Number (e.g., 9876543210)"
+                              required
+                            />
+                          </div>
+                        ) : (
+                          <div className="form-group mb-3">
+                            <label>UPI ID <span className="text-danger">*</span></label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="upiId"
+                              value={claimFormData.upiId}
+                              onChange={handleClaimInputChange}
+                              placeholder="Enter UPI ID (e.g., name@paytm)"
+                              required
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {(selectedReward.rewardType === 'gift' || selectedReward.rewardType === 'trophy') && (
+                    <div className="form-group mb-3">
+                      <label>Delivery Address <span className="text-danger">*</span></label>
+                      <textarea
+                        className="form-control"
+                        name="address"
+                        value={claimFormData.address}
+                        onChange={handleClaimInputChange}
+                        placeholder="Enter complete delivery address"
+                        rows="3"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {/* Dynamic Documents */}
+                  {selectedReward.requiredDocuments && selectedReward.requiredDocuments.length > 0 && (
+                    <div className="mb-3">
+                      <label className="font-weight-bold mb-2">Required Documents</label>
+                      <small className="d-block mb-2 text-muted">
+                        Supported: JPG, PNG, GIF, PDF, DOC, DOCX | Max size: 10MB
+                      </small>
+                      {selectedReward.requiredDocuments.map((doc, idx) => (
+                        <div key={idx} className="form-group mb-3">
+                          <label className="mb-1">
+                            {doc.name}
+                            {doc.mandatory && <span className="text-danger"> *</span>}
+                          </label>
+                          {claimFormData.documents[doc.name] ? (
+                            <div className="d-flex align-items-center">
+                              <a
+                                href={`${bucketUrl}/${claimFormData.documents[doc.name].documentKey}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mr-2 text-primary"
+                                style={{ textDecoration: 'underline' }}
+                              >
+                                <i className="fas fa-file-alt mr-1"></i>
+                                View Uploaded Document
+                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger ml-2"
+                                onClick={() => {
+                                  const newDocs = { ...claimFormData.documents };
+                                  delete newDocs[doc.name];
+                                  setClaimFormData(prev => ({ ...prev, documents: newDocs }));
+                                }}
+                              >
+                                <i className="fas fa-times mr-1"></i>
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <input
+                                type="file"
+                                className="form-control"
+                                accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
+                                onChange={(e) => handleDocumentUpload(e, doc.name)}
+                                required={doc.mandatory}
+                                disabled={uploadingDocs[doc.name]}
+                              />
+                              {uploadingDocs[doc.name] && (
+                                <small className="text-info mt-1 d-block">
+                                  <i className="fas fa-spinner fa-spin mr-1"></i>
+                                  Uploading...
+                                </small>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Feedback Field */}
+                  {selectedReward.requiresFeedback && (
+                    <div className="form-group mb-3">
+                      <label>
+                        {selectedReward.feedbackLabel || 'Feedback'} <span className="text-danger">*</span>
+                      </label>
+                      <textarea
+                        className="form-control"
+                        name="feedback"
+                        value={claimFormData.feedback}
+                        onChange={handleClaimInputChange}
+                        placeholder="Enter your feedback"
+                        rows="4"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {claimError && (
+                    <div className="alert alert-danger" role="alert">
+                      {claimError}
+                    </div>
+                  )}
+
+                  <div className="modal-footer">
+                    <button
+                      type="submit"
+                      className="btn btn-primary waves-effect waves-light"
+                      disabled={claimLoading}
+                    >
+                      {claimLoading ? 'Submitting...' : 'Submit Claim'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-light waves-effect waves-danger text-black"
+                      onClick={closeClaimModal}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        </>
+      )}
 
       <style>
         {

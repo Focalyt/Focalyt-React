@@ -183,6 +183,20 @@ module.exports.isCandidate = async (req, res, next) => {
     const userAgent = req.get('User-Agent');
     const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
     console.log("--- ERROR Candidate ", ipAddress, userAgent, err);
+    // For SPA/XHR/API calls return JSON instead of redirecting to HTML login page.
+    const accept = (req.get('accept') || '').toLowerCase();
+    const wantsJson =
+      req.xhr ||
+      accept.includes('application/json') ||
+      (req.originalUrl || '').startsWith('/candidate/');
+
+    if (wantsJson) {
+      return res.status(401).json({
+        success: false,
+        message: err?.message || "You are not authorized",
+      });
+    }
+
     req.flash("error", err.message);
     return res.redirect("/candidate/login");
   }

@@ -63,7 +63,9 @@ const {
   ReEnquire, Curriculum,
   AssignmentQuestions,
   AssignmentSubmission,
-  JobOffer
+  JobOffer,
+  RewardStatus,
+  RewardClaim
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -5429,6 +5431,454 @@ router.post("/job-offers/:jobOfferId/reject", [isCandidate], async (req, res) =>
     });
   } catch (err) {
     console.error('Error rejecting job offer:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Reward Statuses (for Candidate app)
+router.get('/rewardStatuses', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    // Backward compatible: candidate-specific + global + legacy-global
+    const statuses = await RewardStatus.find({
+      $or: [
+        { candidate: candidate._id },
+        { candidate: null },
+        { candidate: { $exists: false } },
+        { college: null },
+        { college: { $exists: false } }
+      ]
+    })
+      .sort({ index: 1 })
+      .lean()
+      .select('title description milestone rewardType substatuses index candidate college requiredDocuments requiresFeedback feedbackLabel');
+    
+    // Check which statuses have been claimed by this candidate
+    const claims = await RewardClaim.find({ _candidate: candidate._id })
+      .select('_rewardStatus status')
+      .lean();
+    
+    const claimedStatusIds = new Set(claims.map(c => c._rewardStatus.toString()));
+    
+    // Add claim status to each reward status
+    const statusesWithClaimInfo = statuses.map(status => ({
+      ...status,
+      isClaimed: claimedStatusIds.has(status._id.toString()),
+      claimStatus: claims.find(c => c._rewardStatus.toString() === status._id.toString())?.status || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reward statuses fetched successfully',
+      data: statusesWithClaimInfo
+    });
+  } catch (err) {
+    console.error('Error fetching reward statuses:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Claim Reward API
+router.post('/claimReward', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    const { rewardStatusId, upiNumber, upiId, address, documents, feedback } = req.body;
+
+    if (!rewardStatusId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reward status ID is required'
+      });
+    }
+
+    // Check if reward status exists
+    const rewardStatus = await RewardStatus.findById(rewardStatusId);
+    if (!rewardStatus) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reward status not found'
+      });
+    }
+
+    // Check if reward is eligible for this candidate
+    // Reward should be either global (candidate: null) or specifically assigned to this candidate
+    if (rewardStatus.candidate && rewardStatus.candidate.toString() !== candidate._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not eligible to claim this reward'
+      });
+    }
+
+    // Check if already claimed
+    const existingClaim = await RewardClaim.findOne({
+      _candidate: candidate._id,
+      _rewardStatus: rewardStatusId
+    });
+
+    if (existingClaim) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reward already claimed',
+        data: existingClaim
+      });
+    }
+
+    // Validate based on reward type
+    if (rewardStatus.rewardType === 'money') {
+      if (!upiNumber && !upiId) {
+        return res.status(400).json({
+          success: false,
+          message: 'UPI Number or UPI ID is required for money reward'
+        });
+      }
+      // Validate UPI format
+      if (upiNumber && upiNumber.trim() !== '') {
+        const upiNumberRegex = /^[0-9]{10}$/;
+        if (!upiNumberRegex.test(upiNumber.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UPI number format. Must be 10 digits'
+          });
+        }
+      }
+      if (upiId && upiId.trim() !== '') {
+        const upiIdRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
+        if (!upiIdRegex.test(upiId.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UPI ID format. Example: name@paytm'
+          });
+        }
+      }
+    }
+
+    if (rewardStatus.rewardType === 'gift' || rewardStatus.rewardType === 'trophy') {
+      if (!address || address.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Address is required for ' + rewardStatus.rewardType + ' reward'
+        });
+      }
+      // Validate address length
+      if (address.trim().length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Address must be at least 10 characters long'
+        });
+      }
+    }
+
+    // Validate voucher type - may require UPI or address depending on voucher type
+    if (rewardStatus.rewardType === 'voucher') {
+      // Voucher can be digital (UPI) or physical (address)
+      // Both are optional but at least one should be provided
+      const hasUPI = (upiNumber && upiNumber.trim() !== '') || (upiId && upiId.trim() !== '');
+      const hasAddress = address && address.trim() !== '';
+      
+      if (!hasUPI && !hasAddress) {
+        return res.status(400).json({
+          success: false,
+          message: 'For voucher reward, please provide either UPI details (for digital voucher) or address (for physical voucher)'
+        });
+      }
+      
+      // Validate UPI format if provided
+      if (upiNumber && upiNumber.trim() !== '') {
+        const upiNumberRegex = /^[0-9]{10}$/;
+        if (!upiNumberRegex.test(upiNumber.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UPI number format. Must be 10 digits'
+          });
+        }
+      }
+      if (upiId && upiId.trim() !== '') {
+        const upiIdRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
+        if (!upiIdRegex.test(upiId.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UPI ID format. Example: name@paytm'
+          });
+        }
+      }
+    }
+
+    // For 'other' type, no specific validation - admin will review
+
+    // Validate required documents
+    if (rewardStatus.requiredDocuments && rewardStatus.requiredDocuments.length > 0) {
+      const mandatoryDocs = rewardStatus.requiredDocuments.filter(doc => doc.mandatory && doc.status);
+      if (mandatoryDocs.length > 0) {
+        const uploadedDocNames = (documents || []).map(doc => doc.documentName);
+        const missingDocs = mandatoryDocs.filter(doc => !uploadedDocNames.includes(doc.name));
+        if (missingDocs.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Missing required documents: ' + missingDocs.map(d => d.name).join(', ')
+          });
+        }
+      }
+    }
+
+    // Validate feedback if required
+    if (rewardStatus.requiresFeedback && (!feedback || feedback.trim() === '')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Feedback is required for this reward'
+      });
+    }
+
+    // Process and validate documents
+    let processedDocuments = [];
+    if (documents && Array.isArray(documents) && documents.length > 0) {
+      processedDocuments = documents.map(doc => ({
+        documentName: doc.documentName || doc.name || 'Unknown',
+        documentKey: doc.documentKey || doc.key || doc.Key,
+        uploadedAt: doc.uploadedAt ? new Date(doc.uploadedAt) : new Date()
+      })).filter(doc => doc.documentKey); // Only include documents with valid keys
+    }
+
+    console.log('Processing reward claim with documents:', processedDocuments); // Debug log
+
+    // Create reward claim
+    const newClaim = new RewardClaim({
+      _candidate: candidate._id,
+      _rewardStatus: rewardStatusId,
+      rewardType: rewardStatus.rewardType,
+      // For money and voucher (if UPI provided), store UPI details
+      upiNumber: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
+      upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
+      // For gift, trophy, and voucher (if address provided), store address
+      address: (rewardStatus.rewardType === 'gift' || 
+                rewardStatus.rewardType === 'trophy' || 
+                (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
+        (address ? address.trim() : null) : null,
+      documents: processedDocuments,
+      feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
+      status: 'pending'
+    });
+
+    const savedClaim = await newClaim.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Reward claim submitted successfully',
+      data: savedClaim
+    });
+  } catch (err) {
+    console.error('Error claiming reward:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Get Approved Reward Claims for Candidate (My Achievements)
+router.get('/approvedRewardClaims', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    // Fetch approved or disbursed claims
+    const claims = await RewardClaim.find({
+      _candidate: candidate._id,
+      status: { $in: ['approved', 'rejected'] } // Show both approved and rejected for transparency
+    })
+      .populate('_rewardStatus', 'title description rewardType milestone')
+      .sort({ approvedAt: -1, createdAt: -1 })
+      .lean();
+
+    // Format claims with delivery timeline information
+    const formattedClaims = claims.map(claim => {
+      let deliveryMessage = '';
+      let deliveryDays = 0;
+      
+      if (claim.status === 'approved') {
+        if (claim.rewardType === 'money') {
+          deliveryMessage = 'Reward will be transferred within 3 working days';
+          deliveryDays = 3;
+        } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') {
+          deliveryMessage = 'Will be delivered within 7 working days';
+          deliveryDays = 7;
+        } else {
+          deliveryMessage = 'Will be processed within 5 working days';
+          deliveryDays = 5;
+        }
+      }
+
+      return {
+        _id: claim._id,
+        rewardTitle: claim._rewardStatus?.title || 'N/A',
+        rewardDescription: claim._rewardStatus?.description || '',
+        rewardType: claim.rewardType,
+        milestone: claim._rewardStatus?.milestone || '',
+        status: claim.status,
+        approvedAt: claim.approvedAt,
+        rejectedAt: claim.rejectedAt,
+        disbursedAt: claim.disbursedAt,
+        adminRemarks: claim.adminRemarks,
+        deliveryMessage: deliveryMessage,
+        deliveryDays: deliveryDays,
+        claimedAt: claim.claimedAt,
+        createdAt: claim.createdAt,
+        achievementImage: claim.achievementImage || null
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Approved reward claims fetched successfully',
+      data: formattedClaims
+    });
+  } catch (err) {
+    console.error('Error fetching approved reward claims:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Update Achievement Image for Reward Claim
+router.put('/rewardClaim/:claimId/updateImage', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    const { claimId } = req.params;
+    const { achievementImage } = req.body;
+
+    if (!achievementImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Achievement image URL is required'
+      });
+    }
+
+    // Find the claim and verify it belongs to this candidate
+    const claim = await RewardClaim.findOne({
+      _id: claimId,
+      _candidate: candidate._id
+    });
+
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reward claim not found or you do not have permission to update it'
+      });
+    }
+
+    // Update the achievement image
+    claim.achievementImage = achievementImage.trim();
+    await claim.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Achievement image updated successfully',
+      data: {
+        _id: claim._id,
+        achievementImage: claim.achievementImage
+      }
+    });
+  } catch (err) {
+    console.error('Error updating achievement image:', err);
     return res.status(500).json({
       success: false,
       message: 'Server Error',
