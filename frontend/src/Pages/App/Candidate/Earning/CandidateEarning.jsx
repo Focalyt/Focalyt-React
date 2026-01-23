@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment';
 
@@ -34,12 +34,34 @@ const CandidateEarning = ({
     upiNumber: '',
     upiId: '',
     address: '',
+    email: '',
     documents: {},
     feedback: ''
   });
   const [uploadingDocs, setUploadingDocs] = useState({});
   const [claimError, setClaimError] = useState('');
   const [claimLoading, setClaimLoading] = useState(false);
+  const rewardSliderRef = useRef(null);
+
+  const scrollRewardSlider = (direction = 'right') => {
+    const el = rewardSliderRef.current;
+    if (!el) return;
+    const delta = Math.max(260, Math.floor(el.clientWidth * 0.8));
+    el.scrollBy({
+      left: direction === 'left' ? -delta : delta,
+      behavior: 'smooth'
+    });
+  };
+
+  const handleRewardWheel = (e) => {
+    const el = rewardSliderRef.current;
+    if (!el) return;
+    // Convert vertical wheel to horizontal scroll (trackpad/mouse)
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    }
+  };
 
   const requestCashback = () => {
     axios.post(`${backendUrl}/requestCashback`,
@@ -251,6 +273,7 @@ const CandidateEarning = ({
       upiNumber: '',
       upiId: '',
       address: '',
+      email: '',
       documents: {},
       feedback: ''
     });
@@ -266,6 +289,7 @@ const CandidateEarning = ({
       upiNumber: '',
       upiId: '',
       address: '',
+      email: '',
       documents: {},
       feedback: ''
     });
@@ -377,6 +401,32 @@ const CandidateEarning = ({
         return;
       }
     }
+
+    // Validate email for voucher reward
+    if (selectedReward.rewardType === 'voucher') {
+      if (!claimFormData.email.trim()) {
+        setClaimError('Please enter your Email ID');
+        return;
+      }
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(claimFormData.email.trim())) {
+        setClaimError('Please enter a valid email address');
+        return;
+      }
+    }
+
+    // Validate address for other reward
+    if (selectedReward.rewardType === 'other') {
+      if (!claimFormData.address.trim()) {
+        setClaimError('Please enter your address');
+        return;
+      }
+      if (claimFormData.address.trim().length < 10) {
+        setClaimError('Address must be at least 10 characters long');
+        return;
+      }
+    }
     
     setClaimLoading(true);
 
@@ -410,6 +460,15 @@ const CandidateEarning = ({
 
       if (selectedReward.rewardType === 'gift' || selectedReward.rewardType === 'trophy') {
         payload.address = claimFormData.address;
+      }
+
+      if (selectedReward.rewardType === 'voucher') {
+        // For voucher, only send email (required)
+        payload.email = claimFormData.email.trim();
+      }
+
+      if (selectedReward.rewardType === 'other') {
+        payload.address = claimFormData.address.trim();
       }
 
       const response = await axios.post(`${backendUrl}/candidate/claimReward`, payload, {
@@ -554,98 +613,141 @@ const CandidateEarning = ({
                   <div className="table-content shadow-cashback">
                     <div className="tab_head font-weight-bolder py-1 px-1">Reward Achievement</div>
                     <div className="tab_body bg-white p-3">
-                      <div className="row">
-                        {loadingStatuses ? (
-                          <div className="col-12 text-center py-3">
-                            <p>Loading reward statuses...</p>
-                          </div>
-                        ) : rewardStatuses.length > 0 ? (
-                        rewardStatuses.map((status, index) => {
-                          // Check if all previous rewards are claimed
-                          const previousRewardsClaimed = index === 0 || rewardStatuses.slice(0, index).every(prevStatus => prevStatus.isClaimed);
-                          const canClaim = !status.isClaimed && previousRewardsClaimed;
-                          
-                          return (
-                            <div key={status._id || index} className="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-3">
-                              <div className="card h-100" style={{ border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                                <div className="card-body">
-                                  <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 className="card-title mb-0" style={{ fontWeight: 600 }}>
-                                      {status.title}
-                                    </h6>
-                                    <span 
-                                      className="badge" 
-                                      style={{ 
-                                        backgroundColor: '#3b82f6', 
-                                        color: 'white',
-                                        fontSize: '11px',
-                                        textTransform: 'capitalize'
-                                      }}
-                                    >
-                                      {status.rewardType || 'other'}
-                                    </span>
-                                  </div>
-                                  {status.description && (
-                                    <p className="card-text" style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-                                      {status.description}
-                                    </p>
-                                  )}
-                                  {status.milestone && (
-                                    <p className="card-text" style={{ fontSize: '13px', color: '#059669', fontWeight: 500 }}>
-                                      {status.milestone}
-                                    </p>
-                                  )}
-                                  {status.rewardType === 'money' && (
-                                    <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
-                                      <strong>Note:</strong> Please provide your UPI details when claiming this reward
-                                    </div>
-                                  )}
-                                  {(status.rewardType === 'gift' || status.rewardType === 'trophy') && (
-                                    <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
-                                      <strong>Note:</strong> Please provide your delivery address when claiming this reward
-                                    </div>
-                                  )}
-                                  {status.substatuses && status.substatuses.length > 0 && (
-                                    <div className="mt-2">
-                                      <small style={{ color: '#6b7280', fontSize: '11px' }}>
-                                        {status.substatuses.length} Substatus{status.substatuses.length > 1 ? 'es' : ''}
-                                      </small>
-                                    </div>
-                                  )}
-                                  {!previousRewardsClaimed && !status.isClaimed && (
-                                    <div className="mt-2 mb-2">
-                                      <small style={{ color: '#dc3545', fontSize: '11px', fontStyle: 'italic' }}>
-                                        <i className="fas fa-info-circle mr-1"></i>
-                                        Complete previous rewards first
-                                      </small>
-                                    </div>
-                                  )}
-                                  <div className="mt-3">
-                                    {status.isClaimed ? (
-                                      <button className="btn btn-sm btn-secondary w-100" disabled>
-                                        {status.claimStatus === 'pending' ? 'Claim Pending' : 
-                                         status.claimStatus === 'approved' ? 'Claim Approved' :
-                                         status.claimStatus === 'rejected' ? 'Claim Rejected' :
-                                         status.claimStatus === 'disbursed' ? 'Disbursed' : 'Claimed'}
-                                      </button>
-                                    ) : (
-                                      <button 
-                                        className={`btn btn-sm ${canClaim ? 'btn-primary' : 'btn-secondary'} w-100`}
-                                        onClick={() => canClaim && openClaimModal(status)}
-                                        disabled={!canClaim}
-                                        title={!canClaim ? 'Please claim previous rewards first' : 'Claim Reward'}
+                      <div className="d-flex justify-content-end mb-2" style={{ gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => scrollRewardSlider('left')}
+                          aria-label="Scroll rewards left"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => scrollRewardSlider('right')}
+                          aria-label="Scroll rewards right"
+                        >
+                          ›
+                        </button>
+                      </div>
+
+                      {loadingStatuses ? (
+                        <div className="text-center py-3">
+                          <p>Loading reward statuses...</p>
+                        </div>
+                      ) : rewardStatuses.length > 0 ? (
+                        <div
+                          ref={rewardSliderRef}
+                          onWheel={handleRewardWheel}
+                          style={{
+                            display: 'flex',
+                            gap: '12px',
+                            overflowX: 'auto',
+                            paddingBottom: '8px',
+                            scrollSnapType: 'x mandatory',
+                            WebkitOverflowScrolling: 'touch'
+                          }}
+                        >
+                          {rewardStatuses.map((status, index) => {
+                            // Check if all previous rewards are claimed
+                            const previousRewardsClaimed = index === 0 || rewardStatuses.slice(0, index).every(prevStatus => prevStatus.isClaimed);
+                            const canClaim = !status.isClaimed && previousRewardsClaimed;
+
+                            return (
+                              <div
+                                key={status._id || index}
+                                style={{
+                                  minWidth: 260,
+                                  maxWidth: 260,
+                                  flex: '0 0 auto',
+                                  scrollSnapAlign: 'start'
+                                }}
+                              >
+                                <div className="card h-100" style={{ border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                                  <div className="card-body">
+                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                      <h6 className="card-title mb-0" style={{ fontWeight: 600 }}>
+                                        {status.title}
+                                      </h6>
+                                      <span
+                                        className="badge"
+                                        style={{
+                                          backgroundColor: '#3b82f6',
+                                          color: 'white',
+                                          fontSize: '11px',
+                                          textTransform: 'capitalize'
+                                        }}
                                       >
-                                        {canClaim ? 'Claim Reward' : 'Locked'}
-                                      </button>
+                                        {status.rewardType || 'other'}
+                                      </span>
+                                    </div>
+                                    {status.description && (
+                                      <p className="card-text" style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
+                                        {status.description}
+                                      </p>
                                     )}
+                                    {status.milestone && (
+                                      <p className="card-text" style={{ fontSize: '13px', color: '#059669', fontWeight: 500 }}>
+                                        {status.milestone}
+                                      </p>
+                                    )}
+                                    {status.rewardType === 'money' && (
+                                      <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
+                                        <strong>Note:</strong> Please provide your UPI details when claiming this reward
+                                      </div>
+                                    )}
+                                    {(status.rewardType === 'gift' || status.rewardType === 'trophy' || status.rewardType === 'other') && (
+                                      <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
+                                        <strong>Note:</strong> Please provide your delivery address when claiming this reward
+                                      </div>
+                                    )}
+                                    {status.rewardType === 'voucher' && (
+                                      <div className="mt-2" style={{ fontSize: '12px', color: '#6b7280' }}>
+                                        <strong>Note:</strong> Please provide your email ID when claiming this reward
+                                      </div>
+                                    )}
+                                    {status.substatuses && status.substatuses.length > 0 && (
+                                      <div className="mt-2">
+                                        <small style={{ color: '#6b7280', fontSize: '11px' }}>
+                                          {status.substatuses.length} Substatus{status.substatuses.length > 1 ? 'es' : ''}
+                                        </small>
+                                      </div>
+                                    )}
+                                    {!previousRewardsClaimed && !status.isClaimed && (
+                                      <div className="mt-2 mb-2">
+                                        <small style={{ color: '#dc3545', fontSize: '11px', fontStyle: 'italic' }}>
+                                          <i className="fas fa-info-circle mr-1"></i>
+                                          Complete previous rewards first
+                                        </small>
+                                      </div>
+                                    )}
+                                    <div className="mt-3">
+                                      {status.isClaimed ? (
+                                        <button className="btn btn-sm btn-secondary w-100" disabled>
+                                          {status.claimStatus === 'pending' ? 'Claim Pending' :
+                                            status.claimStatus === 'approved' ? 'Claim Approved' :
+                                              status.claimStatus === 'rejected' ? 'Claim Rejected' :
+                                                status.claimStatus === 'disbursed' ? 'Disbursed' : 'Claimed'}
+                                        </button>
+                                      ) : (
+                                        <button
+                                          className={`btn btn-sm ${canClaim ? 'btn-primary' : 'btn-secondary'} w-100`}
+                                          onClick={() => canClaim && openClaimModal(status)}
+                                          disabled={!canClaim}
+                                          title={!canClaim ? 'Please claim previous rewards first' : 'Claim Reward'}
+                                        >
+                                          {canClaim ? 'Claim Reward' : 'Locked'}
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })}
+                        </div>
                       ) : null}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -974,19 +1076,28 @@ const CandidateEarning = ({
       {/* Reward Claim Modal */}
       {claimModalOpen && selectedReward && (
         <>
-          <div className="modal-backdrop fade show" onClick={closeClaimModal} style={{ zIndex: 1040 }}></div>
-          <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog">
+          <div className="modal-backdrop fade show claim-modal__backdrop" onClick={closeClaimModal} style={{ zIndex: 1040 }}></div>
+          <div className="modal fade show" style={{ display: 'block', zIndex: 1050 }} tabIndex="-1" role="dialog" aria-modal="true">
             <div className="modal-dialog modal-dialog-centered modal-lg" role="document" style={{ zIndex: 1051 }}>
-              <div className="modal-content p-0">
-                <div className="modal-header">
-                  <h5 className="modal-title text-black text-uppercase">
-                    Claim Reward - {selectedReward.title}
-                  </h5>
-                  <button type="button" className="close text-white" onClick={closeClaimModal} aria-label="Close">
-                    <span aria-hidden="true">×</span>
+              <div className="modal-content p-0 claim-modal">
+                <div className="modal-header claim-modal__header">
+                  <div>
+                    <div className="claim-modal__kicker">Claim Reward</div>
+                    <h5 className="modal-title claim-modal__title">
+                      {selectedReward.title}
+                    </h5>
+                  </div>
+                  <button
+                    type="button"
+                    className="claim-modal__close"
+                    onClick={closeClaimModal}
+                    aria-label="Close"
+                    title="Close"
+                  >
+                    ×
                   </button>
                 </div>
-              <div className="modal-body pt-3">
+              <div className="modal-body pt-3 claim-modal__body">
                 <form onSubmit={handleClaimSubmit}>
                   {selectedReward.rewardType === 'money' && (
                     <>
@@ -1074,6 +1185,41 @@ const CandidateEarning = ({
                     </div>
                   )}
 
+                  {selectedReward.rewardType === 'other' && (
+                    <div className="form-group mb-3">
+                      <label>Address <span className="text-danger">*</span></label>
+                      <textarea
+                        className="form-control"
+                        name="address"
+                        value={claimFormData.address}
+                        onChange={handleClaimInputChange}
+                        placeholder="Enter your complete address"
+                        rows="3"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {selectedReward.rewardType === 'voucher' && (
+                    <>
+                      <div className="form-group mb-3">
+                        <label>Email ID <span className="text-danger">*</span></label>
+                        <input
+                          type="email"
+                          className="form-control"
+                          name="email"
+                          value={claimFormData.email}
+                          onChange={handleClaimInputChange}
+                          placeholder="Enter your email address (e.g., user@example.com)"
+                          required
+                        />
+                        <small className="form-text text-muted">
+                          For digital voucher, please provide your email ID
+                        </small>
+                      </div>
+                    </>
+                  )}
+
                   {/* Dynamic Documents */}
                   {selectedReward.requiredDocuments && selectedReward.requiredDocuments.length > 0 && (
                     <div className="mb-3">
@@ -1154,25 +1300,26 @@ const CandidateEarning = ({
                   )}
 
                   {claimError && (
-                    <div className="alert alert-danger" role="alert">
+                    <div className="alert alert-danger claim-modal__error" role="alert">
                       {claimError}
                     </div>
                   )}
 
-                  <div className="modal-footer">
+                  <div className="modal-footer claim-modal__footer">
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={closeClaimModal}
+                      disabled={claimLoading}
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="submit"
                       className="btn btn-primary waves-effect waves-light"
                       disabled={claimLoading}
                     >
                       {claimLoading ? 'Submitting...' : 'Submit Claim'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-light waves-effect waves-danger text-black"
-                      onClick={closeClaimModal}
-                    >
-                      Cancel
                     </button>
                   </div>
                 </form>
@@ -1226,6 +1373,38 @@ transition: 1s ease}
    border:1px solid darkblue;
    color:;
   }
+
+  /* Claim Reward modal (Candidate) */
+  .claim-modal { border-radius: 16px; overflow: hidden; border: 1px solid rgba(15,23,42,.10); box-shadow: 0 28px 70px rgba(15,23,42,.28); }
+  .claim-modal__backdrop { background: rgba(2, 6, 23, .55) !important; }
+  .claim-modal__header { background: #FC2B5A; color: #fff; border-bottom: none; padding: 16px 18px; display:flex; align-items:flex-start; gap: 12px; }
+  .claim-modal__header > div { min-width: 0; }
+  .claim-modal__kicker { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .9; }
+  .claim-modal__title { margin: 2px 0 0; font-weight: 800; color: #fff; }
+  .claim-modal__close {
+    appearance: none;
+    border: 0;
+    background: rgba(255,255,255,.22);
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    font-size: 20px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .claim-modal__close:hover { background: rgba(255,255,255,.32); }
+  .claim-modal__body { padding: 18px 18px 6px; }
+  .claim-modal__footer { border-top: 1px solid rgba(148,163,184,.35); padding: 12px 18px; background: #f8fafc; display:flex; gap: 10px; justify-content:flex-end; }
+  .claim-modal__error { border-radius: 12px; border: 1px solid rgba(239,68,68,.25); }
+  .claim-modal .form-control { border-radius: 12px; }
+  .claim-modal label { font-weight: 700; }
+  .claim-modal .btn { border-radius: 12px; font-weight: 800; }
+
                       `
         }
       </style>

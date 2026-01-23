@@ -5534,7 +5534,7 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       });
     }
 
-    const { rewardStatusId, upiNumber, upiId, address, documents, feedback } = req.body;
+    const { rewardStatusId, upiNumber, upiId, address, email, documents, feedback } = req.body;
 
     if (!rewardStatusId) {
       return res.status(400).json({
@@ -5620,42 +5620,42 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       }
     }
 
-    // Validate voucher type - may require UPI or address depending on voucher type
+    // Validate voucher type - require email for digital voucher delivery
     if (rewardStatus.rewardType === 'voucher') {
-      // Voucher can be digital (UPI) or physical (address)
-      // Both are optional but at least one should be provided
-      const hasUPI = (upiNumber && upiNumber.trim() !== '') || (upiId && upiId.trim() !== '');
-      const hasAddress = address && address.trim() !== '';
+      const hasEmail = email && email.trim() !== '';
       
-      if (!hasUPI && !hasAddress) {
+      if (!hasEmail) {
         return res.status(400).json({
           success: false,
-          message: 'For voucher reward, please provide either UPI details (for digital voucher) or address (for physical voucher)'
+          message: 'Email ID is required for voucher reward'
         });
       }
       
-      // Validate UPI format if provided
-      if (upiNumber && upiNumber.trim() !== '') {
-        const upiNumberRegex = /^[0-9]{10}$/;
-        if (!upiNumberRegex.test(upiNumber.trim())) {
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid UPI number format. Must be 10 digits'
-          });
-        }
-      }
-      if (upiId && upiId.trim() !== '') {
-        const upiIdRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
-        if (!upiIdRegex.test(upiId.trim())) {
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid UPI ID format. Example: name@paytm'
-          });
-        }
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format. Please provide a valid email address'
+        });
       }
     }
 
-    // For 'other' type, no specific validation - admin will review
+    // Validate 'other' reward - require address for fulfillment / review
+    if (rewardStatus.rewardType === 'other') {
+      if (!address || address.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Address is required for other reward'
+        });
+      }
+      if (address.trim().length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Address must be at least 10 characters long'
+        });
+      }
+    }
 
     // Validate required documents
     if (rewardStatus.requiredDocuments && rewardStatus.requiredDocuments.length > 0) {
@@ -5702,11 +5702,15 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
         ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
       upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
         ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
-      // For gift, trophy, and voucher (if address provided), store address
+      // For gift, trophy, voucher (if provided), and other, store address
       address: (rewardStatus.rewardType === 'gift' || 
                 rewardStatus.rewardType === 'trophy' || 
+                rewardStatus.rewardType === 'other' ||
                 (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
         (address ? address.trim() : null) : null,
+      // For voucher (if email provided), store email
+      email: (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
+        (email.trim().toLowerCase()) : null,
       documents: processedDocuments,
       feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
       status: 'pending'

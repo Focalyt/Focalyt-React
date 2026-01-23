@@ -3,15 +3,15 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') })
 const { exec } = require('child_process');
 
 const cron = require('node-cron');
-// backupAndRestore();
-// console.log("Local URI:", process.env.MIPIE_MONGODB_URI);
-// console.log("Cloud URI:", process.env.MIPIE_BACKUP_MONGODB_URI);
+backupAndRestore();
+console.log("Local URI:", process.env.MIPIE_MONGODB_URI);
+console.log("Cloud URI:", process.env.MIPIE_BACKUP_MONGODB_URI);
 
 // Schedule a task to run at 2 AM every day
-cron.schedule('0 2 * * *', () => {
-  // console.log('Starting scheduled database backup at 2 AM...');
-  backupAndRestore();
-});
+// cron.schedule('0 2 * * *', () => {
+//   // console.log('Starting scheduled database backup at 2 AM...');
+//   backupAndRestore();
+// });
 
 // Function to take backup of local MongoDB and restore to Cloud MongoDB
 function backupAndRestore() {

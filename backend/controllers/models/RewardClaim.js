@@ -32,6 +32,12 @@ const RewardClaimSchema = new mongoose.Schema({
     trim: true,
     default: null
   },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: null
+  },
   // Dynamic documents uploaded by candidate
   documents: [{
     documentName: {
