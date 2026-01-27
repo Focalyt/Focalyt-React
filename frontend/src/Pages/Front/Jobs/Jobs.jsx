@@ -531,7 +531,7 @@ function Jobs() {
                                 className="pointer img-fluid"
                               >
 
-                                <div className="verified-badge-container" style={{position: "absolute", top: "10px", right: "10px", width: "60px", height: "60px", zIndex: "1000"}}>
+                                <div className="verified-badge-container" style={{position: "absolute", top: "10px", right: "10px", width: "60px", height: "60px", zIndex: "10"}}>
                                   <span className="wave-ring wave-1"></span>
                                   <span className="wave-ring wave-2"></span>
                                   <span className="wave-ring wave-3"></span>
