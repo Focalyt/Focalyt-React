@@ -266,7 +266,7 @@ const CandidateEarning = ({
     }
   };
 
-  const openClaimModal = (rewardStatus) => {
+  const openClaimModal = (rewardStatus, isResubmit = false) => {
     setSelectedReward(rewardStatus);
     setUpiType('number'); // Reset to default
     setClaimFormData({
@@ -724,12 +724,38 @@ const CandidateEarning = ({
                                     )}
                                     <div className="mt-3">
                                       {status.isClaimed ? (
-                                        <button className="btn btn-sm btn-secondary w-100" disabled>
-                                          {status.claimStatus === 'pending' ? 'Claim Pending' :
-                                            status.claimStatus === 'approved' ? 'Claim Approved' :
-                                              status.claimStatus === 'rejected' ? 'Claim Rejected' :
-                                                status.claimStatus === 'disbursed' ? 'Disbursed' : 'Claimed'}
-                                        </button>
+                                        <>
+                                          {status.claimStatus === 'rejected' ? (
+                                            <>
+                                              <button 
+                                                className="btn btn-sm btn-danger w-100 mb-2" 
+                                                disabled
+                                              >
+                                                <i className="fas fa-times-circle mr-1"></i>
+                                                Claim Rejected
+                                              </button>
+                                              {status.adminRemarks && (
+                                                <div className="alert alert-danger p-2 mb-2" style={{ fontSize: '12px' }}>
+                                                  <strong>Reason:</strong> {status.adminRemarks}
+                                                </div>
+                                              )}
+                                              <button
+                                                className="btn btn-sm btn-warning w-100"
+                                                onClick={() => openClaimModal(status, true)}
+                                                title="Resubmit with updated documents"
+                                              >
+                                                <i className="fas fa-redo mr-1"></i>
+                                                Resubmit Claim
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <button className="btn btn-sm btn-secondary w-100" disabled>
+                                              {status.claimStatus === 'pending' ? 'Claim Pending' :
+                                                status.claimStatus === 'approved' ? 'Claim Approved' :
+                                                  status.claimStatus === 'disbursed' ? 'Disbursed' : 'Claimed'}
+                                            </button>
+                                          )}
+                                        </>
                                       ) : (
                                         <button
                                           className={`btn btn-sm ${canClaim ? 'btn-primary' : 'btn-secondary'} w-100`}
@@ -1082,10 +1108,19 @@ const CandidateEarning = ({
               <div className="modal-content p-0 claim-modal">
                 <div className="modal-header claim-modal__header">
                   <div>
-                    <div className="claim-modal__kicker">Claim Reward</div>
+                    <div className="claim-modal__kicker">
+                      {selectedReward.claimStatus === 'rejected' ? 'Resubmit Reward Claim' : 'Claim Reward'}
+                    </div>
                     <h5 className="modal-title claim-modal__title">
                       {selectedReward.title}
                     </h5>
+                    {selectedReward.claimStatus === 'rejected' && selectedReward.adminRemarks && (
+                      <div className="alert alert-warning p-2 mt-2 mb-0" style={{ fontSize: '12px' }}>
+                        <strong>Previous Rejection Reason:</strong> {selectedReward.adminRemarks}
+                        <br />
+                        <small>Please update your documents and resubmit.</small>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"

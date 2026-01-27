@@ -5481,17 +5481,23 @@ router.get('/rewardStatuses', [isCandidate], async (req, res) => {
     
     // Check which statuses have been claimed by this candidate
     const claims = await RewardClaim.find({ _candidate: candidate._id })
-      .select('_rewardStatus status')
+      .select('_rewardStatus status adminRemarks rejectedAt')
       .lean();
     
     const claimedStatusIds = new Set(claims.map(c => c._rewardStatus.toString()));
     
     // Add claim status to each reward status
-    const statusesWithClaimInfo = statuses.map(status => ({
-      ...status,
-      isClaimed: claimedStatusIds.has(status._id.toString()),
-      claimStatus: claims.find(c => c._rewardStatus.toString() === status._id.toString())?.status || null
-    }));
+    const statusesWithClaimInfo = statuses.map(status => {
+      const claim = claims.find(c => c._rewardStatus.toString() === status._id.toString());
+      return {
+        ...status,
+        isClaimed: claimedStatusIds.has(status._id.toString()),
+        claimStatus: claim?.status || null,
+        adminRemarks: claim?.adminRemarks || null,
+        rejectedAt: claim?.rejectedAt || null,
+        claimId: claim?._id || null
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -5567,7 +5573,7 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       _rewardStatus: rewardStatusId
     });
 
-    if (existingClaim) {
+    if (existingClaim && existingClaim.status !== 'rejected') {
       return res.status(400).json({
         success: false,
         message: 'Reward already claimed',
@@ -5692,39 +5698,162 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
 
     console.log('Processing reward claim with documents:', processedDocuments); // Debug log
 
-    // Create reward claim
-    const newClaim = new RewardClaim({
-      _candidate: candidate._id,
-      _rewardStatus: rewardStatusId,
-      rewardType: rewardStatus.rewardType,
-      // For money and voucher (if UPI provided), store UPI details
-      upiNumber: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
-        ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
-      upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
-        ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
-      // For gift, trophy, voucher (if provided), and other, store address
-      address: (rewardStatus.rewardType === 'gift' || 
+    // If existing rejected claim exists, update it; otherwise create new
+    let savedClaim;
+    if (existingClaim && existingClaim.status === 'rejected') {
+      // Resubmit rejected claim - update with new data
+      existingClaim.status = 'pending';
+      existingClaim.rejectedAt = null;
+      existingClaim.adminRemarks = null;
+      existingClaim.claimedAt = new Date();
+      existingClaim.upiNumber = (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null;
+      existingClaim.upiId = (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null;
+      existingClaim.address = (rewardStatus.rewardType === 'gift' || 
                 rewardStatus.rewardType === 'trophy' || 
                 rewardStatus.rewardType === 'other' ||
                 (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
-        (address ? address.trim() : null) : null,
-      // For voucher (if email provided), store email
-      email: (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
-        (email.trim().toLowerCase()) : null,
-      documents: processedDocuments,
-      feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
-      status: 'pending'
-    });
+        (address ? address.trim() : null) : null;
+      existingClaim.email = (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
+        (email.trim().toLowerCase()) : null;
+      existingClaim.documents = processedDocuments;
+      existingClaim.feedback = rewardStatus.requiresFeedback ? (feedback || null) : null;
+      
+      savedClaim = await existingClaim.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Reward claim resubmitted successfully',
+        data: savedClaim
+      });
+    } else {
+      // Create new reward claim
+      const newClaim = new RewardClaim({
+        _candidate: candidate._id,
+        _rewardStatus: rewardStatusId,
+        rewardType: rewardStatus.rewardType,
+        // For money and voucher (if UPI provided), store UPI details
+        upiNumber: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+          ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
+        upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+          ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
+        // For gift, trophy, voucher (if provided), and other, store address
+        address: (rewardStatus.rewardType === 'gift' || 
+                  rewardStatus.rewardType === 'trophy' || 
+                  rewardStatus.rewardType === 'other' ||
+                  (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
+          (address ? address.trim() : null) : null,
+        // For voucher (if email provided), store email
+        email: (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
+          (email.trim().toLowerCase()) : null,
+        documents: processedDocuments,
+        feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
+        status: 'pending'
+      });
 
-    const savedClaim = await newClaim.save();
+      savedClaim = await newClaim.save();
 
-    return res.status(201).json({
-      success: true,
-      message: 'Reward claim submitted successfully',
-      data: savedClaim
-    });
+      return res.status(201).json({
+        success: true,
+        message: 'Reward claim submitted successfully',
+        data: savedClaim
+      });
+    }
   } catch (err) {
     console.error('Error claiming reward:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Get All Reward Claims for Candidate (Pending, Approved, Rejected)
+router.get('/allRewardClaims', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    // Fetch all claims (pending, approved, rejected)
+    const claims = await RewardClaim.find({
+      _candidate: candidate._id
+    })
+      .populate('_rewardStatus', 'title description rewardType milestone requiredDocuments')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Format claims with delivery timeline information
+    const formattedClaims = claims.map(claim => {
+      let deliveryMessage = '';
+      let deliveryDays = 0;
+      
+      if (claim.status === 'approved') {
+        if (claim.rewardType === 'money') {
+          deliveryMessage = 'Reward will be transferred within 3 working days';
+          deliveryDays = 3;
+        } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') {
+          deliveryMessage = 'Will be delivered within 7 working days';
+          deliveryDays = 7;
+        } else {
+          deliveryMessage = 'Will be processed within 5 working days';
+          deliveryDays = 5;
+        }
+      }
+
+      return {
+        _id: claim._id,
+        rewardTitle: claim._rewardStatus?.title || 'N/A',
+        rewardDescription: claim._rewardStatus?.description || '',
+        rewardType: claim.rewardType,
+        milestone: claim._rewardStatus?.milestone || '',
+        status: claim.status,
+        approvedAt: claim.approvedAt,
+        rejectedAt: claim.rejectedAt,
+        disbursedAt: claim.disbursedAt,
+        adminRemarks: claim.adminRemarks,
+        deliveryMessage: deliveryMessage,
+        deliveryDays: deliveryDays,
+        claimedAt: claim.claimedAt,
+        createdAt: claim.createdAt,
+        achievementImage: claim.achievementImage || null,
+        documents: claim.documents || [],
+        upiNumber: claim.upiNumber,
+        upiId: claim.upiId,
+        address: claim.address,
+        email: claim.email,
+        feedback: claim.feedback
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reward claims fetched successfully',
+      data: formattedClaims
+    });
+  } catch (err) {
+    console.error('Error fetching reward claims:', err);
     return res.status(500).json({
       success: false,
       message: 'Server Error',
