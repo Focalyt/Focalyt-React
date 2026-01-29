@@ -3263,7 +3263,7 @@ console.log("response.data",response.data)
                   border: 'none',
                   borderRadius: '24px',
                   fontWeight: '500',
-                  fontSize: '15px'
+                  fontSize: '12px'
                 }}
               >
                 {isSendingWhatsapp ? (
@@ -3403,7 +3403,7 @@ console.log("response.data",response.data)
         id="whatsappPanel"
         style={{
           width: '100%',
-          height: 'calc(100vh - 150px)',
+          height: 'calc(100vh - 25px)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
