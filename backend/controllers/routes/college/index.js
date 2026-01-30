@@ -3350,6 +3350,9 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
 
 	// Name search
 	if (filters.name && filters.name.trim()) {

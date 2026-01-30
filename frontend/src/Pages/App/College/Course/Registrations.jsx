@@ -3060,6 +3060,7 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     }
   };
+
   const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
 
     if (!token) {
