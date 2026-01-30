@@ -749,7 +749,32 @@ const CRMDashboard = () => {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
+          try {
+            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+              headers: { 'x-auth': token }
+            });
+            if (centersRes.data.success && centersRes.data.data) {
+              const allCentersMapped = centersRes.data.data.map(c => ({ 
+                value: c._id, 
+                label: c.name 
+              }));
+              // console.log('🏢 ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
+              setCenterOptions(allCentersMapped);
+            } else {
+              // Fallback to centers from filters-data if list_all_centers fails
+              const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+              // console.log('🏢 CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
+              setCenterOptions(centersMapped);
+            }
+          } catch (centerErr) {
+            console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
+            // Fallback to centers from filters-data
+            const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+            setCenterOptions(centersMapped);
+          }
+          
           setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
@@ -1880,6 +1905,14 @@ const CRMDashboard = () => {
       values: []
     },
   });
+  
+  // Ref to store latest formData for use in async functions
+  const formDataRef = useRef(formData);
+  
+  // Update ref whenever formData changes
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
@@ -2863,12 +2896,30 @@ const CRMDashboard = () => {
   }, [currentPage]);
 
   // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts) => {
+  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null) => {
+    let allCount;
+    
+    if (filteredTotalCountFromAPI !== null && filteredTotalCountFromAPI > 0) {
+      allCount = filteredTotalCountFromAPI;
+    } else {
+      const calculatedFilteredTotal = Object.keys(backendCounts || {})
+        .filter(key => key !== 'all' && key !== 'null')
+        .reduce((sum, key) => {
+          const statusData = backendCounts[key];
+          if (statusData && typeof statusData === 'object' && statusData.count) {
+            return sum + (statusData.count || 0);
+          } else if (typeof statusData === 'number') {
+            return sum + statusData;
+          }
+          return sum;
+        }, 0);
+      allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
+    }
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
-          return { ...filter, count: backendCounts.all || 0 };
+          return { ...filter, count: allCount };
         }
 
         const backendFilter = backendCounts[filter._id];
@@ -2889,7 +2940,6 @@ const CRMDashboard = () => {
     setIsLoadingProfiles(true);
     closePanel();
     setLeadDetailsVisible(null);
-    fetchRegistrationCrmFilterCounts();
 
     if (!token) {
       console.warn('No token found in session storage.');
@@ -2939,6 +2989,8 @@ const CRMDashboard = () => {
         // if (data.crmFilterCounts) {
         //   updateCrmFiltersFromBackend(data.crmFilterCounts);
         // }
+        await fetchRegistrationCrmFilterCounts(filters, page, data.totalCount);
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -3008,7 +3060,7 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     }
   };
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
@@ -3048,7 +3100,9 @@ const CRMDashboard = () => {
 
       if (response.data.success && response.data) {
         const data = response.data;
-        updateCrmFiltersFromBackend(data.crmFilterCount)
+        // Debug log to verify counts received
+       
+        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount)
 
       } else {
         console.error('Failed to fetch crm filter counts', response.data.message);

@@ -2555,6 +2555,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
 
 	// Name search
 	if (filters.name && filters.name.trim()) {
@@ -2760,6 +2763,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	}
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -3614,7 +3620,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			movedInKYCPipeline[0].$match = { ...movedInKYCPipeline[0].$match, ...dateFilters };
 		}
 
-		// Apply other filters if needed
+		// Apply course-related filters (after course lookup)
 		if (appliedFilters.courseType || appliedFilters.projectsArray?.length > 0 ||
 			appliedFilters.verticalsArray?.length > 0 || appliedFilters.courseArray?.length > 0) {
 
@@ -3634,6 +3640,22 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 			basePipeline.push({ $match: filterMatch });
 			movedInKYCPipeline.push({ $match: filterMatch });
+		}
+
+		// Apply center and counselor filters (can be applied directly on AppliedCourses fields)
+		if (appliedFilters.centerArray?.length > 0 || appliedFilters.counselorArray?.length > 0) {
+			const directFilterMatch = {};
+			// Add center filter
+			if (appliedFilters.centerArray?.length > 0) {
+				directFilterMatch['_center'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			// Add counselor filter
+			if (appliedFilters.counselorArray?.length > 0) {
+				directFilterMatch['counsellor'] = { $in: appliedFilters.counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			basePipeline.push({ $match: directFilterMatch });
+			movedInKYCPipeline.push({ $match: directFilterMatch });
 		}
 
 		// Add candidate lookup for name search
@@ -9720,6 +9742,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			baseMatchStage.isBatchFreeze = { $in: [true] };
 			baseMatchStage.dropout = { $in: [false] };
 		}
+		// Apply center filter early for better performance
+		if (centerArray.length > 0) {
+			baseMatchStage._center = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
 		aggregationPipeline.push({ $match: baseMatchStage });
 		aggregationPipeline.push(
 			{
@@ -9810,9 +9836,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		}
 		if (courseArray.length > 0) {
 			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (centerArray.length > 0) {
-			additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (name && name.trim()) {
 			const searchTerm = name.trim();
@@ -10291,9 +10314,12 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		};
 
 		if (teamMembers && teamMembers.length > 0) {
+			const teamMemberIds = teamMembers.map(member =>
+				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+			);
 			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMembers } },
-				{ counsellor: { $in: teamMembers } }
+				{ registeredBy: { $in: teamMemberIds } },
+				{ counsellor: { $in: teamMemberIds } }
 			];
 		}
 		// Add date filters
@@ -10330,6 +10356,10 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 				baseMatchStage.followupDate.$lte = toDate;
 			}
 		}
+		// Apply center filter early for better performance and accuracy
+		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
+			baseMatchStage._center = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
 		basePipeline.push({ $match: baseMatchStage });
 		basePipeline.push(
 			{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course', pipeline: [{ $lookup: { from: 'sectors', localField: 'sectors', foreignField: '_id', as: 'sectors' } }, { $lookup: { from: 'verticals', localField: 'vertical', foreignField: '_id', as: 'vertical' } }, { $lookup: { from: 'projects', localField: 'project', foreignField: '_id', as: 'project' } }] } },
@@ -10355,9 +10385,6 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		}
 		if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
 			additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
-			additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (appliedFilters.name && appliedFilters.name.trim()) {
 			const searchTerm = appliedFilters.name.trim();
