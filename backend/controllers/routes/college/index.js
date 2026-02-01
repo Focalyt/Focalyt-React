@@ -5268,11 +5268,29 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						if (email && email.trim() && can.email) {
 							if (email.toLowerCase().trim() === can.email.toLowerCase().trim()) return true;
 						}
-						// Fallback to name + father name + college (least unique, but still important)
-						return can.name.toLowerCase() === name.toLowerCase() && 
-						       can.fatherName.toLowerCase() === fatherName.toLowerCase() && 
-						       can.collegeName.toLowerCase() === collegeName.toLowerCase();
+						return false;
 					});
+
+					if (dup) {
+						// Find which field matched to give better error message
+						let dupReason = '';
+						if (contactNumber && contactNumber.trim() && dup.contactNumber) {
+							const cleanMobile1 = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							const cleanMobile2 = String(dup.contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							if (cleanMobile1.length >= 10 && cleanMobile2.length >= 10 && cleanMobile1 === cleanMobile2) {
+								dupReason = `Contact Number "${contactNumber}"`;
+							}
+						}
+						if (!dupReason && email && email.trim() && dup.email) {
+							if (email.toLowerCase().trim() === dup.email.toLowerCase().trim()) {
+								dupReason = `Email "${email}"`;
+							}
+						}
+						if (dupReason) {
+							errorMessages.push(`Duplicate candidate with ${dupReason} found in the same file for row ${index + 2}.`);
+							continue;
+						}
+					}
 
 					if (!isExistCandidate && !dup) {
 						allRows.push({ name, fatherName, collegeName, contactNumber, email })

@@ -1540,7 +1540,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import moment from 'moment';
 import Swiper from 'swiper';
 import 'swiper/css';
@@ -1554,6 +1554,8 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 
 const CandidateViewJobs = () => {
   const { JobId } = useParams();
+  const [searchParams] = useSearchParams();
+  const fromOffer = searchParams.get('fromOffer') === 'true';
   const [jobDetails, setJobDetails] = useState(null);
   const [address, setAddress] = useState('');
   const [highestQualificationdata, sethighestQualificationdata] = useState([]);
@@ -1779,6 +1781,14 @@ const CandidateViewJobs = () => {
       setReviewed(data.reviewed);
       setCourses(data.course || []);
       setLoading(false);
+      
+      // If redirected from job offer acceptance, automatically apply for the job
+      if (fromOffer && !data.isApplied && data.canApply) {
+        // Auto-apply after a short delay to ensure page is loaded
+        setTimeout(() => {
+          applyJob();
+        }, 500);
+      }
     } catch (error) {
       console.error('Error fetching job details:', error);
       setLoading(false);

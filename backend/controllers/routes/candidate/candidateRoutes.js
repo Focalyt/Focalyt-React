@@ -65,7 +65,9 @@ const {
   AssignmentSubmission,
   JobOffer,
   RewardStatus,
-  RewardClaim
+  RewardClaim,
+  Placement,
+  PlacementStatus
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -5263,6 +5265,7 @@ router.get("/job-offers", [isCandidate], async (req, res) => {
 
     const jobOffers = await JobOffer.find(jobOfferQuery)
       .populate([
+        { path: '_job', select: '_id title' },
         { path: '_qualification', select: 'name' },
         { path: '_industry', select: 'name' },
         { path: '_jobCategory', select: 'name' },
@@ -5353,6 +5356,31 @@ router.post("/job-offers/:jobOfferId/accept", [isCandidate], async (req, res) =>
       remarks: 'Candidate accepted the job offer'
     });
     await jobOffer.save();
+
+    // Mark placement as "placed" when candidate accepts the job offer
+    if (jobOffer.placement) {
+      const placement = await Placement.findById(jobOffer.placement);
+      if (placement) {
+        // Find "placed" status for the college
+        const placedStatus = await PlacementStatus.findOne({
+          $or: [
+            { college: placement.college, title: { $regex: /placed/i } },
+            { college: null, title: { $regex: /placed/i } }
+          ]
+        });
+
+        if (placedStatus) {
+          placement.status = placedStatus._id;
+          placement.logs.push({
+            user: candidate._id,
+            timestamp: new Date(),
+            action: 'Placed',
+            remarks: `Candidate accepted job offer: ${jobOffer.title || 'Job Offer'}`
+          });
+          await placement.save();
+        }
+      }
+    }
 
     return res.status(200).json({
       success: true,

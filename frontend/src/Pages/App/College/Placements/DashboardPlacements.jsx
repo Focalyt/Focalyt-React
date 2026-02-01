@@ -443,6 +443,8 @@ const DashboardPlacements = () => {
   const [statusCounts, setStatusCounts] = useState([]);
   const [companyJobs, setCompanyJobs] = useState([]);
   const [jobOffers, setJobOffers] = useState([]);
+  const [expandedCandidates, setExpandedCandidates] = useState(new Set());
+  const [expandedCompany, setExpandedCompany] = useState(null);
   
   // Filter states
   const [filterData, setFilterData] = useState({
@@ -564,10 +566,21 @@ const DashboardPlacements = () => {
       }
 
       if (jobOffersResponse.data) {
-        setJobOffers(jobOffersResponse.data?.data || []);
+        const jobOffersData = jobOffersResponse.data?.data || [];
+        console.log('Job Offers Data:', jobOffersData.length, 'offers found');
+        setJobOffers(jobOffersData);
+      } else {
+        console.warn('Job Offers Response:', jobOffersResponse.data);
+        setJobOffers([]);
       }
     } catch (error) {
       console.error('Error fetching placements data:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      // Set empty arrays on error to prevent undefined issues
+      setJobOffers([]);
+      setPlacementsData([]);
+      setStatusCounts([]);
+      setCompanyJobs([]);
     } finally {
       setIsLoading(false);
     }
@@ -689,8 +702,10 @@ const DashboardPlacements = () => {
       if (p._company?.name) uniqueCompanyIds.add(p._company.name);
     });
 
-    const totalPlacements = placementsData.length;
+    // Total Placements should only count candidates who are actually "placed", not all candidates in placement status
+    // This prevents counting when a candidate just applies for a job
     const placedCount = statusCounts.find(s => s.statusName?.toLowerCase() === 'placed')?.count || 0;
+    const totalPlacements = placedCount; // Use placedCount instead of all placementsData.length
     
     // Count candidates who have applied to the same job (jobs with multiple applicants)
     const jobApplicantsMap = new Map();
@@ -759,8 +774,9 @@ const DashboardPlacements = () => {
       }
     });
 
+    // Only count offer letters where candidate has accepted the job invitation
     const offerLetters = jobOffers.filter(offer => 
-      offer.status === 'offered' || offer.status === 'active' || offer.candidateResponse === 'accepted'
+      offer.candidateResponse === 'accepted'
     ).length;
 
     // Jobs shared to students (total job offers)
@@ -786,8 +802,9 @@ const DashboardPlacements = () => {
     const centerWiseMap = new Map();
     placementsData.forEach(p => {
       const centerName = getCenterNameForMetrics(p);
+      // Only count accepted offers
       const centerOffers = p.jobOffers?.filter(jo => 
-        jo.status === 'offered' || jo.status === 'active'
+        jo.candidateResponse === 'accepted'
       ).length || 0;
       
       const existing = centerWiseMap.get(centerName) || { center: centerName, offers: 0, placements: 0 };
@@ -801,7 +818,6 @@ const DashboardPlacements = () => {
       uniqueJobs: uniqueJobIds.size,
       moreThanTwoThird,
       totalCompanies: uniqueCompanyIds.size,
-      totalApplications: selected + rejected + noResponse,
       selected,
       rejected,
       noResponse,
@@ -831,7 +847,8 @@ const DashboardPlacements = () => {
       
       if (p.jobOffers) {
         p.jobOffers.forEach(offer => {
-          if (offer.status === 'offered' || offer.status === 'active') {
+          // Only count accepted offers
+          if (offer.candidateResponse === 'accepted') {
             existing.offers += 1;
           }
           const response = offer.candidateResponse || offer.status;
@@ -1250,22 +1267,6 @@ const DashboardPlacements = () => {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
-                  <p className="text-muted small mb-1">Total Applications</p>
-                  <p className="h3 fw-bold text-purple mb-0">
-                    {metrics.totalApplications.toLocaleString()}
-                  </p>
-                </div>
-                <FileCheck className="text-purple opacity-50" size={32} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
                   <p className="text-muted small mb-1">Offer Letters</p>
                   <p className="h3 fw-bold text-success mb-0">
                     {metrics.offerLetters.toLocaleString()}
@@ -1464,7 +1465,8 @@ const DashboardPlacements = () => {
                           counselorData.jobsShared++;
                         }
                         
-                        if (offer.status === 'offered' || offer.status === 'active' || offer.candidateResponse === 'accepted') {
+                        // Only count accepted offers as offer letters
+                        if (offer.candidateResponse === 'accepted') {
                           counselorData.offerLetters++;
                         }
                         
@@ -1497,7 +1499,8 @@ const DashboardPlacements = () => {
                           counselorData.jobsShared++;
                         }
                         
-                        if (offer.status === 'offered' || offer.status === 'active' || offer.candidateResponse === 'accepted') {
+                        // Only count accepted offers as offer letters
+                        if (offer.candidateResponse === 'accepted') {
                           counselorData.offerLetters++;
                         }
                         
@@ -1593,7 +1596,7 @@ const DashboardPlacements = () => {
       </div>
 
       {/* Application Status Cards */}
-      <div className="row g-3 mb-4">
+      {/* <div className="row g-3 mb-4">
         <div className="col-md-4">
           <div className="card shadow-sm h-100 border-0" style={{
             borderLeft: '4px solid #10b981',
@@ -1616,8 +1619,8 @@ const DashboardPlacements = () => {
                   <p className="h2 fw-bold text-success mb-0">{metrics.selected}</p>
                   <p className="small text-muted mb-0 mt-2">
                     <i className="fas fa-chart-line me-1 text-success"></i>
-                    {metrics.totalApplications > 0 
-                      ? ((metrics.selected / metrics.totalApplications) * 100).toFixed(1)
+                    {metrics.jobsSharedToStudents > 0 
+                      ? ((metrics.selected / metrics.jobsSharedToStudents) * 100).toFixed(1)
                       : 0}% of total
                   </p>
                 </div>
@@ -1659,8 +1662,8 @@ const DashboardPlacements = () => {
                   <p className="h2 fw-bold text-danger mb-0">{metrics.rejected}</p>
                   <p className="small text-muted mb-0 mt-2">
                     <i className="fas fa-chart-line me-1 text-danger"></i>
-                    {metrics.totalApplications > 0 
-                      ? ((metrics.rejected / metrics.totalApplications) * 100).toFixed(1)
+                    {metrics.jobsSharedToStudents > 0 
+                      ? ((metrics.rejected / metrics.jobsSharedToStudents) * 100).toFixed(1)
                       : 0}% of total
                   </p>
                 </div>
@@ -1702,8 +1705,8 @@ const DashboardPlacements = () => {
                   <p className="h2 fw-bold text-warning mb-0">{metrics.noResponse}</p>
                   <p className="small text-muted mb-0 mt-2">
                     <i className="fas fa-chart-line me-1 text-warning"></i>
-                    {metrics.totalApplications > 0 
-                      ? ((metrics.noResponse / metrics.totalApplications) * 100).toFixed(1)
+                    {metrics.jobsSharedToStudents > 0 
+                      ? ((metrics.noResponse / metrics.jobsSharedToStudents) * 100).toFixed(1)
                       : 0}% of total
                   </p>
                 </div>
@@ -1722,7 +1725,7 @@ const DashboardPlacements = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Charts Row */}
       <div className="row g-4 mb-4">
@@ -1856,7 +1859,7 @@ const DashboardPlacements = () => {
       </div>
 
       {/* Status Distribution */}
-      <div className="row g-4 mb-4">
+      {/* <div className="row g-4 mb-4">
         <div className="col-12">
           <div className="card shadow-sm border-0" style={{
             transition: 'all 0.3s ease'
@@ -1904,7 +1907,7 @@ const DashboardPlacements = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Company Wise Table */}
       <div className="card shadow-sm mb-4 border-0">
@@ -2034,8 +2037,56 @@ const DashboardPlacements = () => {
                 <tr>
                   <th>S.No</th>
                   <th>Candidate Name</th>
-                  <th>Job Title</th>
-                  <th>Company</th>
+                  <th>Email</th>
+                  <th>Mobile</th>
+                  {!expandedCompany && (
+                    <th className="company-column-transition">Job Title</th>
+                  )}
+                  <th 
+                    colSpan={expandedCompany ? 2 : 1}
+                    className="text-center company-column-transition"
+                    style={{ 
+                      cursor: 'pointer', 
+                      background: expandedCompany ? '#f0f0f0' : undefined,
+                      transition: 'background-color 0.3s ease'
+                    }}
+                    onClick={() => setExpandedCompany(expandedCompany ? null : 'company')}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      {expandedCompany ? 'Job Details' : 'Company'}
+                      <i 
+                        className={`fas fa-chevron-${expandedCompany ? 'down' : 'right'} text-primary`}
+                        style={{ 
+                          transition: 'transform 0.3s ease',
+                          fontSize: '0.85rem'
+                        }}
+                      ></i>
+                    </span>
+                  </th>
+                  {expandedCompany && (
+                    <th 
+                      className="text-center small text-muted company-column-transition"
+                      style={{
+                        animation: 'slideInColumn 0.3s ease'
+                      }}
+                    >
+                      Job Title
+                    </th>
+                  )}
+                  {expandedCompany && (
+                    <th 
+                      className="text-center small text-muted company-column-transition"
+                      style={{
+                        animation: 'slideInColumn 0.3s ease'
+                      }}
+                    >
+                      Company Name
+                    </th>
+                  )}
+                  <th className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Total Jobs Applied</th>
+                  <th className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Selected</th>
+                  <th className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Rejected</th>
+                  <th className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>No Response</th>
                   <th className="text-center">Job Shared</th>
                   <th className="text-center">Status</th>
                   <th className="text-center">Response</th>
@@ -2043,24 +2094,485 @@ const DashboardPlacements = () => {
                 </tr>
               </thead>
               <tbody>
-                {jobOffers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center text-muted py-4">
+                {(() => {
+                  // Group job offers by candidate
+                  const candidateMap = new Map();
+                  
+                  jobOffers.forEach((offer, index) => {
+                    // Extract candidate info from multiple possible sources
+                    const candidateId = offer._candidate?._id?.toString() || 
+                                     offer._candidate?.toString() ||
+                                     offer.placement?._candidate?._id?.toString() ||
+                                     offer.placement?._candidate?.toString() ||
+                                     offer.placement?._id?.toString() ||
+                                     `unknown-${index}`;
+                    
+                    const candidateName = offer._candidate?.name || 
+                                         offer.placement?.appliedCourse?._candidate?.name ||
+                                         offer.placement?.uploadCandidate?.name ||
+                                         offer.placement?.uploadCandidate?.user?.name ||
+                                         'Unknown';
+                    
+                    const candidateEmail = offer._candidate?.email || 
+                                         offer.placement?.appliedCourse?._candidate?.email ||
+                                         offer.placement?.uploadCandidate?.email ||
+                                         offer.placement?.uploadCandidate?.user?.email ||
+                                         'N/A';
+                    
+                    const candidateMobile = offer._candidate?.mobile || 
+                                         offer._candidate?.contactNumber ||
+                                         offer.placement?.appliedCourse?._candidate?.mobile ||
+                                         offer.placement?.appliedCourse?._candidate?.contactNumber ||
+                                         offer.placement?.uploadCandidate?.contactNumber ||
+                                         offer.placement?.uploadCandidate?.user?.mobile ||
+                                         'N/A';
+                    
+                    if (!candidateMap.has(candidateId)) {
+                      candidateMap.set(candidateId, {
+                        candidateId,
+                        candidateName,
+                        candidateEmail,
+                        candidateMobile,
+                        offers: [],
+                        totalJobs: 0,
+                        selected: 0,
+                        rejected: 0,
+                        noResponse: 0
+                      });
+                    }
+                    
+                    const candidateData = candidateMap.get(candidateId);
+                    candidateData.offers.push(offer);
+                    candidateData.totalJobs++;
+                    
+                    const response = offer.candidateResponse || offer.status || 'noResponse';
+                    if (response === 'accepted' || response === 'selected') {
+                      candidateData.selected++;
+                    } else if (response === 'rejected') {
+                      candidateData.rejected++;
+                    } else {
+                      candidateData.noResponse++;
+                    }
+                  });
+                  
+                  const candidateList = Array.from(candidateMap.values());
+                  
+                  if (candidateList.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={15} className="text-center text-muted py-4">
                       No job sharing records available
                     </td>
                   </tr>
-                ) : (
-                  jobOffers.slice(0, 50).map((offer, index) => {
-                    const candidateName = offer._candidate?.candidateName || 
-                                         offer._candidate?.name || 
-                                         offer.placement?._candidate?.candidateName ||
-                                         offer.placement?._candidate?.name ||
+                    );
+                  }
+                  
+                  let globalSno = 0;
+                  
+                  // If Company column is expanded, show individual job rows
+                  if (expandedCompany) {
+                    const allRows = [];
+                    candidateList.forEach((candidate, idx) => {
+                      const hasMultipleOffers = candidate.offers && candidate.offers.length > 1;
+                      // Main candidate row (first row for each candidate) - aggregated view
+                      allRows.push(
+                        <tr 
+                          key={`main-${candidate.candidateId}`}
+                          style={{ 
+                            backgroundColor: '#f8f9fa',
+                            borderLeft: '4px solid #3b82f6',
+                            borderBottom: '2px solid #dee2e6',
+                            fontWeight: '500'
+                          }}
+                        >
+                          <td className="fw-semibold">{idx + 1}</td>
+                          <td 
+                            className="fw-semibold" 
+                            style={{ color: '#212529', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                            title={candidate.candidateName}
+                          >
+                            {candidate.candidateName}
+                          </td>
+                          <td 
+                            style={{ color: '#6c757d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                            title={candidate.candidateEmail}
+                          >
+                            {candidate.candidateEmail}
+                          </td>
+                          <td 
+                            style={{ color: '#6c757d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}
+                            title={candidate.candidateMobile}
+                          >
+                            {candidate.candidateMobile}
+                          </td>
+                          {!expandedCompany && (
+                            <td 
+                              className="company-column-transition"
+                              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                              title={hasMultipleOffers ? `${candidate.offers.length} Jobs` : (candidate.offers[0]?._job?.title || candidate.offers[0]?.title || 'N/A')}
+                            >
+                              {hasMultipleOffers ? (
+                                <span className="badge bg-info text-white" style={{ fontSize: '0.85rem', padding: '0.35rem 0.7rem' }}>
+                                  {candidate.offers.length} Jobs
+                                </span>
+                              ) : (
+                                candidate.offers[0]?._job?.title || candidate.offers[0]?.title || 'N/A'
+                              )}
+                            </td>
+                          )}
+                          {expandedCompany ? (
+                            <>
+                              <td 
+                                className="text-center fw-medium company-column-transition"
+                                style={{ 
+                                  whiteSpace: 'nowrap', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  maxWidth: '200px',
+                                  animation: 'slideInColumn 0.3s ease'
+                                }} 
+                                title={hasMultipleOffers ? `${candidate.offers.length} Jobs` : (candidate.offers[0]?._job?.title || candidate.offers[0]?.title || 'N/A')}
+                              >
+                                {hasMultipleOffers ? (
+                                  <span className="text-muted small">{candidate.offers.length} Jobs</span>
+                                ) : (
+                                  candidate.offers[0]?._job?.title || candidate.offers[0]?.title || 'N/A'
+                                )}
+                              </td>
+                              <td 
+                                className="text-center company-column-transition"
+                                style={{ 
+                                  whiteSpace: 'nowrap', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  maxWidth: '200px',
+                                  animation: 'slideInColumn 0.3s ease'
+                                }} 
+                                title={hasMultipleOffers ? 'Multiple' : (candidate.offers[0]?.displayCompanyName || candidate.offers[0]?._company?.name || candidate.offers[0]?.companyName || 'N/A')}
+                              >
+                                {hasMultipleOffers ? (
+                                  <span className="text-muted small">Multiple</span>
+                                ) : (
+                                  candidate.offers[0]?.displayCompanyName || candidate.offers[0]?._company?.name || candidate.offers[0]?.companyName || 'N/A'
+                                )}
+                              </td>
+                            </>
+                          ) : (
+                            <td 
+                              className="text-center company-column-transition"
+                              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} 
+                              title={hasMultipleOffers ? 'Multiple' : (candidate.offers[0]?.displayCompanyName || candidate.offers[0]?._company?.name || candidate.offers[0]?.companyName || 'N/A')}
+                            >
+                              {hasMultipleOffers ? (
+                                <span className="text-muted small">Multiple</span>
+                              ) : (
+                                candidate.offers[0]?.displayCompanyName || candidate.offers[0]?._company?.name || candidate.offers[0]?.companyName || 'N/A'
+                              )}
+                            </td>
+                          )}
+                          <td className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                            <span className="badge rounded-pill bg-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem', fontWeight: '600' }}>
+                              {candidate.totalJobs}
+                            </span>
+                          </td>
+                          <td className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                            <span className="badge rounded-pill bg-success" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem', fontWeight: '600' }}>
+                              {candidate.selected}
+                            </span>
+                          </td>
+                          <td className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                            <span className="badge rounded-pill bg-danger" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem', fontWeight: '600' }}>
+                              {candidate.rejected}
+                            </span>
+                          </td>
+                          <td className="text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                            <span className="badge rounded-pill bg-warning" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem', fontWeight: '600' }}>
+                              {candidate.noResponse}
+                            </span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      );
+                      
+                      // Individual job offer rows - clean design, only job-specific info
+                      candidate.offers.forEach((offer, offerIdx) => {
+                        const jobTitle = offer._job?.title || 
+                                       offer._job?.jobTitle || 
+                                       offer.title ||
+                                       offer.jobTitle ||
+                                       'N/A';
+                        const companyName = offer.displayCompanyName ||
+                                          offer._company?.displayCompanyName ||
+                                          offer._company?.name || 
+                                          offer._job?._company?.name ||
+                                          offer.companyName ||
                                          'Unknown';
-                    const jobTitle = offer._job?.jobTitle || 
-                                   offer._job?.title || 
+                        const isShared = offer.status === 'offered' || 
+                                       offer.status === 'active' || 
+                                       offer.status === 'shared';
+                        const isAccepted = offer.candidateResponse === 'accepted' || 
+                                         offer.status === 'accepted';
+                        const response = offer.candidateResponse || offer.status || 'No Response';
+                        const shareDate = offer.createdAt || offer.sharedAt || offer.updatedAt;
+                        
+                        allRows.push(
+                          <tr 
+                            key={`${candidate.candidateId}-${offerIdx}`}
+                            className="expanded-detail-row"
+                            style={{
+                              backgroundColor: '#ffffff',
+                              animation: 'slideDown 0.3s ease',
+                              borderLeft: '3px solid #3b82f6',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8f9fa';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                            }}
+                          >
+                            <td className="text-center" style={{ fontSize: '0.85rem', color: '#3b82f6' }}>
+                              <i className="fas fa-arrow-right"></i>
+                            </td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            {!expandedCompany && (
+                              <td 
+                                className="fw-medium company-column-transition"
+                                style={{ color: '#212529', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                title={jobTitle}
+                              >
+                                {jobTitle}
+                              </td>
+                            )}
+                            {expandedCompany ? (
+                              <>
+                                <td 
+                                  className="text-center fw-medium company-column-transition"
+                                  style={{ 
+                                    color: '#212529', 
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    maxWidth: '200px',
+                                    animation: 'slideInColumn 0.3s ease'
+                                  }}
+                                  title={jobTitle}
+                                >
+                                  {jobTitle}
+                                </td>
+                                <td 
+                                  className="text-center company-column-transition"
+                                  style={{ 
+                                    color: '#495057', 
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    maxWidth: '200px',
+                                    animation: 'slideInColumn 0.3s ease'
+                                  }}
+                                  title={companyName}
+                                >
+                                  {companyName}
+                                </td>
+                              </>
+                            ) : (
+                              <td 
+                                className="text-center company-column-transition"
+                                style={{ color: '#495057', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                title={companyName}
+                              >
+                                {companyName}
+                              </td>
+                            )}
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td className="text-center">
+                              <span className={`badge rounded-pill ${isShared ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '0.85rem' }}>
+                                {isShared ? 'Yes' : 'No'}
+                              </span>
+                            </td>
+                            <td className="text-center">
+                              <span className={`badge rounded-pill ${
+                                isAccepted ? 'bg-success' :
+                                response === 'rejected' ? 'bg-danger' :
+                                response === 'pending' ? 'bg-warning' : 'bg-secondary'
+                              }`} style={{ fontSize: '0.85rem' }}>
+                                {isAccepted ? 'Accepted' : 
+                                 response === 'rejected' ? 'Rejected' :
+                                 response === 'pending' ? 'Pending' : response}
+                              </span>
+                            </td>
+                            <td className="text-center">
+                              <span className={`badge rounded-pill ${
+                                isAccepted ? 'bg-success' :
+                                response === 'rejected' ? 'bg-danger' : 'bg-warning'
+                              }`} style={{ fontSize: '0.85rem' }}>
+                                {response}
+                              </span>
+                            </td>
+                            <td className="text-center" style={{ fontSize: '0.9rem', color: '#6c757d' }}>
+                              {shareDate ? new Date(shareDate).toLocaleDateString('en-IN') : 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    });
+                    
+                    return allRows;
+                  }
+                  
+                  // If Company column is NOT expanded, show aggregated view
+                  return candidateList.map((candidate, idx) => {
+                    const isExpanded = expandedCandidates.has(candidate.candidateId);
+                    const hasMultipleOffers = candidate.offers.length > 1;
+                    
+                    return (
+                      <React.Fragment key={candidate.candidateId}>
+                        {/* Main candidate row with aggregated data */}
+                        <tr 
+                          className={hasMultipleOffers ? 'candidate-row-clickable' : ''}
+                          style={hasMultipleOffers ? { cursor: 'pointer', backgroundColor: '#f8f9fa' } : {}}
+                          onClick={() => {
+                            if (hasMultipleOffers) {
+                              setExpandedCandidates(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(candidate.candidateId)) {
+                                  newSet.delete(candidate.candidateId);
+                                } else {
+                                  newSet.add(candidate.candidateId);
+                                }
+                                return newSet;
+                              });
+                            }
+                          }}
+                        >
+                          <td>{idx + 1}</td>
+                          <td 
+                            className="fw-semibold"
+                            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}
+                            title={candidate.candidateName}
+                          >
+                            {candidate.candidateName}
+                          </td>
+                          <td 
+                            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}
+                            title={candidate.candidateEmail}
+                          >
+                            {candidate.candidateEmail}
+                          </td>
+                          <td 
+                            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}
+                            title={candidate.candidateMobile}
+                          >
+                            {candidate.candidateMobile}
+                          </td>
+                          {!expandedCompany && (
+                            <td 
+                              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                              title={hasMultipleOffers ? `${candidate.offers.length} Jobs` : (candidate.offers[0]?._job?.title || candidate.offers[0]?.title || 'N/A')}
+                            >
+                              {hasMultipleOffers ? (
+                                <span className="text-muted small">
+                                  {candidate.offers.length} Jobs
+                                </span>
+                              ) : (
+                                candidate.offers[0]?._job?.title || 
+                                candidate.offers[0]?.title ||
+                                'N/A'
+                              )}
+                            </td>
+                          )}
+                          <td 
+                            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                            title={hasMultipleOffers ? 'Multiple' : (candidate.offers[0]?.displayCompanyName || candidate.offers[0]?._company?.name || candidate.offers[0]?.companyName || 'N/A')}
+                          >
+                            {hasMultipleOffers ? (
+                              <span className="text-muted small">Multiple</span>
+                            ) : (
+                              candidate.offers[0]?.displayCompanyName ||
+                              candidate.offers[0]?._company?.name ||
+                              candidate.offers[0]?.companyName ||
+                              'N/A'
+                            )}
+                          </td>
+                          <td className="text-center">
+                            <span className="badge rounded-pill bg-primary">
+                              {candidate.totalJobs}
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            <span className="badge rounded-pill bg-success">
+                              {candidate.selected}
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            <span className="badge rounded-pill bg-danger">
+                              {candidate.rejected}
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            <span className="badge rounded-pill bg-warning">
+                              {candidate.noResponse}
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            {!hasMultipleOffers && (
+                              <span className={`badge rounded-pill ${
+                                candidate.offers[0]?.status === 'offered' || 
+                                candidate.offers[0]?.status === 'active' ? 'bg-success' : 'bg-secondary'
+                              }`}>
+                                {candidate.offers[0]?.status === 'offered' || 
+                                 candidate.offers[0]?.status === 'active' ? 'Yes' : 'No'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            {!hasMultipleOffers && (
+                              <span className={`badge rounded-pill ${
+                                candidate.offers[0]?.candidateResponse === 'accepted' ? 'bg-success' :
+                                candidate.offers[0]?.candidateResponse === 'rejected' ? 'bg-danger' : 'bg-warning'
+                              }`}>
+                                {candidate.offers[0]?.candidateResponse || 'Pending'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            {!hasMultipleOffers && (
+                              <span className={`badge rounded-pill ${
+                                candidate.offers[0]?.candidateResponse === 'accepted' ? 'bg-success' :
+                                candidate.offers[0]?.candidateResponse === 'rejected' ? 'bg-danger' : 'bg-warning'
+                              }`}>
+                                {candidate.offers[0]?.candidateResponse || candidate.offers[0]?.status || 'No Response'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            {!hasMultipleOffers && candidate.offers[0]?.createdAt && (
+                              new Date(candidate.offers[0].createdAt).toLocaleDateString('en-IN')
+                            )}
+                          </td>
+                        </tr>
+                        
+                        {/* Expanded rows for individual job offers - same table structure */}
+                        {isExpanded && hasMultipleOffers && candidate.offers.map((offer, offerIdx) => {
+                          const jobTitle = offer._job?.title || 
+                                         offer._job?.jobTitle || 
+                                         offer.title ||
                                    offer.jobTitle ||
                                    'N/A';
-                    const companyName = offer._company?.name || 
+                          const companyName = offer.displayCompanyName ||
+                                            offer._company?.displayCompanyName ||
+                                            offer._company?.name || 
                                       offer._job?._company?.name ||
                                       offer.companyName ||
                                       'Unknown';
@@ -2073,11 +2585,57 @@ const DashboardPlacements = () => {
                     const shareDate = offer.createdAt || offer.sharedAt || offer.updatedAt;
                     
                     return (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td className="fw-semibold">{candidateName}</td>
-                        <td>{jobTitle}</td>
-                        <td>{companyName}</td>
+                            <tr 
+                              key={`${candidate.candidateId}-${offerIdx}`}
+                              className="expanded-detail-row"
+                              style={{
+                                backgroundColor: '#f8f9fa',
+                                animation: 'slideDown 0.3s ease'
+                              }}
+                            >
+                              <td className="text-muted small text-center">
+                                <i className="fas fa-arrow-right text-primary me-1"></i>
+                              </td>
+                              <td></td>
+                              <td></td>
+                              <td></td>
+                              {!expandedCompany && (
+                                <td 
+                                  style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                  title={jobTitle}
+                                >
+                                  {jobTitle}
+                                </td>
+                              )}
+                              {expandedCompany ? (
+                                <>
+                                  <td 
+                                    className="text-center fw-medium"
+                                    style={{ color: '#212529', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                    title={jobTitle}
+                                  >
+                                    {jobTitle}
+                                  </td>
+                                  <td 
+                                    className="text-center"
+                                    style={{ color: '#495057', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                    title={companyName}
+                                  >
+                                    {companyName}
+                                  </td>
+                                </>
+                              ) : (
+                                <td 
+                                  style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}
+                                  title={companyName}
+                                >
+                                  {companyName}
+                                </td>
+                              )}
+                              <td></td>
+                              <td></td>
+                              <td></td>
+                              <td></td>
                         <td className="text-center">
                           <span className={`badge rounded-pill ${isShared ? 'bg-success' : 'bg-secondary'}`}>
                             {isShared ? 'Yes' : 'No'}
@@ -2107,17 +2665,13 @@ const DashboardPlacements = () => {
                         </td>
                       </tr>
                     );
-                  })
-                )}
+                        })}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
-            {jobOffers.length > 50 && (
-              <div className="text-center mt-3">
-                <p className="text-muted small">
-                  Showing first 50 records. Total: {jobOffers.length} job shares
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -2140,14 +2694,28 @@ const DashboardPlacements = () => {
               </div>
               Individual Candidate Job Applications
             </h3>
+            {candidateJobCountData.length > 0 && (
+              <span className="badge bg-primary">
+                Total: {candidateJobCountData.length} candidates
+              </span>
+            )}
           </div>
 
-          <div className="table-responsive">
-            <table className="table table-hover align-middle">
-              <thead className="table-light">
+          <div 
+            className="table-responsive candidate-job-table-container"
+            style={{
+              maxHeight: '70vh',
+              minHeight: '400px',
+              overflowY: 'auto',
+              overflowX: 'auto',
+              position: 'relative'
+            }}
+          >
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8f9fa' }}>
                 <tr>
-                  <th>S.No</th>
-                  <th>Candidate Name</th>
+                  <th style={{ minWidth: '60px', width: '60px' }}>S.No</th>
+                  <th style={{ minWidth: '200px' }}>Candidate Name</th>
                   <th>Center</th>
                   <th className="text-center">Total Jobs Applied</th>
                   <th className="text-center">Selected</th>
@@ -2166,8 +2734,8 @@ const DashboardPlacements = () => {
                 ) : (
                   candidateJobCountData.map((candidate, index) => (
                     <tr key={candidate.candidateId || index}>
-                      <td>{index + 1}</td>
-                      <td className="fw-semibold">{candidate.candidateName}</td>
+                      <td style={{ minWidth: '60px', width: '60px' }}>{index + 1}</td>
+                      <td className="fw-semibold" style={{ minWidth: '200px' }}>{candidate.candidateName}</td>
                       <td className="text-muted">{candidate.center}</td>
                       <td className="text-center">
                         <span className="badge rounded-pill bg-primary" style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
@@ -2196,19 +2764,26 @@ const DashboardPlacements = () => {
                 )}
               </tbody>
             </table>
-            {candidateJobCountData.length > 0 && (
-              <div className="text-center mt-3">
-                <p className="text-muted small">
-                  Showing {candidateJobCountData.length} candidates sorted by job application count
-                </p>
-              </div>
-            )}
           </div>
+          {candidateJobCountData.length > 0 && (
+            <div className="text-center mt-3 pt-2 border-top">
+              <p className="text-muted small mb-0">
+                <i className="fas fa-info-circle me-1"></i>
+                Showing {candidateJobCountData.length} candidates sorted by job application count
+                {candidateJobCountData.length > 50 && (
+                  <span className="ms-2">
+                    <i className="fas fa-arrow-up-down me-1"></i>
+                    Scroll to view all candidates
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Center Based Offer Letters */}
-      <div className="card shadow-sm mb-4 border-0">
+      {/* <div className="card shadow-sm mb-4 border-0">
         <div className="card-body">
           <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <h3 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
@@ -2276,7 +2851,7 @@ const DashboardPlacements = () => {
                 </table>
               </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Advanced Filters Modal */}
       {!isFilterCollapsed && (
@@ -2490,11 +3065,77 @@ const DashboardPlacements = () => {
           from {
             opacity: 0;
             transform: translateY(-10px);
+            max-height: 0;
+            padding: 0;
           }
           to {
             opacity: 1;
             transform: translateY(0);
+            max-height: 2000px;
+            padding: 1rem;
           }
+        }
+
+        @keyframes slideInColumn {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+            max-width: 0;
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+            max-width: 100%;
+          }
+        }
+
+        .company-column-transition {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        .table th.company-column-transition,
+        .table td.company-column-transition {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        .candidate-row-clickable:hover {
+          background-color: #e9ecef !important;
+        }
+
+        .expanded-detail-row {
+          transition: all 0.3s ease;
+        }
+
+        .expanded-detail-row:hover {
+          background-color: #f8f9fa !important;
+        }
+
+        .candidate-row-clickable {
+          transition: all 0.2s ease;
+        }
+
+        .candidate-row-clickable:hover {
+          background-color: #e9ecef !important;
+          transform: translateX(2px);
+        }
+
+        /* Better spacing for expanded rows */
+        .expanded-detail-row td {
+          padding: 0.75rem 0.5rem;
+          font-size: 0.9rem;
+        }
+
+        /* Visual hierarchy for main vs expanded rows */
+        tr[style*="background-color: #f8f9fa"] {
+          border-bottom: 2px solid #dee2e6;
+        }
+
+        .expanded-detail-row {
+          border-left: 3px solid #e9ecef !important;
+        }
+
+        .expanded-detail-row:first-of-type {
+          border-top: 1px solid #e9ecef;
         }
 
         .calendar-container table td {
@@ -2707,6 +3348,69 @@ const DashboardPlacements = () => {
           text-align: center;
           color: #6c757d;
           font-style: italic;
+        }
+
+        /* Candidate Job Table Scrollable Container */
+        .candidate-job-table-container {
+          border: 1px solid #dee2e6;
+          border-radius: 0.375rem;
+          background: white;
+        }
+
+        .candidate-job-table-container::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .candidate-job-table-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        .candidate-job-table-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+          transition: background 0.3s ease;
+        }
+
+        .candidate-job-table-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+
+        .candidate-job-table-container table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background-color: #f8f9fa !important;
+          box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .candidate-job-table-container table tbody tr td {
+          background-color: white;
+        }
+
+        .candidate-job-table-container table tbody tr:hover td {
+          background-color: #f8f9fa !important;
+        }
+
+        /* Responsive height adjustments */
+        @media (max-width: 768px) {
+          .candidate-job-table-container {
+            max-height: 50vh !important;
+            min-height: 300px !important;
+          }
+        }
+
+        @media (min-width: 1200px) {
+          .candidate-job-table-container {
+            max-height: 75vh !important;
+          }
+        }
+
+        @media (min-width: 1600px) {
+          .candidate-job-table-container {
+            max-height: 80vh !important;
+          }
         }
       `}</style>
     </div>

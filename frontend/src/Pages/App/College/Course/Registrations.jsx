@@ -2897,24 +2897,22 @@ const CRMDashboard = () => {
 
   // Add this function in your component:
   const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null) => {
-    let allCount;
+    // Always calculate "All" count by summing all individual tab counts
+    // This ensures "All" tab count remains consistent regardless of which tab is active
+    const calculatedFilteredTotal = Object.keys(backendCounts || {})
+      .filter(key => key !== 'all' && key !== 'null')
+      .reduce((sum, key) => {
+        const statusData = backendCounts[key];
+        if (statusData && typeof statusData === 'object' && statusData.count) {
+          return sum + (statusData.count || 0);
+        } else if (typeof statusData === 'number') {
+          return sum + statusData;
+        }
+        return sum;
+      }, 0);
     
-    if (filteredTotalCountFromAPI !== null && filteredTotalCountFromAPI > 0) {
-      allCount = filteredTotalCountFromAPI;
-    } else {
-      const calculatedFilteredTotal = Object.keys(backendCounts || {})
-        .filter(key => key !== 'all' && key !== 'null')
-        .reduce((sum, key) => {
-          const statusData = backendCounts[key];
-          if (statusData && typeof statusData === 'object' && statusData.count) {
-            return sum + (statusData.count || 0);
-          } else if (typeof statusData === 'number') {
-            return sum + statusData;
-          }
-          return sum;
-        }, 0);
-      allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
-    }
+    // Use calculated sum, or fallback to backend's "all" value, or 0
+    const allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
@@ -2948,6 +2946,23 @@ const CRMDashboard = () => {
     }
 
     // Prepare query parameters
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
@@ -2959,8 +2974,8 @@ const CRMDashboard = () => {
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -2989,7 +3004,7 @@ const CRMDashboard = () => {
         // if (data.crmFilterCounts) {
         //   updateCrmFiltersFromBackend(data.crmFilterCounts);
         // }
-        await fetchRegistrationCrmFilterCounts(filters, page, data.totalCount);
+        await fetchRegistrationCrmFilterCounts(filters, page, null);
 
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -3012,6 +3027,23 @@ const CRMDashboard = () => {
       return;
     }
 
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
     // Prepare query parameters
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -3025,8 +3057,8 @@ const CRMDashboard = () => {
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -3070,19 +3102,35 @@ const CRMDashboard = () => {
     }
 
     // Prepare query parameters
+
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      // leadStatus is intentionally excluded - we want counts for all statuses
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -3328,6 +3376,22 @@ const CRMDashboard = () => {
         if (!token) return;
 
         try {
+
+          const formatDateForAPI = (date, isEndDate = false) => {
+            if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+            const d = new Date(date);
+            if (isEndDate) {
+              d.setHours(23, 59, 59, 999);
+            } else {
+              d.setHours(0, 0, 0, 0);
+            }
+            return d.toISOString();
+          };
+
+          // Format only nextAction dates
+          const nextActionFromDateFormatted = filterData.nextActionFromDate ? formatDateForAPI(filterData.nextActionFromDate, false) : null;
+          const nextActionToDateFormatted = filterData.nextActionToDate ? formatDateForAPI(filterData.nextActionToDate, true) : null;
+
           const queryParams = new URLSearchParams({
             page: '1',
             limit: validNumValue.toString(),
@@ -3340,8 +3404,8 @@ const CRMDashboard = () => {
             ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
             ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
             ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
-            ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
-            ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
+            ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+            ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
             ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
             ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
@@ -5521,6 +5585,19 @@ const CRMDashboard = () => {
     setIsSendingBulkWhatsapp(true);
 
     try {
+      // Helper function to format date for API
+      // Only used for nextAction dates
+      const formatDateForAPI = (date, isEndDate = false) => {
+        if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+        const d = new Date(date);
+        if (isEndDate) {
+          d.setHours(23, 59, 59, 999);
+        } else {
+          d.setHours(0, 0, 0, 0);
+        }
+        return d.toISOString();
+      };
+
       // Fetch all profiles matching current filters (not just current page)
       const queryParams = new URLSearchParams({
         page: '1',

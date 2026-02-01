@@ -79,14 +79,19 @@ router.get('/status-count', isCollege, async (req, res) => {
     const totalResult = await AppliedCourses.aggregate(totalPlacementsPipeline);
     let totalPlacements = totalResult[0]?.total || 0;
 
-    // Also count placements from UploadCandidates (only count if they actually exist and have valid status)
-    // Only count if the UploadCandidate still exists (not deleted)
-    const uploadCandidatePlacementsCountPipeline = [
+    // Count ONLY active UploadCandidates for this college (those with user account - role 3)
+    // This ensures only active uploaded candidates are counted in the total
+    const totalUploadCandidatesCount = await UploadCandidates.countDocuments({
+      college: new mongoose.Types.ObjectId(college._id),
+      status: 'active'  // Only count active candidates
+    });
+
+    // Count UploadCandidates that have Placement records (to avoid double counting)
+    const uploadCandidatesWithPlacementsCountPipeline = [
       {
         $match: {
           college: new mongoose.Types.ObjectId(college._id),
-          uploadCandidate: { $exists: true, $ne: null },
-          status: { $exists: true, $ne: null } // Only count if status exists
+          uploadCandidate: { $exists: true, $ne: null }
         }
       },
       {
@@ -99,7 +104,13 @@ router.get('/status-count', isCollege, async (req, res) => {
       },
       {
         $match: {
-          'uploadCandidateData.0': { $exists: true } // Only count if UploadCandidate still exists
+          'uploadCandidateData.0': { $exists: true }
+        }
+      },
+      {
+        $group: {
+          _id: '$uploadCandidate',
+          count: { $sum: 1 }
         }
       },
       {
@@ -107,10 +118,12 @@ router.get('/status-count', isCollege, async (req, res) => {
       }
     ];
     
-    const uploadCandidatePlacementsCountResult = await Placement.aggregate(uploadCandidatePlacementsCountPipeline);
-    const uploadCandidatePlacementsCount = uploadCandidatePlacementsCountResult[0]?.total || 0;
+    const uploadCandidatesWithPlacementsResult = await Placement.aggregate(uploadCandidatesWithPlacementsCountPipeline);
+    const uploadCandidatesWithPlacementsCount = uploadCandidatesWithPlacementsResult[0]?.total || 0;
 
-    totalPlacements += uploadCandidatePlacementsCount;
+    const uploadCandidatesWithoutPlacements = totalUploadCandidatesCount - uploadCandidatesWithPlacementsCount;
+    
+    totalPlacements += uploadCandidatesWithoutPlacements;
 
     const statusCounts = await Promise.all(
       statuses.map(async (status) => {
@@ -181,7 +194,8 @@ router.get('/status-count', isCollege, async (req, res) => {
           },
           {
             $match: {
-              'uploadCandidateData.0': { $exists: true } // Only count if UploadCandidate still exists
+              'uploadCandidateData.0': { $exists: true }, // Only count if UploadCandidate still exists
+              'uploadCandidateData.0.status': 'active' // Only count active candidates
             }
           },
           {
@@ -257,11 +271,61 @@ router.get('/status-count', isCollege, async (req, res) => {
     const nullStatusResult = await AppliedCourses.aggregate(nullStatusPipeline);
     const nullStatusCount = nullStatusResult[0]?.total || 0;
 
-    if (nullStatusCount > 0) {
+    // Also count UploadCandidates without Placement records or with null status
+    const uploadCandidatesNullStatusPipeline = [
+      {
+        $match: {
+          college: new mongoose.Types.ObjectId(college._id),
+          uploadCandidate: { $exists: true, $ne: null },
+          $or: [
+            { status: null },
+            { status: { $exists: false } }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'uploadcandidates',
+          localField: 'uploadCandidate',
+          foreignField: '_id',
+          as: 'uploadCandidateData'
+        }
+      },
+      {
+        $match: {
+          'uploadCandidateData.0': { $exists: true }, // Only if UploadCandidate still exists
+          'uploadCandidateData.0.status': 'active' // Only active candidates
+        }
+      },
+      {
+        $count: 'total'
+      }
+    ];
+    
+    const uploadCandidatesNullStatusResult = await Placement.aggregate(uploadCandidatesNullStatusPipeline);
+    const uploadCandidatesNullStatusCount = uploadCandidatesNullStatusResult[0]?.total || 0;
+
+    // Count UploadCandidates that don't have any Placement record at all
+    const uploadCandidateIdsWithPlacements = await Placement.distinct('uploadCandidate', {
+      college: new mongoose.Types.ObjectId(college._id),
+      uploadCandidate: { $exists: true, $ne: null }
+    });
+    
+    const uploadCandidatesWithoutAnyPlacement = await UploadCandidates.countDocuments({
+      college: new mongoose.Types.ObjectId(college._id),
+      status: 'active', // Only active candidates
+      _id: { 
+        $nin: uploadCandidateIdsWithPlacements.filter(id => id !== null)
+      }
+    });
+
+    const totalNullStatusCount = nullStatusCount + uploadCandidatesNullStatusCount + uploadCandidatesWithoutAnyPlacement;
+
+    if (totalNullStatusCount > 0) {
       statusCounts.push({
         statusId: null,
         statusName: 'No Status',
-        count: nullStatusCount
+        count: totalNullStatusCount
       });
     }
 
@@ -802,7 +866,8 @@ router.get('/candidates', isCollege, async (req, res) => {
     
     // Build query for UploadCandidates
     const uploadCandidatesQuery = {
-      college: new mongoose.Types.ObjectId(college._id)
+      college: new mongoose.Types.ObjectId(college._id),
+      status: 'active'  // Only fetch active candidates
     };
 
     // Apply search filter to UploadCandidates if provided
@@ -837,7 +902,8 @@ router.get('/candidates', isCollege, async (req, res) => {
         },
         {
           $match: {
-            'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
+            'uploadCandidateData.0': { $exists: true }, // Only if UploadCandidate still exists
+            'uploadCandidateData.0.status': 'active' // Only active candidates
           }
         },
         {
@@ -877,7 +943,8 @@ router.get('/candidates', isCollege, async (req, res) => {
         },
         {
           $match: {
-            'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
+            'uploadCandidateData.0': { $exists: true }, // Only if UploadCandidate still exists
+            'uploadCandidateData.0.status': 'active' // Only active candidates
           }
         },
         {
@@ -1918,7 +1985,31 @@ router.get('/job-offers', isCollege, async (req, res) => {
         { path: '_industry', select: 'name' },
         { path: '_jobCategory', select: 'name' },
         { path: 'state', select: 'name' },
-        { path: 'city', select: 'name' }
+        { path: 'city', select: 'name' },
+        { path: '_candidate', select: 'name email mobile contactNumber' },
+        { 
+          path: 'placement',
+          select: '_id',
+          populate: [
+            {
+              path: 'appliedCourse',
+              select: '_candidate',
+              populate: {
+                path: '_candidate',
+                select: 'name email mobile contactNumber',
+                model: 'CandidateProfile'
+              }
+            },
+            {
+              path: 'uploadCandidate',
+              select: 'name email contactNumber',
+              populate: {
+                path: 'user',
+                select: 'name email mobile'
+              }
+            }
+          ]
+        }
       ])
       .sort({ createdAt: -1 })
       .lean();
@@ -2197,14 +2288,8 @@ router.post('/offer-job', isCollege, async (req, res) => {
       remarks: `Job "${job.title}" offered to candidate. ${remarks || ''}`
     });
 
-    const placedStatus = await PlacementStatus.findOne({
-      college: college._id,
-      title: { $regex: /placed/i }
-    });
-
-    if (placedStatus) {
-      placement.status = placedStatus._id;
-    }
+    // DO NOT mark as placed when job is offered - only when candidate accepts
+    // The placement status will be updated when candidate accepts the job offer
 
     await placement.save();
 
@@ -2311,22 +2396,9 @@ router.post('/offer-job', isCollege, async (req, res) => {
       }
     }
 
-    if (candidateId) {
-      const AppliedJobs = mongoose.model('AppliedJobs');
-      const existingApplication = await AppliedJobs.findOne({
-        _candidate: candidateId,
-        _job: jobId
-      });
-
-      if (!existingApplication) {
-        await AppliedJobs.create({
-          _candidate: candidateId,
-          _job: jobId,
-          _company: job._company,
-          status: 'offered'
-        });
-      }
-    }
+    // DO NOT create AppliedJobs record when just sharing/offering a job
+    // AppliedJobs should only be created when candidate actually applies for the job
+    // Job sharing is tracked via JobOffer model, not AppliedJobs
 
     // Get company details
     const company = job._company || await Company.findById(job._company);
