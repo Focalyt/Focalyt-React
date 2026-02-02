@@ -383,6 +383,12 @@ const B2BSales = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
+  const [bulkUploadMessage, setBulkUploadMessage] = useState('');
+  const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
+  const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
 
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
@@ -442,6 +448,7 @@ const B2BSales = () => {
   const businessNameInputRef = useRef(null);
   const cityInputRef = useRef(null);
   const stateInputRef = useRef(null);
+  const bulkUploadFileInputRef = useRef(null);
   const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
@@ -1146,8 +1153,6 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
-
         // Refresh the leads list
         fetchLeads(selectedStatusFilter, currentPage);
 
@@ -1289,6 +1294,137 @@ const B2BSales = () => {
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
     setShowAddLeadModal(true);
+  };
+
+  // Bulk Upload Functions
+  const handleBulkFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      // Validate file type
+      const validTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'text/csv' // .csv
+      ];
+      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(fileExtension)) {
+        setBulkUploadMessage('Please select a valid Excel file (.xlsx, .xls) or CSV file');
+        e.target.value = '';
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (selectedFile.size > maxSize) {
+        setBulkUploadMessage('File size should not exceed 10MB');
+        e.target.value = '';
+        return;
+      }
+      
+      setBulkUploadFile(selectedFile);
+      setBulkUploadMessage('');
+      setBulkUploadErrors([]);
+      setBulkUploadSuccess(false);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    // Get file directly from input element
+    const fileInput = bulkUploadFileInputRef.current;
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      setBulkUploadMessage('Please select a file');
+      return;
+    }
+
+    const selectedFile = fileInput.files[0];
+
+    // Validate file object
+    if (!(selectedFile instanceof File)) {
+      setBulkUploadMessage('Invalid file object. Please select the file again.');
+      return;
+    }
+
+    setBulkUploadLoading(true);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+
+    // Create FormData and append file
+    const formData = new FormData();
+    formData.append('file', selectedFile, selectedFile.name);
+
+    // Debug: Log FormData contents
+    console.log('File to upload:', selectedFile);
+    console.log('File name:', selectedFile?.name);
+    console.log('File size:', selectedFile?.size);
+    console.log('File type:', selectedFile?.type);
+    console.log('Is File instance:', selectedFile instanceof File);
+    
+    // Verify FormData
+    console.log('FormData entries:');
+    for (let pair of formData.entries()) {
+      console.log('  -', pair[0], ':', pair[1]);
+    }
+
+    try {
+      const response = await axios.post(`${backendUrl}/college/b2b/leads/import`, formData, {
+        headers: {
+          'x-auth': token
+          // Don't set Content-Type - axios will automatically set it with boundary for FormData
+        }
+      });
+
+      if (response.data.status) {
+        setBulkUploadSuccess(true);
+        const successCount = response.data.data?.inserted || 0;
+        const errorCount = response.data.data?.errors || 0;
+        const errorDetails = response.data.data?.errorDetails || [];
+        
+        setBulkUploadMessage(
+          `✅ ${successCount} leads imported successfully${errorCount > 0 ? `. ${errorCount} errors found.` : ''}`
+        );
+        
+        if (errorDetails.length > 0) {
+          setBulkUploadErrors(errorDetails);
+        }
+
+        // Refresh the leads list and status counts
+        fetchLeads(selectedStatusFilter, currentPage);
+        fetchStatusCounts();
+
+        // Clear file after 3 seconds
+        setTimeout(() => {
+          setBulkUploadFile(null);
+          const fileInput = document.getElementById('bulkUploadFile');
+          if (fileInput) {
+            fileInput.value = '';
+          }
+        }, 3000);
+      } else {
+        setBulkUploadMessage(response.data.message || 'Failed to upload file');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setBulkUploadMessage(
+        error.response?.data?.message || 'Failed to upload file. Please try again.'
+      );
+    } finally {
+      setBulkUploadLoading(false);
+    }
+  };
+
+  const handleCloseBulkUploadModal = () => {
+    setShowBulkUploadModal(false);
+    setBulkUploadFile(null);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+    const fileInput = document.getElementById('bulkUploadFile');
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   const getPaginationPages = () => {
@@ -2511,11 +2647,19 @@ const B2BSales = () => {
 
                       </button>
                       {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
- 
-                      <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
-                        <i className="fas fa-plus me-1"></i> Add Lead
-                      </button>
-                    )}  
+                        <>
+                          <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
+                            <i className="fas fa-plus me-1"></i> Add Lead
+                          </button>
+                          <button 
+                            className="btn btn-success" 
+                            onClick={() => setShowBulkUploadModal(true)} 
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            <i className="fas fa-file-upload me-1"></i> Bulk Upload
+                          </button>
+                        </>
+                      )}  
                     </div>
                   </div>
 
@@ -3434,6 +3578,167 @@ const B2BSales = () => {
           </div>
         )
       }
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              {/* Modal Header */}
+              <div className="modal-header" style={{ backgroundColor: '#28a745', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-file-upload me-2"></i>
+                  Bulk Upload B2B Leads
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseBulkUploadModal}
+                ></button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="modal-body p-4">
+                {/* Instructions */}
+                <div className="alert alert-info mb-4">
+                  <h6 className="fw-bold mb-2">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Instructions:
+                  </h6>
+                  <ul className="mb-0 small">
+                    <li>Upload CSV or Excel file (.xlsx, .xls, .csv)</li>
+                    <li>Maximum file size: 10MB</li>
+                    <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Category, Type of B2B</li>
+                   
+                  </ul>
+                </div>
+
+                {/* File Upload Section */}
+                <div className="mb-4">
+                  <label className="form-label fw-bold mb-3">
+                    <i className="fas fa-file-excel text-success me-2"></i>
+                    Select File <span className="text-danger">*</span>
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="file"
+                      id="bulkUploadFile"
+                      ref={bulkUploadFileInputRef}
+                      className="form-control"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleBulkFileChange}
+                      disabled={bulkUploadLoading}
+                    />
+                    <button
+                      className="btn btn-outline-secondary"
+                      type="button"
+                      onClick={() => bulkUploadFileInputRef.current?.click()}
+                      disabled={bulkUploadLoading}
+                    >
+                      <i className="fas fa-folder-open me-1"></i>
+                      Browse
+                    </button>
+                  </div>
+                  {bulkUploadFile && (
+                    <div className="mt-2">
+                      <small className="text-success">
+                        <i className="fas fa-check-circle me-1"></i>
+                        Selected: {bulkUploadFile.name} ({(bulkUploadFile.size / 1024).toFixed(2)} KB)
+                      </small>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sample File Download */}
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => {
+                      // Create sample CSV content with proper format
+                      // Note: Lead Category and Type of B2B names should match system values
+                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Category,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
+ABC Company,John Doe,9876543210,john@abc.com,Corporate,Partner,123 Main Street,Mumbai,Maharashtra,Manager,9876543210,0221234567,Owner Name,Sample remark
+XYZ Corp,Jane Smith,9876543211,jane@xyz.com,Individual,Client,456 Park Avenue,Delhi,Delhi,Director,9876543211,0111234567,Owner Name,Another remark
+Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park,Bangalore,Karnataka,CEO,9876543212,0801234567,Owner Name,Technology company`;
+                      
+                      const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', 'b2b_leads_sample.csv');
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <i className="fas fa-download me-1"></i>
+                    Download Sample CSV
+                  </button>
+                </div>
+
+                {/* Message Display */}
+                {bulkUploadMessage && (
+                  <div className={`alert ${bulkUploadSuccess ? 'alert-success' : 'alert-danger'} mb-3`}>
+                    <i className={`fas ${bulkUploadSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
+                    {bulkUploadMessage}
+                  </div>
+                )}
+
+                {/* Error Details */}
+                {bulkUploadErrors.length > 0 && (
+                  <div className="mb-3">
+                    <h6 className="fw-bold text-danger mb-2">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      Error Details:
+                    </h6>
+                    <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f8f9fa' }}>
+                      <ul className="mb-0 small">
+                        {bulkUploadErrors.map((error, index) => (
+                          <li key={index} className="text-danger">{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="d-flex justify-content-end gap-2 mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary px-4"
+                    onClick={handleCloseBulkUploadModal}
+                    disabled={bulkUploadLoading}
+                  >
+                    <i className="fas fa-times me-1"></i>
+                    {bulkUploadSuccess ? 'Close' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success px-4"
+                    onClick={handleBulkUpload}
+                    disabled={!bulkUploadFile || bulkUploadLoading}
+                  >
+                    {bulkUploadLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-upload me-1"></i>
+                        Upload Leads
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
       <style>{`

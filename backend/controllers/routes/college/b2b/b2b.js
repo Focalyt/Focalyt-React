@@ -68,7 +68,6 @@ const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
-const users = require("../../../models/users");
 
 const router = express.Router();
 
@@ -777,8 +776,64 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			});
 		}
 
-		// Create new lead (default status will be set by schema middleware)
-		const newLead = new Lead({
+		// Handle leadOwner - convert name to ObjectId if needed, or skip if empty
+		let leadOwnerId = null;
+		if (leadOwner && leadOwner.trim()) {
+			const ownerName = leadOwner.trim();
+			
+			// Check if it's a valid ObjectId first
+			let owner = null;
+			if (mongoose.Types.ObjectId.isValid(ownerName)) {
+				owner = await User.findById(ownerName);
+			}
+			
+			// If not found by ID, search by name (case-insensitive)
+			if (!owner) {
+				owner = await User.findOne({
+					name: { $regex: new RegExp(`^${ownerName}$`, 'i') }
+				});
+			}
+			
+			if (owner) {
+				leadOwnerId = owner._id;
+			}
+			// If owner not found, leadOwnerId remains null (optional field)
+		}
+
+		// Find "Untouch Leads" status as default status
+		const College = require("../../../models/college");
+		const college = await College.findOne({
+			'_concernPerson._id': req.user._id
+		});
+
+		let defaultStatusId = null;
+		let defaultSubStatusId = null;
+		
+		if (college) {
+			const untouchStatus = await StatusB2b.findOne({
+				college: college._id,
+				title: { $regex: /^Untouch Leads$/i }
+			});
+
+			if (untouchStatus) {
+				defaultStatusId = untouchStatus._id;
+				// If there's a substatus with same name, use it
+				if (untouchStatus.substatuses && untouchStatus.substatuses.length > 0) {
+					const untouchSubStatus = untouchStatus.substatuses.find(
+						sub => sub.title && /^Untouch Leads$/i.test(sub.title)
+					);
+					if (untouchSubStatus) {
+						defaultSubStatusId = untouchSubStatus._id;
+					} else {
+						// Use first substatus if exact match not found
+						defaultSubStatusId = untouchStatus.substatuses[0]._id;
+					}
+				}
+			}
+		}
+
+		// Create new lead with default status "Untouch Leads"
+		const leadData = {
 			leadCategory,
 			typeOfB2B,
 			businessName,
@@ -791,22 +846,37 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			email,
 			mobile,
 			whatsapp,
-			leadOwner,
 			leadAddedBy: req.user._id,
 			remark,
 			landlineNumber
-		});
+		};
+
+		// Set default status to "Untouch Leads" if found
+		if (defaultStatusId) {
+			leadData.status = defaultStatusId;
+			if (defaultSubStatusId) {
+				leadData.subStatus = defaultSubStatusId;
+			}
+		}
+
+		// Only add leadOwner if we have a valid ObjectId
+		if (leadOwnerId) {
+			leadData.leadOwner = leadOwnerId;
+		}
+
+		const newLead = new Lead(leadData);
 
 
 
 		let savedLead = await newLead.save();
 
 		if (savedLead) {
+			const statusMessage = defaultStatusId ? 'Untouch Leads' : 'default status';
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
-				action: 'Lead added with default status',
-				remarks: remark || 'Lead created with default status'
+				action: `Lead added with ${statusMessage}`,
+				remarks: remark || `Lead created with ${statusMessage}`
 			});
 
 			await savedLead.save();
@@ -1444,42 +1514,292 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 });
 
 // Bulk import leads from CSV/Excel
-router.post('/leads/import', isCollege, upload, async (req, res) => {
+router.post('/leads/import', isCollege, async (req, res) => {
 	try {
-		if (!req.file) {
+		// Find "Untouch Leads" status as default status for bulk upload
+		const College = require("../../../models/college");
+		const college = await College.findOne({
+			'_concernPerson._id': req.user._id
+		});
+
+		let defaultStatusId = null;
+		let defaultSubStatusId = null;
+		
+		if (college) {
+			const untouchStatus = await StatusB2b.findOne({
+				college: college._id,
+				title: { $regex: /^Untouch Leads$/i }
+			});
+
+			if (untouchStatus) {
+				defaultStatusId = untouchStatus._id;
+				// If there's a substatus with same name, use it
+				if (untouchStatus.substatuses && untouchStatus.substatuses.length > 0) {
+					const untouchSubStatus = untouchStatus.substatuses.find(
+						sub => sub.title && /^Untouch Leads$/i.test(sub.title)
+					);
+					if (untouchSubStatus) {
+						defaultSubStatusId = untouchSubStatus._id;
+					} else {
+						// Use first substatus if exact match not found
+						defaultSubStatusId = untouchStatus.substatuses[0]._id;
+					}
+				}
+			}
+		}
+
+		// Debug: Log request details
+		// console.log('Import request received');
+		// console.log('req.file:', req.file);
+		// console.log('req.files:', req.files);
+		// console.log('req.body:', req.body);
+		// console.log('Content-Type:', req.headers['content-type']);
+		
+		// Check for file in req.files (express-fileupload) or req.file (multer)
+		let uploadedFile;
+		let filePath;
+		let fileExtension;
+		
+		if (req.files && req.files.file) {
+			// File uploaded via express-fileupload
+			uploadedFile = req.files.file;
+			fileExtension = path.extname(uploadedFile.name).toLowerCase();
+			
+			// Save file to temp directory
+			const tempFileName = `${path.basename(uploadedFile.name, fileExtension)}-${Date.now()}${fileExtension}`;
+			filePath = path.join(destination, tempFileName);
+			
+			// Use mv method from express-fileupload to save file
+			await new Promise((resolve, reject) => {
+				uploadedFile.mv(filePath, (err) => {
+					if (err) {
+						// console.error('Error saving file:', err);
+						reject(err);
+					} else {
+						resolve();
+					}
+				});
+			});
+		} else if (req.file) {
+			// File uploaded via multer
+			uploadedFile = req.file;
+			filePath = req.file.path;
+			fileExtension = path.extname(req.file.originalname).toLowerCase();
+		} else {
+			// console.log('No file found in request');
 			return res.status(400).json({
 				status: false,
 				message: 'Please upload a file'
 			});
 		}
 
-		const filePath = req.file.path;
-		const fileExtension = path.extname(req.file.originalname).toLowerCase();
-
 		let leads = [];
+
+		const headerMap = {
+			'businessname': 'businessName',
+			'concernpersonname': 'concernPersonName',
+			'mobile': 'mobile',
+			'email': 'email',
+			'leadcategory': 'leadCategory',
+			'typeofb2b': 'typeOfB2B',
+			'address': 'address',
+			'city': 'city',
+			'state': 'state',
+			'designation': 'designation',
+			'whatsapp': 'whatsapp',
+			'landlinenumber': 'landlineNumber',
+			'leadowner': 'leadOwner',
+			'remark': 'remark',
+			'latitude': 'latitude',
+			'longitude': 'longitude',
+			
+			'business': 'businessName',
+			'companyname': 'businessName',
+			'company': 'businessName',
+			'concernperson': 'concernPersonName',
+			'concernp': 'concernPersonName',
+			'contactperson': 'concernPersonName',
+			'contactpersonname': 'concernPersonName',
+			'mobilenumber': 'mobile',
+			'phone': 'mobile',
+			'phonenumber': 'mobile',
+			'emailaddress': 'email',
+			'leadcate': 'leadCategory',
+			'category': 'leadCategory',
+			'typeofb2': 'typeOfB2B',
+			'typeofb': 'typeOfB2B',
+			'b2btype': 'typeOfB2B',
+			'businessaddress': 'address',
+			'designati': 'designation',
+			'whatsappnumber': 'whatsapp',
+			'landline': 'landlineNumber',
+			'leadown': 'leadOwner',
+			'owner': 'leadOwner',
+			'remarks': 'remark',
+			'notes': 'remark',
+			'lat': 'latitude',
+			'lng': 'longitude',
+			'lon': 'longitude'
+		};
 
 		if (fileExtension === '.csv') {
 			// Parse CSV
 			const csvData = fs.readFileSync(filePath, 'utf8');
-			leads = await new Promise((resolve, reject) => {
+			const rawLeads = [];
+			
+			await new Promise((resolve, reject) => {
 				csv.parseString(csvData, { headers: true })
 					.on('data', (row) => {
-						leads.push(row);
+						rawLeads.push(row);
 					})
 					.on('end', () => {
-						resolve(leads);
+						resolve();
 					})
 					.on('error', reject);
 			});
+			
+			// console.log('CSV parsing - First raw row:', JSON.stringify(rawLeads[0], null, 2));
+			// console.log('CSV parsing - Available headers:', Object.keys(rawLeads[0] || {}));
+			
+			// Map CSV headers to standard field names
+			leads = rawLeads.map((row, rowIndex) => {
+				const obj = {};
+				
+				// Process each field in the row
+				Object.keys(row).forEach(originalKey => {
+					// Normalize header: lowercase, remove spaces, remove special chars
+					const normalizedKey = originalKey.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+					
+					// Try exact match first
+					let mappedKey = headerMap[normalizedKey];
+					
+					// If no exact match, try partial matching
+					if (!mappedKey) {
+						for (const [key, value] of Object.entries(headerMap)) {
+							if (normalizedKey.startsWith(key) || key.startsWith(normalizedKey)) {
+								mappedKey = value;
+								break;
+							}
+						}
+					}
+					
+					// If still no match, use original key
+					if (!mappedKey) {
+						mappedKey = originalKey.trim();
+					}
+					
+					let value = row[originalKey];
+					
+					// Skip if value is null or undefined
+					if (value === null || value === undefined) {
+						return;
+					}
+					
+					// Handle scientific notation for numbers (mobile, whatsapp, landline)
+					if (mappedKey === 'mobile' || mappedKey === 'whatsapp' || mappedKey === 'landlineNumber') {
+						if (typeof value === 'number') {
+							if (value >= 1e9 || value < -1e9) {
+								value = value.toFixed(0);
+							} else {
+								value = value.toString();
+							}
+							value = value.replace(/\.0+$/, '').replace('.', '');
+						} else if (typeof value === 'string') {
+							if (value.includes('E+') || value.includes('e+') || value.includes('E-') || value.includes('e-')) {
+								const numValue = parseFloat(value);
+								if (!isNaN(numValue)) {
+									value = numValue.toFixed(0);
+								}
+							}
+						}
+					}
+					
+					// Convert all values to string and trim
+					const stringValue = String(value).trim();
+					
+					// Set value even if empty (validation will handle empty check)
+					if (stringValue !== 'undefined' && stringValue !== 'null') {
+						obj[mappedKey] = stringValue;
+					}
+				});
+				
+				return obj;
+			});
+			
+			// console.log('Total CSV leads parsed:', leads.length);
+			// console.log('First 2 CSV leads:', JSON.stringify(leads.slice(0, 2), null, 2));
 		} else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
 			// Parse Excel
-			leads = await readXlsxFile(filePath);
-			const headers = leads[0];
-			leads = leads.slice(1).map(row => {
+			const excelData = await readXlsxFile(filePath);
+			const headers = excelData[0];
+			
+			// console.log('Excel headers:', headers);
+			// console.log('First data row:', excelData[1]);
+			
+			// Normalize headers (trim, lowercase for matching)
+			const normalizedHeaders = headers.map(h => h ? String(h).trim() : '');
+			
+			// headerMap already defined above for both CSV and Excel
+			
+			// Process rows
+			leads = excelData.slice(1).map((row, rowIndex) => {
 				const obj = {};
-				headers.forEach((header, index) => {
-					obj[header] = row[index];
-				});
+				normalizedHeaders.forEach((header, index) => {
+					if (!header) return;
+					
+					// Normalize header: lowercase, remove spaces, remove special chars
+					const normalizedKey = header.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+					
+					// Try exact match first
+					let mappedKey = headerMap[normalizedKey];
+					
+					// If no exact match, try partial matching
+					if (!mappedKey) {
+						// Try to find a key that starts with normalizedKey or vice versa
+						for (const [key, value] of Object.entries(headerMap)) {
+							if (normalizedKey.startsWith(key) || key.startsWith(normalizedKey)) {
+								mappedKey = value;
+								break;
+							}
+						}
+					}
+					
+					// If still no match, use original header
+					if (!mappedKey) {
+						mappedKey = header.trim();
+					}
+					
+					let value = row[index];
+					
+					if (value === null || value === undefined) {
+						return;
+					}
+					
+					if (mappedKey === 'mobile' || mappedKey === 'whatsapp' || mappedKey === 'landlineNumber') {
+						if (typeof value === 'number') {
+							
+							if (value >= 1e9 || value < -1e9) {
+								value = value.toFixed(0);
+							} else {
+								value = value.toString();
+							}
+							value = value.replace(/\.0+$/, '').replace('.', '');
+						} else if (typeof value === 'string') {
+							if (value.includes('E+') || value.includes('e+') || value.includes('E-') || value.includes('e-')) {
+								const numValue = parseFloat(value);
+								if (!isNaN(numValue)) {
+									value = numValue.toFixed(0);
+								}
+							}
+						}
+					}
+					
+					const stringValue = String(value).trim();
+					
+					if (stringValue !== 'undefined' && stringValue !== 'null') {
+						obj[mappedKey] = stringValue;
+					}
+				});				
 				return obj;
 			});
 		} else {
@@ -1497,55 +1817,150 @@ router.post('/leads/import', isCollege, upload, async (req, res) => {
 			const row = leads[i];
 			try {
 				// Validate required fields
-				if (!row.businessName || !row.concernPersonName || !row.email || !row.mobile) {
-					errors.push(`Row ${i + 2}: Missing required fields`);
+				if (!row.businessName || !row.concernPersonName || !row.mobile) {
+					errors.push(`Row ${i + 2}: Missing required fields (Business Name, Concern Person Name, Mobile are required)`);
 					continue;
 				}
 
-				// Check if email already exists
-				const existingLead = await Lead.findOne({
-					email: row.email,
-					leadAddedBy: req.user._id
-				});
+				// Validate mobile number format (10 digits)
+				const mobileRegex = /^[6-9]\d{9}$/;
+				const cleanMobile = row.mobile.replace(/\D/g, '');
+				if (!mobileRegex.test(cleanMobile)) {
+					errors.push(`Row ${i + 2}: Invalid mobile number format (should be 10 digits starting with 6-9)`);
+					continue;
+				}
 
-				if (existingLead) {
-					errors.push(`Row ${i + 2}: Email ${row.email} already exists`);
+				// Check if email already exists (only if email is provided)
+				if (row.email) {
+					const existingLead = await Lead.findOne({
+						email: row.email,
+						leadAddedBy: req.user._id
+					});
+
+					if (existingLead) {
+						errors.push(`Row ${i + 2}: Email ${row.email} already exists`);
+						continue;
+					}
+				}
+
+				// Validate and get Lead Category (case-insensitive search)
+				if (!row.leadCategory) {
+					errors.push(`Row ${i + 2}: Lead Category is required`);
+					continue;
+				}
+				
+				// Try to find category - first with isActive, then without
+				let leadCategory = await LeadCategory.findOne({ 
+					name: { $regex: new RegExp(`^${row.leadCategory.trim()}$`, 'i') },
+					isActive: true
+				});
+				
+				// If not found with isActive, try without isActive filter
+				if (!leadCategory) {
+					leadCategory = await LeadCategory.findOne({ 
+						name: { $regex: new RegExp(`^${row.leadCategory.trim()}$`, 'i') }
+					});
+				}
+				
+				if (!leadCategory) {
+					// Get available categories for better error message (try both with and without isActive)
+					let availableCategories = await LeadCategory.find({ isActive: true }).select('name').limit(10);
+					if (availableCategories.length === 0) {
+						availableCategories = await LeadCategory.find({}).select('name').limit(10);
+					}
+					const categoryNames = availableCategories.map(c => c.name).join(', ');
+					// console.log(`Row ${i + 2}: Lead Category "${row.leadCategory}" not found. Total categories in DB: ${availableCategories.length}`);
+					errors.push(`Row ${i + 2}: Lead Category "${row.leadCategory}" not found. Available categories: ${categoryNames || 'None'}`);
+					continue;
+				}
+
+				// Validate and get Type of B2B (case-insensitive search)
+				if (!row.typeOfB2B) {
+					errors.push(`Row ${i + 2}: Type of B2B is required`);
+					continue;
+				}
+				
+				// Try to find type - first with isActive, then without
+				let typeOfB2B = await TypeOfB2B.findOne({ 
+					name: { $regex: new RegExp(`^${row.typeOfB2B.trim()}$`, 'i') },
+					isActive: true 
+				});
+				
+				// If not found with isActive, try without isActive filter
+				if (!typeOfB2B) {
+					typeOfB2B = await TypeOfB2B.findOne({ 
+						name: { $regex: new RegExp(`^${row.typeOfB2B.trim()}$`, 'i') }
+					});
+				}
+				
+				if (!typeOfB2B) {
+					// Get available types for better error message (try both with and without isActive)
+					let availableTypes = await TypeOfB2B.find({ isActive: true }).select('name').limit(10);
+					if (availableTypes.length === 0) {
+						availableTypes = await TypeOfB2B.find({}).select('name').limit(10);
+					}
+					const typeNames = availableTypes.map(t => t.name).join(', ');
+					// console.log(`Row ${i + 2}: Type of B2B "${row.typeOfB2B}" not found. Total types in DB: ${availableTypes.length}`);
+					errors.push(`Row ${i + 2}: Type of B2B "${row.typeOfB2B}" not found. Available types: ${typeNames || 'None'}`);
 					continue;
 				}
 
 				// Create lead object
 				const leadData = {
-					businessName: row.businessName,
-					concernPersonName: row.concernPersonName,
-					email: row.email,
-					mobile: row.mobile,
-					businessAddress: row.businessAddress || '',
+					leadCategory: leadCategory._id,
+					typeOfB2B: typeOfB2B._id,
+					businessName: row.businessName.trim(),
+					concernPersonName: row.concernPersonName.trim(),
+					mobile: cleanMobile,
+					address: row.address || row.businessAddress || '',
+					city: row.city || '',
+					state: row.state || '',
 					designation: row.designation || '',
-					whatsapp: row.whatsapp || '',
-					leadOwner: row.leadOwner || '',
+					email: row.email || '',
+					whatsapp: row.whatsapp ? row.whatsapp.replace(/\D/g, '') : '',
+					landlineNumber: row.landlineNumber || row.landline || '',
+					remark: row.remark || row.remarks || '',
 					leadAddedBy: req.user._id
 				};
+
+				// Set default status to "Untouch Leads" if found
+				if (defaultStatusId) {
+					leadData.status = defaultStatusId;
+					if (defaultSubStatusId) {
+						leadData.subStatus = defaultSubStatusId;
+					}
+				}
+
+				// Add leadOwner if provided (by name or ID) - case-insensitive search
+				if (row.leadOwner && row.leadOwner.trim()) {
+					const ownerName = row.leadOwner.trim();
+					
+					// Check if it's a valid ObjectId first
+					let owner = null;
+					if (mongoose.Types.ObjectId.isValid(ownerName)) {
+						owner = await User.findById(ownerName);
+					}
+					
+					// If not found by ID, search by name (case-insensitive)
+					if (!owner) {
+						owner = await User.findOne({
+							name: { $regex: new RegExp(`^${ownerName}$`, 'i') }
+						});
+					}
+					
+					if (owner) {
+						leadData.leadOwner = owner._id;
+					} else {
+						// console.log(`Row ${i + 2}: Lead Owner "${ownerName}" not found. Continuing without owner.`);
+					}
+				}
 
 				// Add coordinates if provided
 				if (row.latitude && row.longitude) {
 					leadData.coordinates = {
+						type: "Point",
 						coordinates: [parseFloat(row.longitude), parseFloat(row.latitude)]
 					};
-				}
-
-				// Add leadCategory and typeOfB2B if provided
-				if (row.leadCategory) {
-					const leadCategory = await LeadCategory.findOne({ name: row.leadCategory, isActive: true });
-					if (leadCategory) {
-						leadData.leadCategory = leadCategory._id;
-					}
-				}
-
-				if (row.typeOfB2B) {
-					const typeOfB2B = await TypeOfB2B.findOne({ name: row.typeOfB2B, isActive: true });
-					if (typeOfB2B) {
-						leadData.typeOfB2B = typeOfB2B._id;
-					}
 				}
 
 				processedLeads.push(leadData);
@@ -1560,6 +1975,65 @@ router.post('/leads/import', isCollege, upload, async (req, res) => {
 			insertedLeads = await Lead.insertMany(processedLeads);
 		}
 
+		// Group similar errors together
+		const groupedErrors = [];
+		const errorGroups = {
+			'typeOfB2B': { rows: [], values: new Set(), availableTypes: '' },
+			'leadCategory': { rows: [], values: new Set(), availableCategories: '' },
+			'other': []
+		};
+
+		errors.forEach(error => {
+			// Extract row number from error message
+			const rowMatch = error.match(/Row (\d+):/);
+			const rowNum = rowMatch ? parseInt(rowMatch[1]) : null;
+
+			// Group Type of B2B errors
+			if (error.includes('Type of B2B') && error.includes('not found')) {
+				const valueMatch = error.match(/Type of B2B "([^"]+)" not found/);
+				const availableMatch = error.match(/Available types: (.+)$/);
+				if (valueMatch) {
+					errorGroups.typeOfB2B.values.add(valueMatch[1]);
+					if (rowNum) errorGroups.typeOfB2B.rows.push(rowNum);
+					if (availableMatch) {
+						errorGroups.typeOfB2B.availableTypes = availableMatch[1];
+					}
+				}
+			}
+			// Group Lead Category errors
+			else if (error.includes('Lead Category') && error.includes('not found')) {
+				const valueMatch = error.match(/Lead Category "([^"]+)" not found/);
+				const availableMatch = error.match(/Available categories: (.+)$/);
+				if (valueMatch) {
+					errorGroups.leadCategory.values.add(valueMatch[1]);
+					if (rowNum) errorGroups.leadCategory.rows.push(rowNum);
+					if (availableMatch) {
+						errorGroups.leadCategory.availableCategories = availableMatch[1];
+					}
+				}
+			}
+			// Other errors
+			else {
+				errorGroups.other.push(error);
+			}
+		});
+
+		// Create grouped error messages
+		if (errorGroups.typeOfB2B.rows.length > 0) {
+			const sortedRows = [...new Set(errorGroups.typeOfB2B.rows)].sort((a, b) => a - b);
+			const valuesList = Array.from(errorGroups.typeOfB2B.values).join(', ');
+			groupedErrors.push(`Rows ${sortedRows.join(', ')}: Type of B2B (${valuesList}) not found. Available types: ${errorGroups.typeOfB2B.availableTypes || 'None'}`);
+		}
+
+		if (errorGroups.leadCategory.rows.length > 0) {
+			const sortedRows = [...new Set(errorGroups.leadCategory.rows)].sort((a, b) => a - b);
+			const valuesList = Array.from(errorGroups.leadCategory.values).join(', ');
+			groupedErrors.push(`Rows ${sortedRows.join(', ')}: Lead Category (${valuesList}) not found. Available categories: ${errorGroups.leadCategory.availableCategories || 'None'}`);
+		}
+
+		// Add other errors as-is
+		groupedErrors.push(...errorGroups.other);
+
 		// Clean up uploaded file
 		fs.unlinkSync(filePath);
 
@@ -1567,10 +2041,10 @@ router.post('/leads/import', isCollege, upload, async (req, res) => {
 			status: true,
 			data: {
 				inserted: insertedLeads.length,
-				errors: errors.length,
-				errorDetails: errors
+				errors: groupedErrors.length,
+				errorDetails: groupedErrors
 			},
-			message: `Import completed. ${insertedLeads.length} leads imported successfully${errors.length > 0 ? `, ${errors.length} errors found` : ''}`
+			message: `Import completed. ${insertedLeads.length} leads imported successfully${groupedErrors.length > 0 ? `, ${groupedErrors.length} errors found` : ''}`
 		});
 	} catch (error) {
 		console.error('Error importing leads:', error);
