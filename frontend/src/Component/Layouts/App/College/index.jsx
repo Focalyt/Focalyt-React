@@ -401,7 +401,7 @@ function CollegeLayout({ children }) {
     <div className="min-h-screen flex flex-col">
       <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
-          <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
+          <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
             <ul className="nav navbar-nav flex-row" style={{ width: '100%', justifyContent: 'center', alignItems: 'center' }}>
               <li className="nav-item" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                 <Link to="/institute/myprofile" className="navbar-brand" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -421,13 +421,100 @@ function CollegeLayout({ children }) {
                   )}
                 </Link>
               </li>
-              <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px' }}>
+              <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px', top: '15px' }}>
                 <a className="nav-link modern-nav-toggle pr-0" onClick={toggleSidebar}>
                   <i className={`icon-x d-block d-xl-none font-medium-4 primary toggle-icon feather ${expanded ? 'icon-disc' : 'icon-circle'}`}></i>
                   <i className={`toggle-icon icon-disc font-medium-4 d-none d-xl-block collapse-toggle-icon primary feather`}></i>
                 </a>
               </li>
             </ul>
+            {/* Account Number - Mobile View Only */}
+            {userData?.collegeId && (
+              <div className="d-md-none w-100 mt-3" style={{ padding: '0 10px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(252, 43, 90, 0.08)',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(252, 43, 90, 0.15)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '600',
+                    color: '#fc2b5a',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}>
+                    Account No:
+                  </span>
+                  <span style={{ 
+                    fontSize: '10px', 
+                    fontWeight: 'bold',
+                    color: '#fc2b5a',
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'monospace',
+                    background: 'rgba(252, 43, 90, 0.12)',
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.2px',
+                    textAlign: 'left',
+                    minWidth: 0
+                  }}>
+                    {userData.collegeId}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(userData.collegeId);
+                        if (window.toast) {
+                          window.toast.success('Account number copied to clipboard!', {
+                            position: "top-right",
+                            autoClose: 2000,
+                          });
+                        } else {
+                          alert('Account number copied!');
+                        }
+                      } catch (error) {
+                        console.error('Failed to copy:', error);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(252, 43, 90, 0.15)',
+                      border: '1px solid rgba(252, 43, 90, 0.25)',
+                      color: '#fc2b5a',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '32px',
+                      height: '32px',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(252, 43, 90, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(252, 43, 90, 0.15)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title="Copy Account Number"
+                  >
+                    <i className="fas fa-copy" style={{ fontSize: '12px' }}></i>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="shadow-bottom"></div>
           <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 0px)' }}>
@@ -1639,6 +1726,10 @@ span#notification {
     }
     .float-right{
         flex-direction: row!important;
+    }
+    .navbar-header {
+        height: 135px !important;
+        min-height: 135px !important;
     }
  
 }

@@ -389,6 +389,11 @@ const B2BSales = () => {
   const [bulkUploadMessage, setBulkUploadMessage] = useState('');
   const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
+  
+  // Bulk inputs state
+  const [showBulkInputs, setShowBulkInputs] = useState(false);
+  const [bulkMode, setBulkMode] = useState('');
+  const [input1Value, setInput1Value] = useState('');
 
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
@@ -2549,124 +2554,412 @@ const B2BSales = () => {
                   </div>
 
                   <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      {/* Quick Search */}
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="position-relative">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Quick search..."
-                            value={filters.search}
-                            onChange={(e) => handleFilterChange('search', e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                applyFilters();
-                              }
-                            }}
-                            style={{
-                              width: '200px',
-                              paddingRight: '30px',
-                              paddingLeft: '12px',
-                              paddingTop: '8px',
-                              paddingBottom: '8px',
-                              backgroundColor: '#ffffff',
-                              border: '1.5px solid #ced4da',
-                              color: '#212529',
-                              fontSize: '13px',
-                              borderRadius: '6px',
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              transition: 'all 0.2s ease'
-                            }}
-                          />
-                          {filters.search && (
-                            <button
-                              type="button"
-                              className="btn btn-sm position-absolute"
-                              onClick={() => {
-                                handleFilterChange('search', '');
-                                applyFilters();
+                    {/* Desktop Layout */}
+                    <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                      {/* Left side - Buttons */}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {/* Quick Search */}
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="position-relative">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Quick search..."
+                              value={filters.search}
+                              onChange={(e) => handleFilterChange('search', e.target.value)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  applyFilters();
+                                }
                               }}
                               style={{
-                                right: '2px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                padding: '2px 6px',
-                                backgroundColor: '#dc3545',
-                                border: 'none',
-                                color: 'white',
-                                borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                                width: '200px',
+                                paddingRight: '30px',
+                                paddingLeft: '12px',
+                                paddingTop: '8px',
+                                paddingBottom: '8px',
+                                backgroundColor: '#ffffff',
+                                border: '1.5px solid #ced4da',
+                                color: '#212529',
+                                fontSize: '13px',
+                                borderRadius: '6px',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                transition: 'all 0.2s ease'
                               }}
-                            >
-                              <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
-                            </button>
-                          )}
+                            />
+                            {filters.search && (
+                              <button
+                                type="button"
+                                className="btn btn-sm position-absolute"
+                                onClick={() => {
+                                  handleFilterChange('search', '');
+                                  applyFilters();
+                                }}
+                                style={{
+                                  right: '2px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  padding: '2px 6px',
+                                  backgroundColor: '#dc3545',
+                                  border: 'none',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={applyFilters}
+                            disabled={!filters.search}
+                            style={{
+                              backgroundColor: '#007bff',
+                              borderColor: '#007bff',
+                              color: 'white',
+                              fontWeight: '500',
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                          </button>
                         </div>
+
                         <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          onClick={applyFilters}
-                          disabled={!filters.search}
+                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          onClick={() => setShowFilters(!showFilters)}
                           style={{
-                            backgroundColor: '#007bff',
-                            borderColor: '#007bff',
-                            color: 'white',
+                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
+                            color: showFilters ? '#ffffff' : '#6c757d',
                             fontWeight: '500',
                             padding: '8px 16px',
                             borderRadius: '6px',
                             fontSize: '13px',
-                            boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            borderWidth: '1.5px'
                           }}
                         >
-                          <i className="fas fa-search me-1"></i>
-
+                          <i className="fas fa-filter me-1"></i>
                         </button>
+                        
+                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
+                          <>
+                            <button className="btn btn-sm btn-outline-primary" style={{
+                              padding: "6px 12px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                              onClick={handleOpenLeadModal}
+                            >
+                              <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                              Add Lead
+                            </button>
+                            <button 
+                              className="btn btn-sm btn-outline-primary" 
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              onClick={() => {
+                                setShowBulkInputs(true);
+                                setBulkMode('bulkupload');
+                                setInput1Value('');
+                                setShowBulkUploadModal(true);
+                              }}
+                            >
+                              <i className="fas fa-file-upload" style={{ fontSize: "10px" }}></i>
+                              Bulk Upload
+                            </button>
+                          </>
+                        )}
                       </div>
 
-                      <button
-                        className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        onClick={() => setShowFilters(!showFilters)}
-                        style={{
-                          backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                          color: showFilters ? '#ffffff' : '#6c757d',
-                          fontWeight: '500',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          transition: 'all 0.2s ease',
-                          borderWidth: '1.5px'
-                        }}
-                      >
-                        <i className="fas fa-filter me-1"></i>
-
-                      </button>
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
-                        <>
-                          <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
-                            <i className="fas fa-plus me-1"></i> Add Lead
-                          </button>
-                          <button 
-                            className="btn btn-success" 
-                            onClick={() => setShowBulkUploadModal(true)} 
-                            style={{ whiteSpace: 'nowrap' }}
-                          >
-                            <i className="fas fa-file-upload me-1"></i> Bulk Upload
-                          </button>
-                        </>
-                      )}  
+                      {/* Right side - Input Fields */}
+                      {showBulkInputs && (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "stretch",
+                          border: "1px solid #dee2e6",
+                          borderRadius: "4px",
+                          backgroundColor: "#fff",
+                          overflow: "hidden",
+                          width: "200px",
+                          height: "32px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Input 1"
+                            value={input1Value}
+                            onChange={(e) => {
+                              const maxValue = totalLeads || leads?.length || 0;
+                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                              
+                              if (inputValue === '') {
+                                setInput1Value('');
+                                return;
+                              }
+                              
+                              const numValue = parseInt(inputValue, 10);
+                              
+                              if (numValue < 1 || isNaN(numValue)) {
+                                inputValue = '1';
+                              } else if (numValue > maxValue) {
+                                inputValue = maxValue.toString();
+                              }
+                              
+                              setInput1Value(inputValue);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              borderRight: "1px solid #dee2e6",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Input 2"
+                            value={totalLeads || leads?.length || 0}
+                            readOnly
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box",
+                              cursor: "default"
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
+                  {/* Mobile Layout */}
+                  <div className="col-12 d-md-none mt-2">
+                    <div className="row g-2">
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
+                        <>
+                          <div className="col-6">
+                            <button className="btn w-100" style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: '#007bff',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                              onClick={handleOpenLeadModal}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+                              }}
+                            >
+                              <i className="fas fa-plus" style={{ fontSize: "14px" }}></i>
+                              Add Lead
+                            </button>
+                          </div>
+                          <div className="col-6">
+                            <button className="btn w-100" style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                              onClick={() => {
+                                setShowBulkInputs(true);
+                                setBulkMode('bulkupload');
+                                setInput1Value('');
+                                setShowBulkUploadModal(true);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
+                              }}
+                            >
+                              <i className="fas fa-file-upload" style={{ fontSize: "14px" }}></i>
+                              Bulk Upload
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      <div className="col-12 mt-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="position-relative flex-grow-1">
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="🔍 Search leads..."
+                              value={filters.search}
+                              onChange={(e) => handleFilterChange('search', e.target.value)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  applyFilters();
+                                }
+                              }}
+                              style={{
+                                paddingRight: '35px',
+                                paddingLeft: '14px',
+                                paddingTop: '12px',
+                                paddingBottom: '12px',
+                                backgroundColor: '#ffffff',
+                                border: '1.5px solid #ced4da',
+                                color: '#212529',
+                                fontSize: '14px',
+                                borderRadius: '8px',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                              }}
+                            />
+                            {filters.search && (
+                              <button
+                                type="button"
+                                className="btn btn-sm position-absolute"
+                                onClick={() => {
+                                  handleFilterChange('search', '');
+                                  applyFilters();
+                                }}
+                                style={{
+                                  right: '4px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#dc3545',
+                                  border: 'none',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 2px 4px rgba(220, 53, 69, 0.3)'
+                                }}
+                              >
+                                <i className="fas fa-times" style={{ fontSize: '10px' }}></i>
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={applyFilters}
+                            disabled={!filters.search}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              minWidth: '48px',
+                              height: '48px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!e.currentTarget.disabled) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+                            }}
+                          >
+                            <i className="fas fa-search" style={{ fontSize: '16px' }}></i>
+                          </button>
+                          <button
+                            className={`btn ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                            onClick={() => setShowFilters(!showFilters)}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              minWidth: '48px',
+                              height: '48px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s ease',
+                              borderWidth: '1.5px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
+                            }}
+                          >
+                            <i className="fas fa-filter" style={{ fontSize: '16px' }}></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-1">
-                    <div className="d-flex flex-wrap gap-1 align-items-center">
+                    <div className="d-flex flex-wrap gap-1 align-items-center mt-sm-3 mt-3">
                       {/* Status Count Cards */}
                       {loadingStatusCounts ? (
                         <div className="d-flex gap-2">
@@ -4090,17 +4383,93 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     
     .lead-actions {
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.75rem;
+      padding: 0.75rem;
     }
     
     .action-group {
       width: 100%;
       justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      min-height: 44px;
+    }
+    
+    .action-btn span {
+      font-size: 0.85rem;
     }
     
     .lead-badges {
       position: static;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .lead-header {
+      padding: 1rem 0.75rem;
+    }
+    
+    .lead-business-name {
+      font-size: 1rem;
+    }
+    
+    .lead-contact-person {
+      font-size: 0.8rem;
+    }
+    
+    .lead-contact-info {
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+    
+    .lead-contact-item {
+      font-size: 0.65rem;
+      max-width: 100%;
+    }
+    
+    .lead-content {
+      padding: 0.75rem 0.5rem;
+    }
+    
+    .status-section {
+      padding: 10px;
+    }
+    
+    .status-section .badge {
+      font-size: 0.7rem;
+      padding: 3px 6px;
+    }
+    
+    .status-section .btn {
+      font-size: 0.7rem;
+      padding: 4px 10px;
+    }
+    
+    .compact-info-item {
+      font-size: 0.7rem;
+      padding: 0.3rem 0;
+    }
+    
+    .status-count-card {
+      min-width: 100px;
+      height: 50px;
+    }
+    
+    .status-count-card .card-body {
+      padding: 0.4rem;
+    }
+    
+    .status-count-card h6 {
+      font-size: 0.75rem;
+    }
+    
+    .status-count-card small {
+      font-size: 0.65rem;
     }
   }
 

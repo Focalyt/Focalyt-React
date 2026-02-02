@@ -99,7 +99,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                   </li>
                 </ul>
                 {collegeAccountNo && (
-                  <ul className="nav navbar-nav" style={{ marginLeft: '20px' }}>
+                  <ul className="nav navbar-nav d-none d-md-block" style={{ marginLeft: '20px' }}>
                     <li className="nav-item">
                       <div style={{ 
                         display: 'flex', 
