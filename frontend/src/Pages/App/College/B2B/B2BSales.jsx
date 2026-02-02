@@ -2653,7 +2653,7 @@ const B2BSales = () => {
                           <i className="fas fa-filter me-1"></i>
                         </button>
                         
-                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
+                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                           <>
                             <button className="btn btn-sm btn-outline-primary" style={{
                               padding: "6px 12px",
@@ -2770,7 +2770,7 @@ const B2BSales = () => {
                   {/* Mobile Layout */}
                   <div className="col-12 d-md-none mt-2">
                     <div className="row g-2">
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                         <>
                           <div className="col-6">
                             <button className="btn w-100" style={{
