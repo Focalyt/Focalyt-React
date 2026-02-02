@@ -774,26 +774,30 @@ const B2BSales = () => {
       const token = userData.token;
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-      // Fetch Lead Categories
-      const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories`, {
+      // Fetch Lead Categories (only active)
+      const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories?status=true`, {
         headers: { 'x-auth': token }
       });
       if (leadCategoriesRes.data.status) {
-        setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
-          value: cat._id,
-          label: cat.name || cat.title
-        })));
+        setLeadCategoryOptions(leadCategoriesRes.data.data
+          .filter(cat => cat.isActive === true) // Filter only active items
+          .map(cat => ({
+            value: cat._id,
+            label: cat.name || cat.title
+          })));
       }
 
-      // Fetch Type of B2B
-      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b`, {
+      // Fetch Type of B2B (only active)
+      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b?status=true`, {
         headers: { 'x-auth': token }
       });
       if (typeOfB2BRes.data.status) {
-        setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({
-          value: type._id,
-          label: type.name
-        })));
+        setTypeOfB2BOptions(typeOfB2BRes.data.data
+          .filter(type => type.isActive === true) // Filter only active items
+          .map(type => ({
+            value: type._id,
+            label: type.name
+          })));
       }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
@@ -3557,7 +3561,7 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select Lead Category</option>
-                        {leadCategoryOptions.map(category => (
+                        {leadCategoryOptions.filter(category => category).map(category => (
                           <option key={category.value} value={category.value}>
                             {category.label}
                           </option>
@@ -3583,7 +3587,7 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select B2B Type</option>
-                        {typeOfB2BOptions.map(type => (
+                        {typeOfB2BOptions.filter(type => type).map(type => (
                           <option key={type.value} value={type.value}>
                             {type.label}
                           </option>
