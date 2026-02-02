@@ -646,7 +646,7 @@ function CollegeLayout({ children }) {
               )}
 
               {/* Sales (B2B) */}
-              {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
+              {((permissions?.custom_permissions?.can_view_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
                 <li className={`nav-item has-sub dropdown-salesb2b ${openSubmenu.salesb2b ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
                     <FontAwesomeIcon icon={faHandshake} />
