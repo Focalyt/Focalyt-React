@@ -440,12 +440,23 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 // Get leads status count
 router.get('/leads/status-count', isCollege, async (req, res) => {
 	try {
-		let teamMembers = await getAllTeamMembers(req.user._id);
+		// Check if user is Admin - only Admin can view all B2B leads
+		const isAdmin = () => {
+			const permissionType = req.user.permissions?.permission_type;
+			return permissionType === 'Admin';
+		};
 
-		// Ownership Conditions for team members
-		const ownershipConditions = teamMembers.map(member => ({
-			$or: [{ leadAddedBy: member }, { leadOwner: member }]
-		}));
+		let ownershipConditions = [];
+
+		// Only apply team member filter if user is not Admin
+		// Admin can view all leads, others can only view their team members' leads
+		if (!isAdmin()) {
+			let teamMembers = await getAllTeamMembers(req.user._id);
+			// Ownership Conditions for team members
+			ownershipConditions = teamMembers.map(member => ({
+				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+			}));
+		}
 
 		// Base query with ownership conditions
 		const baseQuery = {
@@ -538,15 +549,24 @@ router.get('/leads', isCollege, async (req, res) => {
 			subStatus
 		} = req.query;
 
+		// Check if user is Admin - only Admin can view all B2B leads
+		const isAdmin = () => {
+			const permissionType = req.user.permissions?.permission_type;
+			return permissionType === 'Admin';
+		};
 
-
-		let teamMembers = await getAllTeamMembers(req.user._id);
 		const query = {};
+		let ownershipConditions = [];
 
-		// Ownership Conditions for team members
-		const ownershipConditions = teamMembers.map(member => ({
-			$or: [{ leadAddedBy: member }, { leadOwner: member }]
-		}));
+		// Only apply team member filter if user is not Admin
+		// Admin can view all leads, others can only view their team members' leads
+		if (!isAdmin()) {
+			let teamMembers = await getAllTeamMembers(req.user._id);
+			// Ownership Conditions for team members
+			ownershipConditions = teamMembers.map(member => ({
+				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+			}));
+		}
 
 		// Search functionality conditions
 		const searchConditions = search
@@ -563,8 +583,8 @@ router.get('/leads', isCollege, async (req, res) => {
 		// Build the final query
 		const finalQuery = {
 			$and: [
-				// Ownership condition
-				{ $or: ownershipConditions.flatMap(c => c.$or) },
+				// Ownership condition (only if user doesn't have view all permission)
+				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or) }] : []),
 				// Search condition (if search is provided)
 				...(search ? [searchConditions] : []),
 				// Other filters
@@ -2144,12 +2164,23 @@ router.get('/dashboard', isCollege, async (req, res) => {
 	try {
 		const { startDate, endDate, period = 'last30' } = req.query;
 
-		let teamMembers = await getAllTeamMembers(req.user._id);
+		// Check if user is Admin - only Admin can view all B2B leads
+		const isAdmin = () => {
+			const permissionType = req.user.permissions?.permission_type;
+			return permissionType === 'Admin';
+		};
 
-		// Ownership Conditions for team members
-		const ownershipConditions = teamMembers.map(member => ({
-			$or: [{ leadAddedBy: member }, { leadOwner: member }]
-		}));
+		let ownershipConditions = [];
+
+		// Only apply team member filter if user is not Admin
+		// Admin can view all leads, others can only view their team members' leads
+		if (!isAdmin()) {
+			let teamMembers = await getAllTeamMembers(req.user._id);
+			// Ownership Conditions for team members
+			ownershipConditions = teamMembers.map(member => ({
+				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+			}));
+		}
 
 		// Base query with ownership conditions
 		const baseQuery = {
