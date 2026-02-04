@@ -440,6 +440,17 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 // Get leads status count
 router.get('/leads/status-count', isCollege, async (req, res) => {
 	try {
+		// Extract filter parameters from query
+		const {
+			leadCategory,
+			typeOfB2B,
+			search,
+			subStatus,
+			startDate,
+			endDate,
+			leadOwner
+		} = req.query;
+
 		// Check if user is Admin - only Admin can view all B2B leads
 		const isAdmin = () => {
 			const permissionType = req.user.permissions?.permission_type;
@@ -458,12 +469,68 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			}));
 		}
 
-		// Base query with ownership conditions
+		// Convert string IDs to ObjectId for MongoDB query
+		const convertToObjectId = (id) => {
+			if (!id) return null;
+			if (mongoose.Types.ObjectId.isValid(id)) {
+				return new mongoose.Types.ObjectId(id);
+			}
+			return id;
+		};
+
+		// Search functionality conditions
+		const searchConditions = search
+			? {
+				$or: [
+					{ concernPersonName: { $regex: search, $options: 'i' } },
+					{ businessName: { $regex: search, $options: 'i' } },
+					{ email: { $regex: search, $options: 'i' } },
+					{ mobile: { $regex: search, $options: 'i' } }
+				]
+			}
+			: {};
+
+		// Build filter conditions
+		const filterConditions = [];
+		
+		// Other filters - Convert to ObjectId if valid
+		if (leadCategory) filterConditions.push({ leadCategory: convertToObjectId(leadCategory) });
+		if (typeOfB2B) filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
+		if (subStatus) filterConditions.push({ subStatus: convertToObjectId(subStatus) });
+		
+		// Date range filters
+		if (startDate || endDate) {
+			filterConditions.push({
+				createdAt: {
+					...(startDate ? { $gte: new Date(startDate) } : {}),
+					...(endDate ? { $lte: new Date(endDate) } : {})
+				}
+			});
+		}
+		
+		// Lead owner filter - check both leadOwner and leadAddedBy
+		if (leadOwner) {
+			filterConditions.push({
+				$or: [
+					{ leadOwner: convertToObjectId(leadOwner) },
+					{ leadAddedBy: convertToObjectId(leadOwner) }
+				]
+			});
+		}
+
+		// Base query with ownership conditions and filters
 		const baseQuery = {
 			$and: [
-				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
+				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : []),
+				...(search ? [searchConditions] : []),
+				...filterConditions
 			]
 		};
+
+		// Remove empty $and array if no conditions
+		if (baseQuery.$and.length === 0) {
+			delete baseQuery.$and;
+		}
 
 		// Get all statuses for the college
 		const StatusB2b = require("../../../models/statusB2b");
@@ -546,7 +613,10 @@ router.get('/leads', isCollege, async (req, res) => {
 			search,
 			sortBy = 'createdAt',
 			sortOrder = 'desc',
-			subStatus
+			subStatus,
+			startDate,
+			endDate,
+			leadOwner
 		} = req.query;
 
 		// Check if user is Admin - only Admin can view all B2B leads
@@ -562,10 +632,13 @@ router.get('/leads', isCollege, async (req, res) => {
 		// Admin can view all leads, others can only view their team members' leads
 		if (!isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
+			// console.log('👥 [BACKEND] Team Members:', teamMembers.length);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
 				$or: [{ leadAddedBy: member }, { leadOwner: member }]
 			}));
+		} else {
+			// console.log('👑 [BACKEND] User is Admin - No ownership restrictions');
 		}
 
 		// Search functionality conditions
@@ -580,6 +653,19 @@ router.get('/leads', isCollege, async (req, res) => {
 			}
 			: {};
 
+		// if (search) {
+		// 	console.log('🔎 [BACKEND] Search condition applied:', searchConditions);
+		// }
+
+		// Convert string IDs to ObjectId for MongoDB query
+		const convertToObjectId = (id) => {
+			if (!id) return null;
+			if (mongoose.Types.ObjectId.isValid(id)) {
+				return new mongoose.Types.ObjectId(id);
+			}
+			return id;
+		};
+
 		// Build the final query
 		const finalQuery = {
 			$and: [
@@ -587,15 +673,149 @@ router.get('/leads', isCollege, async (req, res) => {
 				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or) }] : []),
 				// Search condition (if search is provided)
 				...(search ? [searchConditions] : []),
-				// Other filters
-				...(status ? [{ status }] : []),
-				...(leadCategory ? [{ leadCategory }] : []),
-				...(typeOfB2B ? [{ typeOfB2B }] : []),
-				...(subStatus ? [{ subStatus }] : [])
-			]
-		};
+				// Other filters - Convert to ObjectId if valid
+				...(status ? [{ status: convertToObjectId(status) }] : []),
+				...(leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
+				...(typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
+				...(subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+			// Date range filters
+			...(startDate || endDate ? [{
+				createdAt: {
+					...(startDate ? { $gte: new Date(startDate) } : {}),
+					...(endDate ? { $lte: new Date(endDate) } : {})
+				}
+			}] : []),
+			// Lead owner filter - Convert to ObjectId
+			// If leadOwner filter is applied, check both leadOwner field AND leadAddedBy field
+			// (because many existing leads have leadOwner set to a different user but leadAddedBy is the actual owner)
+			...(leadOwner ? [{
+				$or: [
+					{ leadOwner: convertToObjectId(leadOwner) },
+					{ leadAddedBy: convertToObjectId(leadOwner) }
+				]
+			}] : [])
+		]
+	};
 
+		// Remove empty $and array if no conditions
+		if (finalQuery.$and.length === 0) {
+			delete finalQuery.$and;
+		}
 
+		// Console logs for filter debugging
+		// console.log('🔍 [BACKEND] Filter Debug - GET /leads endpoint called');
+		// console.log('📋 [BACKEND] Raw Query Parameters:', {
+		// 	page,
+		// 	limit,
+		// 	status,
+		// 	leadCategory,
+		// 	typeOfB2B,
+		// 	search,
+		// 	sortBy,
+		// 	sortOrder,
+		// 	subStatus,
+		// 	startDate,
+		// 	endDate,
+		// 	leadOwner
+		// });
+		// console.log('👤 [BACKEND] User Info:', {
+		// 	userId: req.user._id,
+		// 	userName: req.user.name,
+		// 	permissionType: req.user.permissions?.permission_type
+		// });
+
+		// Log each filter being applied
+		const appliedFilters = [];
+		if (status) appliedFilters.push(`status: ${status} (${mongoose.Types.ObjectId.isValid(status) ? 'Valid ObjectId' : 'Invalid'})`);
+		if (leadCategory) appliedFilters.push(`leadCategory: ${leadCategory} (${mongoose.Types.ObjectId.isValid(leadCategory) ? 'Valid ObjectId' : 'Invalid'})`);
+		if (typeOfB2B) appliedFilters.push(`typeOfB2B: ${typeOfB2B} (${mongoose.Types.ObjectId.isValid(typeOfB2B) ? 'Valid ObjectId' : 'Invalid'})`);
+		if (subStatus) appliedFilters.push(`subStatus: ${subStatus} (${mongoose.Types.ObjectId.isValid(subStatus) ? 'Valid ObjectId' : 'Invalid'})`);
+		if (leadOwner) {
+			appliedFilters.push(`leadOwner: ${leadOwner} (${mongoose.Types.ObjectId.isValid(leadOwner) ? 'Valid ObjectId' : 'Invalid'})`);
+			const convertedLeadOwner = convertToObjectId(leadOwner);
+			// console.log('🔄 [BACKEND] leadOwner conversion:', {
+			// 	original: leadOwner,
+			// 	converted: convertedLeadOwner,
+			// 	type: typeof convertedLeadOwner,
+			// 	isObjectId: convertedLeadOwner instanceof mongoose.Types.ObjectId
+			// });
+		}
+		if (startDate) appliedFilters.push(`startDate: ${startDate}`);
+		if (endDate) appliedFilters.push(`endDate: ${endDate}`);
+		if (search) appliedFilters.push(`search: ${search}`);
+		
+		// if (appliedFilters.length > 0) {
+		// 	console.log('🎯 [BACKEND] Applied Filters:', appliedFilters.join(', '));
+		// } else {
+		// 	console.log('⚠️ [BACKEND] No filters applied - showing all leads');
+		// }
+
+		// Better logging for final query (handle ObjectId serialization)
+		// const queryForLogging = JSON.parse(JSON.stringify(finalQuery, (key, value) => {
+		// 	if (value instanceof mongoose.Types.ObjectId) {
+		// 		return value.toString();
+		// 	}
+		// 	return value;
+		// }));
+		// console.log('🔧 [BACKEND] Final Query Built:', JSON.stringify(queryForLogging, null, 2));
+		
+		// Log actual query structure for leadOwner
+		// if (leadOwner) {
+		// 	const leadOwnerCondition = finalQuery.$and?.find(cond => cond.leadOwner);
+		// 	if (leadOwnerCondition) {
+		// 		console.log('🔍 [BACKEND] leadOwner condition in query:', {
+		// 			leadOwner: leadOwnerCondition.leadOwner,
+		// 			type: leadOwnerCondition.leadOwner?.constructor?.name,
+		// 			isObjectId: leadOwnerCondition.leadOwner instanceof mongoose.Types.ObjectId,
+		// 			toString: leadOwnerCondition.leadOwner?.toString()
+		// 		});
+		// 	}
+		// }
+
+		// Verify leadOwner exists if filter is applied
+		// if (leadOwner) {
+		// 	const leadOwnerId = convertToObjectId(leadOwner);
+		// 	const ownerExists = await User.findById(leadOwnerId);
+		// 	
+		// 	// Check leads with this owner (without other filters)
+		// 	const totalLeadsWithOwner = await Lead.countDocuments({ leadOwner: leadOwnerId });
+		// 	
+		// 	// Also check with the actual finalQuery to see if query is correct
+		// 	const testQuery = { leadOwner: leadOwnerId };
+		// 	const testCount = await Lead.countDocuments(testQuery);
+		// 	
+		// 	// Debug: Check if leads exist with leadAddedBy = this owner (maybe leadOwner is not set)
+		// 	const totalLeadsAddedByOwner = await Lead.countDocuments({ leadAddedBy: leadOwnerId });
+		// 	
+		// 	// Debug: Check total leads with null leadOwner
+		// 	const totalLeadsWithNullOwner = await Lead.countDocuments({ leadOwner: null });
+		// 	
+		// 	// Debug: Get sample leads to check their leadOwner field
+		// 	const sampleLeads = await Lead.find({ leadAddedBy: leadOwnerId })
+		// 		.select('_id businessName leadOwner leadAddedBy')
+		// 		.limit(5)
+		// 		.lean();
+		// 	
+		// 	console.log('👤 [BACKEND] Lead Owner Verification:', {
+		// 		leadOwnerId: leadOwnerId.toString(),
+		// 		ownerExists: ownerExists ? {
+		// 			id: ownerExists._id.toString(),
+		// 			name: ownerExists.name,
+		// 			email: ownerExists.email
+		// 		} : 'NOT FOUND',
+		// 		totalLeadsWithOwner: totalLeadsWithOwner,
+		// 		testQueryCount: testCount,
+		// 		totalLeadsAddedByOwner: totalLeadsAddedByOwner,
+		// 		totalLeadsWithNullOwner: totalLeadsWithNullOwner,
+		// 		sampleLeads: sampleLeads.map(lead => ({
+		// 			id: lead._id.toString(),
+		// 			businessName: lead.businessName,
+		// 			leadOwner: lead.leadOwner ? lead.leadOwner.toString() : 'NULL',
+		// 			leadAddedBy: lead.leadAddedBy ? lead.leadAddedBy.toString() : 'NULL'
+		// 		})),
+		// 		'note': 'totalLeadsWithOwner = leads with leadOwner filter, totalLeadsAddedByOwner = leads added by this owner (maybe leadOwner is null)'
+		// 	});
+		// }
 
 		// Sorting options
 		const sortOptions = {};
@@ -607,6 +827,14 @@ router.get('/leads', isCollege, async (req, res) => {
 		// Get total lead count for pagination
 		const totalLeads = await Lead.countDocuments(finalQuery);
 		const totalPages = Math.ceil(totalLeads / limit);
+
+		// console.log('📊 [BACKEND] Query Results:', {
+		// 	totalLeads,
+		// 	totalPages,
+		// 	currentPage: parseInt(page),
+		// 	limit: Number(limit),
+		// 	skip
+		// });
 
 
 
@@ -622,6 +850,33 @@ router.get('/leads', isCollege, async (req, res) => {
 			.skip(skip)
 			.limit(Number(limit));
 
+		// Debug: Log leadOwner data for first few leads
+		// if (leads.length > 0) {
+		// 	console.log('👤 [BACKEND] Lead Owner Data in Response:');
+		// 	leads.slice(0, 3).forEach((lead, index) => {
+		// 		console.log(`  Lead ${index + 1}:`, {
+		// 			businessName: lead.businessName,
+		// 			leadOwnerId: lead.leadOwner?._id?.toString() || lead.leadOwner?.toString() || 'null',
+		// 			leadOwnerName: lead.leadOwner?.name || 'No Owner',
+		// 			leadOwnerEmail: lead.leadOwner?.email || 'N/A',
+		// 			leadOwnerType: typeof lead.leadOwner,
+		// 			leadOwnerIsObject: lead.leadOwner && typeof lead.leadOwner === 'object',
+		// 			leadAddedById: lead.leadAddedBy?._id?.toString() || lead.leadAddedBy?.toString() || 'null',
+		// 			leadAddedByName: lead.leadAddedBy?.name || 'No Added By'
+		// 		});
+		// 	});
+		// } else {
+		// 	console.log('⚠️ [BACKEND] No leads found with current filters');
+		// }
+
+		// console.log('✅ [BACKEND] Leads fetched successfully:', {
+		// 	leadsCount: leads.length,
+		// 	firstLeadId: leads[0]?._id || 'No leads',
+		// 	firstLeadOwner: leads[0]?.leadOwner?.name || leads[0]?.leadOwner?._id?.toString() || 'No owner'
+		// });
+
+
+		// console.log('📤 [BACKEND] Response sent to frontend');
 
 		res.json({
 			status: true,

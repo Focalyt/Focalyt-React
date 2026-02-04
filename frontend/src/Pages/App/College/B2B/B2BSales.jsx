@@ -1005,6 +1005,11 @@ const B2BSales = () => {
 
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
+    // console.log('🎯 [FRONTEND] Status Card Clicked:', {
+    //   statusId,
+    //   currentFilters: filters,
+    //   leadOwnerFilter: filters.leadOwner
+    // });
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
     fetchLeads(statusId, 1);
@@ -1012,6 +1017,10 @@ const B2BSales = () => {
 
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
+    // console.log('📊 [FRONTEND] Total Card Clicked:', {
+    //   currentFilters: filters,
+    //   leadOwnerFilter: filters.leadOwner
+    // });
     setSelectedStatusFilter(null);
     setCurrentPage(1);
     fetchLeads(null, 1);
@@ -1038,6 +1047,7 @@ const B2BSales = () => {
   const applyFilters = () => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
+    fetchStatusCounts(); // Update status counts with current filters
   };
 
   const clearFilters = () => {
@@ -1055,6 +1065,7 @@ const B2BSales = () => {
     });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
+    fetchStatusCounts(); // Update status counts after clearing filters
   };
 
   const fetchLeads = async (statusFilter = null, page = 1) => {
@@ -1098,21 +1109,66 @@ const B2BSales = () => {
         params.subStatus = filters.subStatus;
       }
 
+      // console.log('🔍 [FRONTEND] fetchLeads called:', {
+      //   statusFilter,
+      //   page,
+      //   filters: filters,
+      //   params: params,
+      //   leadOwnerInFilters: filters.leadOwner,
+      //   leadOwnerInParams: params.leadOwner
+      // });
+
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
         params: params
       });
 
       if (response.data.status) {
-        setLeads(response.data.data.leads || []);
+        const fetchedLeads = response.data.data.leads || [];
+        
+        // console.log('📥 [FRONTEND] Response received:', {
+        //   status: response.data.status,
+        //   leadsCount: fetchedLeads.length,
+        //   pagination: response.data.data?.pagination,
+        //   message: response.data.message,
+        //   appliedFilter: filters.leadOwner ? `leadOwner: ${filters.leadOwner}` : 'No filter'
+        // });
+        
+        // Debug: Log leadOwner data from response
+        // if (fetchedLeads.length > 0) {
+        //   console.log('👤 [FRONTEND] Lead Owner Data Received:');
+        //   fetchedLeads.slice(0, 3).forEach((lead, index) => {
+        //     console.log(`  Lead ${index + 1}:`, {
+        //       businessName: lead.businessName,
+        //       leadOwner: lead.leadOwner,
+        //       leadOwnerId: lead.leadOwner?._id || lead.leadOwner || 'null',
+        //       leadOwnerName: lead.leadOwner?.name || 'No Owner',
+        //       leadOwnerEmail: lead.leadOwner?.email || 'N/A',
+        //       leadAddedBy: lead.leadAddedBy,
+        //       leadAddedByName: lead.leadAddedBy?.name || 'No Added By'
+        //     });
+        //   });
+        // } else {
+        //   console.log('⚠️ [FRONTEND] No leads in response - Setting empty array');
+        // }
+        
+        // console.log('🔄 [FRONTEND] Updating leads state:', {
+        //   previousLeadsCount: leads.length,
+        //   newLeadsCount: fetchedLeads.length,
+        //   willClear: fetchedLeads.length === 0
+        // });
+        
+        setLeads(fetchedLeads);
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
           setPageSize(response.data.data.pagination.totalLeads || 0);
         }
+        
+        // console.log('✅ [FRONTEND] Leads state updated');
       } else {
-        console.error('Failed to fetch leads:', response.data.message);
+        console.error('❌ [FRONTEND] Failed to fetch leads:', response.data.message);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -1125,10 +1181,21 @@ const B2BSales = () => {
   const fetchStatusCounts = async () => {
     try {
       setLoadingStatusCounts(true);
+      
+      // Build params with current filters (except status filter, as we're counting by status)
+      const params = {};
+      if (filters.leadCategory) params.leadCategory = filters.leadCategory;
+      if (filters.typeOfB2B) params.typeOfB2B = filters.typeOfB2B;
+      if (filters.leadOwner) params.leadOwner = filters.leadOwner;
+      if (filters.search) params.search = filters.search;
+      if (filters.subStatus) params.subStatus = filters.subStatus;
+      if (filters.dateRange?.start) params.startDate = filters.dateRange.start;
+      if (filters.dateRange?.end) params.endDate = filters.dateRange.end;
+      
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: params
       });
-
 
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);

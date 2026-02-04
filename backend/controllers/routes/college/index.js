@@ -5588,6 +5588,10 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const p = parseInt(req.query.page, 10);
 		const page = p || 1;
 		const status = req.query.status; 
+		const search = req.query.search;
+		const course = req.query.course;
+		const year = req.query.year;
+		const session = req.query.session;
 
 		const collegeId = mongoose.Types.ObjectId.isValid(college._id) 
 			? new mongoose.Types.ObjectId(college._id) 
@@ -5597,6 +5601,79 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const matchCondition = { college: collegeId };
 		if (status && (status === 'active' || status === 'inactive')) {
 			matchCondition.status = status;
+		}
+
+		// Add search functionality - search by name, fatherName, email, or contactNumber
+		if (search && search.trim()) {
+			const searchRegex = new RegExp(search.trim(), 'i');
+			matchCondition.$or = [
+				{ name: searchRegex },
+				{ fatherName: searchRegex },
+				{ email: searchRegex },
+				{ contactNumber: searchRegex }
+			];
+		}
+
+		// Add course filter
+		if (course) {
+			try {
+				const courseArray = JSON.parse(course);
+				if (Array.isArray(courseArray) && courseArray.length > 0) {
+					// Check if values are ObjectIds (course IDs) or strings (course names)
+					const courseIds = courseArray.filter(c => mongoose.Types.ObjectId.isValid(c));
+					const courseNames = courseArray.filter(c => !mongoose.Types.ObjectId.isValid(c));
+					
+					// If we have course IDs, fetch course names from database
+					if (courseIds.length > 0) {
+						const courses = await Courses.find({ 
+							_id: { $in: courseIds.map(id => new mongoose.Types.ObjectId(id)) }
+						}).select('name');
+						const namesFromIds = courses.map(c => c.name);
+						courseNames.push(...namesFromIds);
+					}
+					
+					// Filter by course names (since course is stored as string in UploadCandidates)
+					if (courseNames.length > 0) {
+						matchCondition.course = { $in: courseNames };
+					}
+				}
+			} catch (e) {
+				// If JSON parse fails, treat as single value
+				if (mongoose.Types.ObjectId.isValid(course)) {
+					// If it's an ObjectId, fetch course name
+					const courseDoc = await Courses.findById(course).select('name');
+					if (courseDoc) {
+						matchCondition.course = courseDoc.name;
+					}
+				} else {
+					// If it's already a string (course name), use as is
+					matchCondition.course = course;
+				}
+			}
+		}
+
+		// Add year filter
+		if (year) {
+			try {
+				const yearArray = JSON.parse(year);
+				if (Array.isArray(yearArray) && yearArray.length > 0) {
+					matchCondition.year = { $in: yearArray };
+				}
+			} catch (e) {
+				matchCondition.year = year;
+			}
+		}
+
+		// Add session filter
+		if (session) {
+			try {
+				const sessionArray = JSON.parse(session);
+				if (Array.isArray(sessionArray) && sessionArray.length > 0) {
+					matchCondition.session = { $in: sessionArray };
+				}
+			} catch (e) {
+				matchCondition.session = session;
+			}
 		}
 
 		let candidates = await UploadCandidates.aggregate([
