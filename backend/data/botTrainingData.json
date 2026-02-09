@@ -1,0 +1,93 @@
+{
+  "examples": [
+    {
+      "id": "1770354205528",
+      "userQuery": "address",
+      "expectedPreferences": {},
+      "expectedResponse": "You can contact us through the following channels:\n\n📞 Phone: 8699011108\n📧 Email: info@focalyt.com\n📍 Address: SCF 3,4, 2nd floor, Shiva Complex, Patiala Rd, opposite Hyundai Showroom, Swastik Vihar, Utrathiya, Zirakpur, Punjab 140603",
+      "tags": [],
+      "notes": "",
+      "createdAt": "2026-02-06T05:03:25.528Z",
+      "updatedAt": "2026-02-06T05:03:25.528Z"
+    },
+    {
+      "id": "1770355637674",
+      "userQuery": "jobs",
+      "expectedPreferences": {},
+      "expectedResponse": "",
+      "tags": [
+        "Kangra",
+        "Dharamshala",
+        "chandigarh",
+        "Punjab",
+        "Delhi",
+        "Noida"
+      ],
+      "notes": "",
+      "createdAt": "2026-02-06T05:27:17.674Z",
+      "updatedAt": "2026-02-06T05:27:17.674Z"
+    },
+    {
+      "id": "1770377278096",
+      "userQuery": "hello",
+      "expectedPreferences": {},
+      "expectedResponse": "👋 Hello! I'm your AI job search assistant. I can help you find the perfect job based on your preferences.",
+      "tags": [
+        "hy",
+        "hii",
+        "hi",
+        "hey"
+      ],
+      "notes": "",
+      "createdAt": "2026-02-06T11:27:58.096Z",
+      "updatedAt": "2026-02-06T11:27:58.096Z"
+    },
+    {
+      "id": "1770450431105",
+      "userQuery": "What type of courses you provided ?",
+      "expectedPreferences": {},
+      "expectedResponse": "We offer a wide range of courses across different domains. You can explore all available courses and detailed information by visiting our portal here: \n\nhttps://focalyt.com/courses",
+      "tags": [
+        "course",
+        "courses",
+        "training",
+        "trainings",
+        "program",
+        "programs",
+        "certification",
+        "diploma",
+        "skill course",
+        "professional course",
+        "online course",
+        "offline course",
+        "job course",
+        "career course",
+        "education",
+        "learning",
+        "skill development",
+        "coaching",
+        "classes",
+        "institute",
+        "enroll",
+        "admission",
+        "study",
+        "syllabus",
+        "certificate",
+        "technical course",
+        "computer course",
+        "digital marketing",
+        "data science",
+        "web development",
+        "placement course",
+        "short term course",
+        "long term course"
+      ],
+      "notes": "",
+      "createdAt": "2026-02-07T07:47:11.106Z",
+      "updatedAt": "2026-02-07T07:47:11.118Z"
+    }
+  ],
+  "rules": [],
+  "intents": [],
+  "lastUpdated": "2026-02-07T07:47:11.120Z"
+}

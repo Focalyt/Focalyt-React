@@ -1,0 +1,133 @@
+<% include partials/header %>
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-9 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-12">
+        <h3 class="content-header-title float-left mb-0">💬 Chat Session Details</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/chatHistory">Chat History</a></li>
+            <li class="breadcrumb-item active">Session Details</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="content-body">
+  <% include partials/flash %>
+  <section class="list-view">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h4 class="card-title">Chat Session Information</h4>
+            <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/chatHistory" class="btn btn-secondary btn-sm">
+              <i class="fa fa-arrow-left"></i> Back to List
+            </a>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <strong>Mobile:</strong> <%= chatHistory.mobile || 'N/A' %>
+              </div>
+              <div class="col-md-3">
+                <strong>Email:</strong> <%= chatHistory.email || 'N/A' %>
+              </div>
+              <div class="col-md-3">
+                <strong>Candidate:</strong> 
+                <% if (chatHistory.candidateId) { %>
+                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/<%= chatHistory.candidateId._id %>" target="_blank">
+                    <%= chatHistory.candidateId.name || 'N/A' %>
+                  </a>
+                <% } else { %>
+                  N/A
+                <% } %>
+              </div>
+              <div class="col-md-3">
+                <strong>Status:</strong> 
+                <span class="badge badge-<%= chatHistory.status === 'active' ? 'success' : chatHistory.status === 'completed' ? 'info' : 'secondary' %>">
+                  <%= chatHistory.status || 'active' %>
+                </span>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <strong>Session ID:</strong> <code><%= chatHistory.sessionId %></code>
+              </div>
+              <div class="col-md-6">
+                <strong>Total Messages:</strong> <span class="badge badge-primary"><%= chatHistory.totalMessages || 0 %></span>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <strong>Started:</strong> <%= new Date(chatHistory.createdAt).toLocaleString('en-IN') %>
+              </div>
+              <div class="col-md-6">
+                <strong>Last Message:</strong> <%= chatHistory.lastMessageAt ? new Date(chatHistory.lastMessageAt).toLocaleString('en-IN') : 'N/A' %>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h4 class="card-title">Chat Messages</h4>
+          </div>
+          <div class="card-body">
+            <div class="chat-messages" style="max-height: 600px; overflow-y: auto;">
+              <% if (chatHistory.messages && chatHistory.messages.length > 0) { %>
+                <% chatHistory.messages.forEach((message, index) => { %>
+                  <div class="message-item mb-3 p-3 <%= message.role === 'user' ? 'bg-light' : 'bg-primary text-white' %>" 
+                       style="border-radius: 8px; <%= message.role === 'user' ? '' : 'background: linear-gradient(135deg, #FC2B5A 0%, #ec4899 100%) !important;' %>">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <div>
+                        <strong>
+                          <%= message.role === 'user' ? '👤 User' : '🤖 AI Assistant' %>
+                        </strong>
+                        <% if (message.isQA) { %>
+                          <span class="badge badge-info ml-2">FAQ Answer</span>
+                        <% } %>
+                        <% if (message.jobs && message.jobs.length > 0) { %>
+                          <span class="badge badge-success ml-2"><%= message.jobs.length %> Job(s)</span>
+                        <% } %>
+                      </div>
+                      <small class="text-muted">
+                        <%= new Date(message.timestamp).toLocaleString('en-IN', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric', 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        }) %>
+                      </small>
+                    </div>
+                    <div class="message-content" style="white-space: pre-wrap; word-wrap: break-word;">
+                      <%= message.content %>
+                    </div>
+                    <% if (message.jobs && message.jobs.length > 0) { %>
+                      <div class="mt-2">
+                        <small><strong>Jobs mentioned:</strong></small>
+                        <ul class="mb-0">
+                          <% message.jobs.forEach(jobId => { %>
+                            <li><code><%= jobId %></code></li>
+                          <% }) %>
+                        </ul>
+                      </div>
+                    <% } %>
+                  </div>
+                <% }) %>
+              <% } else { %>
+                <p class="text-center text-muted">No messages in this session</p>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<% include partials/footer %>
+

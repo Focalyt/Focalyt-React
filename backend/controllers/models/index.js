@@ -96,6 +96,7 @@ module.exports.Traine = require("./trainer")
 
 module.exports.WhatsAppTemplate = require("./wATemplate");
 module.exports.WhatsAppMessage = require("./whatsappMessage");
+module.exports.ChatHistory = require("./chatHistory");
 
 
 module.exports.TrainerTimeTable = require("./trainerTimeTable");

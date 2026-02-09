@@ -9,6 +9,10 @@ const apiRoutes = require('./api');
 const chatRoutes = require('./chat');
 const adminRoutes = require('./admin');
 const collegeRoutes = require('./college');
+const aiRoutes = require('./ai/jobRecommendations');
+const botTrainingRoutes = require('./ai/botTraining');
+const jobScraperRoutes = require('./ai/jobScraper');
+const chatHistoryRoutes = require('./ai/chatHistory');
 const { sendMail } = require("../../helpers");
 // const companyRoutes = require('./company');
 const candidateRoutes = require('./candidate');
@@ -26,6 +30,10 @@ router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
 router.use('/api', apiRoutes);
+router.use('/api/ai', aiRoutes); // AI-powered job recommendations
+router.use('/api/ai', botTrainingRoutes); // AI bot training data management
+router.use('/api/ai', jobScraperRoutes); // LinkedIn job scraping with Anthropic & Google Sheets
+router.use('/api/chat', chatHistoryRoutes); // Chat history management
 router.use('/candidateForm', viewsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/college', collegeRoutes);

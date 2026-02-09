@@ -74,6 +74,8 @@ const statusB2CRoutes = require('./statusB2C');
 const placementStatusRoutes = require('./placementStatus');
 const rewardStatusRoutes = require('./rewardStatus');
 const rewardClaimsRoutes = require('./rewardClaims');
+const botTrainingRoutes = require('./botTraining');
+const chatHistoryRoutes = require('./chatHistory');
 
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
@@ -128,6 +130,8 @@ router.use('/statusB2C', statusB2CRoutes);
 router.use('/placementStatus', placementStatusRoutes);
 router.use('/rewardStatus', rewardStatusRoutes);
 router.use('/rewardClaims', rewardClaimsRoutes);
+router.use('/botTraining', botTrainingRoutes);
+router.use('/chatHistory', chatHistoryRoutes);
 
 const backendUrl = process.env.MIPIE_BACKEND_URL;
 

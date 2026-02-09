@@ -1,0 +1,477 @@
+<% include partials/header %>
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-9 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-12">
+        <h3 class="content-header-title float-left mb-0">🤖 AI Bot Training</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+            <li class="breadcrumb-item active">AI Bot Training</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="content-body">
+  <% include partials/flash %>
+  <section class="list-view">
+    <div class="row">
+      <div class="col-12">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4" id="trainingTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="examples-tab" data-bs-toggle="tab" data-bs-target="#examples" type="button" role="tab">
+              Training Examples (<span id="examples-count">0</span>)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules" type="button" role="tab">
+              Rules (<span id="rules-count">0</span>)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="test-tab" data-bs-toggle="tab" data-bs-target="#test" type="button" role="tab">
+              Test Query
+            </button>
+          </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="trainingTabContent">
+          <!-- Examples Tab -->
+          <div class="tab-pane fade show active" id="examples" role="tabpanel">
+            <div class="row">
+              <div class="col-md-4">
+                <div class="card">
+                  <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Add Training Example</h5>
+                  </div>
+                  <div class="card-body">
+                    <form id="exampleForm">
+                      <div class="mb-3">
+                        <label class="form-label">User Query *</label>
+                        <input type="text" class="form-control" id="userQuery" placeholder="e.g., how to apply for a job" required>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-control" id="exampleType" onchange="toggleExampleType()">
+                          <option value="job-search">Job Search (with preferences)</option>
+                          <option value="qa">Question & Answer</option>
+                        </select>
+                      </div>
+                      
+                      <!-- Q&A Section -->
+                      <div id="qaSection" style="display: none;">
+                        <div class="mb-3">
+                          <label class="form-label">Expected Answer/Response *</label>
+                          <textarea class="form-control" id="expectedResponse" rows="6" placeholder="Enter the answer that should be shown for this question...&#10;&#10;Example:&#10;To apply for a job:&#10;1. Browse available jobs&#10;2. Click 'Apply Now' button&#10;3. Login or create account&#10;4. Fill application form&#10;5. Submit"></textarea>
+                          <small class="form-text text-muted">This answer will be shown when user asks this question</small>
+                        </div>
+                      </div>
+                      
+                      <!-- Job Search Section -->
+                      <div id="jobSearchSection">
+                        <div class="mb-3">
+                          <label class="form-label">Expected City</label>
+                          <input type="text" class="form-control" id="expectedCity" placeholder="Chandigarh">
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Expected State</label>
+                          <input type="text" class="form-control" id="expectedState" placeholder="Punjab">
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Max Experience (Years)</label>
+                          <input type="number" class="form-control" id="maxExperience" placeholder="2">
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Min Salary</label>
+                          <input type="number" class="form-control" id="minSalary" placeholder="25000">
+                        </div>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <label class="form-label">Tags (comma separated)</label>
+                        <input type="text" class="form-control" id="tags" placeholder="application, how-to, guide">
+                        <small class="form-text text-muted">For Q&A: use tags like "application", "how-to", "guide"</small>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="3" placeholder="Additional notes..."></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-primary w-100">Add Example</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-8">
+                <div class="card">
+                  <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Training Examples</h5>
+                  </div>
+                  <div class="card-body">
+                    <div id="examplesList">
+                      <p class="text-muted">Loading...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rules Tab -->
+          <div class="tab-pane fade" id="rules" role="tabpanel">
+            <div class="row">
+              <div class="col-md-4">
+                <div class="card">
+                  <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Add Rule</h5>
+                  </div>
+                  <div class="card-body">
+                    <form id="ruleForm">
+                      <div class="mb-3">
+                        <label class="form-label">Rule *</label>
+                        <input type="text" class="form-control" id="ruleText" placeholder="e.g., User says Chandigarh → only Chandigarh" required>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="ruleDescription" rows="3" placeholder="Explain this rule..."></textarea>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Priority (0-10)</label>
+                        <input type="number" class="form-control" id="rulePriority" min="0" max="10" value="0">
+                      </div>
+                      <button type="submit" class="btn btn-success w-100">Add Rule</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-8">
+                <div class="card">
+                  <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Rules</h5>
+                  </div>
+                  <div class="card-body">
+                    <div id="rulesList">
+                      <p class="text-muted">Loading...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Tab -->
+          <div class="tab-pane fade" id="test" role="tabpanel">
+            <div class="row">
+              <div class="col-md-12">
+                <div class="card">
+                  <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Test Query</h5>
+                  </div>
+                  <div class="card-body">
+                    <form id="testForm">
+                      <div class="mb-3">
+                        <label class="form-label">Enter Query to Test</label>
+                        <input type="text" class="form-control" id="testQuery" placeholder="e.g., I want job in Chandigarh" required>
+                      </div>
+                      <button type="submit" class="btn btn-info">Test Query</button>
+                    </form>
+                    <div id="testResults" class="mt-4" style="display: none;">
+                      <h6>Matching Examples:</h6>
+                      <div id="matchingExamples"></div>
+                      <h6 class="mt-3">Matching Rules:</h6>
+                      <div id="matchingRules"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const backendUrl = '<%= process.env.MIPIE_BACKEND_URL || "" %>';
+
+// Load training data
+async function loadTrainingData() {
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data`);
+    const data = await response.json();
+    if (data.status) {
+      document.getElementById('examples-count').textContent = data.data.examples?.length || 0;
+      document.getElementById('rules-count').textContent = data.data.rules?.length || 0;
+      renderExamples(data.data.examples || []);
+      renderRules(data.data.rules || []);
+    }
+  } catch (error) {
+    console.error('Error loading training data:', error);
+    alert('Failed to load training data');
+  }
+}
+
+// Toggle between Q&A and Job Search forms
+function toggleExampleType() {
+  const type = document.getElementById('exampleType').value;
+  const qaSection = document.getElementById('qaSection');
+  const jobSearchSection = document.getElementById('jobSearchSection');
+  const expectedResponse = document.getElementById('expectedResponse');
+  
+  if (type === 'qa') {
+    qaSection.style.display = 'block';
+    jobSearchSection.style.display = 'none';
+    expectedResponse.required = true;
+  } else {
+    qaSection.style.display = 'none';
+    jobSearchSection.style.display = 'block';
+    expectedResponse.required = false;
+  }
+}
+
+// Render examples
+function renderExamples(examples) {
+  const container = document.getElementById('examplesList');
+  if (examples.length === 0) {
+    container.innerHTML = '<p class="text-muted">No training examples yet. Add one to get started!</p>';
+    return;
+  }
+  
+  let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Type</th><th>Query</th><th>Response/Preferences</th><th>Tags</th><th>Actions</th></tr></thead><tbody>';
+  examples.forEach(ex => {
+    const isQA = ex.expectedResponse && (!ex.expectedPreferences || Object.keys(ex.expectedPreferences).length === 0);
+    const typeBadge = isQA ? '<span class="badge bg-success">Q&A</span>' : '<span class="badge bg-primary">Job Search</span>';
+    
+    let responseContent = '';
+    if (isQA) {
+      responseContent = `<div class="text-success"><strong>Answer:</strong><br><small>${ex.expectedResponse.substring(0, 150)}${ex.expectedResponse.length > 150 ? '...' : ''}</small></div>`;
+    } else {
+      const prefs = [];
+      if (ex.expectedPreferences?.city) prefs.push(`City: ${ex.expectedPreferences.city}`);
+      if (ex.expectedPreferences?.state) prefs.push(`State: ${ex.expectedPreferences.state}`);
+      if (ex.expectedPreferences?.maxExperienceYears) prefs.push(`Exp: ${ex.expectedPreferences.maxExperienceYears}yr`);
+      if (ex.expectedPreferences?.minSalary) prefs.push(`Salary: ₹${ex.expectedPreferences.minSalary}`);
+      responseContent = `<small>${prefs.join(', ') || 'No preferences'}</small>`;
+    }
+    
+    const tags = (ex.tags || []).map(tag => `<span class="badge bg-info me-1">${tag}</span>`).join('');
+    
+    html += `<tr>
+      <td>${typeBadge}</td>
+      <td><strong>${ex.userQuery}</strong>${ex.notes ? `<br><small class="text-muted">${ex.notes}</small>` : ''}</td>
+      <td>${responseContent}</td>
+      <td>${tags}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteExample('${ex.id}')">Delete</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+// Render rules
+function renderRules(rules) {
+  const container = document.getElementById('rulesList');
+  if (rules.length === 0) {
+    container.innerHTML = '<p class="text-muted">No rules yet. Add one to get started!</p>';
+    return;
+  }
+  
+  let html = '<div class="list-group">';
+  rules.forEach(rule => {
+    html += `<div class="list-group-item">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h6 class="mb-1">${rule.rule}</h6>
+          ${rule.description ? `<p class="mb-1 text-muted">${rule.description}</p>` : ''}
+          <small class="text-muted">Priority: ${rule.priority}</small>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="deleteRule('${rule.id}')">Delete</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Add example
+document.getElementById('exampleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const tags = document.getElementById('tags').value.split(',').map(t => t.trim()).filter(t => t);
+  const exampleType = document.getElementById('exampleType').value;
+  
+  const payload = {
+    userQuery: document.getElementById('userQuery').value,
+    tags: tags,
+    notes: document.getElementById('notes').value,
+  };
+  
+  if (exampleType === 'qa') {
+    // Q&A example
+    const expectedResponse = document.getElementById('expectedResponse').value.trim();
+    if (!expectedResponse) {
+      alert('Please enter an expected answer for Q&A examples');
+      return;
+    }
+    payload.expectedResponse = expectedResponse;
+    payload.expectedPreferences = {}; // Empty for Q&A
+  } else {
+    // Job Search example
+    const city = document.getElementById('expectedCity').value.trim();
+    const state = document.getElementById('expectedState').value.trim();
+    const maxExp = document.getElementById('maxExperience').value.trim();
+    const minSal = document.getElementById('minSalary').value.trim();
+    
+    payload.expectedPreferences = {};
+    if (city) payload.expectedPreferences.city = city;
+    if (state) payload.expectedPreferences.state = state;
+    if (maxExp) payload.expectedPreferences.maxExperienceYears = maxExp;
+    if (minSal) payload.expectedPreferences.minSalary = minSal;
+  }
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data/example`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    
+    const data = await response.json();
+    if (data.status) {
+      alert('Training example added successfully!');
+      document.getElementById('exampleForm').reset();
+      document.getElementById('exampleType').value = 'job-search';
+      toggleExampleType();
+      loadTrainingData();
+    } else {
+      alert(data.message || 'Failed to add training example');
+    }
+  } catch (error) {
+    console.error('Error adding example:', error);
+    alert('Failed to add training example');
+  }
+});
+
+// Delete example
+async function deleteExample(id) {
+  if (!confirm('Are you sure you want to delete this example?')) return;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data/example/${id}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (data.status) {
+      alert('Example deleted successfully!');
+      loadTrainingData();
+    }
+  } catch (error) {
+    console.error('Error deleting example:', error);
+    alert('Failed to delete example');
+  }
+}
+
+// Add rule
+document.getElementById('ruleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data/rule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rule: document.getElementById('ruleText').value,
+        description: document.getElementById('ruleDescription').value,
+        priority: parseInt(document.getElementById('rulePriority').value),
+      }),
+    });
+    
+    const data = await response.json();
+    if (data.status) {
+      alert('Rule added successfully!');
+      document.getElementById('ruleForm').reset();
+      loadTrainingData();
+    }
+  } catch (error) {
+    console.error('Error adding rule:', error);
+    alert('Failed to add rule');
+  }
+});
+
+// Delete rule
+async function deleteRule(id) {
+  if (!confirm('Are you sure you want to delete this rule?')) return;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data/rule/${id}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (data.status) {
+      alert('Rule deleted successfully!');
+      loadTrainingData();
+    }
+  } catch (error) {
+    console.error('Error deleting rule:', error);
+    alert('Failed to delete rule');
+  }
+}
+
+// Test query
+document.getElementById('testForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/training-data/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userQuery: document.getElementById('testQuery').value,
+      }),
+    });
+    
+    const data = await response.json();
+    if (data.status) {
+      const results = document.getElementById('testResults');
+      results.style.display = 'block';
+      
+      // Render matching examples
+      const examplesDiv = document.getElementById('matchingExamples');
+      if (data.matches.examples.length === 0) {
+        examplesDiv.innerHTML = '<p class="text-muted">No matching examples found.</p>';
+      } else {
+        let html = '<ul class="list-group">';
+        data.matches.examples.forEach(ex => {
+          html += `<li class="list-group-item"><strong>${ex.userQuery}</strong><br><small>Expected: ${JSON.stringify(ex.expectedPreferences)}</small></li>`;
+        });
+        html += '</ul>';
+        examplesDiv.innerHTML = html;
+      }
+      
+      // Render matching rules
+      const rulesDiv = document.getElementById('matchingRules');
+      if (data.matches.rules.length === 0) {
+        rulesDiv.innerHTML = '<p class="text-muted">No matching rules found.</p>';
+      } else {
+        let html = '<ul class="list-group">';
+        data.matches.rules.forEach(rule => {
+          html += `<li class="list-group-item"><strong>${rule.rule}</strong>${rule.description ? `<br><small class="text-muted">${rule.description}</small>` : ''}</li>`;
+        });
+        html += '</ul>';
+        rulesDiv.innerHTML = html;
+      }
+    }
+  } catch (error) {
+    console.error('Error testing query:', error);
+    alert('Failed to test query');
+  }
+});
+
+// Load data on page load
+loadTrainingData();
+</script>
+<% include partials/footer %>
+
