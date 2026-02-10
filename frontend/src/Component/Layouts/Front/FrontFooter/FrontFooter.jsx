@@ -460,6 +460,129 @@ function Footer() {
             </div>
           </div>
         </div>
+        <style>
+          {
+            `
+            /* Textarea specific styling to match other inputs */
+#careerForm textarea.form-control {
+    min-height: 120px;
+    resize: vertical;
+}
+#careerModal .modal-xl {
+max-width: 1140px;
+}
+
+#careerModal .hero-section {
+/* background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://source.unsplash.com/random/1200x600/?office'); */
+background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 1080' preserveAspectRatio='none'><defs><linearGradient id='bgGradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%230D47A1'/><stop offset='100%' stop-color='%2364B5F6'/></linearGradient></defs><rect width='1920' height='1080' fill='url(%23bgGradient)'/><g opacity='0.2'><line x1='100' y1='200' x2='400' y2='200' stroke='%23ffffff' stroke-width='2'/><line x1='400' y1='200' x2='400' y2='500' stroke='%23ffffff' stroke-width='2'/><circle cx='100' cy='200' r='5' fill='%23ffffff'/><circle cx='400' cy='200' r='5' fill='%23ffffff'/><circle cx='400' cy='500' r='5' fill='%23ffffff'/><circle cx='1600' cy='300' r='60' fill='%23ffffff' opacity='0.1'/><circle cx='1700' cy='700' r='80' fill='%23ffffff' opacity='0.1'/></g><g opacity='0.1'><polygon points='800,100 900,300 700,300' fill='%23ffffff'/><polygon points='1200,800 1300,1000 1100,1000' fill='%23ffffff'/></g></svg>") no-repeat center center/cover;
+background-size: cover;
+background-position: center;
+color: white;
+padding: 100px 0;
+}
+
+#careerModal .benefit-card {
+transition: transform 0.3s ease;
+}
+
+#careerModal .benefit-card:hover {
+transform: translateY(-5px);
+}
+
+#careerModal .icon-large {
+font-size: 2.5rem;
+color: #FC2B5A;
+}
+
+#careerModal .required-field::after {
+content: "*";
+color: red;
+margin-left: 4px;
+}
+
+#careerModal .career-form {
+max-width: 800px;
+margin: 0 auto;
+padding: 2rem;
+}
+
+#careerModal .form-label {
+font-weight: 500;
+}
+
+#careerModal .form-control:focus,
+#careerModal .form-select:focus {
+border-color: #FC2B5A;
+box-shadow: 0 0 0 0.25rem rgba(252, 43, 90, 0.25);
+}
+
+#careerModal .btn-primary {
+padding: 0.8rem 2rem;
+font-weight: 500;
+}
+
+#careerModal .form-check-input:checked {
+background-color: #FC2B5A;
+border-color: #FC2B5A;
+}
+
+/* Success Message Styles */
+.form-success-message {
+display: none;
+position: fixed;
+top: 20px;
+right: 20px;
+background-color: #28a745;
+color: white;
+padding: 1rem 2rem;
+border-radius: 4px;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+z-index: 1060;
+animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-out 2.5s forwards;
+}
+
+@keyframes slideIn {
+from {
+transform: translateX(100%);
+opacity: 0;
+}
+to {
+transform: translateX(0);
+opacity: 1;
+}
+}
+
+@keyframes fadeOut {
+from {
+opacity: 1;
+}
+to {
+opacity: 0;
+}
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+#careerModal .hero-section {
+padding: 60px 0;
+}
+
+#careerModal .career-form {
+padding: 1rem;
+}
+}
+.new_link {
+    width: 50%;
+    margin: auto;
+    background: #FC2B5A;
+    border-radius: 10px;
+    padding: 10px 20px;
+    border: 1px solid #fc2b5a;
+    color: #fff;
+}
+            `
+          }
+        </style>
       </section>
     </>
   )
