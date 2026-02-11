@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Anthropic = require("@anthropic-ai/sdk");
-const { Vacancy, FAQ } = require("../../models");
+const { Vacancy, FAQ, Courses } = require("../../models");
 const fs = require("fs").promises;
 const path = require("path");
 
@@ -50,6 +50,65 @@ const loadTrainingData = async () => {
       intents: [],
       lastUpdated: new Date().toISOString(),
     };
+  }
+};
+
+/** Check if user query is about courses (for attaching course cards to Q&A) */
+const isCourseRelatedQuery = (query) => {
+  if (!query || typeof query !== "string") return false;
+  const q = query.toLowerCase().trim();
+  const courseKeywords = ["course", "courses", "training", "learn", "program", "certification", "syllabus", "enroll", "admission", "skill development", "classes", "what kind of courses", "which type of courses", "courses list"];
+  return courseKeywords.some((kw) => q.includes(kw));
+};
+
+/** Check if answer text is about courses (for attaching course cards) */
+const isCourseRelatedAnswer = (answer) => {
+  if (!answer || typeof answer !== "string") return false;
+  const a = answer.toLowerCase();
+  return a.includes("course") || a.includes("focalyt.com/courses") || a.includes("training") || a.includes("learn");
+};
+
+/** Fetch and format courses for API response (no job filter; used for Q&A course cards) */
+const fetchFormattedCourses = async (preferences = {}) => {
+  try {
+    const todayDateString = new Date().toISOString().split("T")[0];
+    const courseFilter = {
+      status: true,
+      isDeleted: { $ne: true },
+      $or: [
+        { lastDateForApply: { $gte: todayDateString } },
+        { lastDateForApply: { $exists: false } },
+        { lastDateForApply: null },
+        { lastDateForApply: "" },
+      ],
+    };
+    const stateName = (preferences.stateName || preferences.state || "").toString().trim();
+    const cityName = (preferences.cityName || preferences.city || "").toString().trim();
+    if (stateName) courseFilter.state = new RegExp(stateName, "i");
+    if (cityName) courseFilter.city = new RegExp(cityName, "i");
+
+    const allCourses = await Courses.find(courseFilter)
+      .select("name description duration city state courseFee courseFeeType thumbnail sectors")
+      .populate({ path: "sectors", select: "name" })
+      .sort({ sequence: 1, updatedAt: -1 })
+      .limit(15)
+      .lean();
+
+    return (allCourses || []).map((c) => ({
+      _id: c._id,
+      name: c.name,
+      description: (c.description || "").substring(0, 200),
+      duration: c.duration,
+      city: c.city,
+      state: c.state,
+      courseFee: c.courseFee,
+      courseFeeType: c.courseFeeType,
+      thumbnail: c.thumbnail,
+      sectorNames: (c.sectors || []).map((s) => s?.name).filter(Boolean),
+    }));
+  } catch (e) {
+    console.error("[AI] fetchFormattedCourses error:", e.message);
+    return [];
   }
 };
 
@@ -276,13 +335,15 @@ router.post("/job-recommendations", async (req, res) => {
     // console.log(`[AI] 🔍 Checking FAQ database...`);
     const matchingFAQ = await findMatchingFAQ(userQuery);
     if (matchingFAQ) {
-      // console.log(`[AI] ✅ FAQ match found! Returning FAQ answer.`);
+      const attachCourses = isCourseRelatedQuery(userQuery) || isCourseRelatedAnswer(matchingFAQ.Answer);
+      const courses = attachCourses ? await fetchFormattedCourses(preferences) : [];
       return res.json({
         status: true,
         isQA: true,
         answer: matchingFAQ.Answer,
         source: "faq_database",
         jobs: [],
+        courses: courses,
         message: "Question answered from FAQ database",
       });
     }
@@ -382,13 +443,16 @@ router.post("/job-recommendations", async (req, res) => {
       // Use best match if score > 0.25 (lowered threshold for better matching)
       const bestMatch = scoredExamples[0];
       if (bestMatch && bestMatch.score > 0.25 && bestMatch.example.expectedResponse) {
-        // console.log(`[AI] ✅ Training data match found: "${bestMatch.example.userQuery}" (score: ${bestMatch.score.toFixed(2)})`);
+        const answer = bestMatch.example.expectedResponse;
+        const attachCourses = isCourseRelatedQuery(userQuery) || isCourseRelatedAnswer(answer);
+        const courses = attachCourses ? await fetchFormattedCourses(preferences) : [];
         return res.json({
           status: true,
           isQA: true,
-          answer: bestMatch.example.expectedResponse,
+          answer: answer,
           source: "training_data",
-          jobs: [], // No jobs for Q&A
+          jobs: [],
+          courses: courses,
           message: "Question answered from training data",
         });
       }
@@ -474,34 +538,75 @@ For job-related queries, please browse available jobs using the search filters.`
       });
     }
 
-    // Step 1: Fetch all active jobs
-    const allJobs = await Vacancy.find({
+    // Step 1: Fetch all active jobs and courses in parallel
+    const todayDateString = new Date().toISOString().split("T")[0];
+    const courseFilter = {
       status: true,
-      _company: { $ne: null },
-      validity: { $gte: new Date() },
-      verified: true,
+      isDeleted: { $ne: true },
       $or: [
-        { postingType: "Public" },
-        { postingType: { $exists: false } },
-        { postingType: null },
+        { lastDateForApply: { $gte: todayDateString } },
+        { lastDateForApply: { $exists: false } },
+        { lastDateForApply: null },
+        { lastDateForApply: "" },
       ],
-    })
-      .populate([
-        { path: "_company", select: "name logo stateId cityId" },
-        { path: "_industry", select: "name" },
-        { path: "_qualification", select: "name" },
-        { path: "state" },
-        { path: "city", select: "name" },
-        { path: "_techSkills", select: "name" },
-        { path: "_nonTechSkills", select: "name" },
-      ])
-      .limit(100); // Limit for AI processing
+    };
+    const stateName = (preferences.stateName || preferences.state || "").toString().trim();
+    const cityName = (preferences.cityName || preferences.city || "").toString().trim();
+    if (stateName) {
+      courseFilter.state = new RegExp(stateName, "i");
+    }
+    if (cityName) {
+      courseFilter.city = new RegExp(cityName, "i");
+    }
+
+    const [allJobs, allCourses] = await Promise.all([
+      Vacancy.find({
+        status: true,
+        _company: { $ne: null },
+        validity: { $gte: new Date() },
+        verified: true,
+        $or: [
+          { postingType: "Public" },
+          { postingType: { $exists: false } },
+          { postingType: null },
+        ],
+      })
+        .populate([
+          { path: "_company", select: "name logo stateId cityId" },
+          { path: "_industry", select: "name" },
+          { path: "_qualification", select: "name" },
+          { path: "state" },
+          { path: "city", select: "name" },
+          { path: "_techSkills", select: "name" },
+          { path: "_nonTechSkills", select: "name" },
+        ])
+        .limit(100),
+      Courses.find(courseFilter)
+        .select("name description duration city state courseFee courseFeeType thumbnail sectors")
+        .populate({ path: "sectors", select: "name" })
+        .sort({ sequence: 1, updatedAt: -1 })
+        .limit(15)
+        .lean(),
+    ]);
 
     if (allJobs.length === 0) {
+      const coursesFormatted = (allCourses || []).map((c) => ({
+        _id: c._id,
+        name: c.name,
+        description: (c.description || "").substring(0, 200),
+        duration: c.duration,
+        city: c.city,
+        state: c.state,
+        courseFee: c.courseFee,
+        courseFeeType: c.courseFeeType,
+        thumbnail: c.thumbnail,
+        sectorNames: (c.sectors || []).map((s) => s?.name).filter(Boolean),
+      }));
       return res.json({
         status: true,
         jobs: [],
-        message: "No jobs available",
+        courses: coursesFormatted,
+        message: allCourses?.length ? "No jobs found. Here are some courses you might like." : "No jobs or courses available",
         aiAnalysis: null,
       });
     }
@@ -648,10 +753,24 @@ For job-related queries, please browse available jobs using the search filters.`
       responseMessage = `No jobs found in ${cityName}${stateName ? `, ${stateName}` : ''}. Try searching in nearby locations or different cities.`;
     }
 
-    // Step 8: Return results
+    // Step 8: Return results (jobs + courses for AI suggestions)
+    const coursesForResponse = (allCourses || []).map((c) => ({
+      _id: c._id,
+      name: c.name,
+      description: (c.description || "").substring(0, 200),
+      duration: c.duration,
+      city: c.city,
+      state: c.state,
+      courseFee: c.courseFee,
+      courseFeeType: c.courseFeeType,
+      thumbnail: c.thumbnail,
+      sectorNames: (c.sectors || []).map((s) => s?.name).filter(Boolean),
+    }));
+
     return res.json({
       status: true,
       jobs: rankedJobs.slice(0, 20), // Top 20 recommendations
+      courses: coursesForResponse,
       totalJobs: allJobs.length,
       aiAnalysis: aiAnalysis,
       message: responseMessage,
