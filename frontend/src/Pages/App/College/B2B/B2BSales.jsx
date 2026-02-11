@@ -1213,6 +1213,23 @@ const B2BSales = () => {
 
 
 
+  // Check if user can update a lead
+  const canUpdateLead = (lead) => {
+    if (!lead || !userData?._id) return false;
+    
+    // Admin can always update - check both permissions state and userData
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    if (permissionType === 'Admin') return true;
+    
+    // Check if user is the lead owner or lead added by
+    const userId = userData._id;
+    const leadAddedById = lead.leadAddedBy?._id || lead.leadAddedBy;
+    const leadOwnerId = lead.leadOwner?._id || lead.leadOwner;
+    
+    return leadAddedById?.toString() === userId?.toString() || 
+           leadOwnerId?.toString() === userId?.toString();
+  };
+
   // Update lead status
   const updateLeadStatus = async (leadId, statusData) => {
     try {
@@ -1221,8 +1238,6 @@ const B2BSales = () => {
       const currentSubStatus = selectedProfile?.subStatus?.title || 'No Sub-Status';
       const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
       const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
-
-
 
       const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
         headers: { 'x-auth': token }
@@ -1242,7 +1257,8 @@ const B2BSales = () => {
       }
     } catch (error) {
       console.error('Error updating lead status:', error);
-      alert('Failed to update lead status. Please try again.');
+      const errorMessage = error.response?.data?.message || 'Failed to update lead status. Please try again.';
+      alert(errorMessage);
     }
   };
 
@@ -1723,6 +1739,14 @@ const B2BSales = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
+    // Check permission before opening panel
+    if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
+      if (!canUpdateLead(profile)) {
+        alert('You do not have permission to update this lead. Only the lead owner or the person who added the lead can update it.');
+        return;
+      }
+    }
+
     setSelectedProfile(null)
     setShowPanel('')
     setSelectedStatus(null)
@@ -3215,14 +3239,26 @@ const B2BSales = () => {
                                   </span>
                                 )}
                               </div>
-                              <button
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => openEditPanel(lead, 'StatusChange')}
-                                title="Change Status"
-                              >
-                                <i className="fas fa-edit me-1"></i>
-                                Change Status
-                              </button>
+                              {canUpdateLead(lead) ? (
+                                <button
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => openEditPanel(lead, 'StatusChange')}
+                                  title="Change Status"
+                                >
+                                  <i className="fas fa-edit me-1"></i>
+                                  Change Status
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  disabled
+                                  title="You don't have permission to update this lead"
+                                  style={{ cursor: 'not-allowed', opacity: 0.6 }}
+                                >
+                                  <i className="fas fa-lock me-1"></i>
+                                  No Permission
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -3290,20 +3326,43 @@ const B2BSales = () => {
                             </button>
                           </div>
                           <div className="action-group secondary">
-                            <button
-                              className="action-btn status"
-                              onClick={() => openEditPanel(lead, 'StatusChange')}
-                              title="Change Status"
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="action-btn followup"
-                              onClick={() => openEditPanel(lead, 'SetFollowup')}
-                              title="Set Follow-up"
-                            >
-                              <i className="fas fa-calendar-plus"></i>
-                            </button>
+                            {canUpdateLead(lead) ? (
+                              <>
+                                <button
+                                  className="action-btn status"
+                                  onClick={() => openEditPanel(lead, 'StatusChange')}
+                                  title="Change Status"
+                                >
+                                  <i className="fas fa-edit"></i>
+                                </button>
+                                <button
+                                  className="action-btn followup"
+                                  onClick={() => openEditPanel(lead, 'SetFollowup')}
+                                  title="Set Follow-up"
+                                >
+                                  <i className="fas fa-calendar-plus"></i>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="action-btn status"
+                                  disabled
+                                  title="You don't have permission to update this lead"
+                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                >
+                                  <i className="fas fa-lock"></i>
+                                </button>
+                                <button
+                                  className="action-btn followup"
+                                  disabled
+                                  title="You don't have permission to set follow-up for this lead"
+                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                >
+                                  <i className="fas fa-lock"></i>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

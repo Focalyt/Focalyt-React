@@ -7,7 +7,7 @@ import FrontLayout from '../../../Component/Layouts/Front';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import CompanyPartners from '../CompanyPartners/CompanyPartners';
-import ChatbotWidget from '../../../Component/ChatbotWidget/ChatbotWidget';
+// import ChatbotWidget from '../../../Component/ChatbotWidget/ChatbotWidget';
 function Jobs() {
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -4156,7 +4156,7 @@ button.close span {
         )}
 
         {/* Single AI Chatbot Widget - Right Side with Full Functionality & FAQ Support */}
-        <ChatbotWidget 
+        {/* <ChatbotWidget 
           position="bottom-right"
           title="AI Job Search Assistant"
           // Pass existing functionality handlers
@@ -4170,7 +4170,7 @@ button.close span {
           onAddToCompare={handleAddToCompare}
           voiceSupported={aiVoiceSupported}
           onVoiceInput={startVoiceInput}
-        />
+        /> */}
       </FrontLayout>
 
     </>

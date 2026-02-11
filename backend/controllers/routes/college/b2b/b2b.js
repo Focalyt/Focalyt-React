@@ -1206,21 +1206,27 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
-		// Check ownership
-		let teamMembers = await getAllTeamMembers(req.user._id);
+		// Check if user is Admin - Admin can update any lead
+		const isAdmin = () => {
+			const permissionType = req.user.permissions?.permission_type;
+			return permissionType === 'Admin';
+		};
 
+		// If not Admin, check ownership
+		if (!isAdmin()) {
+			let teamMembers = await getAllTeamMembers(req.user._id);
 
-		const isOwner = teamMembers.some(member =>
-			lead.leadAddedBy.toString() === member.toString() ||
-			lead.leadOwner.toString() === member.toString()
-		);
+			const isOwner = teamMembers.some(member =>
+				lead.leadAddedBy.toString() === member.toString() ||
+				lead.leadOwner.toString() === member.toString()
+			);
 
-
-		if (!isOwner) {
-			return res.status(403).json({
-				status: false,
-				message: 'You do not have permission to update this lead'
-			});
+			if (!isOwner) {
+				return res.status(403).json({
+					status: false,
+					message: 'You do not have permission to update this lead'
+				});
+			}
 		}
 
 		// Get old status for logging
@@ -1658,11 +1664,31 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
-		// Check if lead exists and belongs to user
-		const lead = await Lead.findOne({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		});
+		// Check if user is Admin - Admin can update any lead
+		const isAdmin = () => {
+			const permissionType = req.user.permissions?.permission_type;
+			return permissionType === 'Admin';
+		};
+
+		// Check if lead exists
+		let lead;
+		if (isAdmin()) {
+			// Admin can update any lead
+			lead = await Lead.findById(req.params.id);
+		} else {
+			// Non-admin: check if lead belongs to user (either leadAddedBy or leadOwner)
+			lead = await Lead.findById(req.params.id);
+			if (lead) {
+				let teamMembers = await getAllTeamMembers(req.user._id);
+				const isOwner = teamMembers.some(member =>
+					lead.leadAddedBy.toString() === member.toString() ||
+					lead.leadOwner.toString() === member.toString()
+				);
+				if (!isOwner) {
+					lead = null;
+				}
+			}
+		}
 
 		if (!lead) {
 			return res.status(404).json({
