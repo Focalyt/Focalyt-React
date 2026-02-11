@@ -850,7 +850,12 @@ router.route("/addleaddandcourseapply")
 			// let { name, mobile, email, address, state, city, sex, dob, whatsapp, highestQualification, courseId, selectedCenter, longitude, latitude } = req.body;
 			if (mongoose.Types.ObjectId.isValid(highestQualification)) highestQualification = new mongoose.Types.ObjectId(highestQualification);
 			if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
-			if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
+			// Only convert selectedCenter to ObjectId if it's provided and not empty
+			if (selectedCenter && selectedCenter !== "" && mongoose.Types.ObjectId.isValid(selectedCenter)) {
+				selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
+			} else {
+				selectedCenter = null; // Set to null if empty or invalid
+			}
 
 			if (dob) dob = new Date(dob); // Date field
 
@@ -886,7 +891,7 @@ router.route("/addleaddandcourseapply")
 				appliedCourses: [
 					{
 						courseId: courseId,
-						centerId: selectedCenter
+						...(selectedCenter && { centerId: selectedCenter }) // Only include centerId if selectedCenter is not null
 					}
 				],
 				sourceInfo: {
@@ -903,12 +908,16 @@ router.route("/addleaddandcourseapply")
 			const candidate = await Candidate.create(candidateData);
 
 			// ✅ Insert AppliedCourses Record
-			const appliedCourseEntry = await AppliedCourses.create({
+			const appliedCourseData = {
 				_candidate: candidate._id,
 				_course: courseId,
-				_center: selectedCenter,
 				registeredBy: userId
-			});
+			};
+			// Only include _center if selectedCenter is not null
+			if (selectedCenter) {
+				appliedCourseData._center = selectedCenter;
+			}
+			const appliedCourseEntry = await AppliedCourses.create(appliedCourseData);
 
 
 			// ✅ Optional: Update your Google Spreadsheet
