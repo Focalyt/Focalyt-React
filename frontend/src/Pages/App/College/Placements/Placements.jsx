@@ -4159,7 +4159,7 @@ console.log("response.data",response.data)
                   </div>
 
                   {/* Search and Filter Section */}
-                  <div className="col-md-6 col-12">
+                  <div className="col-lg-6  col-mg-12 col-12">
                     <div className={`d-flex ${isMobile ? 'flex-column gap-2' : 'justify-content-end align-items-center gap-2'}`}>
                       {/* Quick Search */}
                       <div className={`d-flex align-items-center ${isMobile ? 'w-100' : 'gap-2'}`} style={isMobile ? { gap: '8px' } : {}}>

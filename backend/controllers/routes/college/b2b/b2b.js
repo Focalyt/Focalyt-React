@@ -1183,13 +1183,14 @@ router.post('/add-lead', isCollege, async (req, res) => {
 // Update lead status
 router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
+		console.log('[B2B Update Status] Step 1: Request received', { method: req.method, path: req.path });
 		const { id } = req.params;
 		const { status, subStatus, remarks } = req.body;
-
-
+		console.log('[B2B Update Status] Step 2: Params & body', { leadId: id, status, subStatus, hasRemarks: !!remarks });
 
 		// Validate required fields
 		if (!status) {
+			console.log('[B2B Update Status] Step 3: Validation failed - status is required');
 			return res.status(400).json({
 				status: false,
 				message: 'Status is required'
@@ -1198,8 +1199,10 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		// Find the lead
 		const lead = await Lead.findById(id);
+		console.log('[B2B Update Status] Step 4: Lead lookup', { leadFound: !!lead, leadId: id });
 
 		if (!lead) {
+			console.log('[B2B Update Status] Step 5: Exiting - lead not found');
 			return res.status(404).json({
 				status: false,
 				message: 'Lead not found'
@@ -1212,21 +1215,36 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			return permissionType === 'Admin';
 		};
 
+		console.log('[B2B Update Status] Step 6: User & permission check', {
+			userId: req.user?._id?.toString(),
+			userName: req.user?.name,
+			permissionType: req.user?.permissions?.permission_type,
+			isAdminResult: isAdmin()
+		});
+
 		// If not Admin, check ownership
 		if (!isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
-
 			const isOwner = teamMembers.some(member =>
 				lead.leadAddedBy.toString() === member.toString() ||
 				lead.leadOwner.toString() === member.toString()
 			);
+			console.log('[B2B Update Status] Step 7: Ownership check (non-admin)', {
+				leadAddedBy: lead.leadAddedBy?.toString(),
+				leadOwner: lead.leadOwner?.toString(),
+				teamMembersCount: teamMembers?.length,
+				isOwner
+			});
 
 			if (!isOwner) {
+				console.log('[B2B Update Status] Step 8: Exiting - permission denied (not owner)');
 				return res.status(403).json({
 					status: false,
 					message: 'You do not have permission to update this lead'
 				});
 			}
+		} else {
+			console.log('[B2B Update Status] Step 7: Skipped ownership check (admin)');
 		}
 
 		// Get old status for logging
@@ -1283,6 +1301,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		});
 
 		await lead.save();
+		console.log('[B2B Update Status] Step 9: Lead saved', { leadId: id, newStatus: status, newSubStatus: subStatus || '(none)' });
 
 		// Populate the updated lead
 		const updatedLead = await Lead.findById(id)
@@ -1292,13 +1311,14 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email');
 
+		console.log('[B2B Update Status] Step 10: Success - sending response');
 		res.json({
 			status: true,
 			data: updatedLead,
 			message: 'Lead status updated successfully'
 		});
 	} catch (error) {
-		console.error('Error updating lead status:', error);
+		console.error('[B2B Update Status] Error:', error);
 		res.status(500).json({
 			status: false,
 			message: 'Failed to update lead status',
@@ -1648,6 +1668,7 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 // Change lead status with optional follow-up
 router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
+		console.log('[B2B Update Status v2] Step 1: Request received', { method: req.method, path: req.path, leadId: req.params.id });
 		const {
 			status,
 			subStatus,
@@ -1656,8 +1677,10 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			remarks,
 			googleCalendarEvent = false
 		} = req.body;
+		console.log('[B2B Update Status v2] Step 2: Body', { status, subStatus, followUpDate, followUpTime, hasRemarks: !!remarks });
 
 		if (!status) {
+			console.log('[B2B Update Status v2] Step 3: Validation failed - status required');
 			return res.status(400).json({
 				status: false,
 				message: 'Status is required'
@@ -1669,14 +1692,19 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			const permissionType = req.user.permissions?.permission_type;
 			return permissionType === 'Admin';
 		};
+		console.log('[B2B Update Status v2] Step 4: User check', {
+			userId: req.user?._id?.toString(),
+			userName: req.user?.name,
+			permissionType: req.user?.permissions?.permission_type,
+			isAdminResult: isAdmin()
+		});
 
 		// Check if lead exists
 		let lead;
 		if (isAdmin()) {
-			// Admin can update any lead
 			lead = await Lead.findById(req.params.id);
+			console.log('[B2B Update Status v2] Step 5: Admin path - lead lookup', { leadFound: !!lead });
 		} else {
-			// Non-admin: check if lead belongs to user (either leadAddedBy or leadOwner)
 			lead = await Lead.findById(req.params.id);
 			if (lead) {
 				let teamMembers = await getAllTeamMembers(req.user._id);
@@ -1684,18 +1712,29 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 					lead.leadAddedBy.toString() === member.toString() ||
 					lead.leadOwner.toString() === member.toString()
 				);
+				console.log('[B2B Update Status v2] Step 5: Non-admin ownership', {
+					leadFound: true,
+					leadAddedBy: lead.leadAddedBy?.toString(),
+					leadOwner: lead.leadOwner?.toString(),
+					teamMembersCount: teamMembers?.length,
+					isOwner
+				});
 				if (!isOwner) {
 					lead = null;
 				}
+			} else {
+				console.log('[B2B Update Status v2] Step 5: Lead not found');
 			}
 		}
 
 		if (!lead) {
+			console.log('[B2B Update Status v2] Step 6: Exiting - lead not found or no permission');
 			return res.status(404).json({
 				status: false,
 				message: 'Lead not found'
 			});
 		}
+		console.log('[B2B Update Status v2] Step 6: Lead found, proceeding to update');
 
 		// Prepare update data
 		const updateData = {
@@ -1753,6 +1792,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		}
 
 		await updatedLead.save();
+		console.log('[B2B Update Status v2] Step 7: Lead status updated and saved', { leadId: req.params.id, status, subStatus: subStatus || '(none)' });
 
 		// Create Google Calendar event if requested (optional)
 		let googleEvent = null;
@@ -1795,6 +1835,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			}
 		}
 
+		console.log('[B2B Update Status v2] Step 8: Success - sending response');
 		res.json({
 			status: true,
 			data: {
@@ -1805,7 +1846,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			message: 'Lead status updated successfully' + (followUp ? ' with follow-up scheduled' : '') + (googleEvent ? ' and added to Google Calendar' : '')
 		});
 	} catch (error) {
-		console.error('Error updating lead status:', error);
+		console.error('[B2B Update Status v2] Error:', error);
 		res.status(500).json({
 			status: false,
 			message: 'Failed to update lead status',

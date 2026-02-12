@@ -20,7 +20,8 @@ const axios = require("axios");
 const AWS = require('aws-sdk');
 const { Server } = require("socket.io");
 
-
+const dns = require('dns');
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 // cron api 
 const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular()

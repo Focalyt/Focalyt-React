@@ -6691,6 +6691,7 @@ router.delete('/center_delete/:id', async (req, res) => {
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	try {
+		console.log('[Lead Status Change] Step 1: Request received', { method: req.method, path: req.path });
 		const { id } = req.params;
 		const {
 			_leadStatus,
@@ -6698,13 +6699,17 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			remarks,
 			followup,  // combined date and time
 		} = req.body;
+		console.log('[Lead Status Change] Step 2: Params & body', { appliedCourseId: id, _leadStatus, _leadSubStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
 		const userId = req.user._id;
 		const collegeId = req.user.college._id;
+		console.log('[Lead Status Change] Step 3: User context', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
 
 		// Find the AppliedCourse document by ID
 		const doc = await AppliedCourses.findById(id);
+		console.log('[Lead Status Change] Step 4: AppliedCourse lookup', { found: !!doc, id });
 		if (!doc) {
+			console.log('[Lead Status Change] Step 5: Exiting - AppliedCourse not found');
 			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
 		}
 
@@ -6779,25 +6784,26 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 		// Save the updated document
 		await doc.save();
-
+		console.log('[Lead Status Change] Step 5: Doc saved', { id, _leadStatus, _leadSubStatus });
 
 		const newStatusLogs = await statusLogHelper(id, {
 			_statusId: _leadStatus,
 			_subStatusId: _leadSubStatus,
 		});
 
-
-
+		console.log('[Lead Status Change] Step 6: Success - sending response');
 		return res.json({ success: true, data: doc });
 	} catch (error) {
-		console.error('Error updating status and followup:', error);
+		console.error('[Lead Status Change] Error:', error);
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
 
 router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	try {
+		console.log('[Lead Bulk Status Change] Step 1: Request received', { method: req.method, path: req.path });
 		const { selectedProfiles, _leadStatus, _leadSubStatus, remarks } = req.body;
+		console.log('[Lead Bulk Status Change] Step 2: Body', { selectedCount: selectedProfiles?.length, _leadStatus, _leadSubStatus, hasRemarks: !!remarks });
 		if (!selectedProfiles || !_leadStatus || !_leadSubStatus) {
 			let missingFields = [];
 
@@ -6805,12 +6811,14 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 			if (!_leadStatus) missingFields.push('_leadStatus');
 			if (!_leadSubStatus) missingFields.push('_leadSubStatus');
 
+			console.log('[Lead Bulk Status Change] Step 3: Validation failed', { missingFields });
 			return res.status(500).json({
 				success: false,
 				message: `Missing required fields: ${missingFields.join(', ')}`
 			});
 		}
 		const userId = req.user._id;
+		console.log('[Lead Bulk Status Change] Step 3: User', { userId: userId?.toString(), userName: req.user?.name });
 
 		// Fetch the new status document (including sub-statuses) only once
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
@@ -6880,10 +6888,11 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		// Wait for all updates to complete
 		await Promise.all(updatePromises);
 
+		console.log('[Lead Bulk Status Change] Step 4: Success', { updatedCount: selectedProfiles.length });
 		return res.json({ success: true, message: 'Status updated successfully' });
 
 	} catch (error) {
-		console.error('Error updating status and followup:', error);
+		console.error('[Lead Bulk Status Change] Error:', error);
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });

@@ -1401,6 +1401,7 @@ router.post('/add-candidate', isCollege, async (req, res) => {
 
 router.put('/update-status/:id', isCollege, async (req, res) => {
   try {
+    console.log('[Placement Update Status] Step 1: Request received', { method: req.method, path: req.path, id: req.params.id });
     const { id } = req.params;
     const {
       status,
@@ -1414,21 +1415,24 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
       location,
       appliedCourseId: appliedCourseid
     } = req.body;
+    console.log('[Placement Update Status] Step 2: Body', { status, subStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
     const userId = req.user._id;
     const collegeId = req.user.college._id;
+    console.log('[Placement Update Status] Step 3: User', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
 
-    
     let placement = null;
     let appliedCourse = null;
     let appliedCourseId = appliedCourseid;
 
     placement = await Placement.findById(id);
+    console.log('[Placement Update Status] Step 4: Placement lookup by id', { found: !!placement, id });
     
     if (placement) {
       appliedCourseId = placement.appliedCourse;
       
       if (placement.college.toString() !== collegeId.toString()) {
+        console.log('[Placement Update Status] Step 5: Exiting - 403 college mismatch', { placementCollege: placement.college?.toString(), userCollegeId: collegeId?.toString() });
         return res.status(403).json({ success: false, message: 'Unauthorized access to this placement' });
       }
       
@@ -1457,6 +1461,7 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
           });
 
         if (!appliedCourse) {
+          console.log('[Placement Update Status] Step 5: Exiting - 404 AppliedCourse not found', { id });
           return res.status(404).json({ success: false, message: 'Applied course or UploadCandidate not found' });
         }
 
@@ -1616,13 +1621,14 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
 
     const updatedPlacement = await placement.save();
 
+    console.log('[Placement Update Status] Step 6: Success - sending response', { placementId: updatedPlacement?._id?.toString(), status, subStatus: subStatus || '(none)' });
     return res.status(200).json({
       success: true,
       message: 'Placement status updated successfully',
       data: updatedPlacement
     });
   } catch (err) {
-    console.error('Error updating placement status:', err.message);
+    console.error('[Placement Update Status] Error:', err.message);
     res.status(500).json({
       success: false,
       message: 'Server Error',
