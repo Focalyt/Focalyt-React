@@ -2590,7 +2590,7 @@ const LeadAnalyticsDashboard = () => {
             <div className="col-lg-6">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
-                  <h3 className="h5 fw-semibold mb-4 d-flex align-items-center gap-2">
+                  <h3 className="h5 fw-semibold mb-4 d-flex align-items-center gap-2 con-vs-drop">
                     <Target className="text-success" size={20} />
                     Conversion vs Dropout Rates
                   </h3>
@@ -2970,13 +2970,13 @@ const LeadAnalyticsDashboard = () => {
           {/* ====== NEW: Course-Counsellor Status Table ====== */}
           <div className="card shadow-sm mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-4">
+              <div className="d-flex justify-content-between align-items-center mb-4 card-flex">
                 <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
 
                 {/* Date Filter Controls */}
-                <div className="d-flex gap-2 align-items-center">
+                <div className="d-flex gap-2 align-items-center car-elements">
                   <button
-                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 card-select-date"
                     onClick={() => setShowCounsellorDatePicker(true)}
                     disabled={counsellorStatusLoading}
                   >
@@ -2987,14 +2987,14 @@ const LeadAnalyticsDashboard = () => {
                     }
                   </button>
                   <button
-                    className={`btn btn-sm ${showAllTime ? 'btn-success' : 'btn-outline-success'}`}
+                    className={`btn btn-sm ${showAllTime ? 'btn-success' : 'btn-outline-success'}  card-select-date`}
                     onClick={showAllTimeData}
                     disabled={counsellorStatusLoading}
                   >
                     All Time
                   </button>
                   <button
-                    className="btn btn-outline-secondary btn-sm"
+                    className="btn btn-outline-secondary btn-sm  card-select-date"
                     onClick={clearCounsellorStatusDateFilter}
                     disabled={counsellorStatusLoading}
                   >
@@ -3004,7 +3004,7 @@ const LeadAnalyticsDashboard = () => {
                   {/* Download Button */}
                   <div className="position-relative">
                     <button
-                      className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                      className="btn btn-outline-info btn-sm d-flex align-items-center gap-1  card-select-date"
                       type="button"
                       onClick={() => {
                         console.log('Download button clicked, current state:', showDownloadDropdown);
@@ -4398,7 +4398,47 @@ font-size: 15px !important;
 width:100%!important;
 height:100%!important;
 }
-   
+@media (max-width: 768px) {
+
+.preVarification{
+padding-bottom:20px
+}
+  
+  .car-elements{
+  overflow: scroll;
+          width: 100%;
+  }
+  .card-select-date{
+ white-space: nowrap;
+        font-size: 11px;
+  }
+  
+  .card-flex {
+    flex-direction: column;
+  }
+
+  .react-date-picker__inputGroup {
+    box-sizing: border-box;
+  }
+
+  .con-vs-drop {
+    margin-bottom: 20px;
+  }
+
+  .recharts-legend-wrapper {
+    margin-bottom: 0 !important;
+  }
+
+  .recharts-legend-item-text {
+    margin-right: 54px !important; /* mobile spacing */
+  }
+
+  /* FIXED selector (was invalid before) */
+  .btn.btn-sm.btn-outline-danger {
+    font-size: 9px !important;
+  }
+}
+      
             `
         }
 

@@ -323,6 +323,27 @@ const B2BSales = () => {
     updatedPermission()
   }, [])
 
+  // Console: logged-in institute user and all permissions (for debugging)
+  useEffect(() => {
+    if (permissions != null && userData?._id) {
+      const instituteUser = {
+        _id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        mobile: userData.mobile,
+        role: userData.role,
+        collegeId: userData.collegeId,
+        collegeName: userData.collegeName,
+        isDefaultAdmin: userData.isDefaultAdmin,
+      };
+      console.log('[Institute] Logged-in user:', instituteUser);
+      console.log('[Institute] User permissions:', permissions);
+      if (permissions?.custom_permissions) {
+        console.log('[Institute] Custom permissions:', permissions.custom_permissions);
+      }
+    }
+  }, [permissions, userData]);
+
   const updatedPermission = async () => {
 
     const respose = await axios.get(`${backendUrl}/college/permission`, {
@@ -1044,10 +1065,10 @@ const B2BSales = () => {
     }));
   };
 
-  const applyFilters = () => {
+  const applyFilters = (filterOverrides = {}) => {
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1);
-    fetchStatusCounts(); // Update status counts with current filters
+    fetchLeads(selectedStatusFilter, 1, filterOverrides);
+    fetchStatusCounts(filterOverrides); // Update status counts with current filters
   };
 
   const clearFilters = () => {
@@ -1068,10 +1089,12 @@ const B2BSales = () => {
     fetchStatusCounts(); // Update status counts after clearing filters
   };
 
-  const fetchLeads = async (statusFilter = null, page = 1) => {
+  const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
     try {
       closePanel();
       setLoadingLeads(true);
+
+      const eff = { ...filters, ...filterOverrides };
 
       // Build query parameters
       const params = {
@@ -1083,30 +1106,30 @@ const B2BSales = () => {
         params.status = statusFilter;
       }
 
-      // Add filter parameters
-      if (filters.search) {
-        params.search = filters.search;
+      // Add filter parameters (use effective filters so clearing search refetches all)
+      if (eff.search) {
+        params.search = eff.search;
       }
-      if (filters.leadCategory) {
-        params.leadCategory = filters.leadCategory;
+      if (eff.leadCategory) {
+        params.leadCategory = eff.leadCategory;
       }
-      if (filters.typeOfB2B) {
-        params.typeOfB2B = filters.typeOfB2B;
+      if (eff.typeOfB2B) {
+        params.typeOfB2B = eff.typeOfB2B;
       }
-      if (filters.leadOwner) {
-        params.leadOwner = filters.leadOwner;
+      if (eff.leadOwner) {
+        params.leadOwner = eff.leadOwner;
       }
-      if (filters.dateRange.start) {
-        params.startDate = filters.dateRange.start;
+      if (eff.dateRange?.start) {
+        params.startDate = eff.dateRange.start;
       }
-      if (filters.dateRange.end) {
-        params.endDate = filters.dateRange.end;
+      if (eff.dateRange?.end) {
+        params.endDate = eff.dateRange.end;
       }
-      if (filters.status) {
-        params.status = filters.status;
+      if (eff.status) {
+        params.status = eff.status;
       }
-      if (filters.subStatus) {
-        params.subStatus = filters.subStatus;
+      if (eff.subStatus) {
+        params.subStatus = eff.subStatus;
       }
 
       // console.log('🔍 [FRONTEND] fetchLeads called:', {
@@ -1178,19 +1201,19 @@ const B2BSales = () => {
   };
 
   // Fetch status counts
-  const fetchStatusCounts = async () => {
+  const fetchStatusCounts = async (filterOverrides = {}) => {
     try {
       setLoadingStatusCounts(true);
-      
+      const eff = { ...filters, ...filterOverrides };
       // Build params with current filters (except status filter, as we're counting by status)
       const params = {};
-      if (filters.leadCategory) params.leadCategory = filters.leadCategory;
-      if (filters.typeOfB2B) params.typeOfB2B = filters.typeOfB2B;
-      if (filters.leadOwner) params.leadOwner = filters.leadOwner;
-      if (filters.search) params.search = filters.search;
-      if (filters.subStatus) params.subStatus = filters.subStatus;
-      if (filters.dateRange?.start) params.startDate = filters.dateRange.start;
-      if (filters.dateRange?.end) params.endDate = filters.dateRange.end;
+      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
+      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
+      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (eff.search) params.search = eff.search;
+      if (eff.subStatus) params.subStatus = eff.subStatus;
+      if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
       
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
@@ -2661,7 +2684,11 @@ const B2BSales = () => {
                               className="form-control form-control-sm"
                               placeholder="Quick search..."
                               value={filters.search}
-                              onChange={(e) => handleFilterChange('search', e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleFilterChange('search', val);
+                                if (val === '') applyFilters({ search: '' });
+                              }}
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter') {
                                   applyFilters();
@@ -2688,7 +2715,7 @@ const B2BSales = () => {
                                 className="btn btn-sm position-absolute"
                                 onClick={() => {
                                   handleFilterChange('search', '');
-                                  applyFilters();
+                                  applyFilters({ search: '' });
                                 }}
                                 style={{
                                   right: '2px',
@@ -2788,7 +2815,7 @@ const B2BSales = () => {
                       </div>
 
                       {/* Right side - Input Fields */}
-                      {showBulkInputs && (
+                      {/* {showBulkInputs && (
                         <div style={{
                           display: "flex",
                           alignItems: "stretch",
@@ -2858,7 +2885,7 @@ const B2BSales = () => {
                             }}
                           />
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </div>
 
@@ -2942,7 +2969,11 @@ const B2BSales = () => {
                               className="form-control"
                               placeholder="🔍 Search leads..."
                               value={filters.search}
-                              onChange={(e) => handleFilterChange('search', e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleFilterChange('search', val);
+                                if (val === '') applyFilters({ search: '' });
+                              }}
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter') {
                                   applyFilters();
@@ -2967,7 +2998,7 @@ const B2BSales = () => {
                                 className="btn btn-sm position-absolute"
                                 onClick={() => {
                                   handleFilterChange('search', '');
-                                  applyFilters();
+                                  applyFilters({ search: '' });
                                 }}
                                 style={{
                                   right: '4px',
