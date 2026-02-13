@@ -14757,7 +14757,7 @@ margin-left:15px;
       </style>
       <style>
         {`
-          
+      
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
   position: relative;
@@ -14831,7 +14831,7 @@ margin-left:15px;
   overflow: hidden;
   animation: slideDown 0.2s ease;
 }
-
+    
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -14884,7 +14884,6 @@ margin-left:15px;
   padding: 0.5rem;
   border-bottom: 1px solid #e9ecef;
 }
-
 .options-list-new {
   max-height: 180px;
   overflow-y: auto;
@@ -14989,7 +14988,6 @@ margin-left:15px;
   font-size: 0.75rem;
   padding: 0.25em 0.4em;
 }
-
 /* Animation for dropdown open/close */
 .multi-select-options-new {
   transform-origin: top;
@@ -15035,18 +15033,15 @@ margin-left:15px;
     height: min-content !important;
     transform: translateX(0px)!important;
 }
-.translateX .react-calendar {
-  height: min-content !important;
-    transform: translateX(-110px) !important;
-    width: 250px !important;
-}
-
+// .translateX .react-calendar {
+//   height: min-content !important;
+//     transform: translateX(-110px) !important;
+//     width: 250px !important;
+// }
 .react-calendar{
     height: min-content !important;
     width: 250px !important;
 }
-
-  /* Mobile Date Picker - Override in media query below */
 @media (max-width: 768px) {
   .multi-select-options-new {
     max-height: 250px;
@@ -15078,39 +15073,35 @@ margin-left:15px;
                     display: none;
                   }
               }
-              .nav-tabs-main > li > button{
-              padding: 15px 9px;
-              }
+  //             .nav-tabs-main > li > button{
+  //             padding: 15px 9px;
+  //             }
   
-  /* Mobile Date Picker Fixes - Prevent Overlap */
   .firstDatepicker .react-calendar,
   .translateX .react-calendar,
-  .react-calendar {
-    width: calc(100vw - 40px) !important;
-    max-width: 300px !important;
-    position: fixed !important;
-    z-index: 9999 !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-  }
+  // .react-calendar {
+  //   // width: calc(100vw - 40px) !important;
+  //   max-width: 300px !important;
+  //   // position: fixed !important;
+  //   z-index: 9999 !important;
+  //   left: 50% !important;
+  //   right: 50% !important;
+  //   transform: translateX(-50%) translateY(-50%) !important;
+  //   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  // }
   
-  /* Ensure date filter cards stack properly on mobile */
   .row.g-4 > .col-12.col-md-4 {
     margin-bottom: 1.5rem !important;
   }
   
-  /* Status filter spacing on mobile */
   .row.g-4 > .col-12.col-md-6 {
     margin-bottom: 1rem !important;
   }
   
-  /* Date picker input spacing */
   .card.bg-light .row.g-2 > .col-12 {
     margin-bottom: 0.75rem;
   }
   
-  /* Modal Body Mobile Spacing */
   .modal-body.p-4 {
     padding: 1rem !important;
   }
@@ -15125,10 +15116,12 @@ margin-left:15px;
     padding-right: 0.5rem !important;
   }
 }
-        `}
+  `}
       </style>
-      <style>
-        {`.bg-gradient-primary {
+<style>
+  {
+    `
+     .bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -15169,7 +15162,7 @@ margin-left:15px;
               width: 40px;
               height: 40px;
           }
-
+    
           .circular-progress-container svg {
               transform: rotate(-90deg);
           }
@@ -15299,8 +15292,7 @@ margin-left:15px;
               padding: 0;
               position: relative;
           }
-
-          .scrollable-container {
+ .scrollable-container {
               display: none;
           }
 
@@ -15368,7 +15360,6 @@ margin-left:15px;
               position: relative;
               justify-content: space-between;
           }
-
           .whatsapp-chat .topbar-container .left-topbar {
               display: flex;
               align-items: center;
@@ -15577,8 +15568,7 @@ margin-left:15px;
               margin-right: 15px;
               margin-left: 10px;
           }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
+        .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
               margin-right: 10px;
           }
 
@@ -15699,7 +15689,6 @@ margin-left:15px;
               flex-wrap: wrap;
               gap: 15px;
           }
-
           .resume-contact-item {
               display: flex;
               align-items: center;
@@ -15882,10 +15871,7 @@ margin-left:15px;
               color: #007bff;
               font-weight: bold;
           }
-
-
-
-          /* WhatsApp Panel Mobile Styles */
+           /* WhatsApp Panel Mobile Styles */
           .whatsapp-chat {
               height: 100%;
               display: flex;
@@ -16098,9 +16084,7 @@ margin-left:15px;
               padding: 8px;
           }
 
-          /* Responsive adjustments */
-
-
+          /* Responsive adjustments */ 
           /* Add this to your existing style tag or CSS file */
           .react-date-picker__wrapper {
               border: 1px solid #ced4da !important;
@@ -16131,13 +16115,9 @@ margin-left:15px;
           .react-date-picker__wrapper {
               background: white !important;
           }
-
-
           .no-scroll {
               overflow: hidden;
           }
-
-
           .doc-iframe {
               transform-origin: top left;
               transition: transform 0.3s ease;
@@ -16165,8 +16145,7 @@ margin-left:15px;
               background-color: #4a6fdc;
               color: white;
           }
-
-          .panel-header h2 {
+     .panel-header h2 {
               color: white;
               font-size: 1.5rem;
               margin: 0;
@@ -16206,8 +16185,7 @@ margin-left:15px;
 
           .candidate-details {
               flex-grow: 1;
-          }
-
+          }   
           .candidate-details h3 {
               margin: 0 0 5px 0;
               font-size: 22px;
@@ -16246,7 +16224,6 @@ margin-left:15px;
               font-size: 20px;
               font-weight: bold;
           }
-
           .document-list {
               overflow-x: auto;
               margin: 0 20px 20px 20px;
@@ -16292,8 +16269,7 @@ margin-left:15px;
               background-color: #fff3cd;
               color: #856404;
           }
-
-          .status-approved {
+        .status-approved {
               background-color: #d4edda;
               color: #155724;
           }
@@ -16316,7 +16292,7 @@ margin-left:15px;
               color: var(--primary-color);
           }
 
-          .view-btn:hover {
+      .view-btn:hover {
               background-color: rgba(74, 111, 220, 0.1);
           }
 
@@ -16349,7 +16325,7 @@ margin-left:15px;
           .reject-btn:hover {
               background-color: #f5c6cb;
           }
-
+        
           .document-modal-overlay {
               position: fixed;
               top: 0;
@@ -16387,8 +16363,7 @@ margin-left:15px;
                   transform: scale(1) translateY(0);
               }
           }
-
-          .document-modal-content .modal-header {
+.document-modal-content .modal-header {
               padding: 1.5rem 2rem;
               border-bottom: 1px solid #e9ecef;
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -16436,8 +16411,7 @@ margin-left:15px;
               flex: 2;
               min-width: 400px;
           }
-
-          .document-preview-container {
+         .document-preview-container {
               background: #f8f9fa;
               border-radius: 8px;
               height: 500px;
@@ -16469,7 +16443,6 @@ margin-left:15px;
               border-radius: 25px;
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
           }
-
           .control-btn {
               background: #007bff;
               color: white;
@@ -16542,8 +16515,7 @@ margin-left:15px;
               color: #6c757d;
               line-height: 1.5;
           }
-
-          .action-buttons {
+        .action-buttons {
               margin-top: 1.5rem;
               display: flex;
               gap: 10px;
@@ -16558,8 +16530,7 @@ margin-left:15px;
               gap: 8px;
               transition: all 0.2s;
           }
-
-          .rejection-form {
+         .rejection-form {
               background: #fff3cd;
               border: 1px solid #ffeaa7;
               border-radius: 8px;
@@ -16580,7 +16551,6 @@ margin-left:15px;
               border-radius: 4px;
               resize: vertical;
           }
-
           /* .document-history {
     overflow-y: auto;
 } */
@@ -17400,12 +17370,10 @@ margin-left:15px;
 
           /* Responsive Design */
 
-          .react-date-picker__calendar.react-date-picker__calendar--open {
-              inset: 0 !important;
-              width: 300px !important;
-          }
-
-          
+          // .react-date-picker__calendar.react-date-picker__calendar--open {
+          //     inset: 0 !important;
+          //     width: 300px !important;
+          // }
           .site-header--sticky--register:not(.mobile-sticky-enable) {
     /* position: absolute !important; */
     top: 97px;
@@ -17414,8 +17382,7 @@ margin-left:15px;
     .breadcrumb-item a, .card-body a {
     color: #fc2b5a;
 }
-
-          @media (max-width: 1200px) {
+    @media (max-width: 1200px) {
               .document-history .history-preview iframe.pdf-thumbnail {
                   height: auto !important;
                   max-height: 600px;
@@ -17688,7 +17655,7 @@ margin-left:15px;
               }
           }
 
-          @media (max-width: 576px) {
+ @media (max-width: 576px) {
 
 
               // .btn-group {
@@ -17715,10 +17682,10 @@ margin-left:15px;
                   min-height: 200px;
               }
           }
-        `}
-      </style>
-
-      <style>
+    `
+  }
+</style>      
+<style>
         {`
           input[type="text"], 
 input[type="email"], 

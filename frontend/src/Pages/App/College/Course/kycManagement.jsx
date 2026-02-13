@@ -3198,7 +3198,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         {ekycFilters.map((filter, index) => (
                           <div key={filter._id} className="position-relative flex-shrink-0 me-2">
                             <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative penddingBtn`}
                               onClick={() => handleCrmFilterClick(filter, index)}
                               style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
                             >
@@ -3468,7 +3468,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <button
-                          className="btn btn-sm btn-outline-danger"
+                          className="btn btn-sm btn-outline-danger CButton"
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
@@ -3632,12 +3632,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear 
                             </button>
                           </div>
                         </div>
@@ -3694,12 +3694,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear 
                             </button>
                           </div>
                         </div>
@@ -3755,12 +3755,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear 
                             </button>
                           </div>
                         </div>
@@ -11047,6 +11047,42 @@ max-width: 600px;
         .verification-table tbody tr:nth-child(5) { animation-delay: 0.3s; }
         .verification-table tbody tr:nth-child(6) { animation-delay: 0.35s; }
         .verification-table tbody tr:nth-child(7) { animation-delay: 0.4s; }
+          `
+        }
+      </style>
+      <style>
+        {
+          `
+          @media (min-width:768px){
+          .penddingBtn{
+                  font-size: 10px !important;
+                  max-width: min-content;
+          }
+                  html body .content .content-wrapper {
+    margin-top: 3rem;
+    padding: 1.8rem 2.2rem 0;
+}
+                  
+          }
+          @media (max-width: 768px){
+          .CButton{ font-size:12px; padding:2px; 
+          white-space: nowrap;}
+          html body .content .content-wrapper {
+    margin-top: 2rem;
+    padding: 1.8rem 1.2rem 0;
+}
+          }
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+         .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+}
           `
         }
       </style>
