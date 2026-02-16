@@ -8762,7 +8762,7 @@ const CRMDashboard = () => {
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
-                          Clear All
+                          Clear
                         </button>
                         <button
                           className="btn-close"
@@ -8997,6 +8997,7 @@ const CRMDashboard = () => {
                           <i className="fas fa-calendar-edit me-1 text-warning"></i>
                           Lead Modification Date Range
                         </label>
+
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
                             <div className="col-12 col-sm-6">
