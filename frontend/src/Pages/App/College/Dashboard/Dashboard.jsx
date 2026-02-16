@@ -2587,7 +2587,7 @@ const LeadAnalyticsDashboard = () => {
           {/* Charts Row */}
           <div className="row g-4 mb-4">
             {/* Conversion vs Dropout Chart */}
-            <div className="col-lg-6">
+            <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
                   <h3 className="h5 fw-semibold mb-4 d-flex align-items-center gap-2 con-vs-drop">
@@ -2798,7 +2798,7 @@ const LeadAnalyticsDashboard = () => {
           {/* Daily Admissions Analytics */}
           <div className="row g-4 mb-4">
             {/* Daily Admissions Table */}
-            <div className="col-lg-6">
+            <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
                   <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
@@ -3125,7 +3125,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
 
                 <div className="row">
-                  <div className="col-md-6">
+                  <div className="col-md-6 preVarification">
                     <div className="card bg-primary text-white">
                       <div className="card-body">
                         <h5 className="card-title">Total Pre Verified</h5>
@@ -3133,7 +3133,7 @@ const LeadAnalyticsDashboard = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="col-md-6">
+                  <div className="col-md-6 preVarification">
                     <div className="card bg-success text-white">
                       <div className="card-body">
                         <h5 className="card-title">Total Pre Unverified</h5>
@@ -3773,7 +3773,7 @@ const LeadAnalyticsDashboard = () => {
                 <div className="row g-4">
                   {/* Course Type Filter */}
                   <div className="col-md-3">
-                    <label className="form-label small fw-bold text-dark">
+                    <label className="form-label small fw-bold text-dark CourseType">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
                       Course Type
                     </label>
@@ -3872,9 +3872,9 @@ const LeadAnalyticsDashboard = () => {
                       <i className="fas fa-calendar-plus me-1 text-success"></i>
                       Date Range
                     </label>
-                    <div className="card border-0 bg-light p-3">
+                    <div className="card border-0 bg-light p-0">
                       <div className="row g-2">
-                        <div className="col-6">
+                        <div className="col-6 fromDate">
                           <label className="form-label small">From Date</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -3886,7 +3886,7 @@ const LeadAnalyticsDashboard = () => {
                             maxDate={filterData.createdToDate || new Date()}
                           />
                         </div>
-                        <div className="col-6">
+                        <div className="col-6 fromDate">
                           <label className="form-label small">To Date</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
@@ -4441,6 +4441,108 @@ padding-bottom:20px
       
             `
         }
+
+      </style>
+
+      <style>{
+        `
+.admissionTrend .recharts-legend-item{
+padding-right:10px!important;
+}
+.varVSunvar{
+padding: 5px;}
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+
+
+.counsolerTable{
+width:100%;
+}
+.ActiveDayFilter{
+margin-right:31%;
+}
+.resetAll{
+font-size:10px;
+box-sizing: content-box;
+margin-left:20px;
+padding:8px;
+
+}
+
+.CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:4px;
+}
+@media (max-width: 768px) {
+    .small {
+        display: block !important;
+    }
+}
+
+
+.CButtton{
+font-size:11px;
+padding:2px;
+}
+
+.preVarification{
+padding-bottom:20px;
+}
+// .varUnvarified{
+// margin-left: 13px;
+// }
+  
+  .car-elements{
+  overflow: scroll;
+          width: 100%;
+  }
+  .card-select-date{
+ white-space: nowrap;
+        font-size: 11px;
+  }
+  
+  .card-flex {
+    flex-direction: column;
+  }
+html body .content .content-wrapper {
+    margin-top: 2rem;
+    padding: 1.8rem 1.2rem 0;
+}
+  .react-date-picker__inputGroup {
+    box-sizing: border-box;
+        font-size: 14px;
+        white-space: nowrap;
+  }
+
+  .con-vs-drop {
+    margin-top: 20px;
+    margin-left: 0px !important;
+  }
+
+  .recharts-legend-wrapper {
+    margin-bottom: 0 !important;
+  }
+
+  
+  /* FIXED selector (was invalid before) */
+  // .btn.btn-sm.btn-outline-danger {
+  //   font-size: 9px !important;
+  // }
+
+}
+  .card-body.li.recharts-legend-item legend-item-0{
+    padding-right: 10px !important; /* mobile spacing */
+  }
+.admissionTrend .recharts-legend-item{
+padding-right:10px
+}
+   
+
+        `
+      }
+
 
       </style>
     </div>
