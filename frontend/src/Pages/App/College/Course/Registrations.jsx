@@ -3348,9 +3348,9 @@ const CRMDashboard = () => {
     fetchProfileData(newFilterData, 1);
   };
 
-  // Auto-select profiles based on Input 1 value
+  // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
       return;
     }
 
@@ -6364,11 +6364,8 @@ const CRMDashboard = () => {
 
         <div className="card-body">
           <form>
-
-
             <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
+              {/* COUNSELOR SELECT DROPDOWN */}
               <div className="mb-1">
                 <label htmlFor="counselor" className="form-label small fw-medium text-dark">
                   Select Counselor<span className="text-danger">*</span>
@@ -6378,6 +6375,7 @@ const CRMDashboard = () => {
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
+                      value={selectedConcernPerson || ''}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -6406,12 +6404,11 @@ const CRMDashboard = () => {
                 CLOSE
               </button>
               <button
-                type="submit"
+                type="button"
                 className="btn text-white"
                 onClick={() => handleReferLead(showPanel === 'Reffer' ? 'RefferSingleLead' : 'RefferBulkLead')}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-
                 {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
@@ -9286,6 +9283,9 @@ const CRMDashboard = () => {
                           gap: "4px"
                         }}
                         onClick={() => {
+                          setShowBulkInputs(true);
+                          setBulkMode('bulkrefer');
+                          setInput1Value('');
                           openPanel(null, 'RefferAllLeads');
                         }}
                       >
@@ -9461,6 +9461,9 @@ const CRMDashboard = () => {
                               gap: "4px"
                             }}
                             onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
                               openPanel(null, 'RefferAllLeads');
                             }}
                           >
