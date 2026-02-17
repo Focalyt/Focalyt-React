@@ -3025,4 +3025,84 @@ router.post('/refer-lead', isCollege, async (req, res) => {
 	}
 });
 
+router.post('/refer-leads', isCollege, async (req, res) => {
+	try {
+		const { leadIds, counselorId } = req.body;
+
+		if (!counselorId) {
+			return res.status(400).json({ status: false, message: 'counselorId is required' });
+		}
+
+		if (!Array.isArray(leadIds) || leadIds.length === 0) {
+			return res.status(400).json({ status: false, message: 'leadIds must be a non-empty array' });
+		}
+
+		const user = req.user;
+		const newUser = await User.findById(counselorId);
+		if (!newUser) {
+			return res.status(404).json({ status: false, message: 'Counselor not found' });
+		}
+
+		// Fetch leads
+		const leads = await Lead.find({ _id: { $in: leadIds } });
+		if (!leads || leads.length === 0) {
+			return res.status(404).json({ status: false, message: 'No leads found' });
+		}
+
+		// Build bulk operations
+		const ops = [];
+		const now = new Date();
+
+		for (const lead of leads) {
+			// Skip if already assigned
+			const oldOwnerId = lead.leadOwner;
+			const olduser = oldOwnerId ? await User.findById(oldOwnerId) : null;
+			const oldName = olduser?.name || 'Unknown';
+
+			ops.push({
+				updateOne: {
+					filter: { _id: lead._id },
+					update: {
+						$push: {
+							previousLeadOwners: oldOwnerId,
+							logs: {
+								user: user._id,
+								action: `Lead referred from ${oldName} to ${newUser.name}`,
+								timestamp: now,
+								remarks: ''
+							}
+						},
+						$set: {
+							leadOwner: counselorId,
+							updatedBy: user._id
+						}
+					}
+				}
+			});
+		}
+
+		const result = await Lead.bulkWrite(ops, { ordered: false });
+		const matched = result?.matchedCount ?? 0;
+		const modified = result?.modifiedCount ?? 0;
+
+		return res.status(200).json({
+			status: true,
+			message: 'Leads referred successfully',
+			data: {
+				requested: leadIds.length,
+				found: leads.length,
+				matched,
+				modified
+			}
+		});
+	} catch (err) {
+		console.error('Error bulk referring leads:', err);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to refer leads',
+			error: err.message
+		});
+	}
+});
+
 module.exports = router;

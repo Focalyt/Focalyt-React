@@ -1024,6 +1024,77 @@ const B2BSales = () => {
     fetchLeads(null, 1);
   }, []);
 
+  // Auto-select leads based on Input 1 value for bulk refer
+  useEffect(() => {
+    if (bulkMode !== 'bulkrefer') {
+      return;
+    }
+
+    if (!leads || leads.length === 0) {
+      return;
+    }
+
+    const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
+    
+    if (isNaN(numValue) || numValue < 1) {
+      setSelectedProfiles([]);
+      return;
+    }
+
+    // Get total available leads
+    const totalAvailableLeads = totalLeads || leads.length;
+    const validNumValue = Math.min(numValue, totalAvailableLeads);
+
+    // If user wants more leads than currently loaded, fetch them
+    if (validNumValue > leads.length && validNumValue > 0) {
+      const fetchLeadsForSelection = async () => {
+        if (!token) return;
+
+        try {
+          const eff = { ...filters };
+          const params = {
+            page: 1,
+            limit: validNumValue.toString(),
+            ...(selectedStatusFilter && { status: selectedStatusFilter }),
+            ...(eff.search && { search: eff.search }),
+            ...(eff.leadCategory && { leadCategory: eff.leadCategory }),
+            ...(eff.typeOfB2B && { typeOfB2B: eff.typeOfB2B }),
+            ...(eff.leadOwner && { leadOwner: eff.leadOwner }),
+            ...(eff.dateRange?.start && { startDate: eff.dateRange.start }),
+            ...(eff.dateRange?.end && { endDate: eff.dateRange.end }),
+            ...(eff.status && { status: eff.status }),
+            ...(eff.subStatus && { subStatus: eff.subStatus })
+          };
+
+          const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+            headers: { 'x-auth': token },
+            params: params
+          });
+
+          if (response.data.status && response.data.data.leads) {
+            const fetchedLeads = response.data.data.leads;
+            const selectedLeadsData = fetchedLeads.slice(0, validNumValue);
+            const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+            setSelectedProfiles(leadsToSelect);
+          }
+        } catch (error) {
+          console.error('Error fetching leads for selection:', error);
+          // Fallback: select from current leads
+          const selectedLeadsData = leads.slice(0, Math.min(validNumValue, leads.length));
+          const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+          setSelectedProfiles(leadsToSelect);
+        }
+      };
+
+      fetchLeadsForSelection();
+    } else {
+      // Select from current leads
+      const selectedLeadsData = leads.slice(0, validNumValue);
+      const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+      setSelectedProfiles(leadsToSelect);
+    }
+  }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
+
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
     // console.log('🎯 [FRONTEND] Status Card Clicked:', {
@@ -1825,6 +1896,13 @@ const B2BSales = () => {
 
 
   const closePanel = () => {
+    // Hide bulk inputs when bulk refer panel is closed
+    if (showPanel === 'RefferAllLeads') {
+      setShowBulkInputs(false);
+      setBulkMode('');
+      setInput1Value('');
+      setSelectedProfiles([]);
+    }
     setShowPanel('');
     clearFollowupFormData();
     setShowPopup(null);
@@ -1842,16 +1920,17 @@ const B2BSales = () => {
 
     if (profile) {
       setSelectedProfile(profile);
-
-
     }
 
-    setShowPopup(null)
+    setShowPopup(null);
 
     if (panel === 'RefferAllLeads') {
-
       setShowPanel('RefferAllLeads');
-
+      // Ensure bulk mode is enabled for "Refer All Leads"
+      setShowBulkInputs(true);
+      setBulkMode('bulkrefer');
+      setInput1Value('');
+      setSelectedProfiles([]);
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
     }
@@ -1864,11 +1943,7 @@ const B2BSales = () => {
           window.dispatchEvent(new Event('resize'));
         }
       }, 200);
-
     }
-
-
-
   };
 
 
@@ -1878,32 +1953,96 @@ const B2BSales = () => {
 
   const handleReferLead = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post(`${backendUrl}/college/b2b/refer-lead`, {
-        counselorId: selectedConcernPerson,
-        leadId: selectedProfile._id
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
+    
+    // Validation
+    if (!selectedConcernPerson) {
+      alert('Please select a counselor');
+      return;
+    }
 
-      if (response.data.status) {
-        const message = alert('Lead referred successfully!');
-        if (message) {
-
-
-        }
-      } else {
-        alert(response.data.message || 'Failed to refer lead');
+    if (showPanel === 'RefferAllLeads') {
+      if (!selectedProfiles || selectedProfiles.length === 0) {
+        alert('Please select at least one lead to refer. Enter a number in Input 1 to select leads.');
+        return;
       }
-      closePanel();
+    } else {
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('Please select a lead to refer');
+        return;
+      }
+    }
 
+    try {
+      const isBulk = showPanel === 'RefferAllLeads';
+      
+      if (isBulk) {
+        // Bulk route (backend supports array)
+        try {
+          const bulkRes = await axios.post(
+            `${backendUrl}/college/b2b/refer-leads`,
+            { counselorId: selectedConcernPerson, leadIds: selectedProfiles },
+            { headers: { 'x-auth': token } }
+          );
 
+          if (bulkRes?.data?.status) {
+            const modified = bulkRes?.data?.data?.modified;
+            const okCount = typeof modified === 'number' ? modified : (selectedProfiles?.length || 0);
+            alert(`Referred ${okCount} lead(s) successfully!`);
+            await fetchLeads(selectedStatusFilter, currentPage);
+            await fetchStatusCounts();
+            closePanel();
+            return;
+          }
+        } catch (bulkErr) {
+          // If bulk endpoint not available yet, fallback below
+          console.warn('Bulk refer endpoint failed, falling back to single calls:', bulkErr?.response?.status);
+        }
 
+        // Fallback: call single endpoint per lead
+        const results = await Promise.allSettled(
+          (selectedProfiles || []).map((id) =>
+            axios.post(
+              `${backendUrl}/college/b2b/refer-lead`,
+              { counselorId: selectedConcernPerson, leadId: id, type: 'single' },
+              { headers: { 'x-auth': token } }
+            )
+          )
+        );
+
+        const ok = results.filter((r) => r.status === 'fulfilled' && r.value?.data?.status).length;
+        const failed = results.length - ok;
+
+        if (ok > 0) {
+          alert(`Referred ${ok} lead(s) successfully${failed ? `, ${failed} failed` : ''}.`);
+          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchStatusCounts();
+          closePanel();
+          return;
+        }
+
+        alert('Failed to refer selected leads');
+        return;
+      }
+
+      // Single refer
+      const response = await axios.post(
+        `${backendUrl}/college/b2b/refer-lead`,
+        { counselorId: selectedConcernPerson, leadId: selectedProfile._id, type: 'single' },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response?.data?.status) {
+        alert('Lead referred successfully!');
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        closePanel();
+        return;
+      }
+
+      alert(response?.data?.message || 'Failed to refer lead');
     } catch (error) {
       console.error('Error referring lead:', error);
-      alert('Failed to refer lead');
+      alert(error.response?.data?.message || 'Failed to refer lead. Please try again.');
     }
   }
   const openleadHistoryPanel = async (profile = null) => {
@@ -1916,7 +2055,7 @@ const B2BSales = () => {
     setShowPopup(null);
     setShowPanel('leadHistory');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -1933,7 +2072,7 @@ const B2BSales = () => {
     setShowPopup(null);
     setShowPanel('ProfileEdit');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2352,10 +2491,8 @@ const B2BSales = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-
-              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?._candidate?.name || 'Unknown'} to Counselor`)}
-              {showPanel === 'RefferAllLeads' && (`Refer All Lead to Counselor`)}
-
+              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?.businessName || 'Unknown'} to Counselor`)}
+              {showPanel === 'RefferAllLeads' && (`Refer All Leads to Counselor`)}
             </h6>
           </div>
           <div>
@@ -2399,6 +2536,24 @@ const B2BSales = () => {
               </div>
             </>
 
+            {/* Bulk refer info (selection happens from the bulk bar above the cards) */} 
+            {showPanel === 'RefferAllLeads' && (
+              <div className="mb-3 p-2 bg-light rounded" style={{ fontSize: '13px' }}>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-muted">
+                    <i className="fas fa-users me-1"></i>
+                    Selected Leads:
+                  </span>
+                  <span className="fw-semibold text-primary">
+                    {selectedProfiles?.length || 0}
+                  </span>
+                </div>
+                <small className="text-muted d-block mt-1">
+                  Type a number in the bulk bar above the lead cards to auto-select.
+                </small>
+              </div>
+            )}
+
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
                 type="button"
@@ -2409,11 +2564,21 @@ const B2BSales = () => {
                 CLOSE
               </button>
               <button
+                type="button"
                 className="btn text-white"
                 onClick={(e) => handleReferLead(e)}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                disabled={
+                  !selectedConcernPerson || 
+                  (showPanel === 'RefferAllLeads' && (selectedProfiles.length === 0 && !input1Value))
+                }
+                style={{ 
+                  backgroundColor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : '#fd7e14', 
+                  border: 'none', 
+                  padding: '8px 24px', 
+                  fontSize: '14px',
+                  cursor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? 'not-allowed' : 'pointer'
+                }}
               >
-
                 {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
@@ -2812,10 +2977,33 @@ const B2BSales = () => {
                             </button>
                           </>
                         )}
+                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                          <button 
+                            className="btn btn-sm btn-outline-primary" 
+                            disabled={loadingLeads || leads.length === 0}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                            Refer All Leads
+                          </button>
+                        )}
                       </div>
 
-                      {/* Right side - Input Fields */}
-                      {/* {showBulkInputs && (
+                      {/* Right side - Input Fields for Bulk Refer */}
+                      {showBulkInputs && bulkMode === 'bulkrefer' && (
                         <div style={{
                           display: "flex",
                           alignItems: "stretch",
@@ -2885,7 +3073,7 @@ const B2BSales = () => {
                             }}
                           />
                         </div>
-                      )} */}
+                      )}
                     </div>
                   </div>
 
@@ -2960,6 +3148,121 @@ const B2BSales = () => {
                             </button>
                           </div>
                         </>
+                      )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <div className="col-6">
+                          <button 
+                            className="btn w-100" 
+                            disabled={loadingLeads || leads.length === 0}
+                            style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: loadingLeads || leads.length === 0 ? '#ccc' : '#6c757d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(108, 117, 125, 0.3)',
+                              transition: 'all 0.2s ease',
+                              cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loadingLeads && leads.length > 0) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(108, 117, 125, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(108, 117, 125, 0.3)';
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "14px" }}></i>
+                            Refer Leads
+                          </button>
+                        </div>
+                      )}
+                      {/* Mobile Bulk Input Fields for Bulk Refer */}
+                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                        <div className="col-12 mt-2">
+                          <div style={{
+                            display: "flex",
+                            alignItems: "stretch",
+                            border: "1px solid #dee2e6",
+                            borderRadius: "4px",
+                            backgroundColor: "#fff",
+                            overflow: "hidden",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                          }}>
+                            <input
+                              type="text"
+                              placeholder="Input 1"
+                              value={input1Value}
+                              onChange={(e) => {
+                                const maxValue = totalLeads || leads?.length || 0;
+                                let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                                
+                                if (inputValue === '') {
+                                  setInput1Value('');
+                                  return;
+                                }
+                                
+                                const numValue = parseInt(inputValue, 10);
+                                
+                                if (numValue < 1 || isNaN(numValue)) {
+                                  inputValue = '1';
+                                } else if (numValue > maxValue) {
+                                  inputValue = maxValue.toString();
+                                }
+                                
+                                setInput1Value(inputValue);
+                              }}
+                              onKeyDown={(e) => {
+                                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                  e.preventDefault();
+                                }
+                              }}
+                              style={{
+                                width: "50%",
+                                border: "none",
+                                borderRight: "1px solid #dee2e6",
+                                outline: "none",
+                                padding: "8px 12px",
+                                fontSize: "14px",
+                                backgroundColor: "transparent",
+                                height: "40px",
+                                boxSizing: "border-box"
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Input 2"
+                              value={totalLeads || leads?.length || 0}
+                              readOnly
+                              style={{
+                                width: "50%",
+                                border: "none",
+                                outline: "none",
+                                padding: "8px 12px",
+                                fontSize: "14px",
+                                backgroundColor: "transparent",
+                                height: "40px",
+                                boxSizing: "border-box",
+                                cursor: "default"
+                              }}
+                            />
+                          </div>
+                        </div>
                       )}
                       <div className="col-12 mt-2">
                         <div className="d-flex align-items-center gap-2">
@@ -3174,6 +3477,119 @@ const B2BSales = () => {
           }}>
             <section className="list-view">
 
+              {/* Bulk refer bar (shows above lead cards) */}
+              {showBulkInputs && bulkMode === 'bulkrefer' && (
+                <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
+                  <div className="card-body py-2">
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fw-semibold text-dark" style={{ fontSize: '13px' }}>
+                          <i className="fas fa-layer-group me-1 text-secondary"></i>
+                          Bulk Select
+                        </span>
+                        <div style={{
+                          display: "flex",
+                          alignItems: "stretch",
+                          border: "1px solid #dee2e6",
+                          borderRadius: "8px",
+                          backgroundColor: "#fff",
+                          overflow: "hidden",
+                          width: "220px",
+                          height: "36px"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Input 1"
+                            value={input1Value}
+                            onChange={(e) => {
+                              const maxValue = totalLeads || leads?.length || 0;
+                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                              if (inputValue === '') {
+                                setInput1Value('');
+                                return;
+                              }
+                              const numValue = parseInt(inputValue, 10);
+                              if (numValue < 1 || isNaN(numValue)) inputValue = '1';
+                              else if (numValue > maxValue) inputValue = maxValue.toString();
+                              setInput1Value(inputValue);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              borderRight: "1px solid #dee2e6",
+                              outline: "none",
+                              padding: "6px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Total"
+                            value={totalLeads || leads?.length || 0}
+                            readOnly
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              outline: "none",
+                              padding: "6px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box",
+                              cursor: "default"
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => {
+                            setInput1Value('');
+                            setSelectedProfiles([]);
+                          }}
+                          title="Clear selection"
+                          style={{ height: '36px' }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="text-muted" style={{ fontSize: '13px' }}>
+                          Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => {
+                            if (!selectedProfiles || selectedProfiles.length === 0) {
+                              alert('Please type a number in Input 1 to select leads first.');
+                              return;
+                            }
+                            openRefferPanel(null, 'RefferAllLeads');
+                          }}
+                          style={{ height: '36px', whiteSpace: 'nowrap' }}
+                        >
+                          <i className="fas fa-share me-1"></i>
+                          Refer
+                        </button>
+                      </div>
+                    </div>
+                    <small className="text-muted d-block mt-1" style={{ fontSize: '12px' }}>
+                      Tip: this selects the first N leads from your current filters/status and highlights them below.
+                    </small>
+                  </div>
+                </div>
+              )}
+
               {/* Loading State */}
               {loadingLeads ? (
                 <div className="text-center py-5">
@@ -3196,7 +3612,7 @@ const B2BSales = () => {
                 <div className="row g-2">
                   {leads.map((lead, leadIndex) => (
                     <div key={lead._id || leadIndex} className="col-12">
-                      <div className="lead-card">
+                      <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {/* Card Header */}
                         <div className="lead-header">
                           <div className="lead-title-section">
@@ -3502,10 +3918,16 @@ const B2BSales = () => {
       {showFilters && (
         <div
           className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1060,
+            // Ensure modal overlay can scroll on smaller screens
+            overflowY: 'auto',
+            maxHeight: '100vh'
+          }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow">
+          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content border-0 shadow" style={{ maxHeight: '90vh' }}>
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
@@ -3517,7 +3939,7 @@ const B2BSales = () => {
                   onClick={() => setShowFilters(false)}
                 ></button>
               </div>
-              <div className="modal-body p-4">
+              <div className="modal-body p-4" style={{ overflowY: 'auto' }}>
                 <div className="row g-3">
                   <div className="col-md-4">
                     <label className="form-label fw-medium text-dark mb-2">
@@ -4230,6 +4652,12 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   .lead-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Bulk selection highlight */
+  .lead-card.bulk-selected {
+    outline: 2px solid #0d6efd;
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.25);
   }
 
   /* Header Section */
