@@ -8963,7 +8963,7 @@ const WhatsappChat = () => {
                         <button
                           onClick={() => fetchProfileData()}
                           className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' }}
+                          style={{ whiteSpace: 'nowrap' ,marginBottom:'0px' }}
                         >
                           <i className={`fas fa-search me-1`}></i>
                           Search
@@ -9059,7 +9059,7 @@ const WhatsappChat = () => {
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <button
-                          className="btn btn-sm btn-outline-danger"
+                          className="btn btn-sm btn-outline-danger CButtton"
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
@@ -9079,8 +9079,8 @@ const WhatsappChat = () => {
                     <div className="row g-4">
                       {/* Course Type Filter */}
                       <div className="col-md-3">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                        <label className="form-label small fw-bold text-dark CourseType">
+                          <i className="fas fa-graduation-cap me-1 text-success CourseType"></i>
                           Course Type
                         </label>
                         <div className="position-relative">
@@ -9237,7 +9237,7 @@ const WhatsappChat = () => {
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6 firstDatepicker">
+                            <div className="col-12 col-sm-12 col-md-6 col-lg-6 firstDatepicker fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -9249,7 +9249,7 @@ const WhatsappChat = () => {
                                 maxDate={filterData.createdToDate || new Date()}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-col-12 col-sm-12 col-md-6 col-lg-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
@@ -9280,12 +9280,12 @@ const WhatsappChat = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButtton"
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -9299,7 +9299,7 @@ const WhatsappChat = () => {
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-col-col-12 col-sm-12 col-md-6 col-lg-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
@@ -9311,7 +9311,7 @@ const WhatsappChat = () => {
                                 maxDate={filterData.modifiedToDate || new Date()}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-12 col-sm-12 col-md-6 col-lg-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
@@ -9342,12 +9342,12 @@ const WhatsappChat = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButtton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -9361,7 +9361,7 @@ const WhatsappChat = () => {
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-col-12 col-sm-12 col-md-6 col-lg-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
@@ -9373,7 +9373,7 @@ const WhatsappChat = () => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6 translateX">
+                            <div className="col-col-12 col-sm-12 col-md-6 col-lg-6 fixDate translateX">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -9403,12 +9403,12 @@ const WhatsappChat = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButtton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -12204,24 +12204,24 @@ const WhatsappChat = () => {
         /* Generic mobile panel styles - apply to all col-4 panels on mobile */
         @media (max-width: 992px) {
           /* Make all col-4 columns (side panels) fullscreen on mobile */
-          .row > .col-4,
-          .row > .col-lg-4,
-          .row > .col-md-4,
-          [class*="col-4"] {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            max-width: 100vw !important;
-            height: 100vh !important;
-            z-index: 9999 !important;
-            background: white !important;
-            animation: slideInRight 0.3s ease !important;
-            padding: 0 !important;
-            overflow-y: auto !important;
-          }
+          // .row > .col-4,
+          // .row > .col-lg-4,
+          // .row > .col-md-4,
+          // [class*="col-4"] {
+          //   position: fixed !important;
+          //   top: 0 !important;
+          //   left: 0 !important;
+          //   right: 0 !important;
+          //   bottom: 0 !important;
+          //   width: 100vw !important;
+          //   max-width: 100vw !important;
+          //   height: 100vh !important;
+          //   z-index: 9999 !important;
+          //   background: white !important;
+          //   animation: slideInRight 0.3s ease !important;
+          //   padding: 0 !important;
+          //   overflow-y: auto !important;
+          // }
           
           /* Prevent body scroll when panel is open */
           body.panel-open {
@@ -19553,7 +19553,36 @@ max-width: 600px;
   }
         `}
       </style>
+      <style>
+        {
+          `
+.fixDate {
+    box-sizing: border-box;
+    font-size: 13px;
+    white-space: nowrap;
+    width: 100%;
+  }
 
+          @media (max-width: 768px){
+          
+          .CButtton{
+            font-size:11px;
+            padding:2px;
+            }
+
+             .small {
+         display: block !important; 
+    }
+         .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+          }
+          `
+        }
+      </style>
     </div>
   );
 };

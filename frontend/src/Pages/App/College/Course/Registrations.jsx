@@ -9993,7 +9993,7 @@ useEffect(() => {
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
-                          Clear All
+                          Clear
                         </button>
                         <button
                           className="btn-close"
@@ -10166,9 +10166,9 @@ useEffect(() => {
                           <i className="fas fa-calendar-plus me-1 text-success"></i>
                           Lead Creation Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6 firstDatepicker">
+                            <div className="col-12 col-sm-6 firstDatepicker fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -10180,7 +10180,7 @@ useEffect(() => {
                                 maxDate={filterData.createdToDate || new Date()}
                               />
                             </div>
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
@@ -10211,12 +10211,12 @@ useEffect(() => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton "
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -10228,9 +10228,10 @@ useEffect(() => {
                           <i className="fas fa-calendar-edit me-1 text-warning"></i>
                           Lead Modification Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
@@ -10242,7 +10243,7 @@ useEffect(() => {
                                 maxDate={filterData.modifiedToDate || new Date()}
                               />
                             </div>
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
@@ -10273,12 +10274,12 @@ useEffect(() => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -10290,9 +10291,9 @@ useEffect(() => {
                           <i className="fas fa-calendar-check me-1 text-info"></i>
                           Next Action Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
@@ -10304,7 +10305,7 @@ useEffect(() => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-12 col-sm-6 translateX">
+                            <div className="col-12 col-sm-6 fixDate translateX">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -10334,12 +10335,12 @@ useEffect(() => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -20559,6 +20560,38 @@ max-width: 600px;
         `}
       </style>
 
+      <style>
+{`
+  .fixDate {
+    box-sizing: border-box;
+    font-size: 13px;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  @media (max-width: 767px) {
+    .CButton {
+      font-size: 13px;
+      padding: 2px;
+      white-space:nowrap;
+    }
+  }
+
+
+  .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+        
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+}
+`}
+</style>
     </div>
   );
 };
