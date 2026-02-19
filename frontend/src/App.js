@@ -14,6 +14,7 @@ import HomePage from '../src/Pages/Front/HomePage/HomePage';
 // import About from './Pages/Front/About/About';
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
+import Result from "./Pages/Front/Result/Result";
 import Course from './Pages/Front/Courses/Course';
 import Jobs from './Pages/Front/Jobs/Jobs';
 import JobDetails from './Pages/Front/Jobs/JobDetails';
@@ -191,6 +192,7 @@ const Layout = () => {
         <Route exact path="/candidate-review" element={<CandidateReview />} />
         {/* <Route exact path="/about_us" element={<About />} /> */}
         <Route exact path="/labs" element={<Labs />} />
+        <Route exact path="/results" element={<Result />} />
         <Route exact path="/courses" element={<Course />} />
         <Route exact path="/joblisting" element={<Jobs />} />
         <Route exact path="/jobdetailsmore/:jobId" element={<JobDetails />} />

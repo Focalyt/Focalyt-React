@@ -198,8 +198,11 @@ function Footer() {
                   <li>
                     <a href="#" data-bs-toggle="modal" data-bs-target="#careerModal">Career</a>
                   </li>
-                  <li>
+                  {/* <li>
                     <a href="https://result.focalyt.com/">Results</a>
+                  </li> */}
+                  <li>
+                    <a href='/results'>Results</a>
                   </li>
                   <li>
                     <a href="/contact">Partner With Us</a>

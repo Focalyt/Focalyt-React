@@ -965,7 +965,8 @@ const CRMDashboard = () => {
   const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
 
  
-  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [modalType, setModalType] = useState(null); 
+
   const [selectedSenderId, setSelectedSenderId] = useState('');
   const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
   const [responseRecipient, setResponseRecipient] = useState('sender');
@@ -3574,6 +3575,9 @@ const CRMDashboard = () => {
       } else {
         alert('Mobile number not found for this candidate');
       }
+    } else if (panel === 'email') {
+      setSelectedProfile(profile);
+      setShowPanel('Email');
     }
 
     if (!isMobile) {
@@ -5982,7 +5986,7 @@ const CRMDashboard = () => {
       alert(resultMessage);
 
       if (failCount === 0 || successCount > 0) {
-        setShowWhatsappModal(false);
+        setModalType(null);
         setSelectedSenderId('');
         setSelectedWhatsappNumbers([]);
         setResponseRecipient('sender');
@@ -6043,12 +6047,14 @@ const CRMDashboard = () => {
       fetchWhatsappTemplates();
     }
   }, [showPanel]);
+useEffect(() => {
+  if (modalType === 'whatsapp') {
+    fetchWhatsappTemplates();
+  } else if (modalType === 'templateEdit') {
+    fetchWhatsappTemplates();
+  }
+}, [modalType]);
 
-  useEffect(() => {
-    if (showWhatsappModal) {
-      fetchWhatsappTemplates();
-    }
-  }, [showWhatsappModal]);
 
   // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
   useEffect(() => {
@@ -8155,7 +8161,1232 @@ const CRMDashboard = () => {
     ) : null;
   };
   /************************************/
+  // Render Email Panel (Desktop Sidebar or Mobile Modal)
+  const renderEmailPanel = () => {
+    if (showPanel !== 'Email') return null;
+  
+    return (
+      <div className="col-11 transition-col" id="EmailPanel">
+        <div className="bg-white h-100 d-flex flex-column">
+  
+          {/* Header */}
+          <div className="border-bottom p-3 d-flex justify-content-between align-items-center">
+            <h5 className="mb-0 fw-bold">Send Email</h5>
+            <button
+              className="btn-close"
+               onClick={closePanel}
+                style={{ marginLeft: '8px' }}
+            />
+          </div>
+  
+          {/* Body */}
+          <div className="flex-grow-1 overflow-auto p-4">
+  
+            {/* Select Email */}
+            <div className="mb-4">
+              <h6 className="fw-bold mb-3">Select the Email to send</h6>
+              <div className="d-flex flex-column gap-2">
+                {['Primary Email', "Father's Email", "Mother's Email", 'Alternate Email'].map((emailType) => (
+                  <div key={emailType} className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={selectedWhatsappNumbers.includes(emailType)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedWhatsappNumbers([...selectedWhatsappNumbers, emailType]);
+                        } else {
+                          setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== emailType));
+                        }
+                      }}
+                    />
+                    <label className="form-check-label">
+                      {emailType}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+  
+            {/* Select Template */}
+            <div className="mb-4">
+              <label className="form-label fw-bold mb-2">
+                Select Email Template
+              </label>
+              <select
+                className="form-select"
+                value={selectedWhatsappTemplateModal}
+                onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+              >
+                <option value="">Select Template</option>
+                {whatsappTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+  
+          </div>
+  
+          {/* Footer */}
+          <div className="border-top p-3 d-flex justify-content-end gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowPanel(null)}
+            >
+              Close
+            </button>
+  
+            <button
+              className="btn btn-primary"
+              onClick={handleBulkWhatsappSend}
+              disabled={isSendingBulkWhatsapp}
+            >
+              {isSendingBulkWhatsapp ? 'Sending...' : 'Send Message'}
+            </button>
+          </div>
+  
+        </div>
+      </div>
+    );
+  };
+  
+  // const renderEmailPanel = () => {
+  //   const panelContent = (
+  //     <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+  //       {/* WhatsApp Header */}
+  //       <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
 
+  //         <div className="d-flex align-items-center mb-2">
+  //           <div
+  //             className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+  //             style={{
+  //               width: '48px',
+  //               height: '48px',
+  //               fontSize: '20px',
+  //               fontWeight: '600',
+  //               background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+  //               flexShrink: 0
+  //             }}
+  //           >
+  //             {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+  //           </div>
+  //           <div className="flex-grow-1">
+  //             <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+  //               {selectedProfile?._candidate?.name || 'N/A'}
+  //             </h6>
+  //             <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+  //               {selectedProfile?._candidate?.mobile || 'N/A'}
+  //             </p>
+  //           </div>
+  //           <button
+  //             className="btn-close"
+  //             onClick={closePanel}
+  //             style={{ marginLeft: '8px' }}
+  //           ></button>
+  //         </div>
+
+  //         {/* Session Status Badge - Below name */}
+  //         <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+  //           {sessionWindow.isOpen ? (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#D1F4E0',
+  //                 border: '1px solid #25D366',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <div
+  //                 className="rounded-circle me-1"
+  //                 style={{
+  //                   width: '6px',
+  //                   height: '6px',
+  //                   backgroundColor: '#25D366'
+  //                 }}
+  //               ></div>
+  //               <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+  //                 <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+  //                 {sessionCountdown} remaining
+  //               </span>
+  //             </div>
+  //           ) : (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#FFF3CD',
+  //                 border: '1px solid #FFA500',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+  //               <span className="fw-semibold" style={{ color: '#856404' }}>
+  //                 No Active Window
+  //               </span>
+  //             </div>
+  //           )}
+  //         </div>
+
+  //       </div>
+
+  //       {/* Messages Area */}
+  //       <div
+  //         className="flex-grow-1 overflow-auto p-3"
+  //         style={{
+  //           backgroundColor: '#ECE5DD',
+  //           backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+  //           maxHeight: '55vh',
+  //           minHeight: '300px'
+  //         }}
+  //       >
+  //         {/* Loading State */}
+  //         {isLoadingChatHistory && (
+  //           <div className="d-flex justify-content-center align-items-center h-100">
+  //             <div className="text-center">
+  //               <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+  //                 <span className="visually-hidden">Loading...</span>
+  //               </div>
+  //               <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Messages */}
+  //         {!isLoadingChatHistory && whatsappMessages.map(message => (
+  //           <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+  //             <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+  //               <div
+  //                 className={`${message.sender === 'agent'
+  //                   ? 'text-white'
+  //                   : 'bg-white text-dark'
+  //                   }`}
+  //                 style={{
+  //                   backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+  //                   color: message.sender === 'agent' ? '#000' : '#000',
+  //                   borderRadius: '8px',
+  //                   borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+  //                   borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+  //                   boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+  //                   padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+  //                   overflow: 'hidden'
+  //                 }}
+  //               >
+  //                 {/* Render template message with components */}
+  //                 {message.type === 'template' && message.templateData ? (
+  //                   <>
+  //                     {renderTemplateMessage(message.templateData, true)}
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 ) : (
+  //                   /* Regular text/media message */
+  //                   <>
+  //                     {/* Render media if present */}
+  //                     {message.mediaUrl && message.type === 'image' && (
+  //                       <img
+  //                         src={message.mediaUrl}
+  //                         alt="Shared image"
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Image]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       />
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'video' && (
+  //                       <video
+  //                         controls
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Video]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="video/mp4" />
+  //                         Your browser does not support the video tag.
+  //                       </video>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'audio' && (
+  //                       <audio
+  //                         controls
+  //                         style={{
+  //                           width: '100%',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="audio/mpeg" />
+  //                         Your browser does not support the audio tag.
+  //                       </audio>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'document' && (
+  //                       <a
+  //                         href={message.mediaUrl}
+  //                         target="_blank"
+  //                         rel="noopener noreferrer"
+  //                         className="d-flex align-items-center text-decoration-none"
+  //                         style={{
+  //                           padding: '8px',
+  //                           backgroundColor: 'rgba(0,0,0,0.05)',
+  //                           borderRadius: '4px',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+  //                         <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+  //                       </a>
+  //                     )}
+
+  //                     {/* Render text if it's not a default placeholder */}
+  //                     {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+  //                       <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+  //                         {message.text}
+  //                       </p>
+  //                     )}
+
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 )}
+  //               </div>
+  //               {message.sender === 'agent' && message.type === 'template' && (
+  //                 <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+  //                   <i className="fas fa-file-alt me-1"></i>Template Message
+  //                 </p>
+  //               )}
+  //             </div>
+  //           </div>
+  //         ))}
+
+  //         {/* Selected Template Preview in Chat */}
+  //         {selectedWhatsappTemplate && (
+  //           <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+  //             <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+  //               <div
+  //                 className="rounded-3 overflow-hidden"
+  //                 style={{
+  //                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                   boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+  //                   border: '2px solid rgba(255,255,255,0.3)',
+  //                   position: 'relative'
+  //                 }}
+  //               >
+  //                 {/* Decorative gradient overlay */}
+  //                 <div style={{
+  //                   position: 'absolute',
+  //                   top: 0,
+  //                   left: 0,
+  //                   right: 0,
+  //                   height: '100%',
+  //                   background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+  //                   pointerEvents: 'none'
+  //                 }}></div>
+
+  //                 {/* Header */}
+  //                 <div className="d-flex align-items-center justify-content-between p-3" style={{
+  //                   backgroundColor: 'rgba(255,255,255,0.15)',
+  //                   backdropFilter: 'blur(10px)',
+  //                   borderBottom: '1px solid rgba(255,255,255,0.2)'
+  //                 }}>
+  //                   <div className="d-flex align-items-center">
+  //                     <div
+  //                       className="rounded-circle d-flex align-items-center justify-content-center me-2"
+  //                       style={{
+  //                         width: '32px',
+  //                         height: '32px',
+  //                         backgroundColor: 'rgba(255,255,255,0.95)',
+  //                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+  //                       }}
+  //                     >
+  //                       <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+  //                     </div>
+  //                     <div>
+  //                       <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+  //                         WhatsApp Template
+  //                       </p>
+  //                       <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+  //                         {selectedWhatsappTemplate.name}
+  //                       </p>
+  //                     </div>
+  //                   </div>
+  //                   <button
+  //                     className="btn btn-sm p-0"
+  //                     onClick={() => setSelectedWhatsappTemplate(null)}
+  //                     style={{
+  //                       width: '28px',
+  //                       height: '28px',
+  //                       backgroundColor: 'rgba(255,255,255,0.2)',
+  //                       border: '1px solid rgba(255,255,255,0.4)',
+  //                       borderRadius: '50%',
+  //                       color: '#fff',
+  //                       fontSize: '12px',
+  //                       display: 'flex',
+  //                       alignItems: 'center',
+  //                       justifyContent: 'center',
+  //                       transition: 'all 0.2s ease'
+  //                     }}
+  //                     onMouseEnter={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+  //                       e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+  //                     }}
+  //                     onMouseLeave={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+  //                       e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+  //                     }}
+  //                     title="Remove Template"
+  //                   >
+  //                     <i className="fas fa-times"></i>
+  //                   </button>
+  //                 </div>
+
+  //                 {/* Content */}
+  //                 <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+  //                   {/* Category Badge */}
+  //                   <div className="mb-2">
+  //                     <span className="badge" style={{
+  //                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                       color: '#fff',
+  //                       fontSize: '10px',
+  //                       padding: '5px 12px',
+  //                       fontWeight: '600',
+  //                       borderRadius: '20px',
+  //                       letterSpacing: '0.3px'
+  //                     }}>
+  //                       <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+  //                       {selectedWhatsappTemplate.category}
+  //                     </span>
+  //                   </div>
+
+  //                   {/* Template Content */}
+  //                   <div
+  //                     className="rounded-3 p-3 mb-2"
+  //                     style={{
+  //                       backgroundColor: '#f8f9fa',
+  //                       border: '2px solid #e9ecef',
+  //                       borderLeft: '4px solid #667eea',
+  //                       position: 'relative'
+  //                     }}
+  //                   >
+  //                     {(() => {
+  //                       const components = selectedWhatsappTemplate.components || [];
+
+  //                       // Check if it's a carousel template
+  //                       const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+  //                       if (carouselComponent && carouselComponent.cards) {
+  //                         return (
+  //                           <div>
+  //                             {/* Carousel Body Text (if exists outside carousel) */}
+  //                             {(() => {
+  //                               const bodyComp = components.find(c => c.type === 'BODY');
+  //                               if (bodyComp && bodyComp.text) {
+  //                                 return (
+  //                                   <p className="mb-3" style={{
+  //                                     fontSize: '13px',
+  //                                     color: '#2c3e50',
+  //                                     fontWeight: '500'
+  //                                   }}>
+  //                                     {bodyComp.text}
+  //                                   </p>
+  //                                 );
+  //                               }
+  //                             })()}
+
+  //                             <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+  //                               <i className="fas fa-images me-1"></i>
+  //                               Carousel ({carouselComponent.cards.length} cards)
+  //                             </p>
+
+  //                             <div style={{
+  //                               display: 'flex',
+  //                               gap: '12px',
+  //                               overflowX: 'auto',
+  //                               paddingBottom: '10px',
+  //                               scrollbarWidth: 'thin'
+  //                             }}>
+  //                               {carouselComponent.cards.map((card, idx) => {
+  //                                 const cardHeader = card.components.find(c => c.type === 'HEADER');
+  //                                 const cardBody = card.components.find(c => c.type === 'BODY');
+  //                                 const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+  //                                 const imageUrl = cardHeader?.example?.header_handle?.[0];
+
+  //                                 return (
+  //                                   <div key={idx} style={{
+  //                                     minWidth: '200px',
+  //                                     maxWidth: '200px',
+  //                                     border: '2px solid #dee2e6',
+  //                                     borderRadius: '12px',
+  //                                     overflow: 'hidden',
+  //                                     backgroundColor: '#fff',
+  //                                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  //                                   }}>
+  //                                     {imageUrl && (
+  //                                       <>
+  //                                         <img
+  //                                           src={imageUrl}
+  //                                           alt={`Card ${idx + 1}`}
+  //                                           style={{
+  //                                             width: '100%',
+  //                                             height: '150px',
+  //                                             objectFit: 'cover'
+  //                                           }}
+  //                                           onError={(e) => {
+  //                                             e.target.style.display = 'none';
+  //                                             e.target.nextElementSibling.style.display = 'flex';
+  //                                           }}
+  //                                         />
+  //                                         <div style={{
+  //                                           display: 'none',
+  //                                           height: '150px',
+  //                                           alignItems: 'center',
+  //                                           justifyContent: 'center',
+  //                                           backgroundColor: '#e9ecef',
+  //                                           fontSize: '48px'
+  //                                         }}>
+  //                                           🖼️
+  //                                         </div>
+  //                                       </>
+  //                                     )}
+  //                                     <div style={{ padding: '12px' }}>
+  //                                       <p className="mb-2" style={{
+  //                                         fontSize: '12px',
+  //                                         lineHeight: '1.4',
+  //                                         color: '#2c3e50'
+  //                                       }}>
+  //                                         {(() => {
+  //                                           // Get candidate data for variable replacement
+  //                                           const candidate = selectedProfile?._candidate;
+  //                                           const registration = selectedProfile;
+
+  //                                           // Replace variables with actual candidate data
+  //                                           let text = cardBody?.text || '';
+
+  //                                           // Replace {{1}} with name
+  //                                           text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                           // Replace {{2}} with gender
+  //                                           text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                           // Replace {{3}} with mobile
+  //                                           text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                           // Replace {{4}} with email
+  //                                           text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                           // Replace {{5}} with course name
+  //                                           text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                           // Replace {{6}} with counselor name
+  //                                           text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                           // Replace {{7}} with job name
+  //                                           text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                           // Replace {{8}} with project name (college name)
+  //                                           text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+  //                                           // Replace {{9}} with batch name
+  //                                           text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                           // Replace {{10}} with lead owner name
+  //                                           text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+
+  //                                           return text;
+  //                                         })()}
+  //                                       </p>
+  //                                       {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+  //                                         <div style={{
+  //                                           borderTop: '1px solid #dee2e6',
+  //                                           paddingTop: '8px',
+  //                                           marginTop: '8px'
+  //                                         }}>
+  //                                           {cardButtons.buttons.map((btn, bidx) => (
+  //                                             <div
+  //                                               key={bidx}
+  //                                               style={{
+  //                                                 padding: '6px',
+  //                                                 marginBottom: '4px',
+  //                                                 textAlign: 'center',
+  //                                                 fontSize: '11px',
+  //                                                 color: '#007bff',
+  //                                                 fontWeight: '500'
+  //                                               }}
+  //                                             >
+  //                                               {btn.type === 'QUICK_REPLY' && '↩️ '}
+  //                                               {btn.text}
+  //                                             </div>
+  //                                           ))}
+  //                                         </div>
+  //                                       )}
+  //                                     </div>
+  //                                   </div>
+  //                                 );
+  //                               })}
+  //                             </div>
+  //                           </div>
+  //                         );
+  //                       }
+
+  //                       // Regular template with header (image/video), body, footer, buttons
+  //                       const headerComponent = components.find(c => c.type === 'HEADER');
+  //                       const bodyComponent = components.find(c => c.type === 'BODY');
+  //                       const footerComponent = components.find(c => c.type === 'FOOTER');
+  //                       const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+
+  //                       return (
+  //                         <div>
+  //                           {/* Header - Image or Video */}
+  //                           {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <img
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 alt="Template header"
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   objectFit: 'cover',
+  //                                   borderRadius: '12px 12px 0 0'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               />
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#e9ecef',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 🖼️
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <video
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 controls
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   borderRadius: '12px 12px 0 0',
+  //                                   backgroundColor: '#000'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               >
+  //                                 Your browser does not support the video tag.
+  //                               </video>
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#000',
+  //                                 color: '#fff',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 🎥
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'TEXT' && (
+  //                             <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+  //                               {headerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Body */}
+  //                           {bodyComponent && (
+  //                             <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+  //                               fontSize: '13px',
+  //                               color: '#2c3e50',
+  //                               lineHeight: '1.6',
+  //                               whiteSpace: 'pre-wrap'
+  //                             }}>
+  //                               {(() => {
+  //                                 // Get candidate data for variable replacement
+  //                                 const candidate = selectedProfile?._candidate;
+  //                                 const registration = selectedProfile;
+
+  //                                 // Get template variable mappings from selectedWhatsappTemplate
+  //                                 const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+  //                                 // Replace variables with actual candidate data using stored mappings
+  //                                 let text = bodyComponent.text || '';
+
+  //                                 if (variableMappings && variableMappings.length > 0) {
+  //                                   // Use stored variable mappings from database
+
+  //                                   variableMappings.forEach(mapping => {
+  //                                     const position = mapping.position;
+  //                                     const variableName = mapping.variableName;
+
+  //                                     // Get value based on actual variable name from mapping
+  //                                     let value = '';
+
+  //                                     switch (variableName) {
+  //                                       case 'name':
+  //                                         value = candidate?.name || registration?.name || 'User';
+  //                                         break;
+  //                                       case 'gender':
+  //                                         value = candidate?.gender || 'Male';
+  //                                         break;
+  //                                       case 'mobile':
+  //                                         value = candidate?.mobile || registration?.mobile || 'Mobile';
+  //                                         break;
+  //                                       case 'email':
+  //                                         value = candidate?.email || registration?.email || 'Email';
+  //                                         break;
+  //                                       case 'course_name':
+  //                                         value = selectedProfile?._course?.name || 'Course Name';
+  //                                         break;
+  //                                       case 'counselor_name':
+  //                                         value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+  //                                         break;
+  //                                       case 'job_name':
+  //                                         value = selectedProfile?._job?.title || 'Job Title';
+  //                                         break;
+  //                                       case 'project_name':
+  //                                         value = selectedProfile?._project?.name || 'Project Name';
+  //                                         break;
+  //                                       case 'batch_name':
+  //                                         value = selectedProfile?._batch?.name || 'Batch Not Assigned';
+  //                                         break;
+  //                                       case 'lead_owner_name':
+  //                                         value = selectedProfile?.registeredBy?.name || 'Self Registered';
+  //                                         break;
+  //                                       default:
+  //                                         // Try direct property access
+  //                                         value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+  //                                         break;
+  //                                     }
+
+  //                                     // Replace the numbered variable with actual value
+  //                                     text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+
+  //                                   });
+  //                                 } else {
+  //                                   text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                   text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                   text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                   text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                   text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                   // Replace {{6}} with counselor name
+  //                                   text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                   // Replace {{7}} with job name
+  //                                   text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                   // Replace {{8}} with project name (college name)
+  //                                   text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+
+  //                                   // Replace {{9}} with batch name
+  //                                   text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                   // Replace {{10}} with lead owner name
+  //                                   text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Self Registered');
+  //                                 }
+
+  //                                 return text;
+  //                               })()}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Footer */}
+  //                           {footerComponent && (
+  //                             <p className="mb-2" style={{
+  //                               fontSize: '11px',
+  //                               color: '#6b7280',
+  //                               fontStyle: 'italic'
+  //                             }}>
+  //                               {footerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Buttons */}
+  //                           {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+  //                             <div style={{
+  //                               marginTop: '12px',
+  //                               paddingTop: '12px',
+  //                               borderTop: '1px solid #dee2e6'
+  //                             }}>
+  //                               {buttonsComponent.buttons.map((button, idx) => (
+  //                                 <div
+  //                                   key={idx}
+  //                                   style={{
+  //                                     padding: '8px 12px',
+  //                                     marginBottom: '6px',
+  //                                     textAlign: 'center',
+  //                                     fontSize: '12px',
+  //                                     color: '#007bff',
+  //                                     border: '1px solid #007bff',
+  //                                     borderRadius: '6px',
+  //                                     backgroundColor: '#fff',
+  //                                     fontWeight: '500',
+  //                                     cursor: 'default'
+  //                                   }}
+  //                                 >
+  //                                   {button.type === 'QUICK_REPLY' && '↩️ '}
+  //                                   {button.type === 'URL' && '🔗 '}
+  //                                   {button.type === 'PHONE_NUMBER' && '📞 '}
+  //                                   {button.text}
+  //                                 </div>
+  //                               ))}
+  //                             </div>
+  //                           )}
+  //                         </div>
+  //                       );
+  //                     })()}
+  //                   </div>
+
+  //                   {/* Footer Info */}
+  //                   <div className="d-flex align-items-center justify-content-between">
+  //                     <div className="d-flex align-items-center">
+  //                       <div
+  //                         className="rounded-circle me-2"
+  //                         style={{
+  //                           width: '8px',
+  //                           height: '8px',
+  //                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  //                           boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+  //                           animation: 'pulse 2s ease-in-out infinite'
+  //                         }}
+  //                       ></div>
+  //                       <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+  //                         Ready to send
+  //                       </span>
+  //                     </div>
+  //                     <div className="d-flex align-items-center">
+  //                       <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+  //                       <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+  //                         Pre-approved
+  //                       </span>
+  //                     </div>
+  //                   </div>
+  //                 </div>
+  //               </div>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Scroll anchor */}
+  //         <div ref={whatsappMessagesEndRef} />
+  //       </div>
+
+  //       {/* Bottom Input Area */}
+  //       <div className="bg-white border-top p-3">
+  //         <div className="d-flex align-items-center gap-2">
+  //           {/* File Upload Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-file-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappFileMenu(!showWhatsappFileMenu);
+  //                 setShowWhatsappTemplateMenu(false);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Attach File"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: 'transparent',
+  //                 color: '#54656F',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //             </button>
+
+  //             {/* File Menu Dropdown */}
+  //             {showWhatsappFileMenu && (
+  //               <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+  //                 <div className="p-2">
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-document-input"
+  //                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-image-input"
+  //                     accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-video-input"
+  //                     accept="video/mp4,video/mkv,video/mov,video/avi"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-audio-input"
+  //                     accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+  //                     style={{ display: 'none' }}
+  //                   />
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-document-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+  //                     <span>Document</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-image-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+  //                     <span>Image</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-video-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+  //                     <span>Video</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start"
+  //                     onClick={() => document.getElementById('whatsapp-audio-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+  //                     <span>Audio</span>
+  //                   </button>
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
+  //           {/* <button
+  //             className="btn"
+  //             title="Attach File"
+  //             style={{
+  //               width: '42px',
+  //               height: '42px',
+  //               backgroundColor: 'transparent',
+  //               color: '#54656F',
+  //               border: 'none',
+  //               borderRadius: '8px',
+  //               padding: '0',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center'
+  //             }}
+  //           >
+  //             <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //           </button> */}
+
+  //           {/* Template Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-template-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Templates"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: '#0B66E4',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+  //             </button>
+
+  //             {/* Template Dropdown */}
+  //             {showWhatsappTemplateMenu && (
+  //               <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+  //                 <div className="p-3 border-bottom bg-light">
+  //                   <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+  //                   <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+  //                 </div>
+
+  //                 {whatsappTemplates.length === 0 ? (
+  //                   <div className="p-4 text-center">
+  //                     <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+  //                       <span className="visually-hidden">Loading...</span>
+  //                     </div>
+  //                     <p className="mb-0 small text-muted">Loading templates...</p>
+  //                   </div>
+  //                 ) : (
+  //                   whatsappTemplates.map(template => (
+  //                     <div
+  //                       key={template.id}
+  //                       className="p-3 border-bottom"
+  //                       style={{ cursor: 'pointer' }}
+  //                       onClick={() => handleWhatsappSelectTemplate(template)}
+  //                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+  //                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  //                     >
+  //                       <div className="d-flex justify-content-between align-items-center">
+  //                         <h6 className="mb-0 fw-semibold">{template.name}</h6>
+  //                         <div className="d-flex gap-1">
+  //                           <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+  //                           {template.language && (
+  //                             <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+  //                           )}
+  //                         </div>
+  //                       </div>
+  //                     </div>
+  //                   ))
+  //                 )}
+  //               </div>
+  //             )}
+  //           </div>
+
+  //           {/* Message Input or Template Send Button */}
+  //           {selectedWhatsappTemplate ? (
+  //             // Template Selected - Show Send Button
+  //             <button
+  //               className="btn flex-grow-1"
+  //               onClick={handleWhatsappSendTemplate}
+  //               disabled={isSendingWhatsapp}
+  //               style={{
+  //                 height: '42px',
+  //                 backgroundColor: '#25D366',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '24px',
+  //                 fontWeight: '500',
+  //                 fontSize: '15px'
+  //               }}
+  //             >
+  //               {isSendingWhatsapp ? (
+  //                 <>
+  //                   <span className="spinner-border spinner-border-sm me-2"></span>
+  //                   Sending...
+  //                 </>
+  //               ) : (
+  //                 <>
+  //                   <i className="fas fa-paper-plane me-2"></i>
+  //                   Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+  //                 </>
+  //               )}
+  //             </button>
+  //           ) : sessionWindow.isOpen ? (
+  //             // Active Session - Show Input
+  //             <>
+  //               <div className="position-relative flex-grow-1">
+  //                 <input
+  //                   type="text"
+  //                   className="form-control"
+  //                   value={whatsappNewMessage}
+  //                   onChange={(e) => setWhatsappNewMessage(e.target.value)}
+  //                   onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+  //                   placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
+  //                   style={{
+  //                     height: '42px',
+  //                     paddingRight: '50px',
+  //                     borderRadius: '24px',
+  //                     border: '1px solid #E9EDEF',
+  //                     fontSize: '15px',
+  //                     backgroundColor: '#F0F2F5'
+  //                   }}
+  //                 />
+  //                 <button
+  //                   className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+  //                   onClick={() => {
+  //                     setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+  //                     setShowWhatsappTemplateMenu(false);
+  //                   }}
+  //                   style={{
+  //                     height: '42px',
+  //                     width: '42px',
+  //                     border: 'none',
+  //                     background: 'transparent',
+  //                     color: '#54656F'
+  //                   }}
+  //                 >
+  //                   <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+  //                 </button>
+
+  //                 {/* Emoji Picker */}
+  //                 {showWhatsappEmojiPicker && (
+  //                   <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+  //                     <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
+  //                       {emojis.map((emoji, index) => (
+  //                         <button
+  //                           key={index}
+  //                           className="btn btn-light"
+  //                           onClick={() => handleWhatsappEmojiClick(emoji)}
+  //                           style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
+  //                         >
+  //                           {emoji}
+  //                         </button>
+  //                       ))}
+  //                     </div>
+  //                   </div>
+  //                 )}
+  //               </div>
+
+  //               {/* Send/Voice Button */}
+  //               {whatsappNewMessage.trim() ? (
+  //                 <button
+  //                   onClick={handleWhatsappSendMessage}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                 >
+  //                   <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+  //                 </button>
+  //               ) : (
+  //                 <button
+  //                   onClick={() => {
+  //                     setWhatsappMessages([...whatsappMessages, {
+  //                       id: whatsappMessages.length + 1,
+  //                       text: '🎤 Voice message',
+  //                       sender: 'agent',
+  //                       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //                       type: 'voice'
+  //                     }]);
+  //                   }}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                   title="Voice Message"
+  //                 >
+  //                   <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+  //                 </button>
+  //               )}
+  //             </>
+  //           ) : (
+  //             // No Session - Disabled Input with Tooltip
+  //             <div
+  //               className="position-relative flex-grow-1"
+  //               title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+  //             >
+  //               <input
+  //                 type="text"
+  //                 className="form-control"
+  //                 disabled
+  //                 placeholder="No active window - Use templates only"
+  //                 style={{
+  //                   height: '42px',
+  //                   borderRadius: '24px',
+  //                   border: '1px solid #E9EDEF',
+  //                   fontSize: '15px',
+  //                   backgroundColor: '#F5F5F5',
+  //                   color: '#8696A0',
+  //                   cursor: 'not-allowed'
+  //                 }}
+  //               />
+  //             </div>
+  //           )}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+
+  //   if (isMobile) {
+  //     return showPanel === 'Whatsapp' ? (
+  //       <div
+  //         className='modal show d-block'
+  //         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+  //         onClick={(e) => {
+  //           if (e.target === e.currentTarget) closePanel();
+  //         }}
+  //       >
+  //         <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+  //           <div className="modal-content" style={{ height: '80vh' }}>
+  //             {panelContent}
+  //           </div>
+  //         </div>
+  //       </div>
+  //     ) : null;
+  //   }
+
+  //   return showPanel === 'Email' ? (
+  //     <div className="col-11 transition-col" id="EmailPanel">
+  //       {panelContent}
+  //     </div>
+  //   ) : null;
+  // };
+  /************************************/
   //lead history
 
   const [leadHistory, setLeadHistory] = useState([]);
@@ -9344,7 +10575,7 @@ const CRMDashboard = () => {
                             const numValue = parseInt(input1Value, 10);
                             const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                             if (numValue >= 1 && numValue <= maxValue) {
-                              setShowWhatsappModal(true);
+                              setModalType('whatsapp');
                             }
                           }
                         }}
@@ -9570,6 +10801,14 @@ const CRMDashboard = () => {
                                         >
                                           <i className="fab fa-whatsapp"></i>
                                         </a>
+                                        {/* <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openPanel(profile, 'email')}
+                                          style={{ fontSize: '20px' }}
+                                          title="Email"
+                                        >
+                                          <i className="fas fa-envelope"></i>
+                                        </a> */}
                                       </div>
                                     </div>
                                   </div>
@@ -11196,14 +12435,14 @@ const CRMDashboard = () => {
                               </div>
                             )}
 
-                            {showWhatsappModal && (
+                            {modalType === 'whatsapp' && (
                             <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                               <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
                                 <div className="modal-content">
                                   <div className="modal-header">
                                     <h1 className="modal-title fs-5">Whatsapp Chat</h1>
                                     <button type="button" className="btn-close" onClick={() => {
-                                      setShowWhatsappModal(false);
+                                      setModalType(null);
                                       setSelectedSenderId('');
                                       setSelectedWhatsappNumbers([]);
                                       setResponseRecipient('sender');
@@ -11317,7 +12556,116 @@ const CRMDashboard = () => {
                                   </div>
                                   <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => {
-                                      setShowWhatsappModal(false);
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}>Close</button>
+                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                                      {isSendingBulkWhatsapp ? (
+                                        <>
+                                          <span className="spinner-border spinner-border-sm me-2"></span>
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        'Send Message'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            )}
+                            {modalType === 'email' && (
+                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+                                <div className="modal-content">
+                                  <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Send Email</h1>
+                                    <button type="button" className="btn-close" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                      setShowBulkInputs(false);
+                                      setBulkMode(null);
+                                    }}></button>
+                                  </div>
+                                  <div className="modal-body" style={{ padding: '20px' }}>
+                                    
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select the Email to send</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        {['Primary Email', 'Father\'s Email', 'Mother\'s Email', 'Alternate Email'].map((numberType) => (
+                                          <div key={numberType} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`whatsappNumber-${numberType}`}
+                                              checked={selectedWhatsappNumbers.includes(numberType)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                                } else {
+                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                                                }
+                                              }}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                              {numberType}
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                     
+
+                                    {/* Select WhatsApp Template Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select Email Template</label>
+                                      <select
+                                        className="form-select border-0 shadow-sm"
+                                        id="whatsappTemplate"
+                                        value={selectedWhatsappTemplateModal}
+                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                                        disabled={whatsappTemplates.length === 0}
+                                        style={{
+                                          height: '48px',
+                                          padding: '12px 16px',
+                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <option value="">
+                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                                        </option>
+                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                                          <option key={template.id || index} value={template.id || template.name}>
+                                            {template.name || template.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {whatsappTemplates.length === 0 && (
+                                        <small className="text-muted d-block mt-1">
+                                          <i className="fas fa-spinner fa-spin me-1"></i>
+                                          Fetching templates...
+                                        </small>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => {
+                                      setModalType(null);
                                       setSelectedSenderId('');
                                       setSelectedWhatsappNumbers([]);
                                       setResponseRecipient('sender');
@@ -11444,6 +12792,7 @@ const CRMDashboard = () => {
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
+              {renderEmailPanel()}
               {renderLeadHistoryPanel()}
               {renderAllLeadPanel()}
               {renderChangeCenterPanel()}
@@ -11454,7 +12803,7 @@ const CRMDashboard = () => {
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
         {isMobile && renderRefferPanel()}
-        {isMobile && renderWhatsAppPanel()}
+        {isMobile && renderEmailPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
         {isMobile && renderChangeCenterPanel()}
