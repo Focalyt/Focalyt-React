@@ -326,15 +326,59 @@ const isQAQuery = (userQuery, trainingData) => {
 
 router.post("/job-recommendations", async (req, res) => {
   try {
-    const { userQuery, preferences = {}, userProfile = {} } = req.body;
+    const { userQuery, preferences = {}, userProfile = {}, intent } = req.body;
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
     // console.log(`[AI] 📥 Received query: "${userQuery}"`);
 
+    // Normalize intent hint from client ('jobs' | 'courses' | 'both')
+    const normalizedIntent = (() => {
+      const v = (intent || "").toString().toLowerCase().trim();
+      if (v === "jobs" || v === "job") return "jobs";
+      if (v === "courses" || v === "course") return "courses";
+      if (v === "both") return "both";
+      return null;
+    })();
+
+    // Detect "search command" style queries so we don't mistakenly treat them as Q&A/training answers
+    const queryLowerForMode = (userQuery || "").toString().toLowerCase().trim();
+    const qaLikeKeywords = ["how", "what", "why", "when", "where", "explain", "steps", "process", "procedure"];
+    const searchLikeKeywords = ["show me", "find", "search", "looking for", "need", "want", "jobs", "job", "courses", "course"];
+    // If intent is explicitly set to jobs/courses, treat it as a search command even if query is short
+    const isExplicitIntent = normalizedIntent === "jobs" || normalizedIntent === "courses";
+    const isLikelySearchCommand =
+      (queryLowerForMode.length > 0 &&
+      searchLikeKeywords.some((k) => queryLowerForMode.includes(k)) &&
+      !qaLikeKeywords.some((k) => queryLowerForMode.includes(k))) ||
+      (isExplicitIntent && (queryLowerForMode === "jobs" || queryLowerForMode === "job" || queryLowerForMode === "courses" || queryLowerForMode === "course" || queryLowerForMode.includes("salary")));
+
+    // If client says it's a jobs/courses search, bypass FAQ/training Q&A flow
+    if (normalizedIntent === "courses" && isLikelySearchCommand) {
+      const courses = await fetchFormattedCourses(preferences);
+      return res.json({
+        status: true,
+        isQA: false,
+        answer: null,
+        source: "intent_courses",
+        jobs: [],
+        courses,
+        message: courses.length ? "Courses fetched successfully" : "No courses found",
+      });
+    }
+
+    // If client says it's a jobs search, bypass FAQ/training Q&A flow and go straight to job search
+    if (normalizedIntent === "jobs" && isLikelySearchCommand) {
+      // Skip FAQ and training Q&A checks, proceed directly to job search logic below
+      console.log(`[AI] ✅ Jobs search command detected, bypassing Q&A flow`);
+    } else if (normalizedIntent === "jobs" && !isLikelySearchCommand) {
+      // If intent is jobs but not a search command, still bypass Q&A
+      console.log(`[AI] ✅ Jobs intent detected, bypassing Q&A flow`);
+    }
+
     // Step 0: First check FAQ database for matching question
     // console.log(`[AI] 🔍 Checking FAQ database...`);
     const matchingFAQ = await findMatchingFAQ(userQuery);
-    if (matchingFAQ) {
+    if (matchingFAQ && !(normalizedIntent === "jobs" && isLikelySearchCommand)) {
       const attachCourses = isCourseRelatedQuery(userQuery) || isCourseRelatedAnswer(matchingFAQ.Answer);
       const courses = attachCourses ? await fetchFormattedCourses(preferences) : [];
       return res.json({
@@ -375,10 +419,13 @@ router.post("/job-recommendations", async (req, res) => {
     
     // First, always check training data for Q&A examples (even if not detected as Q&A query)
     // This ensures bot training questions are always checked
-    const qaExamples = trainingData.examples?.filter(ex => 
-      ex.expectedResponse && (!ex.expectedPreferences || Object.keys(ex.expectedPreferences).length === 0)
-    ) || [];
-    
+    // BUT: if client intent says it's a jobs search, don't use Q&A examples for command-like queries
+    const qaExamples = (normalizedIntent === "jobs" && isLikelySearchCommand)
+      ? []
+      : (trainingData.examples?.filter(ex =>
+          ex.expectedResponse && (!ex.expectedPreferences || Object.keys(ex.expectedPreferences).length === 0)
+        ) || []);
+
     if (qaExamples.length > 0) {
       // console.log(`[AI] 🔍 Checking ${qaExamples.length} training examples for Q&A match...`);
       
@@ -458,7 +505,7 @@ router.post("/job-recommendations", async (req, res) => {
       }
     }
 
-    if (isForceContact || isForceQA || isQAQuery(userQuery, trainingData)) {
+    if ((isForceContact || isForceQA || isQAQuery(userQuery, trainingData)) && !(normalizedIntent === "jobs" && isLikelySearchCommand)) {
       const queryType = isForceContact ? 'contact' : 'Q&A';
       console.log(`[AI] ✅ ${queryType} query detected (force: ${isForceContact || isForceQA}, training: ${isQAQuery(userQuery, trainingData)})`);
       
@@ -605,8 +652,8 @@ For job-related queries, please browse available jobs using the search filters.`
       return res.json({
         status: true,
         jobs: [],
-        courses: coursesFormatted,
-        message: allCourses?.length ? "No jobs found. Here are some courses you might like." : "No jobs or courses available",
+        courses: normalizedIntent === "jobs" ? [] : coursesFormatted,
+        message: "No jobs found",
         aiAnalysis: null,
       });
     }
@@ -735,6 +782,18 @@ For job-related queries, please browse available jobs using the search filters.`
       };
     }
 
+    // If query is "high salary", sort results by salary desc
+    const isHighSalaryQuery = queryLowerForMode.includes("high salary") || (queryLowerForMode.includes("salary") && queryLowerForMode.includes("high"));
+    if (isHighSalaryQuery) {
+      const salaryValue = (job) => {
+        if (!job) return 0;
+        if (job.isFixed) return Number(job.amount || 0);
+        // Prefer max if present, otherwise min
+        return Math.max(Number(job.max || 0), Number(job.min || 0));
+      };
+      rankedJobs = rankedJobs.slice().sort((a, b) => salaryValue(b) - salaryValue(a));
+    }
+
     // Step 7: Check if we need to show nearby jobs message
     let responseMessage = "Job recommendations generated successfully";
     const hasCityPreference = preferences.cityName || preferences.city;
@@ -770,7 +829,7 @@ For job-related queries, please browse available jobs using the search filters.`
     return res.json({
       status: true,
       jobs: rankedJobs.slice(0, 20), // Top 20 recommendations
-      courses: coursesForResponse,
+      courses: normalizedIntent === "jobs" ? [] : coursesForResponse,
       totalJobs: allJobs.length,
       aiAnalysis: aiAnalysis,
       message: responseMessage,

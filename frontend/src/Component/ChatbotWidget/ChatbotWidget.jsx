@@ -61,6 +61,8 @@ function ChatbotWidget({
   const [isTyping, setIsTyping] = useState(false);
   const [showJobConfirm, setShowJobConfirm] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [showCourseConfirm, setShowCourseConfirm] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const lastAiMessageRef = useRef(null);
@@ -599,11 +601,14 @@ function ChatbotWidget({
       };
 
       // Call AI API
+      const queryContext = detectQueryContext(userMessage);
+
       const response = await axios.post(
         `${backendUrl}/api/ai/job-recommendations`,
         {
           userQuery: userMessage,
           preferences: mergedPreferences,
+          intent: queryContext, // 'jobs' | 'courses' | 'both' (hint for backend)
           userProfile: {
             skills: [],
             experience: 0,
@@ -615,15 +620,40 @@ function ChatbotWidget({
         }
       );
 
-      // Check if it's a Q&A response (FAQ answer) - include courses so they show as cards when backend sends them
+      // Check if it's a Q&A response (FAQ answer) - filter based on context
       if (response.data.status && response.data.isQA && response.data.answer) {
-        const courses = response.data.courses || [];
+        let courses = response.data.courses || [];
+        let jobs = response.data.jobs || [];
+
+        const lowerAnswer = String(response.data.answer || '').toLowerCase();
+        const looksLikeCoursePromo =
+          lowerAnswer.includes('course') ||
+          lowerAnswer.includes('/courses') ||
+          lowerAnswer.includes('explore') ||
+          lowerAnswer.includes('training');
+        
+        // Filter based on context - if query is about jobs, don't show courses in QA response
+        if (queryContext === 'courses') {
+          jobs = [];
+          // Only show courses if query is about courses
+        } else if (queryContext === 'jobs') {
+          courses = [];
+          // Only show jobs if query is about jobs - don't show courses in QA response
+          // If no jobs in response but it's a jobs query, don't show courses
+          if (jobs.length === 0 && courses.length > 0) {
+            courses = []; // Don't show courses for jobs query
+          }
+        }
+        
         const newAiMessage = {
           role: 'assistant',
-          content: response.data.answer,
+          content:
+            queryContext === 'jobs' && looksLikeCoursePromo
+              ? `I can help you find jobs. Tell me your city/state + role (e.g., "Fresher Sales jobs in Delhi") and I’ll show relevant openings.`
+              : response.data.answer,
           isQA: true,
           query: userMessage,
-          jobs: [],
+          jobs: jobs,
           courses: courses,
           visibleCoursesCount: 3,
           timestamp: new Date(),
@@ -633,29 +663,67 @@ function ChatbotWidget({
         // Save AI message to database
         await saveChatMessage(newAiMessage);
       } else if (response.data.status && (Array.isArray(response.data.jobs) || Array.isArray(response.data.courses))) {
-        const jobs = response.data.jobs || [];
-        const courses = response.data.courses || [];
+        let jobs = response.data.jobs || [];
+        let courses = response.data.courses || [];
 
-        // Update jobs list in parent if callback provided
-        if (onJobsUpdate && jobs.length > 0) {
-          onJobsUpdate(jobs);
+        // Filter based on query context
+        if (queryContext === 'courses') {
+          jobs = [];
+          // Only update parent if courses are found
+          if (onJobsUpdate && courses.length > 0) {
+            onJobsUpdate(courses);
+          }
+        } else if (queryContext === 'jobs') {
+          courses = [];
+          // Update jobs list in parent if callback provided
+          if (onJobsUpdate && jobs.length > 0) {
+            onJobsUpdate(jobs);
+          }
+        } else {
+          // Both - update parent with jobs if available
+          if (onJobsUpdate && jobs.length > 0) {
+            onJobsUpdate(jobs);
+          }
         }
 
         // Format AI response with nearby jobs message if applicable
         let aiResponse = '';
-        if (jobs.length === 0 && courses.length > 0 && response.data.message) {
-          aiResponse = `📚 ${response.data.message}\n\nCheck out these courses below 👇`;
-        } else if (response.data.showNearbyMessage && response.data.requestedCity) {
-          aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
-          aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
-          aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!`;
-          if (courses.length > 0) aiResponse += ` & ${courses.length} course${courses.length !== 1 ? 's' : ''}`;
-          aiResponse += `\n\nCheck out these opportunities below 👇`;
+        if (queryContext === 'courses') {
+          if (courses.length > 0) {
+            aiResponse = `📚 Found ${courses.length} course${courses.length !== 1 ? 's' : ''} for you!\n\nCheck out these courses below 👇`;
+          } else {
+            aiResponse = `📚 No courses found matching your query. Try adjusting your search criteria.`;
+          }
+        } else if (queryContext === 'jobs') {
+          if (response.data.showNearbyMessage && response.data.requestedCity) {
+            aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
+            aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
+            aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!\n\nCheck out these opportunities below 👇`;
+          } else if (jobs.length > 0) {
+            aiResponse = `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} for you!\n\nCheck out the recommendations below 👇`;
+          } else {
+            aiResponse = `🎯 No jobs found matching your query. Try adjusting your search criteria.`;
+          }
         } else {
-          const parts = [];
-          if (jobs.length > 0) parts.push(`${jobs.length} job${jobs.length !== 1 ? 's' : ''}`);
-          if (courses.length > 0) parts.push(`${courses.length} course${courses.length !== 1 ? 's' : ''}`);
-          aiResponse = `🎯 Found ${parts.join(' & ')} for you!\n\nCheck out the recommendations below 👇`;
+          // Both contexts
+          if (jobs.length === 0 && courses.length > 0 && response.data.message) {
+            aiResponse = `📚 ${response.data.message}\n\nCheck out these courses below 👇`;
+          } else if (response.data.showNearbyMessage && response.data.requestedCity) {
+            aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
+            aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
+            aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!`;
+            if (courses.length > 0) aiResponse += ` & ${courses.length} course${courses.length !== 1 ? 's' : ''}`;
+            aiResponse += `\n\nCheck out these opportunities below 👇`;
+          } else {
+            const parts = [];
+            if (jobs.length > 0) parts.push(`${jobs.length} job${jobs.length !== 1 ? 's' : ''}`);
+            if (courses.length > 0) parts.push(`${courses.length} course${courses.length !== 1 ? 's' : ''}`);
+            if (parts.length > 0) {
+              aiResponse = `🎯 Found ${parts.join(' & ')} for you!\n\nCheck out the recommendations below 👇`;
+            } else {
+              aiResponse = `No jobs or courses found matching your query. Try adjusting your search criteria.`;
+            }
+          }
         }
 
         // Add AI response to chat
@@ -723,6 +791,42 @@ function ChatbotWidget({
         </React.Fragment>
       );
     });
+  };
+
+  /**
+   * Detect if query is about courses or jobs
+   * Returns: 'courses', 'jobs', or 'both'
+   */
+  const detectQueryContext = (query) => {
+    const lowerQuery = query.toLowerCase();
+    
+    // Course-related keywords
+    const courseKeywords = [
+      'course', 'courses', 'training', 'learn', 'learning', 'education', 
+      'certificate', 'certification', 'skill', 'skills', 'program', 'programme',
+      'study', 'studies', 'tutorial', 'tutorials', 'class', 'classes'
+    ];
+    
+    // Job-related keywords
+    const jobKeywords = [
+      'job', 'jobs', 'employment', 'work', 'career', 'hiring', 'recruitment',
+      'vacancy', 'vacancies', 'position', 'positions', 'opening', 'openings',
+      'apply', 'application', 'opportunity', 'opportunities', 'fresher', 'experience'
+    ];
+    
+    const hasCourseKeywords = courseKeywords.some(keyword => lowerQuery.includes(keyword));
+    const hasJobKeywords = jobKeywords.some(keyword => lowerQuery.includes(keyword));
+    
+    if (hasCourseKeywords && !hasJobKeywords) {
+      return 'courses';
+    } else if (hasJobKeywords && !hasCourseKeywords) {
+      return 'jobs';
+    } else if (hasCourseKeywords && hasJobKeywords) {
+      return 'both';
+    }
+    
+    // Default to 'both' if no clear context
+    return 'both';
   };
 
   /**
@@ -889,67 +993,54 @@ function ChatbotWidget({
         return;
       }
 
-      // If redirectToPortal is true, redirect to candidate portal
-      if (redirectToPortal) {
-        window.open(`/candidate/login?returnUrl=/candidate/job/${jobId}`, '_blank');
-        setShowJobConfirm(false);
-        setSelectedJob(null);
-        return;
-      }
-
-      // Otherwise, apply directly from chatbot
-      const mobile = userMobile || (userData?.mobile?.toString().replace(/\D/g, '').slice(0, 10));
+      const returnUrl = `/candidate/job/${jobId}`;
+      window.open(`/candidate/login?returnUrl=${encodeURIComponent(returnUrl)}`, '_blank');
       
-      if (!mobile || mobile.length !== 10) {
-        alert('Please provide your mobile number first to apply for jobs.');
-        setShowJobConfirm(false);
-        setSelectedJob(null);
-        return;
-      }
-
-      // Apply job directly from chatbot
-      try {
-        const response = await axios.post(
-          `${backendUrl}/applyjob/${jobId}`,
-          { mobile: mobile.trim() },
-          {
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
-
-        if (response.data.status) {
-          // Show success message in chat
-          const successMessage = {
-            role: 'assistant',
-            content: `✅ Successfully applied to "${selectedJob.title || selectedJob.name}"! We'll notify you about the next steps.`,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, successMessage]);
-          await saveChatMessage(successMessage);
-        } else {
-          throw new Error(response.data.msg || 'Application failed');
-        }
-      } catch (error) {
-        const errorMsg = error.response?.data?.msg || error.message || 'Failed to apply. Please try again.';
-        const errorMessage = {
-          role: 'assistant',
-          content: `❌ ${errorMsg}`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-        await saveChatMessage(errorMessage);
-      }
+      setShowJobConfirm(false);
+      setSelectedJob(null);
     }
+  };
+
+
+  const handleJobConfirmNo = () => {
     setShowJobConfirm(false);
     setSelectedJob(null);
   };
 
+
+  const handleCourseClick = (course) => {
+    setSelectedCourse(course);
+    setShowCourseConfirm(true);
+  };
+
   /**
-   * Handle job confirmation - No
+   * Handle course confirmation - Yes
    */
-  const handleJobConfirmNo = () => {
-    setShowJobConfirm(false);
-    setSelectedJob(null);
+  const handleCourseConfirmYes = () => {
+    if (selectedCourse) {
+      const courseId = selectedCourse._id || selectedCourse.id;
+      if (!courseId) {
+        console.error('Course ID not found:', selectedCourse);
+        alert('Error: Course ID not found. Please try again.');
+        setShowCourseConfirm(false);
+        setSelectedCourse(null);
+        return;
+      }
+
+      const returnUrl = `/coursedetails/${courseId}`;
+      window.open(`/candidate/login?returnUrl=${encodeURIComponent(returnUrl)}`, '_blank');
+      
+      setShowCourseConfirm(false);
+      setSelectedCourse(null);
+    }
+  };
+
+  /**
+   * Handle course confirmation - No
+   */
+  const handleCourseConfirmNo = () => {
+    setShowCourseConfirm(false);
+    setSelectedCourse(null);
   };
 
   /**
@@ -1077,13 +1168,12 @@ function ChatbotWidget({
   };
 
   /**
-   * Quick action buttons
+   * Quick action buttons - Simplified
    */
   const quickActions = [
-    { text: 'Fresher Jobs', query: 'Show me fresher jobs' },
-    { text: 'Remote Jobs', query: 'Find remote work opportunities' },
-    { text: 'High Salary', query: 'Show me high salary jobs' },
-    { text: 'IT Jobs', query: 'Find IT sector jobs' },
+    { text: 'Jobs', query: 'jobs', context: 'jobs' },
+    { text: 'Courses', query: 'courses', context: 'courses' },
+    { text: 'High Salary', query: 'high salary jobs', context: 'jobs' },
   ];
 
   const handleQuickAction = async (query) => {
@@ -1117,11 +1207,14 @@ function ChatbotWidget({
         minSalary: jobPreferences?.minSalary || preferences.minSalary,
       };
 
+      const queryContext = detectQueryContext(query);
+
       const response = await axios.post(
         `${backendUrl}/api/ai/job-recommendations`,
         {
           userQuery: query,
           preferences: mergedPreferences,
+          intent: queryContext, // hint for backend
           userProfile: {
             skills: [],
             experience: 0,
@@ -1133,15 +1226,40 @@ function ChatbotWidget({
         }
       );
 
-      // Check if it's a Q&A response (FAQ answer) - include courses for card display
+      // Check if it's a Q&A response (FAQ answer) - filter based on context
       if (response.data.status && response.data.isQA && response.data.answer) {
-        const courses = response.data.courses || [];
+        let courses = response.data.courses || [];
+        let jobs = response.data.jobs || [];
+
+        const lowerAnswer = String(response.data.answer || '').toLowerCase();
+        const looksLikeCoursePromo =
+          lowerAnswer.includes('course') ||
+          lowerAnswer.includes('/courses') ||
+          lowerAnswer.includes('explore') ||
+          lowerAnswer.includes('training');
+        
+        // Filter based on context - if query is about jobs, don't show courses in QA response
+        if (queryContext === 'courses') {
+          jobs = [];
+          // Only show courses if query is about courses
+        } else if (queryContext === 'jobs') {
+          courses = [];
+          // Only show jobs if query is about jobs - don't show courses in QA response
+          // If no jobs in response but it's a jobs query, don't show courses
+          if (jobs.length === 0 && courses.length > 0) {
+            courses = []; // Don't show courses for jobs query
+          }
+        }
+        
         const newAiMessage = {
           role: 'assistant',
-          content: response.data.answer,
+          content:
+            queryContext === 'jobs' && looksLikeCoursePromo
+              ? `I can help you find jobs. Tell me your city/state + role (e.g., "Fresher Data Entry jobs in Punjab") and I’ll show relevant openings.`
+              : response.data.answer,
           isQA: true,
           query: query,
-          jobs: [],
+          jobs: jobs,
           courses: courses,
           visibleCoursesCount: 3,
           timestamp: new Date(),
@@ -1149,27 +1267,77 @@ function ChatbotWidget({
         setMessages((prev) => [...prev, newAiMessage]);
         await saveChatMessage(newAiMessage);
       } else if (response.data.status && (Array.isArray(response.data.jobs) || Array.isArray(response.data.courses))) {
-        const jobs = response.data.jobs || [];
-        const courses = response.data.courses || [];
+        let jobs = response.data.jobs || [];
+        let courses = response.data.courses || [];
 
-        if (onJobsUpdate && jobs.length > 0) {
-          onJobsUpdate(jobs);
+        // Filter based on query context
+        if (queryContext === 'courses') {
+          jobs = [];
+          // Only update parent if courses are found
+          if (onJobsUpdate && courses.length > 0) {
+            onJobsUpdate(courses);
+          }
+        } else if (queryContext === 'jobs') {
+          courses = [];
+          // Update jobs list in parent if callback provided
+          if (onJobsUpdate && jobs.length > 0) {
+            onJobsUpdate(jobs);
+          }
+        } else {
+          // Both - update parent with jobs if available
+          if (onJobsUpdate && jobs.length > 0) {
+            onJobsUpdate(jobs);
+          }
+        }
+
+        // Safeguard: for "high salary" quick search, always sort by salary desc client-side
+        const isHighSalary = String(query || '').toLowerCase().includes('high salary');
+        if (isHighSalary && jobs.length > 1) {
+          const salaryValue = (job) => {
+            if (!job) return 0;
+            if (job.isFixed) return Number(job.amount || 0);
+            return Math.max(Number(job.max || 0), Number(job.min || 0));
+          };
+          jobs = jobs.slice().sort((a, b) => salaryValue(b) - salaryValue(a));
         }
 
         let aiResponse = '';
-        if (jobs.length === 0 && courses.length > 0 && response.data.message) {
-          aiResponse = `📚 ${response.data.message}\n\nCheck out these courses below 👇`;
-        } else if (response.data.showNearbyMessage && response.data.requestedCity) {
-          aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
-          aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
-          aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!`;
-          if (courses.length > 0) aiResponse += ` & ${courses.length} course${courses.length !== 1 ? 's' : ''}`;
-          aiResponse += `\n\nCheck out these opportunities below 👇`;
+        if (queryContext === 'courses') {
+          if (courses.length > 0) {
+            aiResponse = `📚 Found ${courses.length} course${courses.length !== 1 ? 's' : ''} for you!\n\nCheck out these courses below 👇`;
+          } else {
+            aiResponse = `📚 No courses found matching your query. Try adjusting your search criteria.`;
+          }
+        } else if (queryContext === 'jobs') {
+          if (response.data.showNearbyMessage && response.data.requestedCity) {
+            aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
+            aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
+            aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!\n\nCheck out these opportunities below 👇`;
+          } else if (jobs.length > 0) {
+            aiResponse = `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} for you!\n\nCheck out the recommendations below 👇`;
+          } else {
+            aiResponse = `🎯 No jobs found matching your query. Try adjusting your search criteria.`;
+          }
         } else {
-          const parts = [];
-          if (jobs.length > 0) parts.push(`${jobs.length} job${jobs.length !== 1 ? 's' : ''}`);
-          if (courses.length > 0) parts.push(`${courses.length} course${courses.length !== 1 ? 's' : ''}`);
-          aiResponse = `🎯 Found ${parts.join(' & ')} for you!\n\nCheck out the recommendations below 👇`;
+          // Both contexts
+          if (jobs.length === 0 && courses.length > 0 && response.data.message) {
+            aiResponse = `📚 ${response.data.message}\n\nCheck out these courses below 👇`;
+          } else if (response.data.showNearbyMessage && response.data.requestedCity) {
+            aiResponse = `📍 No jobs found in ${response.data.requestedCity}.\n\n`;
+            aiResponse += `Showing nearby jobs in ${response.data.actualLocation || 'the same state'}:\n\n`;
+            aiResponse += `🎯 Found ${jobs.length} job${jobs.length !== 1 ? 's' : ''} nearby!`;
+            if (courses.length > 0) aiResponse += ` & ${courses.length} course${courses.length !== 1 ? 's' : ''}`;
+            aiResponse += `\n\nCheck out these opportunities below 👇`;
+          } else {
+            const parts = [];
+            if (jobs.length > 0) parts.push(`${jobs.length} job${jobs.length !== 1 ? 's' : ''}`);
+            if (courses.length > 0) parts.push(`${courses.length} course${courses.length !== 1 ? 's' : ''}`);
+            if (parts.length > 0) {
+              aiResponse = `🎯 Found ${parts.join(' & ')} for you!\n\nCheck out the recommendations below 👇`;
+            } else {
+              aiResponse = `No jobs or courses found matching your query. Try adjusting your search criteria.`;
+            }
+          }
         }
 
         const newAiMessage = {
@@ -1404,6 +1572,7 @@ function ChatbotWidget({
               className="btn btn-sm btn-outline-primary"
               onClick={() => handleQuickAction(action.query)}
               disabled={isLoading}
+              title={action.context === 'courses' ? 'Search courses' : action.context === 'jobs' ? 'Search jobs' : 'Search'}
             >
               {action.text}
             </button>
@@ -1508,13 +1677,17 @@ function ChatbotWidget({
                   <div className="course-cards-preview mt-2">
                     <div className="row g-2 mt-2">
                       {message.courses.slice(0, message.visibleCoursesCount || 3).map((course) => {
-                        const courseUrl = `/coursedetails/${course._id}`;
                         const thumbUrl = course.thumbnail && process.env.REACT_APP_MIPIE_BUCKET_URL
                           ? (course.thumbnail.startsWith('http') ? course.thumbnail : `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${course.thumbnail}`)
                           : null;
+                        
                         return (
                           <div key={course._id} className="col-12">
-                            <a href={courseUrl} target="_blank" rel="noopener noreferrer" className="course-card-mini text-decoration-none text-dark">
+                            <div 
+                              onClick={() => handleCourseClick(course)}
+                              className="course-card-mini text-decoration-none text-dark"
+                              style={{ cursor: 'pointer' }}
+                            >
                               {thumbUrl && <img src={thumbUrl} alt="" className="course-card-mini-thumb" onError={(e) => { e.target.style.display = 'none'; }} />}
                               <div className="course-card-mini-body">
                                 <h6 className="course-title-mini">{course.name}</h6>
@@ -1529,7 +1702,7 @@ function ChatbotWidget({
                                   <p className="course-meta-mini mb-0 small text-muted">{course.sectorNames.join(', ')}</p>
                                 )}
                               </div>
-                            </a>
+                            </div>
                           </div>
                         );
                       })}
@@ -1620,6 +1793,47 @@ function ChatbotWidget({
               <button
                 className="btn btn-secondary"
                 onClick={handleJobConfirmNo}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Application Confirmation Modal - Inside Chatbot */}
+      {showCourseConfirm && selectedCourse && (
+        <div className="job-confirm-overlay-inner" onClick={handleCourseConfirmNo}>
+          <div className="job-confirm-modal-inner" onClick={(e) => e.stopPropagation()}>
+            <div className="job-confirm-header">
+              <h5>View this course?</h5>
+            </div>
+            <div className="job-confirm-body">
+              <p className="mb-2">
+                <strong>{selectedCourse.name || 'N/A'}</strong>
+              </p>
+              {selectedCourse.duration && (
+                <p className="text-muted small mb-1">
+                  ⏱️ {selectedCourse.duration}
+                </p>
+              )}
+              {(selectedCourse.city || selectedCourse.state) && (
+                <p className="text-muted small mb-3">
+                  📍 {[selectedCourse.city, selectedCourse.state].filter(Boolean).join(', ')}
+                </p>
+              )}
+              <p>Do you want to view this course?</p>
+            </div>
+            <div className="job-confirm-actions">
+              <button
+                className="btn btn-primary"
+                onClick={handleCourseConfirmYes}
+              >
+                Yes
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleCourseConfirmNo}
               >
                 No
               </button>
