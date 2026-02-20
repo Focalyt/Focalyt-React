@@ -134,6 +134,7 @@ import ReEnquire from './Pages/App/College/Course/ReEnquire';
 import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
 import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
+import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -301,6 +302,7 @@ const Layout = () => {
           <Route path='trainerManagement' element={<TrainerManagement/>}/>
           <Route path='whatsappChat' element={<WhatsappChat/>}/>
           <Route path='whatsappWallet' element={<WhatsappWallet/>}/>
+          <Route path='emailTemplate' element={<EmailTemplate/>}/>
         </Route>
 
         {/* company  */}
