@@ -1602,6 +1602,14 @@ const CandidateViewJobs = () => {
   const videoRef = useRef(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+
+  useEffect(() => {
+    const refCode = searchParams.get('refCode');
+    if (refCode) {
+      localStorage.setItem('refCode', refCode);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (JobId) {
       fetchJobDetails();
@@ -1797,7 +1805,10 @@ const CandidateViewJobs = () => {
 
   const applyJob = async () => {
     try {
-      const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, {}, {
+      const refCode = localStorage.getItem('refCode');
+      const requestBody = refCode ? { refCode } : {};
+      
+      const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, requestBody, {
         headers: {
           'x-auth': localStorage.getItem('token')
         }
@@ -2019,7 +2030,10 @@ const CandidateViewJobs = () => {
       });
 
 
-      const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, {}, {
+      const refCode = localStorage.getItem('refCode');
+      const requestBody = refCode ? { refCode } : {};
+      
+      const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, requestBody, {
         headers: {
           'x-auth': localStorage.getItem('token')
         }

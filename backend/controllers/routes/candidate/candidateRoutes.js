@@ -1,4 +1,4 @@
-// const ObjectId = require("mongodb").ObjectId;
+
 const mongoose = require('mongoose');
 const bcrypt = require("bcryptjs");
 const express = require("express");
@@ -54,6 +54,7 @@ const {
   Company,
   VideoData,
   Referral,
+  ReferralShareOffer,
   Contact,
   LoanEnquiry,
   Review,
@@ -306,7 +307,8 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     const validation = { mobile: req.user.mobile };
    
-
+    // ✅ Accept refCode from request body or query (for old candidates)
+    const refCode = req.body?.refCode || req.query?.refCode;
 
     let selectedCenter = req.body.selectedCenter;
     if (!selectedCenter) {
@@ -343,6 +345,21 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     if (!candidate) {
       return res.status(404).json({ status: false, msg: "Candidate not found." });
+    }
+
+    // ✅ Handle refCode for old candidates (if referredBy not set)
+    let referrerId = candidate?.referredBy;
+    if (!referrerId && refCode && mongoose.Types.ObjectId.isValid(refCode)) {
+      const refCodeObjectId = new mongoose.Types.ObjectId(refCode);
+      if (refCodeObjectId.toString() === candidate._id.toString()) {
+        referrerId = null;
+      } else {
+        const referrerCandidate = await Candidate.findOne({ _id: refCodeObjectId, status: true, isDeleted: false }).lean();
+        if (referrerCandidate && referrerCandidate._id.toString() !== candidate._id.toString()) {
+          referrerId = refCodeObjectId;
+          await Candidate.findByIdAndUpdate(candidate._id, { referredBy: referrerId }, { new: true });
+        }
+      }
     }
 
     const alreadyApplied = await AppliedCourses.findOne({ _candidate: candidate._id, _course: courseId }).lean();
@@ -394,6 +411,53 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
 
     const appliedData = await new AppliedCourses(data).save();
+
+
+    // ✅ Use referrerId (from referredBy or refCode)
+    if (referrerId) {
+      const offer = await ReferralShareOffer.findOne({ offerType: "COURSE", isActive: true }).sort({ createdAt: -1 }).lean();
+      if (offer) {
+        const referrerReward = Number(offer.referrerAmount ?? offer.amount ?? 0);
+        const referredReward = Number(offer.referredAmount ?? 0);
+        const commentKey = `refApply:COURSE:${courseId}:${candidate._id}`;
+
+        if (Number.isFinite(referrerReward) && referrerReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: referrerId,
+            eventName: candidateCashbackEventName.referrer_course_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: referrerId,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referrer_course_apply,
+              amount: referrerReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+
+        if (Number.isFinite(referredReward) && referredReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: candidate._id,
+            eventName: candidateCashbackEventName.referee_course_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: candidate._id,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referee_course_apply,
+              amount: referredReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+      }
+    }
 
 
     // Capitalize every word's first letter
@@ -1889,36 +1953,83 @@ router.get("/learn", isCandidate, async (req, res) => {
     console.log("caught error ", err);
   }
 });
+
+router.get("/getCandidateId", isCandidate, async (req, res) => {
+  try {
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, error: "Invalid mobile number" });
+    }
+    
+    const candidate = await Candidate.findOne({ 
+      mobile: value.mobile,
+      status: true,
+      isDeleted: false
+    }).select('_id name mobile').lean();
+    
+    if (!candidate) {
+      return res.status(404).json({ status: false, error: "Candidate not found" });
+    }
+    
+    return res.json({ 
+      status: true, 
+      candidateId: candidate._id.toString(),
+      candidate: {
+        _id: candidate._id,
+        name: candidate.name,
+        mobile: candidate.mobile
+      }
+    });
+  } catch (err) {
+    console.error("Error getting candidate ID:", err);
+    return res.status(500).json({ status: false, error: "Internal server error" });
+  }
+});
+
 router
   .route("/myprofile")
   .get(isCandidate, async (req, res) => {
     try {
-
-      console.log(req.user)
-
       let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
         return res.send({ status: "failure", error: "Something went wrong!", error });
       }
-      const candidate = await Candidate.findOne({
-        mobile: value.mobile,
-      }).populate([
-        { path: "experiences.Company_State", select: ["name", "stateId"] },
-        {
-          path: "experiences.Company_City",
-          select: ["name", "stateId", "cityId"],
-        },
-        { path: "experiences.Industry_Name", select: ["name"] },
-        { path: "experiences.SubIndustry_Name", select: ["name"] },
-        { path: "state", select: ["name", "stateId"] },
-        { path: "locationPreferences.state", select: ["name", "stateId"] },
-        {
-          path: "locationPreferences.city",
-          select: ["name", "stateId", "cityId"],
-        },
-      ]);
+
+      let candidate;
+      try {
+        candidate = await Candidate.findOne({
+          mobile: value.mobile,
+        }).populate([
+          { path: "experiences.Company_State", select: ["name", "stateId"] },
+          {
+            path: "experiences.Company_City",
+            select: ["name", "stateId", "cityId"],
+          },
+          { path: "experiences.Industry_Name", select: ["name"] },
+          { path: "experiences.SubIndustry_Name", select: ["name"] },
+          { path: "state", select: ["name", "stateId"] },
+          { path: "locationPreferences.state", select: ["name", "stateId"] },
+          {
+            path: "locationPreferences.city",
+            select: ["name", "stateId", "cityId"],
+          },
+        ]);
+      } catch (populateError) {
+        // If populate fails, get candidate without problematic populates
+        candidate = await Candidate.findOne({
+          mobile: value.mobile,
+        }).populate([
+          { path: "state", select: ["name", "stateId"] },
+          { path: "locationPreferences.state", select: ["name", "stateId"] },
+          {
+            path: "locationPreferences.city",
+            select: ["name", "stateId", "cityId"],
+          },
+        ]);
+      }
       const isProfileCompleted = candidate.isProfileCompleted;
       const isVideoCompleted = candidate.profilevideo
       const cashback = await CashBackLogic.findOne({})
@@ -2284,7 +2395,6 @@ async function getUploadedURL() {
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   let jobId = req.params.jobId;
-  console.log('jobId', jobId)
   let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
@@ -2292,12 +2402,39 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     return res.send({ status: "failure", error: "Something went wrong!", error });
   }
   let candidateMobile = value.mobile;
+  
+  const refCode = req.body?.refCode || req.query?.refCode;
+  
   let vacancy = await Vacancy.findOne({ _id: jobId });
   if (!vacancy) {
     return res.send({ status: false, msg: "Vacancy not Found!" });
   }
   let candidate = await Candidate.findOne({ mobile: candidateMobile })
+  
+  if (!candidate) {
+    return res.send({ status: false, msg: "Candidate not found!" });
+  }
 
+  let referrerId = candidate?.referredBy;
+  
+  if (!referrerId && refCode && mongoose.Types.ObjectId.isValid(refCode)) {
+    const refCodeObjectId = new mongoose.Types.ObjectId(refCode);
+    
+    if (refCodeObjectId.toString() === candidate._id.toString()) {
+      referrerId = null;
+    } else {
+      const referrerCandidate = await Candidate.findOne({ 
+        _id: refCodeObjectId, 
+        status: true, 
+        isDeleted: false 
+      }).lean();
+      
+      if (referrerCandidate && referrerCandidate._id.toString() !== candidate._id.toString()) {
+        referrerId = refCodeObjectId;
+        await Candidate.findByIdAndUpdate(candidate._id, { referredBy: referrerId }, { new: true });
+      }
+    }
+  }
 
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
     // console.log("Already Applied")
@@ -2337,6 +2474,52 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     // data["coinsDeducted"] = coinsDeducted
    
     const appliedData = await AppliedJobs.create(data);
+
+
+    if (referrerId) {
+      const offer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).sort({ createdAt: -1 }).lean();
+      if (offer) {
+        const referrerReward = Number(offer.referrerAmount ?? offer.amount ?? 0);
+        const referredReward = Number(offer.referredAmount ?? 0);
+        const commentKey = `refApply:JOB:${jobId}:${candidate._id}`;
+
+        if (Number.isFinite(referrerReward) && referrerReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: referrerId,
+            eventName: candidateCashbackEventName.referrer_job_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: referrerId,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referrer_job_apply,
+              amount: referrerReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+
+        if (Number.isFinite(referredReward) && referredReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: candidate._id,
+            eventName: candidateCashbackEventName.referee_job_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: candidate._id,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referee_job_apply,
+              amount: referredReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+      }
+    }
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
 
@@ -5958,14 +6141,96 @@ router.get('/approvedRewardClaims', [isCandidate], async (req, res) => {
         deliveryDays: deliveryDays,
         claimedAt: claim.claimedAt,
         createdAt: claim.createdAt,
-        achievementImage: claim.achievementImage || null
+        achievementImage: claim.achievementImage || null,
+        achievementType: 'reward_claim' 
       };
+    });
+
+    const referralEventNames = [
+      candidateCashbackEventName.referrer_job_apply,
+      candidateCashbackEventName.referee_job_apply,
+      candidateCashbackEventName.referrer_course_apply,
+      candidateCashbackEventName.referee_course_apply,
+    ];
+
+    const referralCashbacks = await CandidateCashBack.find({
+      candidateId: candidate._id,
+      eventName: { $in: referralEventNames }
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const referralAchievements = referralCashbacks.map(cashback => {
+      const isReferrer = cashback.eventName.includes('referrer_');
+      const isJob = cashback.eventName.includes('job_apply');
+      const isCourse = cashback.eventName.includes('course_apply');
+      
+      let itemId = null;
+      let itemType = '';
+      if (cashback.comment) {
+        const parts = cashback.comment.split(':');
+        if (parts.length >= 3) {
+          itemType = parts[1] || '';
+          itemId = parts[2] || null;
+        }
+      }
+
+      let rewardTitle = '';
+      let rewardDescription = '';
+      
+      if (isReferrer) {
+        if (isJob) {
+          rewardTitle = 'Job Referral Success';
+          rewardDescription = `You successfully referred someone for a job and earned ₹${cashback.amount}`;
+        } else if (isCourse) {
+          rewardTitle = 'Course Referral Success';
+          rewardDescription = `You successfully referred someone for a course and earned ₹${cashback.amount}`;
+        }
+      } else {
+        if (isJob) {
+          rewardTitle = 'Job Application Reward';
+          rewardDescription = `You applied for a job through referral and earned ₹${cashback.amount}`;
+        } else if (isCourse) {
+          rewardTitle = 'Course Application Reward';
+          rewardDescription = `You applied for a course through referral and earned ₹${cashback.amount}`;
+        }
+      }
+
+      return {
+        _id: cashback._id,
+        rewardTitle: rewardTitle,
+        rewardDescription: rewardDescription,
+        rewardType: 'money',
+        milestone: isReferrer ? 'Referral Achievement' : 'Application Reward',
+        status: cashback.isPending ? 'pending' : 'approved',
+        approvedAt: cashback.isPending ? null : cashback.updatedAt,
+        rejectedAt: null,
+        disbursedAt: null,
+        adminRemarks: null,
+        deliveryMessage: 'Reward will be transferred within 3 working days',
+        deliveryDays: 3,
+        claimedAt: null,
+        createdAt: cashback.createdAt,
+        achievementImage: null,
+        achievementType: 'referral', 
+        referralType: isReferrer ? 'referrer' : 'referee',
+        referralItemType: itemType.toLowerCase(), 
+        amount: cashback.amount,
+        isPending: cashback.isPending
+      };
+    });
+
+ 
+    const allAchievements = [...formattedClaims, ...referralAchievements].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA; 
     });
 
     return res.status(200).json({
       success: true,
       message: 'Approved reward claims fetched successfully',
-      data: formattedClaims
+      data: allAchievements
     });
   } catch (err) {
     console.error('Error fetching approved reward claims:', err);

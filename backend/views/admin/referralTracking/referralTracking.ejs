@@ -1,0 +1,470 @@
+<% include ../partials/header %>
+
+<style>
+  /* Referral Tracking UI polish (scoped via .rtm-*) */
+  .rtm-wrap { --rtm-border:#e5e7eb; --rtm-muted:#6b7280; --rtm-bg:#f8fafc; --rtm-text:#0f172a; }
+  .rtm-wrap .card { border: 1px solid var(--rtm-border); border-radius: 14px; box-shadow: 0 10px 22px rgba(15,23,42,.06); }
+  .rtm-wrap .rtm-header-title { letter-spacing: .2px; }
+
+  /* Stats */
+  .rtm-stats { margin: 6px 0 18px; }
+  .rtm-stat-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 18px 38px rgba(15,23,42,.10);
+    transform: translateY(0);
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  }
+  .rtm-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 22px 46px rgba(15,23,42,.14);
+    filter: saturate(1.05);
+  }
+  .rtm-stat-card::after {
+    content:"";
+    position:absolute;
+    inset:-48px -48px auto auto;
+    width:190px;
+    height:190px;
+    background:rgba(255,255,255,.16);
+    transform: rotate(25deg);
+    border-radius: 28px;
+  }
+  .rtm-stat-card::before {
+    content:"";
+    position:absolute;
+    left:-60px;
+    bottom:-80px;
+    width:200px;
+    height:200px;
+    background:rgba(255,255,255,.10);
+    border-radius: 999px;
+    filter: blur(1px);
+  }
+  .rtm-stat-body {
+    padding: 18px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height: 98px;
+  }
+  .rtm-stat-label { font-size: 12px; font-weight: 800; opacity: .92; margin: 0; letter-spacing: .04em; text-transform: uppercase; }
+  .rtm-stat-value { font-size: 34px; font-weight: 900; margin: 2px 0 0; line-height: 1; letter-spacing: -.02em; }
+  .rtm-stat-sub { font-size: 12px; opacity: .9; margin-top: 8px; display:flex; align-items:center; gap: 6px; }
+  .rtm-stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(255,255,255,.22);
+    border: 1px solid rgba(255,255,255,.22);
+    backdrop-filter: blur(6px);
+  }
+  .rtm-stat-icon i { font-size: 18px; color: #fff; }
+
+  .rtm-filters { background: var(--rtm-bg); border: 1px solid var(--rtm-border); border-radius: 14px; padding: 14px; }
+  .rtm-filters label { font-size: 12px; font-weight: 700; color: var(--rtm-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .rtm-filters .form-control { border-radius: 12px; border: 1px solid #dbe2ea; box-shadow: none; height: 40px; }
+  .rtm-filters .btn { border-radius: 12px; height: 40px; padding: 0 14px; font-weight: 700; display:inline-flex; align-items:center; justify-content:center; line-height: 1; }
+  .rtm-actions { display:flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .rtm-actions .btn { border-radius: 10px; font-weight: 700; display:inline-flex; align-items:center; justify-content:center; line-height: 1; }
+  .rtm-actions .rtm-subtle { display:inline-flex; align-items:center; height: 32px; padding: 0 6px; }
+
+  .rtm-table { border: 1px solid var(--rtm-border); border-radius: 14px; overflow: hidden; }
+  .rtm-table thead th { background: #f1f5f9; color: #334155; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--rtm-border) !important; white-space: nowrap; }
+  .rtm-table td { vertical-align: top; padding-top: 14px !important; padding-bottom: 14px !important; }
+  .rtm-table tbody tr:hover { background: #fbfdff; }
+  .rtm-subtle { color: var(--rtm-muted); font-size: 12px; }
+  .rtm-status { border-radius: 999px; padding: 6px 10px; font-weight: 800; font-size: 11px; text-transform: capitalize; }
+  .rtm-status--pending { background:#fff7ed; color:#9a3412; }
+  .rtm-status--approved { background:#dcfce7; color:#166534; }
+
+  .rtm-empty { padding: 28px; text-align:center; color: var(--rtm-muted); }
+  .rtm-empty h5 { color: var(--rtm-text); margin-bottom: 6px; }
+
+  @media (max-width: 575px) {
+    .rtm-stat-body { min-height: 78px; }
+    .rtm-stat-value { font-size: 28px; }
+    .rtm-stat-body { padding: 16px 16px; }
+  }
+</style>
+
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-12 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-9">
+        <h3 class="content-header-title float-left mb-0 rtm-header-title">Referral Tracking</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+            <li class="breadcrumb-item active">Referral Tracking</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="content-body">
+  <% include ../partials/flash %>
+
+  <section class="list-view">
+    <div class="row">
+      <div class="col-12 rounded equal-height-2 coloumn-2 rtm-wrap">
+        <div class="card">
+          <!-- Statistics Cards -->
+          <div class="row rtm-stats">
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="rtm-stat-card" style="background: linear-gradient(135deg,#3b82f6,#60a5fa); color:#fff;">
+                <div class="rtm-stat-body">
+                  <div>
+                    <p class="rtm-stat-label">Total Transactions</p>
+                    <p class="rtm-stat-value"><%= summary.totalTransactions || 0 %></p>
+                    <div class="rtm-stat-sub"><i class="feather icon-activity"></i> Overall referrals</div>
+                  </div>
+                  <div class="rtm-stat-icon"><i class="feather icon-handshake"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="rtm-stat-card" style="background: linear-gradient(135deg,#f59e0b,#fb7185); color:#fff;">
+                <div class="rtm-stat-body">
+                  <div>
+                    <p class="rtm-stat-label">Pending</p>
+                    <p class="rtm-stat-value"><%= summary.pending || 0 %></p>
+                    <div class="rtm-stat-sub"><i class="feather icon-clock"></i> Needs review</div>
+                  </div>
+                  <div class="rtm-stat-icon"><i class="feather icon-clock"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="rtm-stat-card" style="background: linear-gradient(135deg,#22c55e,#10b981); color:#fff;">
+                <div class="rtm-stat-body">
+                  <div>
+                    <p class="rtm-stat-label">Approved</p>
+                    <p class="rtm-stat-value"><%= summary.approved || 0 %></p>
+                    <div class="rtm-stat-sub"><i class="feather icon-check-circle"></i> Verified</div>
+                  </div>
+                  <div class="rtm-stat-icon"><i class="feather icon-check-circle"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
+              <div class="rtm-stat-card" style="background: linear-gradient(135deg,#8b5cf6,#a78bfa); color:#fff;">
+                <div class="rtm-stat-body">
+                  <div>
+                    <p class="rtm-stat-label">Total Rewards</p>
+                    <p class="rtm-stat-value">₹<%= summary.totalRewardsPaid || 0 %></p>
+                    <div class="rtm-stat-sub"><i class="feather icon-dollar-sign"></i> Amount paid</div>
+                  </div>
+                  <div class="rtm-stat-icon"><i class="feather icon-dollar-sign"></i></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="card-content">
+            <div class="row mb-2">
+              <div class="col-xl-12 col-lg-12">
+                <form method="GET" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/referralTracking" class="row rtm-filters">
+                  <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 col-12 mt-1">
+                    <label>Type</label>
+                    <select name="type" class="form-control">
+                      <option value="">All</option>
+                      <option value="JOB" <%= filters.type === 'JOB' ? 'selected' : '' %>>Job</option>
+                      <option value="COURSE" <%= filters.type === 'COURSE' ? 'selected' : '' %>>Course</option>
+                    </select>
+                  </div>
+                  <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 col-12 mt-1">
+                    <label>From</label>
+                    <input type="date" name="from" class="form-control" value="<%= filters.from %>">
+                  </div>
+                  <div class="col-xl-2 col-lg-2 col-md-6 col-sm-6 col-12 mt-1">
+                    <label>To</label>
+                    <input type="date" name="to" class="form-control" value="<%= filters.to %>">
+                  </div>
+                  <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
+                    <label>Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Name / Mobile..." value="<%= filters.search %>">
+                  </div>
+                  <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1 d-flex align-items-end justify-content-end">
+                    <div class="rtm-actions">
+                      <button class="btn btn-success waves-effect waves-light text-white" type="submit">
+                        <i class="feather icon-filter mr-50"></i> Filter
+                      </button>
+                      <a class="btn btn-outline-danger waves-effect waves-light" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/referralTracking">
+                        <i class="feather icon-refresh-ccw mr-50"></i> Reset
+                      </a>
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/referAmount" class="btn btn-outline-primary waves-effect waves-light">
+                        <i class="feather icon-settings mr-50"></i> Offers
+                      </a>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Transactions Table -->
+            <div class="table-responsive rtm-table">
+              <table class="table mb-0">
+                <thead>
+                  <tr>
+                    <th style="width:40px;">#</th>
+                    <th>Referrer (Shared By)</th>
+                    <th>Referred (Applied By)</th>
+                    <th>Type</th>
+                    <th>Referrer Reward</th>
+                    <th>Referred Reward</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% if (transactions && transactions.length > 0) { %>
+                    <% transactions.forEach((txn, idx) => { %>
+                      <tr>
+                        <td><%= (page - 1) * perPage + idx + 1 %></td>
+                        <td>
+                          <% if (txn.referrerId) { %>
+                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%= txn.referrerId %>" target="_blank">
+                              <strong><%= txn.referrer.name || 'N/A' %></strong>
+                            </a>
+                            <br><small class="rtm-subtle"><%= txn.referrer.mobile || '' %></small>
+                          <% } else { %>
+                            <span class="rtm-subtle">N/A</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <% if (txn.refereeId) { %>
+                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%= txn.refereeId %>" target="_blank">
+                              <strong><%= txn.referee.name || 'N/A' %></strong>
+                            </a>
+                            <br><small class="rtm-subtle"><%= txn.referee.mobile || '' %></small>
+                          <% } else { %>
+                            <span class="rtm-subtle">N/A</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <% if (txn.offerType === 'JOB') { %>
+                            <span class="badge badge-primary">JOB</span>
+                          <% } else if (txn.offerType === 'COURSE') { %>
+                            <span class="badge badge-info">COURSE</span>
+                          <% } else { %>
+                            <span class="badge badge-secondary"><%= txn.offerType %></span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <span class="text-success font-weight-bold">₹<%= txn.referrerAmount %></span>
+                        </td>
+                        <td>
+                          <span class="text-success font-weight-bold">₹<%= txn.refereeAmount %></span>
+                        </td>
+                        <td>
+                          <span class="rtm-status rtm-status--<%= txn.isPending ? 'pending' : 'approved' %>">
+                            <%= txn.isPending ? 'Pending' : 'Approved' %>
+                          </span>
+                        </td>
+                        <td>
+                          <%= moment(txn.date).utcOffset('+05:30').format('DD MMM YYYY') %>
+                          <br><small class="rtm-subtle"><%= moment(txn.date).utcOffset('+05:30').format('hh:mm A') %></small>
+                        </td>
+                        <td>
+                          <% if (txn.isPending) { %>
+                            <div class="rtm-actions">
+                              <button class="btn btn-success btn-sm text-white" onclick="approveTransaction('<%= txn.commentKey %>')">
+                                <i class="feather icon-check mr-50"></i> Approve
+                              </button>
+                              <button class="btn btn-danger btn-sm text-white" onclick="rejectTransaction('<%= txn.commentKey %>')">
+                                <i class="feather icon-x mr-50"></i> Reject
+                              </button>
+                            </div>
+                          <% } else { %>
+                            <div class="rtm-actions">
+                              <span class="rtm-subtle">No action</span>
+                            </div>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  <% } else { %>
+                    <tr>
+                      <td colspan="9" class="rtm-empty">
+                        <h5>No referral transactions found</h5>
+                        <div class="rtm-subtle">Try adjusting filters or reset to see all transactions.</div>
+                      </td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <% if (totalPages > 1) { %>
+            <div class="card-footer d-flex justify-content-between align-items-center py-1">
+              <small class="text-muted">
+                Showing <%= (page - 1) * perPage + 1 %> - <%= Math.min(page * perPage, totalCount) %> of <%= totalCount %>
+              </small>
+              <nav>
+                <ul class="pagination pagination-sm mb-0">
+                  <% const buildUrl = (p) => {
+                    const params = new URLSearchParams();
+                    params.set('page', p);
+                    if (filters.type) params.set('type', filters.type);
+                    if (filters.from) params.set('from', filters.from);
+                    if (filters.to) params.set('to', filters.to);
+                    if (filters.search) params.set('search', filters.search);
+                    return process.env.MIPIE_BACKEND_URL + '/admin/referralTracking?' + params.toString();
+                  }; %>
+                  <li class="page-item <%= page <= 1 ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= buildUrl(page - 1) %>">&laquo;</a>
+                  </li>
+                  <% for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) { %>
+                    <li class="page-item <%= i === page ? 'active' : '' %>">
+                      <a class="page-link" href="<%= buildUrl(i) %>"><%= i %></a>
+                    </li>
+                  <% } %>
+                  <li class="page-item <%= page >= totalPages ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= buildUrl(page + 1) %>">&raquo;</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Approve Referral Transaction</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to approve this referral transaction?</p>
+        <div class="form-group">
+          <label>Admin Remarks (Optional)</label>
+          <textarea class="form-control" id="approveRemarks" rows="3" placeholder="Add any remarks..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="confirmApprove()">Approve</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reject Referral Transaction</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to reject this referral transaction?</p>
+        <div class="form-group">
+          <label>Admin Remarks <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="rejectRemarks" rows="3" placeholder="Please provide reason for rejection..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmReject()">Reject</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentCommentKey = null;
+
+function approveTransaction(commentKey) {
+  currentCommentKey = commentKey;
+  $('#approveRemarks').val('');
+  $('#approveModal').modal('show');
+}
+
+function confirmApprove() {
+  const remarks = $('#approveRemarks').val();
+  
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/referralTracking/approve`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ commentKey: currentCommentKey, adminRemarks: remarks })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Transaction approved successfully!');
+      location.reload();
+    } else {
+      alert('Error: ' + (data.message || 'Failed to approve transaction'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error approving transaction');
+  });
+}
+
+function rejectTransaction(commentKey) {
+  currentCommentKey = commentKey;
+  $('#rejectRemarks').val('');
+  $('#rejectModal').modal('show');
+}
+
+function confirmReject() {
+  const remarks = $('#rejectRemarks').val().trim();
+  
+  if (!remarks) {
+    alert('Please provide reason for rejection');
+    return;
+  }
+  
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/referralTracking/reject`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ commentKey: currentCommentKey, adminRemarks: remarks })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Transaction rejected successfully!');
+      location.reload();
+    } else {
+      alert('Error: ' + (data.message || 'Failed to reject transaction'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error rejecting transaction');
+  });
+}
+</script>
+
+<% include ../partials/footer %>
+
+</body>
+</html>

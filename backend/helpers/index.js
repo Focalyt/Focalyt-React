@@ -198,7 +198,10 @@ module.exports.isCandidate = async (req, res, next) => {
     }
 
     req.flash("error", err.message);
-    return res.redirect("/candidate/login");
+    // ✅ Preserve refCode in redirect URL if present
+    const refCode = req.query.refCode || req.body.refCode;
+    const redirectUrl = refCode ? `/candidate/login?refCode=${refCode}` : "/candidate/login";
+    return res.redirect(redirectUrl);
   }
 };
 

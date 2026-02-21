@@ -115,3 +115,4 @@ module.exports.Placement = require("./Placement");
 module.exports.JobOffer = require("./jobOffer");
 module.exports.UploadCandidates = require("./uploadCandidates");
 module.exports.RewardClaim = require("./RewardClaim");
+module.exports.ReferralShareOffer = require("./referralShareOffer");

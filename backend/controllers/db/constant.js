@@ -9,7 +9,11 @@ module.exports = {
     inactive: "inactive",
     cashbackrequestaccepted: "cashbackrequestaccepted",
     cashbackrequestrejected: "cashbackrequestrejected",
-    referral : 'referral'
+    referral : 'referral',
+    referrer_job_apply: "referrer_job_apply",
+    referee_job_apply: "referee_job_apply",
+    referrer_course_apply: "referrer_course_apply",
+    referee_course_apply: "referee_course_apply",
   },
   cashbackRequestStatus: {
     pending: "pending",
