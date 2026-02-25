@@ -915,6 +915,12 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Create Template</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/emailTemplate' ? 'active' : ''}`}>
+                    <Link to="/institute/emailTemplate" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faFileAlt} />
+                      <span className="menu-title">Create Template</span>
+                    </Link>
+                  </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatsappWallet' ? 'active' : ''}`}>
                     <Link to="/institute/whatsappWallet" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWallet} />

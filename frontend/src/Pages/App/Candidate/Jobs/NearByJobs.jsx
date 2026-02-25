@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Link } from 'react-router-dom';
-// Import Bootstrap if needed (if you're not importing it elsewhere)
-// import 'bootstrap/dist/css/bootstrap.min.css';
 
 // Add this CSS for smooth transitions
 const styles = {
@@ -29,139 +27,109 @@ const NearByJobs = () => {
 
   const [jobs, setJobs] = useState([]);
   const [mapError, setMapError] = useState("");
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [allQualifications, setAllQualifications] = useState([]);
   const [allIndustry, setAllIndustry] = useState([]);
   const [techSkills, setTechSkills] = useState([]);
   const [allStates, setAllStates] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const mapContainerRef = useRef(null);
+  const isMountedRef = useRef(true);
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
-    // Fetch all filter options when component mounts
+    isMountedRef.current = true;
     fetchFilterOptions();
-    
-    // Check if user location is set
-    if (latitude && longitude) {
-      fetchJobs();
-    } else {
-      getUserLocation();
-    }
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
-  
+
   // Toggle filters with animation effect
   const toggleFilters = () => {
     setShowFilters(!showFilters);
   };
-  
-  // Initialize arrays to prevent map errors
+
+  // Ensure arrays for dropdowns to prevent map errors
   useEffect(() => {
-    // Ensure these are always arrays even before data is loaded
     if (!Array.isArray(allQualifications)) setAllQualifications([]);
     if (!Array.isArray(allIndustry)) setAllIndustry([]);
     if (!Array.isArray(techSkills)) setTechSkills([]);
     if (!Array.isArray(allStates)) setAllStates([]);
   }, [allQualifications, allIndustry, techSkills, allStates]);
 
-  // Re-fetch jobs when filters or location changes
-  useEffect(() => {
-    if (latitude && longitude) {
-      fetchJobs();
-    }
-  }, [filters, latitude, longitude]);
-
   const fetchFilterOptions = async () => {
     try {
-      // Initialize with empty arrays first to prevent map errors
-      setAllQualifications([]);
-      setAllIndustry([]);
-      setTechSkills([]);
-      setAllStates([]);
-      
-      // Fetch qualifications, industries, skills, and states
-      const [qualResponse, indResponse, skillsResponse, statesResponse] = await Promise.all([
-        axios.get(`${backendUrl}/getQualifications`),
-        axios.get(`${backendUrl}/getIndustries`),
-        axios.get(`${backendUrl}/getTechSkills`),
-        axios.get(`${backendUrl}/getStates`)
-      ]);
-
-      // Ensure we're setting arrays
-      setAllQualifications(Array.isArray(qualResponse.data) ? qualResponse.data : []);
-      setAllIndustry(Array.isArray(indResponse.data) ? indResponse.data : []);
-      setTechSkills(Array.isArray(skillsResponse.data) ? skillsResponse.data : []);
-      setAllStates(Array.isArray(statesResponse.data) ? statesResponse.data : []);
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/candidate/nearby-jobs-form-options`, {
+        headers: { "x-auth": token },
+      });
+      if (response.data && response.data.status) {
+        setAllQualifications(Array.isArray(response.data.allQualification) ? response.data.allQualification : []);
+        setAllIndustry(Array.isArray(response.data.allIndustry) ? response.data.allIndustry : []);
+        setAllStates(Array.isArray(response.data.allStates) ? response.data.allStates : []);
+        setTechSkills(Array.isArray(response.data.skills) ? response.data.skills : []);
+      }
     } catch (error) {
       console.error("Error fetching filter options:", error);
-      // Set empty arrays on error
       setAllQualifications([]);
       setAllIndustry([]);
       setTechSkills([]);
       setAllStates([]);
     }
-  };
-
-  const getUserLocation = () => {
-    // First check if user has set a location in their profile
-    const checkUserProfile = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${backendUrl}/getUserLocation`, {
-          headers: {
-            "x-auth": token
-          }
-        });
-        
-        if (response.data && response.data.latitude && response.data.longitude) {
-          setLatitude(response.data.latitude);
-          setLongitude(response.data.longitude);
-        } else {
-          // If no location in profile, try to get current location
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              setLatitude(position.coords.latitude);
-              setLongitude(position.coords.longitude);
-            },
-            (error) => {
-              console.error("Error getting location:", error);
-              setMapError("Please set your location in your profile to see nearby jobs.");
-              setShowProfileModal(true);
-            }
-          );
-        }
-      } catch (error) {
-        console.error("Error checking user profile:", error);
-        setShowProfileModal(true);
-      }
-    };
-    
-    checkUserProfile();
   };
 
   const fetchJobs = async () => {
     try {
+      setMapError("");
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/getNearbyJobsForMap`, {
-        headers: {
-          "x-auth": token
-        },
-        params: { ...filters, lat: latitude, long: longitude },
+      const params = {};
+      Object.keys(filters).forEach((key) => {
+        if (filters[key] !== "" && filters[key] != null) params[key] = filters[key];
       });
-      
+      // console.log("📞 Calling getNearbyJobsForMap API with params:", params);
+      const response = await axios.get(`${backendUrl}/candidate/getNearbyJobsForMap`, {
+        headers: { "x-auth": token },
+        params,
+      });
+
+      // console.log("📊 API Response:", response.data);
+      if (!isMountedRef.current) return;
+
       if (response.data.status === false) {
-        setMapError("No jobs found near your location.");
+        console.error("❌ API Error:", response.data.message);
+        setMapError(response.data.message || "Add your Current Location");
+        setShowProfileModal(true);
         setJobs([]);
+        initMap([], null);
       } else {
-        setJobs(response.data.jobs);
-        initMap(response.data.jobs);
+        const jobsData = response.data.jobs || response.data.data || [];
+        // console.log("✅ Jobs received:", jobsData.length, "jobs");
+        // jobsData.forEach((job, idx) => {
+        //   console.log(`Job ${idx}:`, {
+        //     name: job.displayCompanyName,
+        //     location: job.location,
+        //     coordinates: job.location?.coordinates
+        //   });
+        // });
+        setJobs(jobsData);
+        setShowProfileModal(false);
+        const nearest = response.data.nearest;
+        const center =
+          nearest?.location?.coordinates
+            ? { lat: nearest.location.coordinates[1], lng: nearest.location.coordinates[0] }
+            : null;
+        initMap(jobsData, center);
       }
     } catch (error) {
-      console.error("Error fetching jobs:", error);
-      setMapError("Failed to fetch jobs.");
+      console.error("❌ Error fetching jobs:", error);
+      if (isMountedRef.current) {
+        setMapError("Failed to fetch jobs.");
+        setJobs([]);
+        initMap([], null);
+      }
     }
   };
 
@@ -179,66 +147,168 @@ const NearByJobs = () => {
       techSkills: "",
       state: "",
     });
+    fetchJobsWithParams({});
   };
 
-  const initMap = (jobsData) => {
+  const fetchJobsWithParams = (params) => {
+    const token = localStorage.getItem("token");
+    setMapError("");
+    axios
+      .get(`${backendUrl}/candidate/getNearbyJobsForMap`, {
+        headers: { "x-auth": token },
+        params: params || {},
+      })
+      .then((response) => {
+        if (!isMountedRef.current) return;
+        if (response.data.status === false) {
+          setMapError("Add your Current Location");
+          setShowProfileModal(true);
+          setJobs([]);
+          initMap([], null);
+        } else {
+          setJobs(response.data.jobs || []);
+          setShowProfileModal(false);
+          const nearest = response.data.nearest;
+          const center =
+            nearest?.location?.coordinates
+              ? { lat: nearest.location.coordinates[1], lng: nearest.location.coordinates[0] }
+              : null;
+          initMap(response.data.jobs || [], center);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching jobs:", error);
+        if (isMountedRef.current) {
+          setMapError("Failed to fetch jobs.");
+          setJobs([]);
+          initMap([], null);
+        }
+      });
+  };
+
+  const initMap = (jobsData, center) => {
     if (!window.google || !window.google.maps) {
       console.error("Google Maps API not loaded.");
       return;
     }
+    const mapEl = mapContainerRef.current;
+    if (!mapEl) return;
 
-    const map = new window.google.maps.Map(document.getElementById("map"), {
-      zoom: 9,
-      center: { lat: latitude, lng: longitude },
-    });
+    const defaultCenter = { lat: 20.5937, lng: 78.9629 };
+    const mapCenter = center && center.lat && center.lng ? center : defaultCenter;
 
-    jobsData.forEach((job) => {
-      const marker = new window.google.maps.Marker({
-        position: { lat: job.location.coordinates[1], lng: job.location.coordinates[0] },
-        map: map,
-        icon: {
-          url: "/images/marker.png",
-          scaledSize: new window.google.maps.Size(35, 35),
-        },
-        title: job.displayCompanyName || job._company[0]?.name || "N/A",
-      });
+    // console.log("🗺️  Initializing map with center:", mapCenter);
+    // console.log("📍 Jobs to plot:", jobsData.length);
 
-      const infoWindow = new window.google.maps.InfoWindow({
-        content: `
-          <div>
-            <p><strong>${job.displayCompanyName || job._company[0]?.name || "N/A"}</strong></p>
-            <p>${job.city && job.city[0]?.name || ""}, ${job.state && job.state[0]?.name || ""}</p>
-            <p>Industry: ${job._industry && job._industry[0]?.name || "N/A"}</p>
-            <p>Qualification: ${job._qualification && job._qualification[0]?.name || "N/A"}</p>
-            <p>Salary: ${job.isFixed ? job.amount : (job.min && job.max ? `${job.min} - ${job.max}` : (job.min || "N/A"))}</p>
-            <p>Location: ${Math.round(job.distance / 1000)} km</p>
-            <a href="/candidate/job/${job._id}">View Details</a>
-          </div>
-        `,
-      });
+    const runMapInit = () => {
+      if (!isMountedRef.current || !mapContainerRef.current) return;
+      try {
+        const map = new window.google.maps.Map(mapContainerRef.current, {
+          zoom: 12,
+          center: mapCenter,
+        });
 
-      marker.addListener("click", () => {
-        infoWindow.open(map, marker);
-      });
-    });
+        let markersPlotted = 0;
+        const bounds = new window.google.maps.LatLngBounds();
+        
+        (jobsData || []).forEach((job, idx) => {
+          if (!job.location?.coordinates || job.location.coordinates.length < 2) {
+            // console.warn(`Job ${idx} has no valid coordinates:`, job.location);
+            return;
+          }
+          
+          const lat = job.location.coordinates[1];
+          const lng = job.location.coordinates[0];
+          
+          // Log full location object for debugging
+          // console.log(`Job ${idx} Full Location Object:`, JSON.stringify(job.location, null, 2));
+          
+          markersPlotted++;
+          const companyName = job.displayCompanyName || (job._company && job._company[0]?.name) || "N/A";
+          const cityState = `${(job.city && job.city[0]?.name) || ""}, ${(job.state && job.state[0]?.name) || ""}`.trim();
+          const industryName = (job._industry && job._industry[0]?.name) || "N/A";
+          const qualName = (job._qualification && job._qualification[0]?.name) || "N/A";
+          const salaryStr =
+            job.isFixed === true && job.amount != null
+              ? `₹ ${job.amount}`
+              : job.isFixed === false && job.min != null
+              ? `₹ ${job.min}+`
+              : "NA";
+          const distanceKm = job.distance != null ? Math.round(job.distance / 1000) : "—";
+
+          const markerPosition = { lat: lat, lng: lng };
+          // console.log(`📌 Plotting marker ${markersPlotted} [${idx}] for ${companyName} at:`, markerPosition);
+
+          const marker = new window.google.maps.Marker({
+            position: markerPosition,
+            map,
+            title: companyName,
+          });
+
+          bounds.extend(markerPosition);
+
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `
+              <div style="padding: 10px; font-size: 12px;">
+                <p style="margin: 5px 0;"><strong>${companyName}</strong></p>
+                <p style="margin: 5px 0;">${cityState}</p>
+                <p style="margin: 5px 0;">Industry: ${industryName}</p>
+                <p style="margin: 5px 0;">Qualification: ${qualName}</p>
+                <p style="margin: 5px 0;">Salary: ${salaryStr}</p>
+                <p style="margin: 5px 0;">Distance: ${distanceKm} km</p>
+                <a href="/candidate/job/${job._id}" style="color: #FF1744; text-decoration: none;">View Details</a>
+              </div>
+            `,
+          });
+
+          marker.addListener("click", () => {
+            infoWindow.open(map, marker);
+          });
+        });
+        
+        // Fit bounds if we have markers
+        if (markersPlotted > 0) {
+          map.fitBounds(bounds);
+          // console.log(`🎯 Map bounds adjusted for ${markersPlotted} markers`);
+        }
+        
+        // console.log(`✅ Map initialized with ${markersPlotted} markers`);
+      } catch (err) {
+        console.error("Google Maps init error:", err);
+      }
+    };
+
+    setTimeout(runMapInit, 0);
   };
 
-  // UseEffect to load Google Maps API only once
   useEffect(() => {
-    const existingScript = document.getElementById('googleMaps');
+    const tryFetchJobs = () => {
+      if (window.google?.maps && isMountedRef.current) {
+        setTimeout(() => fetchJobs(), 50);
+        return true;
+      }
+      return false;
+    };
 
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}`;
-      script.id = 'googleMaps';
+    const anyMapsScript = document.querySelector('script[src*="maps.googleapis.com/maps/api"]');
+    if (anyMapsScript) {
+      if (tryFetchJobs()) return;
+      let attempts = 0;
+      const maxAttempts = 40;
+      const t = setInterval(() => {
+        attempts++;
+        if (tryFetchJobs() || attempts >= maxAttempts) clearInterval(t);
+      }, 150);
+      return () => clearInterval(t);
+    }
+
+    if (googleMapsApiKey) {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`;
+      script.id = "googleMapsNearbyJobs";
       script.async = true;
       script.defer = true;
-      script.onload = () => {
-        // After script is loaded and if coordinates are already available, fetch jobs
-        if (latitude && longitude) {
-          fetchJobs();
-        }
-      };
+      script.onload = () => setTimeout(() => fetchJobs(), 50);
       document.body.appendChild(script);
     }
   }, [googleMapsApiKey]);
@@ -377,9 +447,10 @@ const NearByJobs = () => {
                           onChange={handleFilterChange}
                         >
                           <option value="">Select Option</option>
-                          {[5000, 10000, 15000, 20000, 30000, 40000, 50000, 70000, 80000].map(salary => (
+                          {[5000, 10000, 15000, 20000, 30000, 40000, 50000, 70000].map((salary) => (
                             <option key={salary} value={salary}>{salary}</option>
                           ))}
+                          <option value="80000">80000+</option>
                         </select>
                       </div>
 
@@ -427,7 +498,7 @@ const NearByJobs = () => {
 
                       <div className="col-xl-3 col-lg-3 col-md-3 col-sm-12 col-12 mt-2">
                         <button
-                          className="btn btn-success waves-effect waves-light text-white d-inline me-3"
+                          className="btn btn-success waves-effect waves-light text-black d-inline me-3"
                           onClick={fetchJobs}
                         >
                           Go
@@ -450,8 +521,21 @@ const NearByJobs = () => {
 
       {/* Google Map */}
       <div className="mt-3">
-        <div id="error" className="text-danger">{mapError}</div>
-        <div id="map" className="rounded" style={{ width: "100%", height: "400px" }}></div>
+        {mapError === "Add your Current Location" ? (
+          <div className="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2" role="alert">
+            <span>
+              <strong>Location required.</strong> Set your current location in your profile to see jobs near you.
+              <br className="d-none d-md-block" />
+              <span className="text-muted small">आस-पास की नौकरियाँ देखने के लिए प्रोफ़ाइल में अपना स्थान जोड़ें।</span>
+            </span>
+            <Link to="/candidate/myProfile" className="btn btn-primary btn-sm text-white text-nowrap">
+              Go to My Profile
+            </Link>
+          </div>
+        ) : mapError ? (
+          <div id="error" className="text-danger">{mapError}</div>
+        ) : null}
+        <div ref={mapContainerRef} id="map" className="rounded" style={{ width: "100%", height: "400px" }}></div>
       </div>
 
       {/* Profile completion modal */}
@@ -472,11 +556,11 @@ const NearByJobs = () => {
                 </h5>
               </div>
               <div className="modal-footer">
-                <a href="/candidate/myProfile">
-                  <button type="submit" className="btn btn-primary text-black">Complete Profile</button>
-                </a>
-                <button type="button" className="btn btn-outline-light" onClick={() => setShowProfileModal(false)}>
-                <i class="fas fa-times d-block d-lg-none"></i>
+                <Link to="/candidate/myProfile">
+                  <button type="button" className="btn btn-primary text-white">Complete Profile / Set Location</button>
+                </Link>
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setShowProfileModal(false)}>
+                  <i className="fas fa-times d-block d-lg-none"></i>
                   <span className="d-none d-lg-block">Cancel</span>
                 </button>
               </div>
@@ -486,7 +570,7 @@ const NearByJobs = () => {
       )}
 
       {/* Hidden div for marker info window content */}
-      <div className="d-none">
+      <div className="none">
         <div id="markerContent">
           <p id="companyNameMarker"></p>
           <p id="stateCityMarker"></p>

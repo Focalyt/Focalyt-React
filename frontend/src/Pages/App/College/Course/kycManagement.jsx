@@ -388,7 +388,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const token = userData.token;
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [showPanel, setShowPanel] = useState('')
-
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchModal, setShowBranchModal] = useState(false);
   const candidateRef = useRef();
 
   const fetchProfile = (id) => {
@@ -2003,7 +2005,75 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
 
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
 
 
   useEffect(() => {
@@ -3637,7 +3707,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear 
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3699,7 +3769,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear 
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3760,7 +3830,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear 
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3917,226 +3987,250 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                               </div>
                                             )}
-                                             <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                          <div className="btn-group">
-                                            <div style={{ position: "relative", display: "inline-block" }}>
-                                              <button
-                                                className="btn btn-sm btn-outline-secondary border-0"
-                                                onClick={() => togglePopup(profileIndex)}
-                                                aria-label="Options"
-                                              >
-                                                <i className="fas fa-ellipsis-v"></i>
-                                              </button>
-
-                                              {/* Mobile Bottom Sheet Modal */}
-                                              {showPopup === profileIndex && (
-                                                <>
-                                                  {/* Backdrop */}
-                                                  <div
-                                                    onClick={() => setShowPopup(null)}
-                                                    style={{
-                                                      position: "fixed",
-                                                      top: 0,
-                                                      left: 0,
-                                                      width: "100vw",
-                                                      height: "100vh",
-                                                      backgroundColor: "rgba(0, 0, 0, 0.5)",
-                                                      zIndex: 9998,
-                                                      animation: "fadeIn 0.3s ease"
-                                                    }}
-                                                  ></div>
-
-                                                  {/* Bottom Sheet */}
-                                                  <div
-                                                    style={{
-                                                      position: "fixed",
-                                                      bottom: 0,
-                                                      left: 0,
-                                                      right: 0,
-                                                      backgroundColor: "white",
-                                                      borderRadius: "20px 20px 0 0",
-                                                      boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
-                                                      zIndex: 9999,
-                                                      animation: "slideUpMobile 0.3s ease",
-                                                      maxHeight: "80vh",
-                                                      overflowY: "auto",
-                                                      padding: "20px 0"
-                                                    }}
+                                            <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                              <div className="btn-group">
+                                                <div style={{ position: "relative", display: "inline-block" }}>
+                                                  <button
+                                                    className="btn btn-sm btn-outline-secondary border-0"
+                                                    onClick={() => togglePopup(profileIndex)}
+                                                    aria-label="Options"
                                                   >
-                                                    {/* Handle Bar */}
-                                                    <div style={{
-                                                      width: "40px",
-                                                      height: "4px",
-                                                      backgroundColor: "#ddd",
-                                                      borderRadius: "2px",
-                                                      margin: "0 auto 20px",
-                                                    }}></div>
+                                                    <i className="fas fa-ellipsis-v"></i>
+                                                  </button>
 
-                                                    {/* Menu Items */}
-                                                    <div
-                                                      style={{
-                                                        padding: "0 20px"
-                                                      }}
-                                                    >
-                                                      {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
-                                                        <button
-                                                          className="dropdown-item"
-                                                          style={{
-                                                            width: "100%",
-                                                            padding: "16px 0",
-                                                            border: "none",
-                                                            background: "none",
-                                                            textAlign: "left",
-                                                            cursor: "pointer",
-                                                            fontSize: "15px",
-                                                            fontWeight: "500",
-                                                            borderBottom: "1px solid #f0f0f0",
-                                                            color: "#333"
-                                                          }}
-                                                          onClick={() => {
-                                                            setShowPopup(null);
-                                                            handleMoveToAdmission(profile);
-                                                          }}
-                                                        >
-                                                          Move to Admission
-                                                        </button>
-                                                      )}
-
-                                                      {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                                        <>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              handleMarkDropout(profile);
-                                                            }}
-                                                          >
-                                                            Mark Dropout
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              openPanel('SetFollowup', profile);
-                                                            }}
-                                                          >
-                                                            Set Followup
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              handleFetchCandidate(profile);
-                                                            }}
-                                                          >
-                                                            Edit Profile
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              openPreVerificationModal(profile);
-                                                            }}
-                                                          >
-                                                            Add Pre Verification
-                                                          </button>
-
-                                                        </>
-                                                      )}
-                                                      <button
-                                                        className="dropdown-item"
+                                                  {/* Mobile Bottom Sheet Modal */}
+                                                  {showPopup === profileIndex && (
+                                                    <>
+                                                      {/* Backdrop */}
+                                                      <div
+                                                        onClick={() => setShowPopup(null)}
                                                         style={{
-                                                          width: "100%",
-                                                          padding: "16px 0",
-                                                          border: "none",
-                                                          background: "none",
-                                                          textAlign: "left",
-                                                          cursor: "pointer",
-                                                          fontSize: "15px",
-                                                          fontWeight: "500",
-                                                          color: "#333"
+                                                          position: "fixed",
+                                                          top: 0,
+                                                          left: 0,
+                                                          width: "100vw",
+                                                          height: "100vh",
+                                                          backgroundColor: "rgba(0, 0, 0, 0.5)",
+                                                          zIndex: 9998,
+                                                          animation: "fadeIn 0.3s ease"
                                                         }}
-                                                        onClick={() => {
-                                                          setShowPopup(null);
-                                                          openPanel('leadHistory', profile);
+                                                      ></div>
+
+                                                      {/* Bottom Sheet */}
+                                                      <div
+                                                        style={{
+                                                          position: "fixed",
+                                                          bottom: 0,
+                                                          left: 0,
+                                                          right: 0,
+                                                          backgroundColor: "white",
+                                                          borderRadius: "20px 20px 0 0",
+                                                          boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
+                                                          zIndex: 9999,
+                                                          animation: "slideUpMobile 0.3s ease",
+                                                          maxHeight: "80vh",
+                                                          overflowY: "auto",
+                                                          padding: "20px 0"
                                                         }}
                                                       >
-                                                        History List
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </>
-                                              )}
+                                                        {/* Handle Bar */}
+                                                        <div style={{
+                                                          width: "40px",
+                                                          height: "4px",
+                                                          backgroundColor: "#ddd",
+                                                          borderRadius: "2px",
+                                                          margin: "0 auto 20px",
+                                                        }}></div>
+
+                                                        {/* Menu Items */}
+                                                        <div
+                                                          style={{
+                                                            padding: "0 20px"
+                                                          }}
+                                                        >
+                                                          {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                                            <button
+                                                              className="dropdown-item"
+                                                              style={{
+                                                                width: "100%",
+                                                                padding: "16px 0",
+                                                                border: "none",
+                                                                background: "none",
+                                                                textAlign: "left",
+                                                                cursor: "pointer",
+                                                                fontSize: "15px",
+                                                                fontWeight: "500",
+                                                                borderBottom: "1px solid #f0f0f0",
+                                                                color: "#333"
+                                                              }}
+                                                              onClick={() => {
+                                                                setShowPopup(null);
+                                                                handleMoveToAdmission(profile);
+                                                              }}
+                                                            >
+                                                              Move to Admission
+                                                            </button>
+                                                          )}
+
+                                                          {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                                            <>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleMarkDropout(profile);
+                                                                }}
+                                                              >
+                                                                Mark Dropout
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPanel('SetFollowup', profile);
+                                                                }}
+                                                              >
+                                                                Set Followup
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleFetchCandidate(profile);
+                                                                }}
+                                                              >
+                                                                Edit Profile
+                                                              </button>
+                                                              {/* Change Branch */}
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setSelectedProfile(profile);
+                                                                  getBranches(profile);
+                                                                  setShowBranchModal(true);
+                                                                  setShowPopup(null);
+                                                                }}
+                                                              >
+                                                                <span className="fw-medium">Change Branch</span>
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPreVerificationModal(profile);
+                                                                }}
+                                                              >
+                                                                Add Pre Verification
+                                                              </button>
+
+                                                            </>
+                                                          )}
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              openPanel('leadHistory', profile);
+                                                            }}
+                                                          >
+                                                            History List
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                </div>
+
+                                                <button
+                                                  className="btn btn-sm btn-outline-secondary border-0"
+                                                  onClick={() => {
+                                                    setLeadDetailsVisible(profileIndex)
+                                                    setSelectedProfile(profile)
+                                                  }}
+                                                >
+                                                  {leadDetailsVisible === profileIndex ? (
+                                                    <i className="fas fa-chevron-up"></i>
+                                                  ) : (
+                                                    <i className="fas fa-chevron-down"></i>
+                                                  )}
+                                                </button>
+                                              </div>
                                             </div>
 
-                                            <button
-                                              className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => {
-                                                setLeadDetailsVisible(profileIndex)
-                                                setSelectedProfile(profile)
-                                              }}
-                                            >
-                                              {leadDetailsVisible === profileIndex ? (
-                                                <i className="fas fa-chevron-up"></i>
-                                              ) : (
-                                                <i className="fas fa-chevron-down"></i>
-                                              )}
-                                            </button>
-                                          </div>
-                                        </div>
-                                            
                                           </div>
                                         </div>
 
-                                       
+
 
                                         <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                           <div className="btn-group">
@@ -4260,6 +4354,27 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       }}
                                                     >
                                                       Edit Profile
+                                                    </button>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      onClick={() => {
+                                                        setSelectedProfile(profile);
+                                                        getBranches(profile);
+                                                        setShowBranchModal(true);
+                                                        setShowPopup(null);
+                                                      }}
+                                                    >
+                                                      Change Branch
                                                     </button>
                                                     <button
                                                       className="dropdown-item"
@@ -5843,6 +5958,55 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           </div>
         </div>
       )}
+        {showBranchModal && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                                  <div className="modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Select Branch</h1>
+                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="course"
+                                          value={selectedBranch}
+                                          onChange={(e) => setSelectedBranch(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+
+                                          }}
+
+                                        >
+                                          <option value="">Select Branch</option>
+                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                            <option key={branch._id || index} value={branch._id}>
+                                              {branch.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {
+                                        setShowBranchModal(false);
+                                        setSelectedBranch('');
+                                      }}>Close</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(selectedProfile, selectedBranch)}>Save Branch</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
       <style>
         {`

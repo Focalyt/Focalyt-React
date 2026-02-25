@@ -3694,17 +3694,68 @@ router.get("/nearbyJobs", [isCandidate], async (req, res) => {
 });
 
 router.get(
+  "/nearby-jobs-form-options",
+  [isCandidate, authenti],
+  async (req, res) => {
+    try {
+      const [allQualification, allIndustry, allStates, skills] = await Promise.all([
+        Qualification.find({ status: true }).sort({ basic: -1 }).select("_id name").lean(),
+        Industry.find({ status: true }).select("_id name").lean(),
+        State.find({ countryId: "101", status: { $ne: false } }).select("_id name").lean(),
+        Skill.find({ status: true, type: "technical" }).select("_id name").lean(),
+      ]);
+      return res.json({
+        status: true,
+        allQualification: allQualification || [],
+        allIndustry: allIndustry || [],
+        allStates: allStates || [],
+        skills: skills || [],
+      });
+    } catch (err) {
+      console.error("nearby-jobs-form-options:", err.message);
+      return res.status(500).json({ status: false, error: err.message || "Something went wrong!" });
+    }
+  }
+);
+
+router.get(
   "/getNearbyJobsForMap",
   [isCandidate, authenti],
   async (req, res) => {
     const userMobile = req.user.mobile;
+    
+    console.log('\n' + '='.repeat(60));
+    // console.log('🗺️  ===== GET NEARBY JOBS API =====');
+    // console.log('User Mobile:', userMobile);
+    
     const candidate = await Candidate.findOne({ mobile: userMobile });
-    if (!candidate.latitude || !candidate.longitude) {
+    
+    // console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
+    // console.log('Candidate Found:', !!candidate);
+    
+    // Check personalInfo.currentAddress for location (not root level)
+    let latitude = candidate?.personalInfo?.currentAddress?.latitude;
+    let longitude = candidate?.personalInfo?.currentAddress?.longitude;
+    
+    // console.log('Location Source: personalInfo.currentAddress');
+    // console.log('  - latitude:', latitude, `(type: ${typeof latitude})`);
+    // console.log('  - longitude:', longitude, `(type: ${typeof longitude})`);
+    // console.log('  - coordinates:', candidate?.personalInfo?.currentAddress?.coordinates);
+    // console.log('  - city:', candidate?.personalInfo?.currentAddress?.city);
+    
+    if (!latitude || !longitude) {
+      console.error('❌ ERROR: No location found! Cannot proceed with geo-search.');
+      // console.log('Full currentAddress:', candidate?.personalInfo?.currentAddress);
+      // console.log('Full permanentAddress:', candidate?.personalInfo?.permanentAddress);
+      console.log('='.repeat(60) + '\n');
       req.flash("error", "Add Your Current Location!");
-      return res.send({ jobs: [], nearest: {}, status: false })
+      return res.send({ jobs: [], nearest: {}, status: false, message: "Location not found" })
     }
-    const lat = Number(candidate.latitude);
-    const long = Number(candidate.longitude);
+    
+    // console.log('✅ Location found! Proceeding with geo-search...');
+    const lat = Number(latitude);
+    const long = Number(longitude);
+    // console.log('Parsed Location:', { latitude: lat, longitude: long });
     let {
       qualification,
       experience,
@@ -3822,7 +3873,14 @@ router.get(
       }
     }
 
-    res.send({ jobs, nearest });
+    console.log('\n📊 ===== RESPONSE DATA =====');
+    console.log('Total Jobs Found:', jobs.length);
+    console.log('Nearest Job:', nearest?._id || 'No jobs, using user location');
+    console.log('Nearest Coordinates:', nearest?.location?.coordinates || [long, lat]);
+    console.log('Response Status:', 'true');
+    console.log('='.repeat(60) + '\n');
+
+    res.send({ jobs, nearest, status: true });
   }
 );
 
@@ -4709,7 +4767,10 @@ router.route('/reqDocs/:courseId')
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
-    console.log('user', user)
+    // console.log('\n' + '='.repeat(60));
+    // console.log('📥 ===== SAVE PROFILE REQUEST =====');
+    // console.log('User Mobile:', user.mobile);
+    // console.log('Request Body Keys:', Object.keys(req.body));
 
     const {
       name,
@@ -4722,10 +4783,35 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       experiences,
       qualifications,
       declaration,
-      isExperienced,showProfileForm
+      isExperienced,showProfileForm,
+      latitude,
+      longitude
     } = req.body;
 
-    console.log('experiences from frontend',experiences)
+    // console.log('\n📍 ===== LOCATION DATA RECEIVED =====');
+    // console.log('Root Level:');
+    // console.log('  - latitude:', latitude, `(type: ${typeof latitude})`);
+    // console.log('  - longitude:', longitude, `(type: ${typeof longitude})`);
+    
+    // if (personalInfo) {
+    //   console.log('\nPersonalInfo Location Data:');
+    //   console.log('  - currentAddress:', personalInfo.currentAddress ? {
+    //     latitude: personalInfo.currentAddress.latitude,
+    //     longitude: personalInfo.currentAddress.longitude,
+    //     coordinates: personalInfo.currentAddress.coordinates,
+    //     city: personalInfo.currentAddress.city,
+    //     state: personalInfo.currentAddress.state
+    //   } : 'NOT FOUND');
+      
+    //   console.log('  - permanentAddress:', personalInfo.permanentAddress ? {
+    //     latitude: personalInfo.permanentAddress.latitude,
+    //     longitude: personalInfo.permanentAddress.longitude,
+    //     coordinates: personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'NOT FOUND');
+    // }
+
+    // console.log('experiences from frontend',experiences)
 
     // Build dynamic update object
     const updatePayload = {
@@ -4756,7 +4842,32 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
       if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
       if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
-      if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
+      
+      // Ensure coordinates are populated from latitude/longitude for currentAddress
+      if (personalInfo.currentAddress) {
+        updatePayload.personalInfo.currentAddress = { ...personalInfo.currentAddress };
+        if (personalInfo.currentAddress.latitude && personalInfo.currentAddress.longitude) {
+          // Populate coordinates from latitude/longitude if missing or [0, 0]
+          if (!personalInfo.currentAddress.coordinates || 
+              (personalInfo.currentAddress.coordinates[0] === 0 && personalInfo.currentAddress.coordinates[1] === 0)) {
+            updatePayload.personalInfo.currentAddress.coordinates = [
+              Number(personalInfo.currentAddress.longitude),
+              Number(personalInfo.currentAddress.latitude)
+            ];
+            // console.log('✅ Updated currentAddress coordinates from latitude/longitude:', 
+            //   updatePayload.personalInfo.currentAddress.coordinates);
+          }
+        }
+      }
+
+      // Handle sameCurrentAddress flag - sync permanentAddress with currentAddress
+      if (personalInfo.permanentAddress?.sameCurrentAddress && personalInfo.currentAddress) {
+        updatePayload.personalInfo.permanentAddress = {
+          ...personalInfo.currentAddress,
+          sameCurrentAddress: true
+        };
+        // console.log('🔄 Synced permanentAddress with currentAddress (sameCurrentAddress=true)');
+      }
 
       if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
         updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
@@ -4835,8 +4946,8 @@ if (Array.isArray(experiences) && experiences.length > 0) {
           }
         }));
     }
-    console.log('updatePayload', updatePayload)
-    console.log('Incoming Data:', req.body);
+    // console.log('updatePayload', updatePayload)
+    // console.log('Incoming Data:', req.body);
   
     // Final DB Update
     const updatedProfile = await Candidate.findOneAndUpdate(
@@ -4845,8 +4956,29 @@ if (Array.isArray(experiences) && experiences.length > 0) {
       { new: true, runValidators: true }
     );
 
-    console.log('updatedProfile', updatedProfile)
-
+    // console.log('\n📊 ===== PROFILE UPDATE RESULT =====');
+    // console.log('updatedProfile Root Fields:');
+    // console.log('  - latitude:', updatedProfile?.latitude, `(type: ${typeof updatedProfile?.latitude})`);
+    // console.log('  - longitude:', updatedProfile?.longitude, `(type: ${typeof updatedProfile?.longitude})`);
+    
+    // if (updatedProfile?.personalInfo) {
+    //   console.log('\nUpdatedProfile PersonalInfo Location:');
+    //   console.log('  - currentAddress:', updatedProfile.personalInfo.currentAddress ? {
+    //     latitude: updatedProfile.personalInfo.currentAddress.latitude,
+    //     longitude: updatedProfile.personalInfo.currentAddress.longitude,
+    //     coordinates: updatedProfile.personalInfo.currentAddress.coordinates,
+    //     city: updatedProfile.personalInfo.currentAddress.city
+    //   } : 'EMPTY');
+      
+    //   console.log('  - permanentAddress:', updatedProfile.personalInfo.permanentAddress ? {
+    //     latitude: updatedProfile.personalInfo.permanentAddress.latitude,
+    //     longitude: updatedProfile.personalInfo.permanentAddress.longitude,
+    //     coordinates: updatedProfile.personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: updatedProfile.personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'EMPTY');
+    // }
+    
+    // console.log('='.repeat(60) + '\n');
 
     return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
   } catch (error) {
@@ -4859,7 +4991,7 @@ router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
   try {
     // Step 1: Find dynamic key (should be only 1 key in body)
 
-    console.log('updatefiles')
+    // console.log('updatefiles')
     const keys = Object.keys(req.body);
     if (keys.length !== 1) {
       return res.send({ status: false, message: 'Invalid request structure' });
@@ -4904,17 +5036,42 @@ console.log('updateQuery',updateQuery)
 router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('👤 ===== GET PROFILE REQUEST =====');
+    console.log('User Mobile:', user.mobile);
 
     const educations = await Qualification.find({ status: true });
-
-
-
     const candidate = await Candidate.findOne({ mobile: user.mobile });
 
     if (!candidate) {
+      console.error('❌ Candidate not found!');
+      console.log('='.repeat(60) + '\n');
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
+    console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
+    console.log('Root Level:');
+    console.log('  - latitude:', candidate?.latitude, `(type: ${typeof candidate?.latitude})`);
+    console.log('  - longitude:', candidate?.longitude, `(type: ${typeof candidate?.longitude})`);
+    console.log('  - location:', candidate?.location);
+    
+    if (candidate?.personalInfo) {
+      console.log('\nPersonalInfo Location Data:');
+      console.log('  - currentAddress:', candidate.personalInfo.currentAddress ? {
+        latitude: candidate.personalInfo.currentAddress.latitude,
+        longitude: candidate.personalInfo.currentAddress.longitude,
+        coordinates: candidate.personalInfo.currentAddress.coordinates
+      } : 'NOT SET');
+      console.log('  - permanentAddress:', candidate.personalInfo.permanentAddress ? {
+        latitude: candidate.personalInfo.permanentAddress.latitude,
+        longitude: candidate.personalInfo.permanentAddress.longitude,
+        coordinates: candidate.personalInfo.permanentAddress.coordinates,
+        sameCurrentAddress: candidate.personalInfo.permanentAddress.sameCurrentAddress
+      } : 'NOT SET');
+    }
+    
+    console.log('='.repeat(60) + '\n');
 
     res.status(200).json({
       status: true,
