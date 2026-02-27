@@ -1602,13 +1602,33 @@ const CandidateViewJobs = () => {
   const videoRef = useRef(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  const [showReferralKycModal, setShowReferralKycModal] = useState(false);
+  // which action to perform after KYC modal submission: 'apply' or 'register'
+  const [kycAction, setKycAction] = useState(null);
+  const [referralFormData, setReferralFormData] = useState({
+    aadharCard: '',
+    panCard: '',
+    aadharCardImage: '',
+    panCardImage: '',
+    upi: '',
+    bankAccountNumber: '',
+    bankIfscCode: '',
+    bankDocumentImage: ''
+  });
+  const [referralDocumentError, setReferralDocumentError] = useState('');
+  const [referralUploading, setReferralUploading] = useState(false);
+  const [referralKycSubmitted, setReferralKycSubmitted] = useState(false);
+  const [referralOffer, setReferralOffer] = useState(null); // current active job referral offer
+
+
 
   useEffect(() => {
     const refCode = searchParams.get('refCode');
-    if (refCode) {
-      localStorage.setItem('refCode', refCode);
+    if (refCode && JobId) {
+      const key = `refCode:${JobId}`;
+      localStorage.setItem(key, refCode);
     }
-  }, [searchParams]);
+  }, [searchParams, JobId]);
 
   useEffect(() => {
     if (JobId) {
@@ -1618,6 +1638,48 @@ const CandidateViewJobs = () => {
       waitForGoogle();
     }
   }, [JobId]);
+
+  useEffect(() => {
+    if (!candidate) return;
+
+    // Prefill referral KYC form from candidate profile documents if available
+    if (candidate.documents) {
+      setReferralFormData(prev => ({
+        ...prev,
+        aadharCard: candidate.documents.aadharCard || prev.aadharCard,
+        panCard: candidate.documents.panCard || prev.panCard,
+        aadharCardImage: candidate.documents.aadharCardImage || prev.aadharCardImage,
+        panCardImage: candidate.documents.panCardImage || prev.panCardImage,
+        upi: candidate.upi || prev.upi,
+        bankAccountNumber: candidate.documents.bankAccountNumber || prev.bankAccountNumber,
+        bankIfscCode: candidate.documents.bankIfscCode || prev.bankIfscCode,
+        bankDocumentImage: candidate.documents.bankDocumentImage || prev.bankDocumentImage
+      }));
+    }
+
+    // Global one-time KYC flag per candidate:
+    // if we have already marked KYC done earlier, respect that across all jobs.
+    if (candidate._id) {
+      const kycFlagKey = `referralKycDone:${candidate._id}`;
+      const kycDone = localStorage.getItem(kycFlagKey) === 'true';
+      if (kycDone) {
+        setReferralKycSubmitted(true);
+        return;
+      }
+    }
+
+    // Fallback: infer KYC submitted from existing documents / UPI on the candidate
+    if (
+      candidate.documents &&
+      (candidate.documents.bankDocumentImage ||
+        candidate.documents.aadharCardImage ||
+        candidate.documents.panCardImage)
+    ) {
+      setReferralKycSubmitted(true);
+    } else if (candidate.upi) {
+      setReferralKycSubmitted(true);
+    }
+  }, [candidate]);
 
   useEffect(() => {
     if (showApplyModal && !canApply) {
@@ -1780,6 +1842,13 @@ const CandidateViewJobs = () => {
       sethighestQualificationdata(response.data.highestQualification);
 
       setCandidate(data.candidate);
+      setReferralOffer(data.referralOffer || null);
+      if (data.candidate && data.candidate.documents) {
+        const docs = data.candidate.documents;
+        if (docs.bankDocumentImage || docs.aadharCardImage || docs.panCardImage || data.candidate.upi) {
+          setReferralKycSubmitted(true);
+        }
+      }
       setIsApplied(data.isApplied);
       setIsRegisterInterview(data.isRegisterInterview);
       setCanApply(data.canApply);
@@ -1805,7 +1874,20 @@ const CandidateViewJobs = () => {
 
   const applyJob = async () => {
     try {
-      const refCode = localStorage.getItem('refCode');
+      const refCodeKey = JobId ? `refCode:${JobId}` : 'refCode';
+      const refCode = localStorage.getItem(refCodeKey);
+      
+      const hasReferralOffer = !!(referralOffer && Number(referralOffer.referredAmount) > 0);
+      const shouldCollectKyc = !!(refCode && hasReferralOffer && !referralKycSubmitted);
+      
+
+      if (shouldCollectKyc) {
+       
+        setKycAction('apply');
+        setShowApplyModal(false);
+        setShowReferralKycModal(true);
+        return;
+      }
       const requestBody = refCode ? { refCode } : {};
       
       const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, requestBody, {
@@ -1815,6 +1897,8 @@ const CandidateViewJobs = () => {
       });
 
       if (response.data.status) {
+        const refCodeKey = JobId ? `refCode:${JobId}` : 'refCode';
+        localStorage.removeItem(refCodeKey);
         await trackMetaConversion({
           eventName: "JobApply",
           sourceUrl: window.location.href,
@@ -1828,7 +1912,155 @@ const CandidateViewJobs = () => {
     }
   };
 
+  const checkImageType = (fileName) => {
+    return /\.(jpg|jpeg|png)$/i.test(fileName);
+  };
+
+  const checkImageSize = (size) => {
+    return (size / 1024 / 1024) <= 3; // max 3MB
+  };
+
+  const referralImageChangeHandler = (e, id) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const { name: type, size } = file;
+
+    if (!checkImageType(type) && !checkImageSize(size)) {
+      alert("Upload the image in .jpg, .jpeg or .png format and size should be less than 3MB");
+      e.target.value = '';
+    } else if (!checkImageType(type)) {
+      alert("Upload the image in .jpg, .jpeg or .png format");
+      e.target.value = '';
+    } else if (!checkImageSize(size)) {
+      alert("Uploaded image size should be less than 3MB");
+      e.target.value = '';
+    } else {
+      const form = new FormData();
+      form.append('file', file);
+      axios.post(`${backendUrl}/api/uploadSingleFile`, form, {
+        headers: {
+          'x-auth': localStorage.getItem('token'),
+          "Content-Type": "multipart/form-data"
+        }
+      }).then(res => {
+        if (res.data.status && res.data.data) {
+          setReferralFormData(prev => ({
+            ...prev,
+            [id]: res.data.data.Key
+          }));
+        } else {
+          alert("There is some error while uploading the document. Please upload again.");
+        }
+      }).catch(err => {
+        console.error('Image upload failed', err);
+        alert("Error uploading image");
+      });
+    }
+  };
+
+  const handleReferralInputChange = (e) => {
+    const { name, value } = e.target;
+    setReferralFormData(prev => ({
+      ...prev,
+      [name]: value.replace(/\s/g, '')
+    }));
+  };
+
+  const removeReferralImage = (type) => {
+    const key = type === 'aadhar' ? referralFormData.aadharCardImage : referralFormData.panCardImage;
+    axios.post(`${backendUrl}/api/deleteSingleFile`, { key }, {
+      headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" }
+    }).then(() => {
+      setReferralFormData(prev => ({
+        ...prev,
+        [type === 'aadhar' ? 'aadharCardImage' : 'panCardImage']: ''
+      }));
+    });
+  };
+
+  const validateReferralKyc = () => {
+    const { aadharCard, panCard, aadharCardImage, panCardImage, upi, bankAccountNumber, bankIfscCode, bankDocumentImage } = referralFormData;
+    if ((!aadharCard.trim() && !panCard.trim()) || (!aadharCardImage && !panCardImage)) {
+      setReferralDocumentError('Please upload at least one Document.');
+      return false;
+    }
+    if (!upi.trim()) {
+      setReferralDocumentError('Please enter the value for UPI.');
+      return false;
+    }
+    if (!bankAccountNumber.trim() || !bankIfscCode.trim() || !bankDocumentImage) {
+      setReferralDocumentError('Please fill bank account number, IFSC code and upload bank document.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleReferralKycSubmit = async (e) => {
+    e.preventDefault();
+    setReferralDocumentError('');
+
+    if (!validateReferralKyc()) return;
+
+    try {
+      setReferralUploading(true);
+      const token = localStorage.getItem('token');
+      // send as FormData so backend receives fields like a normal form post
+      const formData = new FormData();
+      Object.keys(referralFormData).forEach(key => {
+        if (referralFormData[key] !== undefined && referralFormData[key] !== null) {
+          formData.append(key, referralFormData[key]);
+        }
+      });
+
+      await axios.post(`${backendUrl}/candidate/kycDocument`, formData, {
+        headers: { 'x-auth': token, 'Content-Type': 'multipart/form-data' }
+      });
+      setReferralKycSubmitted(true);
+      // Persist a global flag so this candidate never sees the
+      // referral KYC modal again on future referred jobs.
+      if (candidate?._id) {
+        const kycFlagKey = `referralKycDone:${candidate._id}`;
+        localStorage.setItem(kycFlagKey, 'true');
+      }
+      setShowReferralKycModal(false);
+      // after KYC we should perform whichever action triggered the modal
+      if (kycAction === 'register') {
+        registerForInterview();
+      } else {
+        applyJob();
+      }
+      setKycAction(null);
+    } catch (err) {
+      console.error('Error submitting referral KYC:', err);
+      setReferralDocumentError('Something went wrong while submitting KYC. Please try again.');
+    } finally {
+      setReferralUploading(false);
+    }
+  };
+
   const registerForInterview = async () => {
+    const refCodeKey = JobId ? `refCode:${JobId}` : 'refCode';
+    const refCode = localStorage.getItem(refCodeKey);
+    console.log('[REGISTER] refCode:', refCode, 'referralKycSubmitted:', referralKycSubmitted, 'referralOffer:', referralOffer);
+    const hasReferralOffer = !!(referralOffer && Number(referralOffer.referredAmount) > 0);
+    const shouldCollectKyc = !!(refCode && hasReferralOffer && !referralKycSubmitted);
+    console.info(
+      '[REGISTER] shouldCollectKyc:',
+      shouldCollectKyc,
+      '(refCode:',
+      !!refCode,
+      'hasOffer:',
+      hasReferralOffer,
+      'notSubmitted:',
+      !referralKycSubmitted,
+      ')'
+    );
+    if (shouldCollectKyc) {
+      console.log('[REGISTER] referral present – showing KYC modal');
+      setKycAction('register');
+      setShowReferralKycModal(true);
+      return;
+    }
     try {
       const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/registerInterviews`, {}, {
         headers: {
@@ -2030,22 +2262,7 @@ const CandidateViewJobs = () => {
       });
 
 
-      const refCode = localStorage.getItem('refCode');
-      const requestBody = refCode ? { refCode } : {};
-      
-      const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, requestBody, {
-        headers: {
-          'x-auth': localStorage.getItem('token')
-        }
-      });
-
-      if (response.data.status) {
-        setIsApplied(true);
-        setCanApply(true);
-        setShowApplyModal(false);
-        setShowRegisterModal(true);
-
-      }
+      await applyJob();
     } catch (err) {
       console.error("Profile update or apply failed:", err);
     }
@@ -2673,6 +2890,259 @@ const CandidateViewJobs = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+{showReferralKycModal && (
+        <div className="modal fade show" style={{ display: 'block' }} id="referralKyc">
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h5 className="modal-title text-black text-uppercase">Upload KYC Document</h5>
+                <button type="button" className="close" onClick={() => setShowReferralKycModal(false)}>
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div className="modal-body pt-1" id="popup-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <form onSubmit={handleReferralKycSubmit}>
+                  <div className="col-xl-6 mb-1">
+                    <label>
+                      Aadhar Card Number <span className="mandatory">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="aadharCard"
+                      id="aadharCardNumber"
+                      className="form-control"
+                      maxLength="12"
+                      placeholder="xxxx-xxxx-xxxx"
+                      value={referralFormData.aadharCard}
+                      onChange={handleReferralInputChange}
+                      required
+                    />
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    {referralFormData.aadharCardImage ? (
+                      <>
+                        <a
+                          href={`${bucketUrl}/${referralFormData.aadharCardImage}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          id="aadharLink"
+                        >
+                          Uploaded image
+                        </a>
+                        <i
+                          className="feather icon-x remove_uploaded_pic"
+                          style={{ color: 'red' }}
+                          id="removeAadhar"
+                          onClick={() => removeReferralImage('aadhar')}
+                        />
+                        <input
+                          type="file"
+                          className="form-control"
+                          id="uploadAadharCard"
+                          onChange={(e) => referralImageChangeHandler(e, 'aadharCardImage')}
+                          style={{ display: 'none' }}
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="aadharCardImage"
+                          id="aadharCardImage"
+                          value={referralFormData.aadharCardImage}
+                          required
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          className="form-control"
+                          id="uploadAadharCard"
+                          onChange={(e) => referralImageChangeHandler(e, 'aadharCardImage')}
+                          required
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="aadharCardImage"
+                          id="aadharCardImage"
+                          value={referralFormData.aadharCardImage}
+                          required
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    <label>PAN Card Number</label>
+                    <input
+                      type="text"
+                      name="panCard"
+                      id="panCardNumber"
+                      className="form-control"
+                      style={{ textTransform: 'uppercase' }}
+                      maxLength="10"
+                      minLength="10"
+                      value={referralFormData.panCard}
+                      onChange={handleReferralInputChange}
+                    />
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    {referralFormData.panCardImage ? (
+                      <>
+                        <a
+                          href={`${bucketUrl}/${referralFormData.panCardImage}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          id="panLink"
+                        >
+                          Uploaded image
+                        </a>
+                        <i
+                          className="feather icon-x remove_uploaded_pic"
+                          style={{ color: 'red' }}
+                          id="removePan"
+                          onClick={() => removeReferralImage('pan')}
+                        />
+                        <input
+                          type="file"
+                          className="form-control here"
+                          id="uploadPanCard"
+                          onChange={(e) => referralImageChangeHandler(e, 'panCardImage')}
+                          style={{ display: 'none' }}
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="panCardImage"
+                          id="panCardImage"
+                          value={referralFormData.panCardImage}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          className="form-control"
+                          id="uploadPanCard"
+                          onChange={(e) => referralImageChangeHandler(e, 'panCardImage')}
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="panCardImage"
+                          id="panCardImage"
+                          value={referralFormData.panCardImage}
+                        />
+                      </>
+                    )}
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    <label>
+                      UPI Id <span className="mandatory">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="upi"
+                      value={referralFormData.upi}
+                      name="upi"
+                      onChange={handleReferralInputChange}
+                      required
+                    />
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    <label>
+                      Bank Account Number <span className="mandatory">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="bankAccountNumber"
+                      className="form-control"
+                      value={referralFormData.bankAccountNumber}
+                      onChange={handleReferralInputChange}
+                      required
+                    />
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    <label>
+                      IFSC Code <span className="mandatory">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="bankIfscCode"
+                      className="form-control"
+                      style={{ textTransform: 'uppercase' }}
+                      value={referralFormData.bankIfscCode}
+                      onChange={handleReferralInputChange}
+                      required
+                    />
+                  </div>
+                  <div className="col-xl-6 mb-1">
+                    <label>
+                      Bank Document (Passbook / Cancelled Cheque) <span className="mandatory">*</span>
+                    </label>
+                    {referralFormData.bankDocumentImage ? (
+                      <>
+                        <a
+                          href={`${bucketUrl}/${referralFormData.bankDocumentImage}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Uploaded image
+                        </a>
+                        <input
+                          type="file"
+                          className="form-control"
+                          onChange={(e) => referralImageChangeHandler(e, 'bankDocumentImage')}
+                          style={{ display: 'none' }}
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="bankDocumentImage"
+                          value={referralFormData.bankDocumentImage}
+                          required
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          className="form-control"
+                          onChange={(e) => referralImageChangeHandler(e, 'bankDocumentImage')}
+                          required
+                        />
+                        <input
+                          type="hidden"
+                          className="form-control"
+                          name="bankDocumentImage"
+                          value={referralFormData.bankDocumentImage}
+                          required
+                        />
+                      </>
+                    )}
+                  </div>
+                  <p className="text-danger">{referralDocumentError}</p>
+                  <div className="modal-footer">
+                    <button
+                      type="submit"
+                      className="btn btn-primary waves-effect waves-light"
+                      id="uploadDocument"
+                      disabled={referralUploading}
+                    >
+                      {referralUploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                    <button type="button" className="btn btn-outline-light waves-effect waves-danger" onClick={() => setShowReferralKycModal(false)}>
+                    <i className="fas fa-times d-block d-lg-none text-black"></i>
+                    <span className="d-none d-lg-block">Cancel</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       )}

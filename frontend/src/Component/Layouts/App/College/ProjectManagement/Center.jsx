@@ -571,7 +571,7 @@ const updatedPermission = async () => {
                             <h4 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
                             <span className="mx-2"> &gt; </span>
                             <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedProject.name} Project
+                               {selectedProject.name} Project
                             </h5>
                             <span className="mx-2"> &gt; </span>
                             <h5 className="breadcrumb-item mb-0" aria-current="page">

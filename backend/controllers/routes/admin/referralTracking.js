@@ -12,6 +12,7 @@ const {
   Referral,
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
+const KycDocument = require("../../models/kycDocument");
 
 router.get("/", async (req, res) => {
   try {
@@ -62,6 +63,8 @@ router.get("/", async (req, res) => {
       const parts = commentKey.split(":");
       const offerType = parts[1] || "N/A";
       const itemId = parts[2] || null;
+      // some comment keys (refApply) also encode the referred candidate id as the fourth segment
+      const candidateIdFromKey = parts[3] || null;
 
       let referrerEntry = null;
       let refereeEntry = null;
@@ -74,12 +77,20 @@ router.get("/", async (req, res) => {
         }
       }
 
-      const referrerId = referrerEntry?.candidateId;
-      const refereeId = refereeEntry?.candidateId;
+      // primary ids come from cashback entries, but if the referee entry is missing
+      // (e.g. when referred reward is zero) we can fall back to the id embedded in
+      // the comment key so that the candidate details still show up in the table.
+      let referrerId = referrerEntry?.candidateId || null;
+      let refereeId = refereeEntry?.candidateId || null;
+      if (!refereeId && candidateIdFromKey && mongoose.Types.ObjectId.isValid(candidateIdFromKey)) {
+        refereeId = candidateIdFromKey;
+      }
 
-      const [referrer, referee] = await Promise.all([
+      const [referrer, referee, referrerKyc, refereeKyc] = await Promise.all([
         referrerId ? Candidate.findById(referrerId).select("name mobile").lean() : null,
         refereeId ? Candidate.findById(refereeId).select("name mobile").lean() : null,
+        referrerId ? KycDocument.findOne({ _candidate: referrerId }).lean() : null,
+        refereeId ? KycDocument.findOne({ _candidate: refereeId }).lean() : null,
       ]);
 
       if (search) {
@@ -93,6 +104,36 @@ router.get("/", async (req, res) => {
         if (!referrerMatch && !refereeMatch) continue;
       }
 
+      const computePending = (refEntry, reedEntry) => {
+        if (refEntry && reedEntry) {
+          return refEntry.isPending !== false || reedEntry.isPending !== false;
+        } else if (refEntry) {
+          return refEntry.isPending !== false;
+        } else if (reedEntry) {
+          return reedEntry.isPending !== false;
+        }
+        return false;
+      };
+
+     
+      let referrerAmount = referrerEntry?.amount ?? 0;
+      let refereeAmount = refereeEntry?.amount ?? 0;
+
+      if ((referrerAmount === 0 || refereeAmount === 0) && offerType === 'JOB') {
+        let jobOffer = await ReferralShareOffer.findOne({ offerType: 'JOB', isActive: true }).sort({ createdAt: -1 }).lean();
+        if (!jobOffer) {
+          jobOffer = await ReferralShareOffer.findOne({ offerType: 'JOB' }).sort({ createdAt: -1 }).lean();
+        }
+        if (jobOffer) {
+          if (referrerAmount === 0) {
+            referrerAmount = Number(jobOffer.referrerAmount ?? jobOffer.amount ?? 0);
+          }
+          if (refereeAmount === 0) {
+            refereeAmount = Number(jobOffer.referredAmount ?? 0);
+          }
+        }
+      }
+
       transactions.push({
         commentKey,
         offerType,
@@ -101,12 +142,14 @@ router.get("/", async (req, res) => {
         referrerId,
         referee: referee || { name: "N/A", mobile: "N/A" },
         refereeId,
-        referrerAmount: referrerEntry?.amount || 0,
-        refereeAmount: refereeEntry?.amount || 0,
+        referrerKyc: referrerKyc || null,
+        refereeKyc: refereeKyc || null,
+        referrerAmount,
+        refereeAmount,
         date: group.createdAt,
         referrerEntryId: referrerEntry?._id,
         refereeEntryId: refereeEntry?._id,
-        isPending: !(referrerEntry?.isPending === false && refereeEntry?.isPending === false),
+        isPending: computePending(referrerEntry, refereeEntry),
       });
     }
 
@@ -143,7 +186,17 @@ router.get("/", async (req, res) => {
         }
       }
       
-      const isPending = !(referrerEntry?.isPending === false && refereeEntry?.isPending === false);
+      const computePending = (refEntry, reedEntry) => {
+        if (refEntry && reedEntry) {
+          return refEntry.isPending !== false || reedEntry.isPending !== false;
+        } else if (refEntry) {
+          return refEntry.isPending !== false;
+        } else if (reedEntry) {
+          return reedEntry.isPending !== false;
+        }
+        return false;
+      };
+      const isPending = computePending(referrerEntry, refereeEntry);
       if (isPending) {
         pendingCount++;
       } else {

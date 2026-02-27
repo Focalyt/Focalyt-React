@@ -638,7 +638,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
             <div className='d-flex align-items-center'>
               <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }}  title={selectedProject.name} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
               <span className="mx-2"> &gt; </span>

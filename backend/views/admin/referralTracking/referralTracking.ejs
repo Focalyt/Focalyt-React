@@ -216,8 +216,8 @@
                 <thead>
                   <tr>
                     <th style="width:40px;">#</th>
-                    <th>Referrer (Shared By)</th>
-                    <th>Referred (Applied By)</th>
+                    <th>Referrer </th>
+                    <th>Referred</th>
                     <th>Type</th>
                     <th>Referrer Reward</th>
                     <th>Referred Reward</th>
@@ -229,7 +229,7 @@
                 <tbody>
                   <% if (transactions && transactions.length > 0) { %>
                     <% transactions.forEach((txn, idx) => { %>
-                      <tr>
+                      <tr data-comment="<%= txn.commentKey %>">
                         <td><%= (page - 1) * perPage + idx + 1 %></td>
                         <td>
                           <% if (txn.referrerId) { %>
@@ -237,6 +237,30 @@
                               <strong><%= txn.referrer.name || 'N/A' %></strong>
                             </a>
                             <br><small class="rtm-subtle"><%= txn.referrer.mobile || '' %></small>
+                            <% if (txn.referrerKyc) { %>
+                              <br><small class="rtm-subtle">
+                                PAN:
+                                <%= txn.referrerKyc.panCard || 'N/A' %>,
+                                Aadhar:
+                                <%= txn.referrerKyc.aadharCard || 'N/A' %>
+                              </small>
+                              <br><small class="rtm-subtle">
+                                Ac:
+                                <%= txn.referrerKyc.bankAccountNumber || 'N/A' %>,
+                                IFSC:
+                                <%= txn.referrerKyc.bankIfscCode || 'N/A' %>
+                              </small>
+                              <% if (txn.referrerKyc.bankDocumentImage) { %>
+                                <br>
+                                <a
+                                  href="<%= process.env.MIPIE_BUCKET_URL %>/<%= txn.referrerKyc.bankDocumentImage %>"
+                                  target="_blank"
+                                  class="rtm-subtle"
+                                >
+                                  View Bank Document
+                                </a>
+                              <% } %>
+                            <% } %>
                           <% } else { %>
                             <span class="rtm-subtle">N/A</span>
                           <% } %>
@@ -247,6 +271,30 @@
                               <strong><%= txn.referee.name || 'N/A' %></strong>
                             </a>
                             <br><small class="rtm-subtle"><%= txn.referee.mobile || '' %></small>
+                            <% if (txn.refereeKyc) { %>
+                              <br><small class="rtm-subtle">
+                                PAN:
+                                <%= txn.refereeKyc.panCard || 'N/A' %>,
+                                Aadhar:
+                                <%= txn.refereeKyc.aadharCard || 'N/A' %>
+                              </small>
+                              <br><small class="rtm-subtle">
+                                Ac:
+                                <%= txn.refereeKyc.bankAccountNumber || 'N/A' %>,
+                                IFSC:
+                                <%= txn.refereeKyc.bankIfscCode || 'N/A' %>
+                              </small>
+                              <% if (txn.refereeKyc.bankDocumentImage) { %>
+                                <br>
+                                <a
+                                  href="<%= process.env.MIPIE_BUCKET_URL %>/<%= txn.refereeKyc.bankDocumentImage %>"
+                                  target="_blank"
+                                  class="rtm-subtle"
+                                >
+                                  View Bank Document
+                                </a>
+                              <% } %>
+                            <% } %>
                           <% } else { %>
                             <span class="rtm-subtle">N/A</span>
                           <% } %>
@@ -415,6 +463,17 @@ function confirmApprove() {
   .then(response => response.json())
   .then(data => {
     if (data.success) {
+      const row = document.querySelector(`tr[data-comment="${currentCommentKey}"]`);
+      if (row) {
+        const statusEl = row.querySelector('.rtm-status');
+        if (statusEl) {
+          statusEl.textContent = 'Approved';
+          statusEl.classList.remove('rtm-status--pending');
+          statusEl.classList.add('rtm-status--approved');
+        }
+        const actions = row.querySelector('.rtm-actions');
+        if (actions) actions.innerHTML = '<span class="rtm-subtle">No action</span>';
+      }
       alert('Transaction approved successfully!');
       location.reload();
     } else {
@@ -451,8 +510,18 @@ function confirmReject() {
   .then(response => response.json())
   .then(data => {
     if (data.success) {
+      const row = document.querySelector(`tr[data-comment="${currentCommentKey}"]`);
+      if (row) {
+        const statusEl = row.querySelector('.rtm-status');
+        if (statusEl) {
+          statusEl.textContent = 'Pending';
+          statusEl.classList.remove('rtm-status--approved');
+          statusEl.classList.add('rtm-status--pending');
+        }
+        const actions = row.querySelector('.rtm-actions');
+        if (actions) actions.innerHTML = '<span class="rtm-subtle">No action</span>';
+      }
       alert('Transaction rejected successfully!');
-      location.reload();
     } else {
       alert('Error: ' + (data.message || 'Failed to reject transaction'));
     }

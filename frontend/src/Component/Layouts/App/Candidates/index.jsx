@@ -1703,7 +1703,10 @@ span#notification {
     }
 }
 @media(max-width:768px){
-    
+     html body .content .content-wrapper {
+    padding: calc(2.2rem - 0.4rem) .8rem 0;
+    margin-top: 6rem;
+}
     .header-navbar.floating-nav{
         width: 100%!important;
         margin: 0;

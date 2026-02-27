@@ -121,7 +121,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
 
   return (
     <>
-        <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+        <div class="">
           <div class="content-header-left col-md-9 col-12 mb-2">
             <div class="row breadcrumbs-top">
               <div class="col-12">
@@ -155,8 +155,8 @@ const CandidateDocumets = ({ candidate, documents }) => {
                 <div className="card-body">
                   <div className="row">
                     {documentLabels.map(({ name, label }, i) => (
-                      <div className="col-md-6 mb-3" key={i}>
-                        <label>
+                      <div className="col-md-6 mb-3 fw-bolder" key={i}>
+                        <label className="mb-2 docLable-Size">
                           {label} {["Photograph", "AadharCardFront", "AadharCardBack", "10thMarksheet"].includes(name) && <span className="mandatory">*</span>}
                         </label>
                         {documentData[name] ? (
@@ -1229,7 +1229,15 @@ input.star:checked ~ .rev-box {
   }
  </style>
 
-
+<style>
+  {
+    `
+    .docLable-Size{
+    font-size: 13px !important;
+    }
+    `
+  }
+</style>
     </>
   )
 }

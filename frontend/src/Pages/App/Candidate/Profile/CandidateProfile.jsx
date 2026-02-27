@@ -2660,13 +2660,14 @@ const CandidateProfile = () => {
                       </div>
                     ))}
 
-                    <button
+                   
+                  </div>
+                  <button
                       className="add-button"
-                      onClick={() => setLanguages([...languages, { lname: '', level: 0 }])} style={{ width: '55%', height: '34px', marginTop: '20px' }}
+                      onClick={() => setLanguages([...languages, { lname: '', level: 0 }])} style={{ height: '34px', marginTop: '20px' }}
                     >
                       <i className="bi bi-plus"></i> Add Language
                     </button>
-                  </div>
                 </div>
 
                 {/* Certifications */}
@@ -2682,7 +2683,7 @@ const CandidateProfile = () => {
                         <div className="certificate-details">
                           <div className="certificate-name">
                             {/* Certificate Name field with validation */}
-                            <div className="form-group w-50">
+                            <div className="form-group w-80">
                               <label className="form-label">
                                 Certificate Name
                                 {(certificate.month || certificate.year || certificate.currentlypursuing) && (
@@ -4231,7 +4232,7 @@ font-weight: bold;
 }
 
 .add-certificate {
-width: 40%;
+width: clamp(160px , 13vw , 800px);
 }
 
 .declaration-checkbox {
@@ -4376,7 +4377,7 @@ width: 40%;
   background-color: #fc2b5a;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 12px;
   padding: 10px 15px;
   display: flex;
   align-items: center;
@@ -4395,8 +4396,7 @@ width: 40%;
 }
 @media(max-width: 768px) {
 .add-certificate {
-max-width: 59%;
-width: 100%;
+width: 154px;
 }
 }
 @media (max-width: 576px) {
@@ -4443,12 +4443,19 @@ width: 100%;
 .board-autocomplete-wrapper {
   position: relative;
 }
+  .mediawidth{
+  justify-content:center;
+  }
   @media(max-width:768px){
   .mediawidth{
-  flex-direction:column;}
+  flex-direction:column;
+  justify-content:center;
+  }
+
   .mediawidth button{
   margin-bottom: 15px;
-  font-size:11px;}
+  font-size:14px;}
+
   .content h2{
   font-size:1.1rem}
   }
@@ -5292,6 +5299,7 @@ border-radius: 8px;
 
 .project-details {
 flex: 1;
+padding : 5px 13px 0px 0px;
 }
 
 .project-header {
@@ -5342,7 +5350,7 @@ margin-bottom: 15px;
 display: flex;
 align-items: center;
 background-color: #f1f1f1;
-border-radius: 30px;
+border-radius: 8px;
 padding: 6px 15px;
 font-size: 14px;
 }
@@ -6282,6 +6290,23 @@ max-width: 600px;
     }
   }
   
+    `
+  }
+</style>
+
+<style>
+  {
+    `
+    @media( max-width: 768px){
+    .upload-resume{
+    width:auto;
+    }
+    .form-select{
+        background-position: right .1rem center;
+        font-size: clamp(15px, 1.5vw, 22px);
+        padding: 1px 20px 1px 10px;
+        margin-bottom: 7px;
+    }
     `
   }
 </style>

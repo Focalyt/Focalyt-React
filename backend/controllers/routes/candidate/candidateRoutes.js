@@ -575,11 +575,12 @@ router
       const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced, fatherName, motherName} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
-        let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
+        let referredBy = await CandidateProfile.findOne({ _id: formData.refCode })
         if (!referredBy) {
           req.flash("error", "Enter a valid referral code.");
           return res.send({ status: 'failure', error: "Enter a valid referral code." })
         }
+        console.log('[REGISTER] Valid referral code - referrer:', referredBy._id);
       }
       const dataCheck = await Candidate.findOne({ mobile: mobile });
       if (email && email.trim() !== '') {
@@ -1105,6 +1106,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   if (jobDetails.status == false) {
     return res.redirect("/candidate/searchJob");
   }
+  const referralOffer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).lean();
 
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
@@ -1169,6 +1171,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
     highestQualification,
     jobDetails,
     candidate,
+    referralOffer,
     isApplied,
     isRegisterInterview,
     canApply,
@@ -2416,25 +2419,41 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   }
 
   let referrerId = candidate?.referredBy;
+  console.log('[JOB_APPLY] Starting - refCode:', refCode, 'candidate.referredBy:', candidate?.referredBy, 'candidateId:', candidate._id);
   
   if (!referrerId && refCode && mongoose.Types.ObjectId.isValid(refCode)) {
+    console.log('[JOB_APPLY] Validating refCode:', refCode);
     const refCodeObjectId = new mongoose.Types.ObjectId(refCode);
     
     if (refCodeObjectId.toString() === candidate._id.toString()) {
+      console.log('[JOB_APPLY] RefCode is same as current candidate - ignoring');
       referrerId = null;
     } else {
       const referrerCandidate = await Candidate.findOne({ 
-        _id: refCodeObjectId, 
-        status: true, 
-        isDeleted: false 
+        _id: refCodeObjectId
       }).lean();
       
+      console.log('[JOB_APPLY] Referrer lookup result:', {
+        found: !!referrerCandidate,
+        referrerId: referrerCandidate?._id,
+        status: referrerCandidate?.status,
+        isDeleted: referrerCandidate?.isDeleted
+      });
+      
+      // Accept referrer as long as they exist, even if disabled/deleted (for tracking purposes)
       if (referrerCandidate && referrerCandidate._id.toString() !== candidate._id.toString()) {
         referrerId = refCodeObjectId;
         await Candidate.findByIdAndUpdate(candidate._id, { referredBy: referrerId }, { new: true });
+        console.log('[JOB_APPLY] Set referrerId to:', referrerId);
+      } else {
+        console.log('[JOB_APPLY] Referrer not found or is same candidate');
       }
     }
+  } else {
+    console.log('[JOB_APPLY] Skipping refCode validation - refCode valid:', mongoose.Types.ObjectId.isValid(refCode), 'has referredBy:', !!referrerId);
   }
+  console.log('[JOB_APPLY] Final referrerId:', referrerId);
+
 
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
     // console.log("Already Applied")
@@ -2477,48 +2496,58 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
 
 
     if (referrerId) {
-      const offer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).sort({ createdAt: -1 }).lean();
-      if (offer) {
-        const referrerReward = Number(offer.referrerAmount ?? offer.amount ?? 0);
-        const referredReward = Number(offer.referredAmount ?? 0);
-        const commentKey = `refApply:JOB:${jobId}:${candidate._id}`;
-
-        if (Number.isFinite(referrerReward) && referrerReward > 0) {
-          const exists = await CandidateCashBack.findOne({
-            candidateId: referrerId,
-            eventName: candidateCashbackEventName.referrer_job_apply,
-            comment: commentKey,
-          }).lean();
-          if (!exists) {
-            await CandidateCashBack.create({
-              candidateId: referrerId,
-              eventType: cashbackEventType.credit,
-              eventName: candidateCashbackEventName.referrer_job_apply,
-              amount: referrerReward,
-              isPending: true,
-              comment: commentKey,
-            });
-          }
-        }
-
-        if (Number.isFinite(referredReward) && referredReward > 0) {
-          const exists = await CandidateCashBack.findOne({
-            candidateId: candidate._id,
-            eventName: candidateCashbackEventName.referee_job_apply,
-            comment: commentKey,
-          }).lean();
-          if (!exists) {
-            await CandidateCashBack.create({
-              candidateId: candidate._id,
-              eventType: cashbackEventType.credit,
-              eventName: candidateCashbackEventName.referee_job_apply,
-              amount: referredReward,
-              isPending: true,
-              comment: commentKey,
-            });
-          }
-        }
+      // try active offer first
+      let offer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).sort({ createdAt: -1 }).lean();
+      if (!offer) {
+        // if none active, fall back to most recent job offer so rewards remain consistent
+        offer = await ReferralShareOffer.findOne({ offerType: "JOB" }).sort({ createdAt: -1 }).lean();
+        console.log('[REFERRAL] No active job offer, using last available offer:', offer?._id);
       }
+      console.log('[REFERRAL] Job Apply - referrerId:', referrerId, 'offer:', offer);
+      
+      const referrerReward = offer ? Number(offer.referrerAmount ?? offer.amount ?? 0) : 0;
+      const referredReward = offer ? Number(offer.referredAmount ?? 0) : 0;
+      const commentKey = `refApply:JOB:${jobId}:${candidate._id}`;
+      console.log('[REFERRAL] Creating entries - referrerReward:', referrerReward, 'referredReward:', referredReward, 'commentKey:', commentKey);
+
+      // Always create referrer entry (track even when offer missing)
+      const referrerExists = await CandidateCashBack.findOne({
+        candidateId: referrerId,
+        eventName: candidateCashbackEventName.referrer_job_apply,
+        comment: commentKey,
+      }).lean();
+      if (!referrerExists) {
+        await CandidateCashBack.create({
+          candidateId: referrerId,
+          eventType: cashbackEventType.credit,
+          eventName: candidateCashbackEventName.referrer_job_apply,
+          amount: referrerReward,
+          isPending: referrerReward > 0 ? true : false,
+          comment: commentKey,
+        });
+        console.log('[REFERRAL] Created referrer entry for', referrerId);
+      }
+
+      // Always create referee entry (track even if no reward)
+      const refereeExists = await CandidateCashBack.findOne({
+        candidateId: candidate._id,
+        eventName: candidateCashbackEventName.referee_job_apply,
+        comment: commentKey,
+      }).lean();
+      if (!refereeExists) {
+        await CandidateCashBack.create({
+          candidateId: candidate._id,
+          eventType: cashbackEventType.credit,
+          eventName: candidateCashbackEventName.referee_job_apply,
+          amount: referredReward,
+          isPending: referredReward > 0 ? true : false,
+          comment: commentKey,
+        });
+        console.log('[REFERRAL] Created referee entry for', candidate._id);
+      }
+
+    } else {
+      console.log('[REFERRAL] No referrerId found for job application - candidate.referredBy:', candidate?.referredBy, 'refCode:', refCode);
     }
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
@@ -4062,7 +4091,7 @@ router.route('/kycDocument')
         req.flash("error", "Candidate doesn't exists!");
         return res.status(404).send({ status: false, message: "Candidate doesn't exists!" })
       }
-      let { aadharCard, aadharCardImage, panCard, panCardImage, upi } = req.body
+      let { aadharCard, aadharCardImage, panCard, panCardImage, upi, bankAccountNumber, bankIfscCode, bankDocumentImage } = req.body
       let add = {}
       if (aadharCard || aadharCard == '') {
         add['aadharCard'] = aadharCard
@@ -4075,6 +4104,15 @@ router.route('/kycDocument')
       }
       if (panCardImage || panCardImage == '') {
         add['panCardImage'] = panCardImage
+      }
+      if (bankAccountNumber || bankAccountNumber === '') {
+        add['bankAccountNumber'] = bankAccountNumber
+      }
+      if (bankIfscCode || bankIfscCode === '') {
+        add['bankIfscCode'] = bankIfscCode
+      }
+      if (bankDocumentImage || bankDocumentImage === '') {
+        add['bankDocumentImage'] = bankDocumentImage
       }
       if (upi) {
         let updateUpi = await Candidate.findOneAndUpdate({ _id: candidate._id }, { upi })
@@ -5037,9 +5075,9 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
     
-    console.log('\n' + '='.repeat(60));
-    console.log('👤 ===== GET PROFILE REQUEST =====');
-    console.log('User Mobile:', user.mobile);
+    // console.log('\n' + '='.repeat(60));
+    // console.log('👤 ===== GET PROFILE REQUEST =====');
+    // console.log('User Mobile:', user.mobile);
 
     const educations = await Qualification.find({ status: true });
     const candidate = await Candidate.findOne({ mobile: user.mobile });
@@ -5050,28 +5088,28 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
-    console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
-    console.log('Root Level:');
-    console.log('  - latitude:', candidate?.latitude, `(type: ${typeof candidate?.latitude})`);
-    console.log('  - longitude:', candidate?.longitude, `(type: ${typeof candidate?.longitude})`);
-    console.log('  - location:', candidate?.location);
+    // console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
+    // console.log('Root Level:');
+    // console.log('  - latitude:', candidate?.latitude, `(type: ${typeof candidate?.latitude})`);
+    // console.log('  - longitude:', candidate?.longitude, `(type: ${typeof candidate?.longitude})`);
+    // console.log('  - location:', candidate?.location);
     
-    if (candidate?.personalInfo) {
-      console.log('\nPersonalInfo Location Data:');
-      console.log('  - currentAddress:', candidate.personalInfo.currentAddress ? {
-        latitude: candidate.personalInfo.currentAddress.latitude,
-        longitude: candidate.personalInfo.currentAddress.longitude,
-        coordinates: candidate.personalInfo.currentAddress.coordinates
-      } : 'NOT SET');
-      console.log('  - permanentAddress:', candidate.personalInfo.permanentAddress ? {
-        latitude: candidate.personalInfo.permanentAddress.latitude,
-        longitude: candidate.personalInfo.permanentAddress.longitude,
-        coordinates: candidate.personalInfo.permanentAddress.coordinates,
-        sameCurrentAddress: candidate.personalInfo.permanentAddress.sameCurrentAddress
-      } : 'NOT SET');
-    }
+    // if (candidate?.personalInfo) {
+    //   // console.log('\nPersonalInfo Location Data:');
+    //   console.log('  - currentAddress:', candidate.personalInfo.currentAddress ? {
+    //     latitude: candidate.personalInfo.currentAddress.latitude,
+    //     longitude: candidate.personalInfo.currentAddress.longitude,
+    //     coordinates: candidate.personalInfo.currentAddress.coordinates
+    //   } : 'NOT SET');
+    //   console.log('  - permanentAddress:', candidate.personalInfo.permanentAddress ? {
+    //     latitude: candidate.personalInfo.permanentAddress.latitude,
+    //     longitude: candidate.personalInfo.permanentAddress.longitude,
+    //     coordinates: candidate.personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: candidate.personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'NOT SET');
+    // }
     
-    console.log('='.repeat(60) + '\n');
+    // console.log('='.repeat(60) + '\n');
 
     res.status(200).json({
       status: true,

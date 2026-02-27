@@ -17,7 +17,10 @@ const CandidateEarning = ({
     panCard: documents?.panCard || '',
     aadharCardImage: documents?.aadharCardImage || '',
     panCardImage: documents?.panCardImage || '',
-    upi: upi || ''
+    upi: upi || '',
+    bankAccountNumber: documents?.bankAccountNumber || '',
+    bankIfscCode: documents?.bankIfscCode || '',
+    bankDocumentImage: documents?.bankDocumentImage || ''
   });
 
   const [error, setError] = useState('');
@@ -168,10 +171,19 @@ const CandidateEarning = ({
       });
   };
 
-  const validations = (e) => {
+  const validations = async (e) => {
     e.preventDefault();
 
-    const { aadharCard, panCard, aadharCardImage, panCardImage, upi } = formData;
+    const {
+      aadharCard,
+      panCard,
+      aadharCardImage,
+      panCardImage,
+      upi,
+      bankAccountNumber,
+      bankIfscCode,
+      bankDocumentImage
+    } = formData;
 
     if ((!aadharCard.trim() && !panCard.trim()) || (!aadharCardImage && !panCardImage)) {
       setDocumentError('Please upload at least one Document.');
@@ -179,11 +191,36 @@ const CandidateEarning = ({
     } else if (!upi.trim()) {
       setDocumentError('Please enter the value for UPI.');
       return;
+    } else if (!bankAccountNumber.trim() || !bankIfscCode.trim() || !bankDocumentImage) {
+      setDocumentError('Please fill bank account number, IFSC code and upload bank document.');
+      return;
     }
 
-    // Submit form if validation passes
-    const form = e.target;
-    form.submit();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${backendUrl}/candidate/kycDocument`,
+        {
+          aadharCard,
+          aadharCardImage,
+          panCard,
+          panCardImage,
+          upi,
+          bankAccountNumber,
+          bankIfscCode,
+          bankDocumentImage
+        },
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+      window.location.reload();
+    } catch (err) {
+      console.error('Error submitting KYC:', err);
+      setDocumentError('Something went wrong while submitting KYC. Please try again.');
+    }
   };
 
   // Fetch reward statuses from candidate endpoint
@@ -571,6 +608,38 @@ const CandidateEarning = ({
                           </form>
                         </span>
                       </div>
+                  <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 mt-1">
+                    Bank Account Number <br />
+                    <span>
+                      <form>
+                        <input
+                          type="checkbox"
+                          checked={documents?.bankAccountNumber ? true : false}
+                          disabled={documents?.bankAccountNumber ? true : false}
+                        />
+                        <label>
+                          {documents?.bankAccountNumber
+                            ? `****${documents.bankAccountNumber.slice(-4)}`
+                            : 'xxxx-xxxx-xxxx'}
+                        </label>
+                      </form>
+                    </span>
+                  </div>
+                  <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 mt-1">
+                    IFSC Code <br />
+                    <span>
+                      <form>
+                        <input
+                          type="checkbox"
+                          checked={documents?.bankIfscCode ? true : false}
+                          disabled={documents?.bankIfscCode ? true : false}
+                        />
+                        <label>
+                          {documents?.bankIfscCode ? documents.bankIfscCode : 'XXXXXXXX'}
+                        </label>
+                      </form>
+                    </span>
+                  </div>
                     </div>
                     <p className='cashout-p'>For Cashout, please upload your Adhaar card and PAN card.</p>
                     <p className="my-3">कैशआउट के लिए कृपया अपना आधार कार्ड और पैन कार्ड अपलोड करें|</p>
@@ -905,23 +974,27 @@ const CandidateEarning = ({
 
       {/* KYC modal */}
       <div className="modal fade" id="kyc" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle">
-        <div className="modal-dialog modal-dialog-centered" role="document">
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
           <div className="modal-content p-0">
             <div className="modal-header">
               <h5 className="modal-title text-black text-uppercase" id="exampleModalLongTitle">
                 Upload KYC Document
               </h5>
-              {/* <button type="button" className="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">×</span>
-              </button> */}
-              <button type="button" className="btn btn-outline-light waves-effect waves-danger close" onClick={closeKycModal}>
-                <i className="fas fa-times d-block d-lg-none"></i>
-                <span className="d-none d-lg-block">Cancel</span>
+              <button
+                type="button"
+                className="close"
+                aria-label="Close"
+                onClick={closeKycModal}
+              >
+                <span aria-hidden="true">&times;</span>
               </button>
-
             </div>
-            <div className="modal-body pt-1" id="popup-body">
-              <form method="post" action="/candidate/kycDocument" onSubmit={validations}>
+            <div
+              className="modal-body pt-1"
+              id="popup-body"
+              style={{ maxHeight: '70vh', overflowY: 'auto' }}
+            >
+              <form onSubmit={validations}>
                 <div className="col-xl-6 mb-1">
                   <label>
                     Aadhar Card Number <span className="mandatory">*</span>
@@ -1074,6 +1147,92 @@ const CandidateEarning = ({
                     onChange={handleInputChange}
                     required
                   />
+                </div>
+                <div className="col-xl-6 mb-1">
+                  <label>
+                    Bank Account Number <span className="mandatory">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="bankAccountNumber"
+                    className="form-control"
+                    value={formData.bankAccountNumber}
+                    onChange={handleInputChange}
+                    readOnly={documents?.kycCompleted}
+                    required
+                  />
+                </div>
+                <div className="col-xl-6 mb-1">
+                  <label>
+                    IFSC Code <span className="mandatory">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="bankIfscCode"
+                    className="form-control"
+                    style={{ textTransform: 'uppercase' }}
+                    value={formData.bankIfscCode}
+                    onChange={handleInputChange}
+                    readOnly={documents?.kycCompleted}
+                    required
+                  />
+                </div>
+                <div className="col-xl-6 mb-1">
+                  <label>
+                    Bank Document (Passbook / Cancelled Cheque) <span className="mandatory">*</span>
+                  </label>
+                  {formData.bankDocumentImage ? (
+                    <>
+                      <a
+                        href={`${bucketUrl}/${formData.bankDocumentImage}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Uploaded image
+                      </a>
+                      {!documents?.kycCompleted && (
+                        <i
+                          className="feather icon-x remove_uploaded_pic"
+                          style={{ color: 'red' }}
+                          onClick={() =>
+                            setFormData(prev => ({
+                              ...prev,
+                              bankDocumentImage: ''
+                            }))
+                          }
+                        />
+                      )}
+                      <input
+                        type="file"
+                        className="form-control"
+                        onChange={(e) => imageChangeHandler(e, 'bankDocumentImage')}
+                        style={{ display: 'none' }}
+                      />
+                      <input
+                        type="hidden"
+                        className="form-control"
+                        name="bankDocumentImage"
+                        value={formData.bankDocumentImage}
+                        required
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="file"
+                        className="form-control"
+                        onChange={(e) => imageChangeHandler(e, 'bankDocumentImage')}
+                        required
+                      />
+                      <input
+                        type="hidden"
+                        className="form-control"
+                        name="bankDocumentImage"
+                        value={formData.bankDocumentImage}
+                        required
+                      />
+                    </>
+                  )}
                 </div>
                 <p id="documentError" className="text-danger">{documentError}</p>
                 <div className="modal-footer">

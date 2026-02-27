@@ -22,8 +22,8 @@ const CandidateWallet = () => {
 
     return (
         <>
-            <section className="money-rain py-3">
-                <div className="mipie-earn px-2">
+            <section className="money-rain py-3 cashBackSection">
+                <div className="mipie-earn px-2 ms-2 CashHead">
                     <h4 className="font-weight-bold now-padding">Now you can earn with Focalyt</h4>
                     <h4 className="font-weight-bold">अब आप Focalyt से कमा सकते हैं</h4>
                 </div>
@@ -355,6 +355,25 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
         background-position: bottom !important;
     }
 }
+                    `
+                }
+            </style>
+
+            <style>
+                {
+                    `
+                    .cashBackSection{
+                        padding: 0px 13px;
+                        }
+                    .CashHead{
+                    width: 50% !important; }
+                    @media (max-width:425px){
+                    .CashHead{
+                        width: 80% !important;
+                    }
+                        .cashBack-text{
+                        font-size: 15px !important;}
+                    }
                     `
                 }
             </style>

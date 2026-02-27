@@ -132,9 +132,9 @@ const AppliedCourses = () => {
                           </Link>
                         </div>
                       </div>
-                      <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0">
+                      <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0 BTnPosition">
                         <div className="extra-job-info mt-1">
-                          <span className="px-0">
+                          <span className="px-0 uploadeBtn" style={{marginBottom:'10px'}}>
                             <i className="la la-map"></i>
                             <strong>Last Date</strong>{" "}
                             {moment(course?.lastDateForApply || course?.createdAt)
@@ -145,7 +145,7 @@ const AppliedCourses = () => {
                         <div className="add--documents mt-1">
                           <Link
                             to={`/candidate/reqDocs/${course?._id}`}
-                            className="btn btn-success text-white waves-effect waves-light"
+                            className="btn btn-success text-white waves-effect waves-light uploadeBtn"
                           >
                             Upload Documents
                           </Link>
@@ -278,10 +278,10 @@ const AppliedCourses = () => {
 }
 
 @media(max-width:768px){
-  .job-overview > ul{
-display: flex;
-flex-direction: column;
-  }
+//   .job-overview > ul{
+// display: flex;
+// flex-direction: column;
+//   }
   .job-single-sec .job-overview ul li{
     width: 100%!important;
   }
@@ -291,6 +291,44 @@ flex-direction: column;
         }
       `}
       </style>
+
+      <style>
+  {
+    `
+    @media(max-width:768px){
+
+  .job-single-sec .job-overview ul li{
+    width: 50%!important;
+}
+
+    .BTnPosition{
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+  .uploadeBtn{
+  padding: 0.5rem 1rem;
+}
+
+}
+  
+
+    @media(max-width: 425px) {
+      .BTnPosition{
+        display: block;
+      } 
+        .uploadeBtn{
+        white-space: nowrap;
+        // margin-top: 5px;
+        margin-left: 23px;
+        }
+        
+    }
+
+    `
+  }
+</style>
     </>
   );
 };
