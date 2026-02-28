@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import axios from 'axios';
@@ -325,12 +325,42 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
+  const containerRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        onToggle();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onToggle]);
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
     onChange(newValues);
   };
+
+  const filteredOptions = options.filter(option => {
+    const label = String(option?.label ?? '');
+    return label.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   // Get display text for selected items
   const getDisplayText = () => {
@@ -351,7 +381,7 @@ const MultiSelectCheckbox = ({
   };
 
   return (
-    <div className="multi-select-container-new">
+    <div className="multi-select-container-new" ref={containerRef}>
       <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
         <i className={`${icon} me-1 text-primary`}></i>
         {title}
@@ -385,6 +415,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -392,7 +424,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -408,10 +440,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `No ${String(title).toLowerCase()} found for "${searchTerm}"` : `No ${String(title).toLowerCase()} available`}
                 </div>
               )}
             </div>
@@ -420,7 +452,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
                 </small>
               </div>
             )}
@@ -436,6 +469,9 @@ const LeadAnalyticsDashboard = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+
+  
   // Initialize with today's date
   const getInitialDates = () => {
     const today = new Date();
