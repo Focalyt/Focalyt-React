@@ -2,25 +2,106 @@ const express = require("express");
 const router = express.Router();
 const fs = require("fs").promises;
 const path = require("path");
+const { BotTraining, BotTrainingRule } = require("../../models");
 
 const TRAINING_DATA_FILE = path.join(__dirname, "../../../data/botTrainingData.json");
 
-// Ensure data directory exists
-const ensureDataDir = async () => {
-  const dataDir = path.dirname(TRAINING_DATA_FILE);
-  try {
-    await fs.mkdir(dataDir, { recursive: true });
-  } catch (e) {
-    // Directory might already exist
-  }
+// Build training data structure from DB
+const buildTrainingDataFromDb = async () => {
+  const [examples, rules] = await Promise.all([
+    BotTraining.find({}).sort({ createdAt: -1 }).lean(),
+    BotTrainingRule.find({}).sort({ priority: -1, createdAt: -1 }).lean(),
+  ]);
+
+  const mapExample = (doc) => ({
+    id: doc._id.toString(),
+    type: doc.type || "qa",
+    userQuery: doc.userQuery || "",
+    expectedPreferences: doc.expectedPreferences || {},
+    expectedResponse: doc.expectedResponse || "",
+    tags: doc.tags || [],
+    notes: doc.notes || "",
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  });
+
+  const mapRule = (doc) => ({
+    id: doc._id.toString(),
+    rule: doc.rule || "",
+    description: doc.description || "",
+    priority: typeof doc.priority === "number" ? doc.priority : 0,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  });
+
+  const allDocs = [...examples, ...rules];
+  const lastUpdated =
+    allDocs.length > 0
+      ? new Date(
+          Math.max(
+            ...allDocs.map((d) => new Date(d.updatedAt || d.createdAt || new Date(0)).getTime())
+          )
+        ).toISOString()
+      : new Date().toISOString();
+
+  return {
+    examples: examples.map(mapExample),
+    rules: rules.map(mapRule),
+    intents: [],
+    lastUpdated,
+  };
 };
 
-// Load training data
+// Load training data (prefers DB, falls back to JSON file and migrates once)
 const loadTrainingData = async () => {
+  const [exampleCount, ruleCount] = await Promise.all([
+    BotTraining.countDocuments(),
+    BotTrainingRule.countDocuments(),
+  ]);
+  if (exampleCount > 0 || ruleCount > 0) {
+    return buildTrainingDataFromDb();
+  }
+
+  // If DB empty, try to read from legacy JSON file and migrate
   try {
-    await ensureDataDir();
-    const data = await fs.readFile(TRAINING_DATA_FILE, "utf8");
-    return JSON.parse(data);
+    const raw = await fs.readFile(TRAINING_DATA_FILE, "utf8");
+    const legacy = JSON.parse(raw);
+
+    const exampleDocs = [];
+    const ruleDocs = [];
+
+    (legacy.examples || []).forEach((ex) => {
+      const hasPrefs = ex.expectedPreferences && Object.keys(ex.expectedPreferences || {}).length > 0;
+      exampleDocs.push({
+        type: hasPrefs ? "job-search" : "qa",
+        userQuery: ex.userQuery,
+        expectedPreferences: ex.expectedPreferences || {},
+        expectedResponse: ex.expectedResponse || "",
+        tags: ex.tags || [],
+        notes: ex.notes || "",
+        createdAt: ex.createdAt,
+        updatedAt: ex.updatedAt,
+      });
+    });
+
+    (legacy.rules || []).forEach((r) => {
+      ruleDocs.push({
+        rule: r.rule,
+        description: r.description || "",
+        priority: r.priority || 0,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      });
+    });
+
+    if (exampleDocs.length > 0) {
+      await BotTraining.insertMany(exampleDocs);
+    }
+    if (ruleDocs.length > 0) {
+      await BotTrainingRule.insertMany(ruleDocs);
+    }
+
+    return buildTrainingDataFromDb();
   } catch (e) {
     return {
       examples: [],
@@ -29,13 +110,6 @@ const loadTrainingData = async () => {
       lastUpdated: new Date().toISOString(),
     };
   }
-};
-
-// Save training data
-const saveTrainingData = async (data) => {
-  await ensureDataDir();
-  data.lastUpdated = new Date().toISOString();
-  await fs.writeFile(TRAINING_DATA_FILE, JSON.stringify(data, null, 2), "utf8");
 };
 
 /**
@@ -47,7 +121,7 @@ router.get("/training-data", async (req, res) => {
     const data = await loadTrainingData();
     res.json({
       status: true,
-      data: data,
+      data,
     });
   } catch (error) {
     console.error("Error loading training data:", error);
@@ -59,13 +133,9 @@ router.get("/training-data", async (req, res) => {
   }
 });
 
-/**
- * POST /api/ai/training-data/example
- * Add a new training example
- */
 router.post("/training-data/example", async (req, res) => {
   try {
-    const { userQuery, expectedPreferences, expectedResponse, tags, notes } = req.body;
+    const { userQuery, expectedPreferences, expectedResponse, tags, notes, type } = req.body;
 
     if (!userQuery) {
       return res.status(400).json({
@@ -74,31 +144,42 @@ router.post("/training-data/example", async (req, res) => {
       });
     }
 
-    const data = await loadTrainingData();
-    const newExample = {
-      id: Date.now().toString(),
+    const exampleType =
+      type ||
+      (expectedPreferences && Object.keys(expectedPreferences || {}).length > 0
+        ? "job-search"
+        : "qa");
+
+    const doc = await BotTraining.create({
+      type: exampleType,
       userQuery: userQuery.trim(),
       expectedPreferences: expectedPreferences || {},
       expectedResponse: expectedResponse || "",
       tags: tags || [],
       notes: notes || "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
-    data.examples.push(newExample);
-    await saveTrainingData(data);
+    const example = {
+      id: doc._id.toString(),
+      userQuery: doc.userQuery,
+      expectedPreferences: doc.expectedPreferences,
+      expectedResponse: doc.expectedResponse,
+      tags: doc.tags,
+      notes: doc.notes,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    };
 
     res.json({
       status: true,
-      message: "Training example added successfully",
-      example: newExample,
+      message: "Added successfully",
+      example,
     });
   } catch (error) {
-    console.error("Error adding training example:", error);
+    console.error("Error adding training:", error);
     res.status(500).json({
       status: false,
-      message: "Failed to add training example",
+      message: "Failed to add",
       error: error.message,
     });
   }
@@ -111,30 +192,45 @@ router.post("/training-data/example", async (req, res) => {
 router.put("/training-data/example/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = req.body || {};
 
-    const data = await loadTrainingData();
-    const index = data.examples.findIndex((e) => e.id === id);
+    const doc = await BotTraining.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          type: updates.type,
+          userQuery: updates.userQuery,
+          expectedPreferences: updates.expectedPreferences,
+          expectedResponse: updates.expectedResponse,
+          tags: updates.tags,
+          notes: updates.notes,
+        },
+      },
+      { new: true }
+    ).lean();
 
-    if (index === -1) {
+    if (!doc) {
       return res.status(404).json({
         status: false,
         message: "Training example not found",
       });
     }
 
-    data.examples[index] = {
-      ...data.examples[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
+    const example = {
+      id: doc._id.toString(),
+      userQuery: doc.userQuery,
+      expectedPreferences: doc.expectedPreferences || {},
+      expectedResponse: doc.expectedResponse || "",
+      tags: doc.tags || [],
+      notes: doc.notes || "",
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
     };
-
-    await saveTrainingData(data);
 
     res.json({
       status: true,
       message: "Training example updated successfully",
-      example: data.examples[index],
+      example,
     });
   } catch (error) {
     console.error("Error updating training example:", error);
@@ -154,18 +250,14 @@ router.delete("/training-data/example/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const data = await loadTrainingData();
-    const index = data.examples.findIndex((e) => e.id === id);
+    const result = await BotTraining.deleteOne({ _id: id });
 
-    if (index === -1) {
+    if (!result.deletedCount) {
       return res.status(404).json({
         status: false,
         message: "Training example not found",
       });
     }
-
-    data.examples.splice(index, 1);
-    await saveTrainingData(data);
 
     res.json({
       status: true,
@@ -196,43 +288,41 @@ router.post("/training-data/rule", async (req, res) => {
       });
     }
 
-    const data = await loadTrainingData();
-    
     if (id) {
-      // Update existing rule
-      const index = data.rules.findIndex((r) => r.id === id);
-      if (index !== -1) {
-        data.rules[index] = {
-          ...data.rules[index],
-          rule,
-          description: description || "",
-          priority: priority || 0,
-          updatedAt: new Date().toISOString(),
-        };
-      } else {
+      const updated = await BotTrainingRule.findOneAndUpdate(
+        { _id: id },
+        {
+          $set: {
+            rule: rule.trim(),
+            description: description || "",
+            priority: priority || 0,
+          },
+        },
+        { new: true }
+      );
+
+      if (!updated) {
         return res.status(404).json({
           status: false,
           message: "Rule not found",
         });
       }
-    } else {
-      // Add new rule
-      const newRule = {
-        id: Date.now().toString(),
-        rule: rule.trim(),
-        description: description || "",
-        priority: priority || 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      data.rules.push(newRule);
+
+      return res.json({
+        status: true,
+        message: "Rule updated successfully",
+      });
     }
 
-    await saveTrainingData(data);
+    await BotTrainingRule.create({
+      rule: rule.trim(),
+      description: description || "",
+      priority: priority || 0,
+    });
 
     res.json({
       status: true,
-      message: id ? "Rule updated successfully" : "Rule added successfully",
+      message: "Rule added successfully",
     });
   } catch (error) {
     console.error("Error saving rule:", error);
@@ -252,18 +342,14 @@ router.delete("/training-data/rule/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const data = await loadTrainingData();
-    const index = data.rules.findIndex((r) => r.id === id);
+    const result = await BotTrainingRule.deleteOne({ _id: id });
 
-    if (index === -1) {
+    if (!result.deletedCount) {
       return res.status(404).json({
         status: false,
         message: "Rule not found",
       });
     }
-
-    data.rules.splice(index, 1);
-    await saveTrainingData(data);
 
     res.json({
       status: true,

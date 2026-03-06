@@ -1,56 +1,53 @@
 const express = require("express");
 const router = express.Router();
 const Anthropic = require("@anthropic-ai/sdk");
-const { Vacancy, FAQ, Courses } = require("../../models");
-const fs = require("fs").promises;
-const path = require("path");
+const { Vacancy, FAQ, Courses, BotTraining, BotTrainingRule } = require("../../models");
 
-/**
- * AI-Powered Job Recommendations using Anthropic Claude
- * 
- * Features:
- * 1. Natural Language Job Search
- * 2. Smart Job Matching based on user profile
- * 3. Personalized Ranking
- * 4. Skill-based Recommendations
- */
 
-/**
- * POST /api/ai/job-recommendations
- * 
- * Request Body:
- * {
- *   "userQuery": "I want a data analyst job in Mumbai with 2 years experience",
- *   "preferences": {
- *     "state": "Maharashtra",
- *     "city": "Mumbai",
- *     "maxExperienceYears": 2,
- *     "minSalary": 25000,
- *     "qualification": "B.Tech"
- *   },
- *   "userProfile": {
- *     "skills": ["Python", "SQL", "Excel"],
- *     "currentRole": "Data Analyst",
- *     "experience": 1.5
- *   }
- * }
- */
-// Load training data helper
-const TRAINING_DATA_FILE = path.join(__dirname, "../../../data/botTrainingData.json");
+// Load training data helper (from DB)
 const loadTrainingData = async () => {
-  try {
-    const dataDir = path.dirname(TRAINING_DATA_FILE);
-    await fs.mkdir(dataDir, { recursive: true });
-    const data = await fs.readFile(TRAINING_DATA_FILE, "utf8");
-    return JSON.parse(data);
-  } catch (e) {
-    return {
-      examples: [],
-      rules: [],
-      intents: [],
-      lastUpdated: new Date().toISOString(),
-    };
-  }
+  const [examples, rules] = await Promise.all([
+    BotTraining.find({}).sort({ createdAt: -1 }).lean(),
+    BotTrainingRule.find({}).sort({ priority: -1, createdAt: -1 }).lean(),
+  ]);
+
+  const mapExample = (doc) => ({
+    id: doc._id.toString(),
+    type: doc.type || "qa",
+    userQuery: doc.userQuery || "",
+    expectedPreferences: doc.expectedPreferences || {},
+    expectedResponse: doc.expectedResponse || "",
+    tags: doc.tags || [],
+    notes: doc.notes || "",
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  });
+
+  const mapRule = (doc) => ({
+    id: doc._id.toString(),
+    rule: doc.rule || "",
+    description: doc.description || "",
+    priority: typeof doc.priority === "number" ? doc.priority : 0,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  });
+
+  const allDocs = [...examples, ...rules];
+  const lastUpdated =
+    allDocs.length > 0
+      ? new Date(
+          Math.max(
+            ...allDocs.map((d) => new Date(d.updatedAt || d.createdAt || new Date(0)).getTime())
+          )
+        ).toISOString()
+      : new Date().toISOString();
+
+  return {
+    examples: examples.map(mapExample),
+    rules: rules.map(mapRule),
+    intents: [],
+    lastUpdated,
+  };
 };
 
 /** Check if user query is about courses (for attaching course cards to Q&A) */
@@ -375,7 +372,35 @@ router.post("/job-recommendations", async (req, res) => {
       console.log(`[AI] ✅ Jobs intent detected, bypassing Q&A flow`);
     }
 
-    // Step 0: First check FAQ database for matching question
+    // Step 0: Prefer explicit bot training examples (DB) over FAQ
+    const trainingData = await loadTrainingData();
+    const queryLower = (userQuery || "").toString().toLowerCase().trim();
+
+    const exactTrainingMatch =
+      trainingData.examples?.find((ex) => {
+        const exLower = (ex.userQuery || "").toString().toLowerCase().trim();
+        const isQAExample =
+          ex.expectedResponse &&
+          (!ex.expectedPreferences || Object.keys(ex.expectedPreferences).length === 0);
+        return isQAExample && exLower === queryLower;
+      }) || null;
+
+    if (exactTrainingMatch && !(normalizedIntent === "jobs" && isLikelySearchCommand)) {
+      const answer = exactTrainingMatch.expectedResponse;
+      const attachCourses = isCourseRelatedQuery(userQuery) || isCourseRelatedAnswer(answer);
+      const courses = attachCourses ? await fetchFormattedCourses(preferences) : [];
+      return res.json({
+        status: true,
+        isQA: true,
+        answer,
+        source: "training_data_exact",
+        jobs: [],
+        courses,
+        message: "Question answered from training data (exact match)",
+      });
+    }
+
+    // Step 1: Then check FAQ database for matching question
     // console.log(`[AI] 🔍 Checking FAQ database...`);
     const matchingFAQ = await findMatchingFAQ(userQuery);
     if (matchingFAQ && !(normalizedIntent === "jobs" && isLikelySearchCommand)) {
@@ -393,14 +418,14 @@ router.post("/job-recommendations", async (req, res) => {
     }
     // console.log(`[AI] ❌ No FAQ match found, checking if it's a Q&A query...`);
 
-    // Step 1: Check if this is a Q&A query (from training data or keywords)
-    const trainingData = await loadTrainingData();
-    const queryLower = userQuery.toLowerCase().trim();
+    // Step 2: Check if this is a Q&A query (from training data or keywords)
     
     // Force Q&A detection for certain keywords (even if FAQ doesn't match)
+    // This ensures common "how to apply" / application questions are handled as Q&A,
+    // not treated as a job search intent.
     const forceQAKeywords = [
-      'how to apply', 'how do i apply', 'how can i apply',
-      'application process', 'application procedure', 'how to submit',
+      'how to apply', 'how do i apply', 'how can i apply', 'how can i apply for a job',
+      'how do i apply for a job', 'application process', 'application procedure', 'how to submit',
       'what documents', 'what is required', 'what do i need'
     ];
     

@@ -117,3 +117,4 @@ module.exports.JobOffer = require("./jobOffer");
 module.exports.UploadCandidates = require("./uploadCandidates");
 module.exports.RewardClaim = require("./RewardClaim");
 module.exports.ReferralShareOffer = require("./referralShareOffer");
+module.exports.BotTraining = require("./botTraining");

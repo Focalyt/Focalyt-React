@@ -305,6 +305,7 @@ document.getElementById('exampleForm').addEventListener('submit', async (e) => {
   
   const payload = {
     userQuery: document.getElementById('userQuery').value,
+    type: exampleType,
     tags: tags,
     notes: document.getElementById('notes').value,
   };
