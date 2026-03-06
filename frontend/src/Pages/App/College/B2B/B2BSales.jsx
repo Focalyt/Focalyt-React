@@ -523,6 +523,28 @@ const B2BSales = () => {
     // initiateGoogleAuth();
   };
 
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+
+      // Clear any stored Google auth token from sessionStorage
+      sessionStorage.removeItem('googleAuthToken');
+
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
+      alert('Disconnected from Google Calendar successfully.');
+    } catch (err) {
+      console.error('Error while disconnecting Google Calendar:', err);
+    }
+  };
+
   // Simple function to add follow-up to Google Calendar
   // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
@@ -549,69 +571,64 @@ const B2BSales = () => {
         return;
       }
 
-      // Handle status change first
+      // Determine whether follow-up fields are filled
+      const hasFollowup =
+        (showPanel === 'followUp') ||
+        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+
+      const hasFollowupData =
+        hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
+
+      // Normalise date value for API (string or Date instance)
+      const followupDateValue = followupFormData.followupDate instanceof Date
+        ? followupFormData.followupDate.toISOString()
+        : followupFormData.followupDate;
+
+      // 1) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
       if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
         const statusData = {
           status: seletectedStatus,
           subStatus: seletectedSubStatus?._id || null,
           remarks: followupFormData.remarks || 'Status updated via B2B panel'
         };
+
+        if (hasFollowupData) {
+          statusData.followUpDate = followupDateValue;
+          statusData.followUpTime = followupFormData.followupTime;
+          statusData.googleCalendarEvent = true;
+        }
+
         await updateLeadStatus(selectedProfile._id, statusData);
+
+        if (hasFollowupData) {
+          alert('✅ Status and follow-up updated successfully!');
+        } else {
+          alert('✅ Status updated successfully!');
+        }
       }
 
-      // Check if followup is required (either from followup panel or status change with followup)
-      const hasFollowup = (showPanel === 'followUp') ||
-        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
-
-      if (hasFollowup && followupFormData.followupDate && followupFormData.followupTime) {
-        // Get data from followupFormData
-        const scheduledDateTime = new Date(followupFormData.followupDate);
-        const [hours, minutes] = followupFormData.followupTime.split(':');
-        scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-        // Create calendar event data
-        const event = {
-          summary: `B2B Follow-up: ${selectedProfile?.businessName || 'Unknown'}`,
-          description: `Follow-up with ${selectedProfile?.concernPersonName || 'Unknown'} (${selectedProfile?.designation || 'N/A'})\n\nBusiness: ${selectedProfile?.businessName || 'Unknown'}\nContact: ${selectedProfile?.mobile || 'N/A'}\nEmail: ${selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
-          start: {
-            dateTime: scheduledDateTime.toISOString(),
-            timeZone: 'Asia/Kolkata',
+      // 2) Standalone follow-up panel: create follow-up (and Google Calendar event) via B2B follow-up API
+      if (showPanel === 'followUp' && selectedProfile && hasFollowupData) {
+        await axios.post(
+          `${backendUrl}/college/b2b/leads/${selectedProfile._id}/followup`,
+          {
+            scheduledDate: followupDateValue,
+            scheduledTime: followupFormData.followupTime,
+            remarks: followupFormData.remarks || '',
+            googleCalendarEvent: true
           },
-          end: {
-            dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
-            timeZone: 'Asia/Kolkata',
-          },
-          reminders: {
-            useDefault: false,
-            overrides: [
-              { method: 'email', minutes: 24 * 60 }, // 1 day before
-              { method: 'popup', minutes: 60 }, // 1 hour before
-            ],
-          },
-        };
+          {
+            headers: { 'x-auth': token }
+          }
+        );
 
-        // Call backend API to create calendar event
-        const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-          user: userData,
-          event: event
-        });
-
-        if (response.data.success) {
-          alert('✅ Follow-up added to Google Calendar!');
-        } else {
-          alert('❌ Failed to add to Google Calendar');
-          console.error('❌ Failed to add to Google Calendar:', response.data.message);
-        }
-      } else if (showPanel === 'editPanel') {
-        // Status change without followup
-        alert('✅ Status updated successfully!');
+        alert('✅ Follow-up saved and scheduled successfully!');
       }
 
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
       alert('❌ Error processing request');
-    }
-    finally {
+    } finally {
       closePanel();
     }
   };
@@ -2114,6 +2131,15 @@ const B2BSales = () => {
             </h6>
           </div>
           <div>
+            {userData.googleAuthToken?.accessToken && (
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm me-2"
+                onClick={handleGoogleLogout}
+              >
+                Disconnect Google Calendar
+              </button>
+            )}
             <button className="btn-close" type="button" onClick={closePanel}></button>
           </div>
         </div>
@@ -2309,6 +2335,20 @@ const B2BSales = () => {
             </h6>
           </div>
           <div>
+            {userData.googleAuthToken?.accessToken && (
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm me-2"
+                onClick={handleGoogleLogout}
+                style={{
+                  fontSize: '12px',
+                  padding: '4px 10px',
+                  borderRadius: '999px'
+                }}
+              >
+                Disconnect Google Calendar
+              </button>
+            )}
             <button className="btn-close" type="button" onClick={closePanel} style={{
               fontSize: '14px',
               padding: '4px',
@@ -3733,13 +3773,26 @@ const B2BSales = () => {
                                   <span className="compact-info-value">{lead.leadAddedBy.name}</span>
                                 </div>
                               )}
-                              {lead.remark && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-comment text-success"></i>
-                                  <span className="compact-info-label">Remarks:</span>
-                                  <span className="compact-info-value">{lead.remark}</span>
-                                </div>
-                              )}
+                              {(() => {
+                                let latestRemark = '';
+
+                                if (Array.isArray(lead.logs) && lead.logs.length > 0) {
+                                  const lastLog = lead.logs[lead.logs.length - 1];
+                                  latestRemark = lastLog?.remarks || '';
+                                }
+
+                                if (!latestRemark && typeof lead.remark === 'string' && lead.remark.trim()) {
+                                  latestRemark = lead.remark;
+                                }
+
+                                return latestRemark ? (
+                                  <div className="compact-info-item">
+                                    <i className="fas fa-comment text-success"></i>
+                                    <span className="compact-info-label">Remarks:</span>
+                                    <span className="compact-info-value">{latestRemark}</span>
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </div>
                         </div>

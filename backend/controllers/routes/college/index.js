@@ -2021,6 +2021,24 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const totalCount = totalCountResult[0]?.total || 0;
 
+		
+		const appliedIds = results.map(r => r._id);
+		const followups = await B2cFollowup
+			.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
+			.sort({ followupDate: -1, createdAt: -1 })
+			.lean();
+		const followupByCourse = new Map();
+		followups.forEach(f => {
+			const key = f.appliedCourseId.toString();
+			if (!followupByCourse.has(key)) {
+				followupByCourse.set(key, {
+					_id: f._id,
+					followupDate: f.followupDate,
+					remarks: f.remarks
+				});
+			}
+		});
+
 		// Process results - sirf essential fields return karenge
 		const processedResults = results.map(doc => {
 			// Calculate doc counts
@@ -2036,6 +2054,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					sub => sub._id.toString() === doc._leadSubStatus.toString()
 				);
 			}
+
+			const followup = followupByCourse.get(doc._id.toString()) || null;
 
 			return {
 				_id: doc._id,
@@ -2057,7 +2077,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 				},
-				docCounts
+				docCounts,
+				followup
 			};
 		});
 
@@ -6699,6 +6720,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			remarks,
 			followup,  // combined date and time
 		} = req.body;
+		console.log("req", req.body)
 		console.log('[Lead Status Change] Step 2: Params & body', { appliedCourseId: id, _leadStatus, _leadSubStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
 		const userId = req.user._id;
@@ -6737,9 +6759,13 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 			doc._leadSubStatus = _leadSubStatus;
 		}
-		let lastFollowup = await B2cFollowup.findOne({ appliedCourseId: doc._id, status: 'planned' });
+		// Get the most recent planned followup for this lead, if any
+		let lastFollowup = await B2cFollowup
+			.findOne({ appliedCourseId: doc._id, status: 'planned' })
+			.sort({ followupDate: -1, createdAt: -1 });
 		if (lastFollowup) {
-			lastFollowup.status = 'done'
+			lastFollowup.status = 'done';
+			await lastFollowup.save();
 		}
 
 		// If followup date and time is set or updated, log the change and update the followup
@@ -6751,9 +6777,11 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 				followupDate: new Date(followup),
 				remarks: remarks,
 				status: 'planned',
+				counsellorId: userId,
 				createdBy: userId,
 				collegeId: collegeId
 			});
+			console.log("newFollowup",newFollowup)
 			await newFollowup.save();
 		}
 
@@ -6781,7 +6809,8 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		doc.logs.push(newLogEntry);
-
+console.log('[Lead Status Change] Step 5: Log entry added', { logEntry: newLogEntry, id, _leadStatus, _leadSubStatus });
+console.log("newLogEntry", newLogEntry)
 		// Save the updated document
 		await doc.save();
 		console.log('[Lead Status Change] Step 5: Doc saved', { id, _leadStatus, _leadSubStatus });
@@ -7108,12 +7137,11 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		const { id } = req.params;
-		const b2cFollowup = await B2cFollowup.findOneAndUpdate({
-			_id: id,
-			status: 'pending'
-		},
-			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } }, { new: true }
-		).sort({ createdAt: -1 });
+		const b2cFollowup = await B2cFollowup.findOneAndUpdate(
+			{ _id: id, status: 'planned' },
+			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } },
+			{ new: true }
+		);
 
 		// console.log("b2cFollowup", b2cFollowup)
 
@@ -7162,34 +7190,38 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		const user = req.user;
 
-		let { fromDate, toDate, projects, verticals, course, center, counselor } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor, allTime, filterBy } = req.query;
+		const useAllTime = allTime === 'true' || allTime === true;
+		const useActivityFilter = filterBy === 'activity';
 
+		// Parse dates (default today when filterBy=activity)
 		if (fromDate && fromDate !== 'null') {
 			fromDate = new Date(fromDate);
 			if (isNaN(fromDate.getTime())) {
-				console.log('Invalid fromDate format')
+				console.log('Invalid fromDate format');
 				return res.status(400).json({ error: "Invalid fromDate format" });
 			}
 		} else {
-			fromDate = new Date(new Date().setHours(0, 0, 0, 0));
+			fromDate = new Date();
+			fromDate.setUTCHours(0, 0, 0, 0);
 		}
 		if (toDate && toDate !== 'null') {
 			toDate = new Date(toDate);
 			if (isNaN(toDate.getTime())) {
-				console.log('Invalid toDate format')
+				console.log('Invalid toDate format');
 				return res.status(400).json({ error: "Invalid toDate format" });
 			}
+			toDate.setUTCHours(23, 59, 59, 999);
 		} else {
-			toDate = new Date(new Date().setHours(23, 59, 59, 999));
+			toDate = new Date();
+			toDate.setUTCHours(23, 59, 59, 999);
 		}
-
 
 		let projectsArray = [];
 		let verticalsArray = [];
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
-
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -7201,15 +7233,23 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-
-		let aggregate = []
-
-		let baseMatch = {}
-
+		let aggregate = [];
+		let baseMatch = {};
 		if (counselorArray.length > 0) {
 			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
 		} else {
 			baseMatch.createdBy = user._id;
+		}
+		if (useAllTime) {
+			// no date filter
+		} else if (useActivityFilter) {
+			// Today's activity: followups SET today (createdAt) OR status UPDATED today (done/missed - statusUpdatedAt)
+			baseMatch.$or = [
+				{ createdAt: { $gte: fromDate, $lte: toDate } },
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+			];
+		} else {
+			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
 		}
 
 		let group = [{
@@ -7242,12 +7282,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 
 		aggregate.push(
-			{
-				$match: {
-					followupDate: { $gte: fromDate, $lte: toDate },
-					...baseMatch
-				}
-			},
+			{ $match: baseMatch },
 			{
 				$lookup: {
 					from: 'appliedcourses',
@@ -7335,7 +7370,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			{
 				$lookup: {
 					from: 'users',
-					localField: 'appliedCourseId._counsellor',
+					localField: 'counsellorId',
 					foreignField: '_id',
 					as: 'counselorData'
 				}
@@ -7423,8 +7458,284 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 
 	}
-	catch (err) {
+		catch (err) {
 		console.error("Error fetching followup counts:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
+router.get('/followupcounts-by-counselor', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const collegeId = user?.college?._id;
+
+		let { fromDate, toDate, projects, verticals, course, center, counselor, allTime, filterBy } = req.query;
+		const useAllTime = allTime === 'true' || allTime === true;
+		const useActivityFilter = filterBy === 'activity';
+
+		// Parse dates as local dates when the client sends YYYY-MM-DD (no time component).
+		// This prevents timezone shifting when filtering by calendar dates.
+		const parseLocalDate = (value) => {
+			if (!value) return null;
+			// Treat plain YYYY-MM-DD as local midnight
+			if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+				const [year, month, day] = value.split('-').map(Number);
+				return new Date(year, month - 1, day);
+			}
+			return new Date(value);
+		};
+
+		if (fromDate && fromDate !== 'null') {
+			fromDate = parseLocalDate(fromDate);
+			if (!fromDate || isNaN(fromDate.getTime())) {
+				return res.status(400).json({ success: false, message: "Invalid fromDate format" });
+			}
+		} else {
+			fromDate = new Date();
+		}
+		fromDate.setHours(0, 0, 0, 0);
+
+		if (toDate && toDate !== 'null') {
+			toDate = parseLocalDate(toDate);
+			if (!toDate || isNaN(toDate.getTime())) {
+				return res.status(400).json({ success: false, message: "Invalid toDate format" });
+			}
+		} else {
+			toDate = new Date();
+		}
+		toDate.setHours(23, 59, 59, 999);
+
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays (followupcounts-by-counselor):', parseError);
+		}
+
+		let baseMatch = {};
+
+		// Always restrict to this college, but by default include all counsellors
+		if (collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+			baseMatch.collegeId = new mongoose.Types.ObjectId(collegeId);
+		}
+
+		// Counselor filter – when provided, limit to selected counsellors
+		if (counselorArray.length > 0) {
+			const ids = counselorArray.map(id => new mongoose.Types.ObjectId(id));
+		
+			baseMatch.$or = [
+				{ counsellorId: { $in: ids } },
+				{ counsellorId: { $exists: false }, createdBy: { $in: ids } },
+				{ counsellorId: null, createdBy: { $in: ids } }
+			];
+		}
+
+		// Date filter
+		if (useAllTime) {
+			// no date restriction
+		} else if (useActivityFilter) {
+			// Activity mode: created OR status updated in range
+			baseMatch.$or = [
+				{ createdAt: { $gte: fromDate, $lte: toDate } },
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+			];
+		} else {
+			// Default: followup date in range
+			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
+		}
+
+		const aggregate = [];
+
+		aggregate.push(
+			{ $match: baseMatch },
+			{
+				$addFields: {
+					effectiveCounsellorId: { $ifNull: ['$counsellorId', '$createdBy'] }
+				}
+			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: 'appliedCourseId',
+					foreignField: '_id',
+					as: 'appliedCourseId'
+				}
+			},
+			{
+				$unwind: {
+					path: '$appliedCourseId',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'courses',
+					localField: 'appliedCourseId._course',
+					foreignField: '_id',
+					as: 'courseData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$courseData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'verticals',
+					localField: 'courseData.vertical',
+					foreignField: '_id',
+					as: 'verticalData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$verticalData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'projects',
+					localField: 'courseData.project',
+					foreignField: '_id',
+					as: 'projectData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$projectData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'centers',
+					localField: 'appliedCourseId._center',
+					foreignField: '_id',
+					as: 'centerData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$centerData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'effectiveCounsellorId',
+					foreignField: '_id',
+					as: 'counselorData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$counselorData',
+					preserveNullAndEmptyArrays: true
+				}
+			}
+		);
+
+		// Apply multi-select filters (projects / verticals / course / center)
+		let additionalMatches = {};
+
+		if (projectsArray.length > 0) {
+			additionalMatches['courseData.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (verticalsArray.length > 0) {
+			additionalMatches['courseData.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (courseArray.length > 0) {
+			additionalMatches['courseData._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (centerArray.length > 0) {
+			additionalMatches['centerData._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (Object.keys(additionalMatches).length > 0) {
+			aggregate.push({ $match: additionalMatches });
+		}
+
+		// Group by counsellor + status
+		aggregate.push(
+			{
+				$group: {
+					_id: {
+						counselorId: '$effectiveCounsellorId',
+						counselorName: '$counselorData.name',
+						status: '$status'
+					},
+					count: { $sum: 1 }
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$_id.counselorId',
+						counselorName: '$_id.counselorName'
+					},
+					done: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'done'] }, '$count', 0]
+						}
+					},
+					planned: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'planned'] }, '$count', 0]
+						}
+					},
+					missed: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'missed'] }, '$count', 0]
+						}
+					}
+				}
+			},
+			{
+				$project: {
+					_id: 0,
+					counselorId: '$_id.counselorId',
+					counselorName: '$_id.counselorName',
+					done: 1,
+					planned: 1,
+					missed: 1,
+					total: { $add: ['$done', '$planned', '$missed'] }
+				}
+			},
+			{
+				$sort: {
+					counselorName: 1
+				}
+			}
+		);
+
+		const rows = await B2cFollowup.aggregate(aggregate);
+
+		return res.json({
+			success: true,
+			data: rows || []
+		});
+	} catch (err) {
+		console.error("Error fetching followup counts by counselor:", err);
 		return res.status(500).json({
 			success: false,
 			message: "Internal server error",
@@ -9046,7 +9357,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			}
 
 
-			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
+			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, counsellorId: user._id, remarks });
 
 			if (!followup) {
 				return res.status(400).json({ status: false, message: "Followup not created" });
@@ -9062,6 +9373,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			}
 
+	
 
 			const newLogEntry = {
 				user: user._id,
@@ -9080,7 +9392,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			}
 
 
-
+		
 
 
 
@@ -9106,7 +9418,8 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				remarks: remarks,
 				status: 'planned',
 				createdBy: user._id,
-				collegeId: collegeId
+				collegeId: collegeId,
+				counsellorId: user._id
 			});
 			let actionParts = [];
 			actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);

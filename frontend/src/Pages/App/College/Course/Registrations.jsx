@@ -6,6 +6,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import useWebsocket from '../../../../utils/websocket';
 
@@ -703,7 +704,7 @@ const CRMDashboard = () => {
   const candidateRef = useRef();
   // Refs
   const addressInputRef = useRef(null);
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
   const { messages, updates } = useWebsocket(userData._id || userData._id);
@@ -811,6 +812,8 @@ const CRMDashboard = () => {
 
 
 
+  const [isGoogleLoginLoading, setIsGoogleLoginLoading] = useState(false);
+
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
   const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
@@ -853,6 +856,66 @@ const CRMDashboard = () => {
   // const permissions = userData.permissions
 
   const [permissions, setPermissions] = useState();
+
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoginLoading(true);
+
+      const result = await getGoogleAuthCode({
+        scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
+        user: userData
+      });
+
+      const refreshToken = await getGoogleRefreshToken({
+        code: result,
+        user: userData
+      });
+
+      const user = {
+        ...userData,
+        googleAuthToken: refreshToken.data
+      };
+
+      sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+      sessionStorage.setItem('user', JSON.stringify(user));
+
+      setUserData(user);
+
+    } catch (error) {
+      console.error('Google login failed:', error);
+
+      if (error.message?.includes('Popup blocked')) {
+        alert('Please allow popups for this site and try again.');
+      } else if (error.message?.includes('closed by user')) {
+        alert('Login cancelled by user.');
+      } else {
+        alert('Login failed: ' + error.message);
+      }
+    } finally {
+      setIsGoogleLoginLoading(false);
+    }
+  };
+
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+
+      sessionStorage.removeItem('googleAuthToken');
+
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
+      alert('Disconnected from Google Calendar successfully.');
+    } catch (err) {
+      console.error('Error while disconnecting Google Calendar:', err);
+    }
+  };
 
   useEffect(() => {
     updatedPermission()
@@ -2512,6 +2575,49 @@ const CRMDashboard = () => {
     return isRequired ? 'border-danger' : '';
   };
 
+  const createGoogleCalendarEventForFollowup = async (followupDateTime) => {
+    try {
+      if (!userData.googleAuthToken?.accessToken) {
+        return;
+      }
+
+      const scheduledDateTime = new Date(followupDateTime);
+
+      const event = {
+        summary: `B2C Follow-up: ${selectedProfile?._candidate?.name || 'Unknown'}`,
+        description: `Follow-up with ${selectedProfile?._candidate?.name || 'Unknown'}\n\nMobile: ${selectedProfile?._candidate?.mobile || 'N/A'}\nEmail: ${selectedProfile?._candidate?.email || 'N/A'}\nCourse: ${selectedProfile?._course?.name || 'N/A'}\nCenter: ${selectedProfile?._center?.name || 'N/A'}\n\nRemarks: ${remarks || 'No remarks'}`,
+        start: {
+          dateTime: scheduledDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 },
+            { method: 'popup', minutes: 60 },
+          ],
+        },
+      };
+
+      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
+        user: userData,
+        event,
+      });
+
+      if (response.data.success) {
+        console.log('Followup added to Google Calendar');
+      } else {
+        console.error('Failed to add to Google Calendar:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error in createGoogleCalendarEventForFollowup:', error);
+    }
+  };
+
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
 
@@ -2671,10 +2777,14 @@ const CRMDashboard = () => {
             }
           }
         );
-
+console.log('API Response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
+
+          if (followupDateTime && userData.googleAuthToken?.accessToken) {
+            await createGoogleCalendarEventForFollowup(followupDateTime);
+          }
 
           // Reset form
           setSelectedStatus('');
@@ -2685,6 +2795,22 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
+
+          // Refetch full details for this lead and merge into list so NEXT ACTION DATE updates immediately
+          const updatedLeadId = selectedProfile._id;
+          try {
+            const detailRes = await axios.get(`${backendUrl}/college/appliedCandidatesDetails`, {
+              params: { leadId: updatedLeadId },
+              headers: { 'x-auth': token }
+            });
+            if (detailRes.data.success && detailRes.data.data) {
+              const fullDetail = detailRes.data.data;
+              setAllProfiles(prev => prev.map(p => p._id === updatedLeadId ? { ...p, ...fullDetail, followup: fullDetail.followup } : p));
+            }
+          } catch (err) {
+            console.error('Error refetching lead details after status update:', err);
+          }
+
           closePanel();
         } else {
           console.error('API returned error:', response.data);
@@ -2726,13 +2852,21 @@ const CRMDashboard = () => {
           }
         }
 
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
+        const hasExistingFollowup = selectedProfile?.followup?._id;
+        const payload = hasExistingFollowup
+          ? {
+            id: selectedProfile.followup._id,
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'update'
+          }
+          : {
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'new'
+          };
 
         // Check if backend URL and token exist
         if (!backendUrl) {
@@ -2745,20 +2879,9 @@ const CRMDashboard = () => {
           return;
         }
 
-        // Send PUT request to backend API
-        // const response = await axios.put(
-        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-        //   data,
-        //   {
-        //     headers: {
-        //       'x-auth': token,
-        //       'Content-Type': 'application/json'
-        //     }
-        //   }
-        // );
         const response = await axios.post(
           `${backendUrl}/college/b2c-set-followups`,
-          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
+          payload,
           {
             headers: {
               'x-auth': token,
@@ -2767,15 +2890,16 @@ const CRMDashboard = () => {
           }
         );
 
+        // Backend returns status: true (not success: true)
+        if (response.data.status === true || response.data.success === true) {
+          alert('Followup updated successfully!');
 
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-
+          if (userData.googleAuthToken?.accessToken && followupDateTime) {
+            await createGoogleCalendarEventForFollowup(followupDateTime);
+          }
         } else {
           console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
+          alert(response.data.message || 'Failed to update followup');
         }
 
       }
@@ -3478,44 +3602,75 @@ const CRMDashboard = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
-    setSelectedProfile(null)
-    setShowPanel('')
-    setSelectedStatus(null)
-    setSelectedSubStatus(null)
-
+    setSelectedProfile(null);
+    setShowPanel('');
+    setSelectedStatus(null);
+    setSelectedSubStatus(null);
 
     if (profile) {
       setSelectedProfile(profile);
     }
 
     // Close all panels first
-
     setShowPopup(null);
     setSelectedConcernPerson(null);
-
 
     if (panel === 'StatusChange') {
       if (profile) {
         const newStatus = profile?._leadStatus?._id || '';
         setSelectedStatus(newStatus);
-
-        // if (newStatus) {
-        //   await fetchSubStatus(newStatus);
-        // }
-
         setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
-      setShowPanel('editPanel')
+      setShowPanel('editPanel');
 
-    }
-    else if (panel === 'SetFollowup') {
-      setShowPopup(null)
-      setShowPanel('followUp')
-    }
-    else if (panel === 'bulkstatuschange') {
-      setShowPopup(null)
-      setShowPanel('bulkstatuschange')
+    } else if (panel === 'SetFollowup') {
+      // For followup we need the latest followup document (if any)
+      if (profile && profile._id) {
+        try {
+          const response = await axios.get(
+            `${backendUrl}/college/appliedCandidatesDetails`,
+            {
+              params: { leadId: profile._id },
+              headers: { 'x-auth': token }
+            }
+          );
 
+          if (response.data.success && response.data.data) {
+            const fullProfile = response.data.data;
+            setSelectedProfile(fullProfile);
+
+            // Pre-fill from existing followup if present
+            if (fullProfile.followup?.followupDate) {
+              const existing = new Date(fullProfile.followup.followupDate);
+              if (!isNaN(existing.getTime())) {
+                setFollowupDate(existing);
+                const hours = String(existing.getHours()).padStart(2, '0');
+                const minutes = String(existing.getMinutes()).padStart(2, '0');
+                setFollowupTime(`${hours}:${minutes}`);
+              } else {
+                setFollowupDate('');
+                setFollowupTime('');
+              }
+              setRemarks(fullProfile.followup.remarks || '');
+            } else {
+              setFollowupDate('');
+              setFollowupTime('');
+              setRemarks('');
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching lead details for followup:', error);
+          // Fallback: keep basic profile; backend will handle first-time followup
+          setSelectedProfile(profile);
+        }
+      }
+
+      setShowPopup(null);
+      setShowPanel('followUp');
+
+    } else if (panel === 'bulkstatuschange') {
+      setShowPopup(null);
+      setShowPanel('bulkstatuschange');
     }
 
     if (!isMobile) {
@@ -6152,7 +6307,39 @@ useEffect(() => {
 
             </h6>
           </div>
-          <div>
+          <div className="d-flex align-items-center gap-2">
+            {(showPanel === 'followUp' || showPanel === 'editPanel') && (
+              userData.googleAuthToken?.accessToken ? (
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleGoogleLogout}
+                  disabled={isGoogleLoginLoading}
+                >
+                  <i className="fas fa-calendar-times me-1"></i>
+                  Disconnect Google Calendar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoginLoading}
+                >
+                  {isGoogleLoginLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-calendar-plus me-1"></i>
+                      Connect Google Calendar
+                    </>
+                  )}
+                </button>
+              )
+            )}
             <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
@@ -6246,6 +6433,7 @@ useEffect(() => {
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
                       placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Date is mandatory" : "Select date"}
+                      style={{position: 'static'}}
                     />
                   </div>
                 </div>
@@ -11142,7 +11330,7 @@ useEffect(() => {
                                                 <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">NEXT ACTION DATE</div>
+                                                <div className="info-label">NEXT ACTION </div>
                                                 <div className="info-value">
                                                   {profile.followup?.followupDate ? (() => {
                                                     const dateObj = new Date(profile.followup?.followupDate);
@@ -20556,6 +20744,9 @@ max-width: 600px;
 
   .pac-container {
     z-index: 10000 !important;
+  }
+  .react-date-picker__calendar--open{
+  position: sticky!important
   }
         `}
       </style>

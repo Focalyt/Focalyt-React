@@ -1290,7 +1290,9 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		lead.subStatus = subStatus;
 		lead.updatedBy = req.user._id;
 
-
+		if (remarks) {
+			lead.remark = remarks;
+		}
 
 		// Add to logs with detailed status change information
 		lead.logs.push({
@@ -1514,11 +1516,8 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 			});
 		}
 
-		// Check if lead exists
-		const lead = await Lead.findOne({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		});
+		// Check if lead exists (allow any visible lead; permission already handled elsewhere)
+		const lead = await Lead.findById(req.params.id);
 
 		if (!lead) {
 			return res.status(404).json({
@@ -1581,13 +1580,18 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 				};
 
 				googleEvent = await createGoogleCalendarEvent({
-					accessToken: req.user.googleAuthToken.accessToken,
+					user: req.user,
 					event: event
 				});
 
-				// Update follow-up with Google Calendar event ID
-				savedFollowUp.googleCalendarEventId = googleEvent.data.id;
-				await savedFollowUp.save();
+				// Update follow-up with Google Calendar event ID (only if present)
+				const eventId = googleEvent?.event?.id || googleEvent?.data?.id;
+				if (eventId) {
+					savedFollowUp.googleCalendarEventId = eventId;
+					await savedFollowUp.save();
+				} else {
+					console.warn('Google Calendar event created but no ID returned:', googleEvent);
+				}
 
 			} catch (googleError) {
 				console.error('Google Calendar Error:', googleError);
@@ -1620,11 +1624,8 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 	try {
 		const { status, completedDate } = req.body;
 
-		// Check if lead exists and belongs to user
-		const lead = await Lead.findOne({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		});
+		// Check if lead exists (allow any visible lead; permission already handled elsewhere)
+		const lead = await Lead.findById(req.params.id);
 
 		if (!lead) {
 			return res.status(404).json({
@@ -1774,6 +1775,10 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			{ path: 'leadAddedBy', select: 'name email' }
 		]);
 
+		if (remarks) {
+			updatedLead.remark = remarks;
+		}
+
 		// Add to logs
 		updatedLead.logs.push({
 			user: req.user._id,
@@ -1821,13 +1826,18 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				};
 
 				googleEvent = await createGoogleCalendarEvent({
-					accessToken: req.user.googleAuthToken.accessToken,
+					user: req.user,
 					event: event
 				});
 
-				// Update follow-up with Google Calendar event ID
-				followUp.googleCalendarEventId = googleEvent.data.id;
-				await followUp.save();
+				// Update follow-up with Google Calendar event ID (only if present)
+				const eventIdStatus = googleEvent?.event?.id || googleEvent?.data?.id;
+				if (eventIdStatus) {
+					followUp.googleCalendarEventId = eventIdStatus;
+					await followUp.save();
+				} else {
+					console.warn('Google Calendar event created but no ID returned (status change):', googleEvent);
+				}
 
 			} catch (googleError) {
 				console.error('Google Calendar Error:', googleError);

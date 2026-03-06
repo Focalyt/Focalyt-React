@@ -4,27 +4,22 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane, faTimes, faRobot, faSpinner, faCommentDots } from '@fortawesome/free-solid-svg-icons';
 import './ChatbotWidget.css';
 
-/**
- * Reusable AI Chatbot Widget Component
- * 
- * Usage:
- * 
- * 1. Floating Widget (default):
- *    <ChatbotWidget />
- * 
- * 2. Inline Component:
- *    <ChatbotWidget mode="inline" />
- * 
- * 3. Custom Position:
- *    <ChatbotWidget position="bottom-left" />
- * 
- * Props:
- * - mode: "floating" | "inline" (default: "floating")
- * - position: "bottom-right" | "bottom-left" | "top-right" | "top-left" (only for floating)
- * - title: Custom title (default: "AI Job Search Assistant")
- * - initialMessage: Custom welcome message
- * - onJobClick: Callback when job is clicked
- */
+const DEFAULT_COUNSELLOR_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'ta', name: 'Tamil' },
+  { code: 'te', name: 'Telugu' },
+  { code: 'bn', name: 'Bengali' },
+  { code: 'mr', name: 'Marathi' },
+  { code: 'gu', name: 'Gujarati' },
+  { code: 'kn', name: 'Kannada' },
+  { code: 'ml', name: 'Malayalam' },
+  { code: 'pa', name: 'Punjabi' },
+  { code: 'ur', name: 'Urdu' },
+  { code: 'or', name: 'Odia' },
+  { code: 'as', name: 'Assamese' },
+];
+
 function ChatbotWidget({
   mode = 'floating',
   position = 'bottom-right',
@@ -32,6 +27,7 @@ function ChatbotWidget({
   initialMessage = '👋 Hello! I\'m your AI job search assistant. I can help you find the perfect job based on your preferences.',
   onJobClick = null,
   className = '',
+  multilanguageCounsellor = false,
   // Additional props for full functionality
   onJobsUpdate = null, // Callback to update jobs list in parent
   jobPreferences = {}, // Job preferences from parent
@@ -81,7 +77,27 @@ function ChatbotWidget({
   const [hasDragged, setHasDragged] = useState(false);
   const [hasDraggedWidget, setHasDraggedWidget] = useState(false);
 
+  // Multilanguage counsellor: language list and selected language
+  const [counsellorLanguages, setCounsellorLanguages] = useState(DEFAULT_COUNSELLOR_LANGUAGES);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  // Fetch counsellor languages when multilanguage mode is on
+  useEffect(() => {
+    if (!multilanguageCounsellor) return;
+    const fetchLanguages = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/api/ai/counsellor-languages`);
+        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          setCounsellorLanguages(res.data.data);
+        }
+      } catch (_) {
+        // Keep default list
+      }
+    };
+    fetchLanguages();
+  }, [multilanguageCounsellor, backendUrl]);
 
   // Generate session ID on mount
   useEffect(() => {
@@ -588,6 +604,40 @@ function ChatbotWidget({
     setIsTyping(true);
 
     try {
+      // Multilanguage AI Counsellor: use counsellor-chat API, reply in selected language
+      if (multilanguageCounsellor) {
+        const conversationHistory = messages
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, content: m.content }));
+
+        const response = await axios.post(
+          `${backendUrl}/api/ai/counsellor-chat`,
+          {
+            message: userMessage,
+            language: selectedLanguage,
+            conversationHistory,
+          },
+          { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+        );
+
+        if (response.data?.success && response.data?.data?.reply) {
+          const newAiMessage = {
+            role: 'assistant',
+            content: response.data.data.reply,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, newAiMessage]);
+          await saveChatMessage(newAiMessage);
+        } else {
+          throw new Error(response.data?.message || 'No reply from AI.');
+        }
+        setIsLoading(false);
+        setIsTyping(false);
+        inputRef.current?.focus();
+        return;
+      }
+
+      // Default: job/course recommendations flow
       // Extract preferences from user message
       const preferences = extractPreferences(userMessage);
 
@@ -1179,7 +1229,7 @@ function ChatbotWidget({
   const handleQuickAction = async (query) => {
     if (isLoading) return; // Don't trigger if already loading
     
-    // Set input message
+    // Set input message (for voice / normal send flow)
     setInputMessage(query);
     
     // Add user message immediately
@@ -1196,8 +1246,34 @@ function ChatbotWidget({
     setIsLoading(true);
     setIsTyping(true);
     
-    // Trigger search immediately
     try {
+      // Multilanguage counsellor: use counsellor-chat for quick action too
+      if (multilanguageCounsellor) {
+        const conversationHistory = messages
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, content: m.content }));
+        const response = await axios.post(
+          `${backendUrl}/api/ai/counsellor-chat`,
+          { message: query, language: selectedLanguage, conversationHistory },
+          { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+        );
+        if (response.data?.success && response.data?.data?.reply) {
+          const newAiMessage = {
+            role: 'assistant',
+            content: response.data.data.reply,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, newAiMessage]);
+          await saveChatMessage(newAiMessage);
+        } else {
+          throw new Error(response.data?.message || 'No reply from AI.');
+        }
+        setIsLoading(false);
+        setIsTyping(false);
+        return;
+      }
+
+      // Default: job/course recommendations
       const preferences = extractPreferences(query);
       const mergedPreferences = {
         ...preferences,
@@ -1466,13 +1542,28 @@ function ChatbotWidget({
         onTouchStart={handleWidgetDragStart}
         style={{ cursor: isDraggingWidget ? 'grabbing' : 'grab', userSelect: 'none' }}
       >
-        <div className="d-flex align-items-center gap-3">
+        <div className="d-flex align-items-center gap-3 flex-grow-1">
           <div className="ai-avatar">
             <FontAwesomeIcon icon={faRobot} />
           </div>
-          <div>
+          <div className="flex-grow-1 min-w-0">
             <h5 className="mb-0">{title}</h5>
             <p className="mb-0 text-muted small">Powered by Anthropic Claude</p>
+            {multilanguageCounsellor && (
+              <select
+                className="form-select form-select-sm mt-1 bg-white text-dark border-0 shadow-sm"
+                style={{ maxWidth: '160px' }}
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="Select language"
+              >
+                {counsellorLanguages.map(({ code, name }) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
         {mode === 'floating' && (

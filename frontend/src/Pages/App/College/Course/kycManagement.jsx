@@ -640,6 +640,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
   const [visitDates, setVisitDates] = useState([]);
 
+  const [preVerificationQuestions, setPreVerificationQuestions] = useState([]);
+  const [isLoadingPreVerificationQuestions, setIsLoadingPreVerificationQuestions] = useState(false);
   // Question rejection reason modal state
   const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
   const [questionRejectionReason, setQuestionRejectionReason] = useState('');
@@ -650,6 +652,32 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     showSetPreVerification(true);
     // Fetch existing question answers if any
     await fetchQuestionAnswers(profile._id);
+  };
+
+  const fetchPreVerificationQuestions = async () => {
+    try {
+      setIsLoadingPreVerificationQuestions(true);
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerification/questions`,
+        {
+          headers: { "x-auth": token },
+        }
+      );
+
+      if (response.data.status && Array.isArray(response.data.data)) {
+        setPreVerificationQuestions(response.data.data);
+      } else {
+        setPreVerificationQuestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching pre‑verification questions:", error);
+      setPreVerificationQuestions([]);
+    } finally {
+      setIsLoadingPreVerificationQuestions(false);
+    }
   };
 
   // Handle question rejection with reason
@@ -782,28 +810,17 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
         setQuestionAnswers(existingData);
 
-        // Populate form with existing data
         const formData = {};
-        const questions = [
-          "Is the Candidate Aware of the Course Duration and Placement Benefits?",
-          "Is the Candidate Aware of the Course and practicle Module ?",
-          "Currently Work Status / Not Working Status / Not Working Status",
-          "Is Candidate Interested Placement by us?",
-          "If we offered a job outside Odisha, would you be interested in the placement?",
-          "Parent Confirmation",
-          "Is Candidate Interested for Course Completion?",
-          "Recommendation from Placement",
-          "Confirm DOB",
-          "Are you Going to Attend Center for Physical Counselling"
-        ];
-
-        existingData.forEach((qa, index) => {
-          if (qa.question === questions[index]) {
-            formData[`q${index + 1}`] = qa.answer;
-            // If there's a rejection reason, also load it
-            // if (qa.rejectionReason) {
-            //   formData[`q${index + 1}_reason`] = qa.rejectionReason;
-            // }
+        const sortedQuestions = (preVerificationQuestions || [])
+          .filter((q) => q.isActive !== false)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        sortedQuestions.forEach((q, index) => {
+          const match = existingData.find((qa) => qa.question === q.questionText);
+          if (match) {
+            formData[`q${index + 1}`] = match.answer;
+            if (match.rejectionReason) {
+              formData[`q${index + 1}_reason`] = match.rejectionReason;
+            }
           }
         });
 
@@ -827,16 +844,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  useEffect(() => {
+    fetchPreVerificationQuestions();
+  }, []);
+
   const QuestionAnswer = async () => {
     try {
       setIsSubmittingAnswers(true);
-
-      // -----------------
-      // Validation for visit date
-      if (questionFormData.q10 && !selectedDate) {
-        alert('Please select a date');
-        return;
-      }
 
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
@@ -845,20 +859,34 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         return;
       }
 
-      // 1️⃣ Prepare data for first API
+      if (!preVerificationQuestions.length) {
+        alert("Pre‑verification questions are not loaded. Please try again.");
+        return;
+      }
+
+      const sortedQuestions = preVerificationQuestions
+        .filter((q) => q.isActive !== false)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const isVisitTypeQuestion = (q) => {
+        if (q.type === 'visit') return true;
+        const opts = Array.isArray(q.options) ? q.options : [];
+        return opts.length >= 2 &&
+          opts.some((o) => /visit/i.test(String(o))) &&
+          opts.some((o) => /joining/i.test(String(o))) &&
+          opts.some((o) => /both/i.test(String(o)));
+      };
+      const visitQuestionIndex = sortedQuestions.findIndex(isVisitTypeQuestion);
+
+      // Validation for visit date when user has answered the visit-type question
+      const visitAnswerKey = visitQuestionIndex >= 0 ? `q${visitQuestionIndex + 1}` : null;
+      if (visitAnswerKey && questionFormData[visitAnswerKey] && !selectedDate) {
+        alert('Please select a date');
+        setIsSubmittingAnswers(false);
+        return;
+      }
+
       const responses = [];
-      const questions = [
-        "Is the Candidate Aware of the Course Duration and Placement Benefits?",
-        "Is the Candidate Aware of the Course and practicle Module ?",
-        "Currently Work Status / Not Working Status",
-        "Is Candidate Interested Placement by us?",
-        "If we offered a job outside Odisha, would you be interested in the placement?",
-        "Parent Confirmation",
-        "Is Candidate Interested for Course Completion?",
-        "Recommendation from Placement",
-        "Confirm DOB",
-        "Are you Going to Attend Center for Physical Counselling"
-      ];
+      const questions = sortedQuestions.map((q) => q.questionText);
 
       const existingAnswersMap = {};
       questionAnswers.forEach(qa => {
@@ -866,14 +894,15 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       });
 
       questions.forEach((question, index) => {
-        const newAnswer = questionFormData[`q${index + 1}`];
+        const fieldKey = `q${index + 1}`;
+        const newAnswer = questionFormData[fieldKey];
         const existingAnswer = existingAnswersMap[question];
         const answer = newAnswer || existingAnswer;
 
         if (answer) {
           const responseObj = { question, answer };
           if (answer === 'Rejected') {
-            const rejectionReason = questionFormData[`q${index + 1}_reason`];
+            const rejectionReason = questionFormData[`${fieldKey}_reason`];
             if (rejectionReason) responseObj.rejectionReason = rejectionReason;
           }
           responses.push(responseObj);
@@ -907,18 +936,19 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       }
 
 
-      const formData = {
-        appliedCourseId: selectedProfile._id,
-        visitDate: selectedDate,
-        visitType: questionFormData.q10
-      };
-
-      // Call second API
-      const visitResponse = await axios.post(
-        `${backendUrl}/college/candidate/visit-calendar`,
-        formData,
-        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
-      );
+      const visitType = visitAnswerKey ? questionFormData[visitAnswerKey] : null;
+      if (visitAnswerKey && visitType && selectedDate) {
+        const formData = {
+          appliedCourseId: selectedProfile._id,
+          visitDate: selectedDate,
+          visitType: visitType
+        };
+        await axios.post(
+          `${backendUrl}/college/candidate/visit-calendar`,
+          formData,
+          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+        );
+      }
 
       // 4️⃣ Handle responses
       alert("Pre-verification & visit scheduled successfully!");
@@ -5481,19 +5511,29 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                                           <div className="mt-1 text-muted">{item.rejectionReason}</div>
                                                                         </div>
                                                                       )}
-                                                                      {item.question === "Are you Going to Attend Center for Physical Counselling" && visitDates && visitDates.length > 0 && (
+                                                                      {(item.answer === 'Visit' || item.answer === 'Joining' || item.answer === 'Both') && (item.visitDate || (visitDates && visitDates.length > 0)) && (
                                                                         <div className="mt-2 p-2 bg-light border rounded">
                                                                           <small className="text-primary fw-bold">Visit Date:</small>
                                                                           <div className="mt-1">
-                                                                            {visitDates.map((visit, visitIndex) => (
-                                                                              <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                            {item.visitDate ? (
+                                                                              <div className="d-flex align-items-center gap-2">
                                                                                 <i className="fas fa-calendar-alt text-primary"></i>
-                                                                                <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
-                                                                                <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
-                                                                                  {visit.visitType}
+                                                                                <span>{new Date(item.visitDate).toLocaleDateString()}</span>
+                                                                                <span className={`badge bg-${item.answer === 'Visit' ? 'primary' : item.answer === 'Joining' ? 'success' : 'info'}`}>
+                                                                                  {item.answer}
                                                                                 </span>
                                                                               </div>
-                                                                            ))}
+                                                                            ) : (
+                                                                              visitDates.map((visit, visitIndex) => (
+                                                                                <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                                  <i className="fas fa-calendar-alt text-primary"></i>
+                                                                                  <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
+                                                                                  <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
+                                                                                    {visit.visitType}
+                                                                                  </span>
+                                                                                </div>
+                                                                              ))
+                                                                            )}
                                                                           </div>
                                                                         </div>
                                                                       )}
@@ -5662,257 +5702,106 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td className="s-no">1</td>
-                        <td className="question">Is the Candidate Aware of the Course Duration and Placement Benefits?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q1_select"
-                                className="form-select"
-                                value={questionFormData.q1}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q1: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">2</td>
-                        <td className="question">Is the Candidate Aware of the Course and practicle Module ?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q2_select"
-                                className="form-select"
-                                value={questionFormData.q2}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q2: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">3</td>
-                        <td className="question">Currently Work Status / Not Working Status</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q3_select"
-                                className="form-select"
-                                value={questionFormData.q3}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q3: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Working">Working</option>
-                                <option value="Not Working">Not Working</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">4</td>
-                        <td className="question">Is Candidate Interested Placement by us?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q4_select"
-                                className="form-select"
-                                value={questionFormData.q4}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q4: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-
-                      <tr>
-                        <td className="s-no">5</td>
-                        <td className="question">If we offered a job outside Odisha, would you be interested in the placement?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q5_select"
-                                className="form-select"
-                                value={questionFormData.q5}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q5: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">6</td>
-                        <td className="question">Parent Confirmation</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q6_select"
-                                className="form-select"
-                                value={questionFormData.q6}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q6: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">7</td>
-                        <td className="question">Is Candidate Interested for Course Completion?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q7_select"
-                                className="form-select"
-                                value={questionFormData.q7}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">8</td>
-                        <td className="question">Recommendation from Placement</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q8_select"
-                                className="form-select"
-                                value={questionFormData.q8}
-                                // onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                                onChange={(e) => {
-                                  if (e.target.value === 'Rejected') {
-                                    handleQuestionRejection(7, 'Recommendation from Placement');
-                                  } else {
-                                    setQuestionFormData({ ...questionFormData, q8: e.target.value });
-                                  }
-                                }}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Selected">Selected</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                              {questionFormData.q8 === "Rejected" && questionFormData.q8_reason && (
-                                <div className="mt-2 p-2 bg-light border rounded">
-                                  <small className="text-danger fw-bold">Rejection Reason:</small>
-                                  <div className="mt-1 text-muted">{questionFormData.q8_reason}</div>
+                      {isLoadingPreVerificationQuestions ? (
+                        <tr>
+                          <td colSpan={3} className="text-center py-3 text-muted">
+                            Loading questions...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const sortedQuestions = (preVerificationQuestions || [])
+                          .filter((q) => q.isActive !== false)
+                          .sort((a, b) => (a.order || 0) - (b.order || 0));
+                        if (sortedQuestions.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={3} className="text-center py-3 text-muted">
+                                No pre-verification questions configured. Add questions in Pre Verification settings.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return sortedQuestions.map((q, index) => {
+                          const fieldKey = `q${index + 1}`;
+                          const options = Array.isArray(q.options) ? q.options : [];
+                          const hasRejected = options.some((opt) => String(opt).toLowerCase() === 'rejected');
+                          const isVisitType = q.type === 'visit' || (
+                            options.length >= 2 &&
+                            options.some((o) => /visit/i.test(String(o))) &&
+                            options.some((o) => /joining/i.test(String(o))) &&
+                            options.some((o) => /both/i.test(String(o)))
+                          );
+                          return (
+                            <tr key={q._id || index}>
+                              <td className="s-no">{index + 1}</td>
+                              <td className="question">{q.questionText}</td>
+                              <td>
+                                <div className="checkbox-group">
+                                  <div className="select-option">
+                                    <select
+                                      name={`${fieldKey}_select`}
+                                      className="form-select"
+                                      value={questionFormData[fieldKey] ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (hasRejected && val === 'Rejected') {
+                                          handleQuestionRejection(index + 1, q.questionText);
+                                        } else {
+                                          setQuestionFormData((prev) => ({ ...prev, [fieldKey]: val }));
+                                        }
+                                      }}
+                                    >
+                                      <option value="">Select Option</option>
+                                      {options.map((opt, i) => (
+                                        <option key={i} value={String(opt).trim()}>
+                                          {String(opt).trim()}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {isVisitType && questionFormData[fieldKey] && (
+                                      <div className="date-field mt-2">
+                                        <label className="form-label">Select Date:</label>
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          value={selectedDate}
+                                          onChange={(e) => setSelectedDate(e.target.value)}
+                                          required
+                                        />
+                                      </div>
+                                    )}
+                                    {hasRejected && questionFormData[fieldKey] === 'Rejected' && questionFormData[`${fieldKey}_reason`] && (
+                                      <div className="mt-2 p-2 bg-light border rounded">
+                                        <small className="text-danger fw-bold">Rejection Reason:</small>
+                                        <div className="mt-1 text-muted">{questionFormData[`${fieldKey}_reason`]}</div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">9</td>
-                        <td className="question">Confirm DOB</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q9_select"
-                                className="form-select"
-                                value={questionFormData.q9}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q9: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">10</td>
-                        <td className="question">Are you Going to Attend Center for Physical Counselling</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q10_select"
-                                className="form-select"
-                                value={questionFormData.q10}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q10: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Visit">Visit</option>
-                                <option value="Joining">Joining</option>
-                                <option value="Both">Both</option>
-                              </select>
-                            </div>
-                            {questionFormData.q10 && (
-                              <div className="date-field mt-2">
-                                <label className="form-label">Select Date:</label>
-                                <input
-                                  type="date"
-                                  className="form-control"
-                                  value={selectedDate}
-                                  onChange={(e) => setSelectedDate(e.target.value)}
-                                  required
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
-                    <button
-                      onClick={QuestionAnswer}
-                      className="btn btn-primary"
-                      disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
-                    >
-                      {isSubmittingAnswers ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit'
-                      )}
-                    </button>
                   </table>
+                <div className="modal-footer border-0 pt-2">
+                  <button
+                    type="button"
+                    onClick={QuestionAnswer}
+                    className="btn btn-primary"
+                    disabled={isLoadingQuestionAnswers || isSubmittingAnswers || isLoadingPreVerificationQuestions}
+                  >
+                    {isSubmittingAnswers ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
                 </div>
               </div>
 

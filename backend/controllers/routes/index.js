@@ -12,6 +12,7 @@ const collegeRoutes = require('./college');
 const aiRoutes = require('./ai/jobRecommendations');
 const botTrainingRoutes = require('./ai/botTraining');
 const jobScraperRoutes = require('./ai/jobScraper');
+const leadIntelligenceRoutes = require('./ai/leadIntelligence');
 const chatHistoryRoutes = require('./ai/chatHistory');
 const { sendMail } = require("../../helpers");
 // const companyRoutes = require('./company');
@@ -33,6 +34,7 @@ router.use('/api', apiRoutes);
 router.use('/api/ai', aiRoutes); // AI-powered job recommendations
 router.use('/api/ai', botTrainingRoutes); // AI bot training data management
 router.use('/api/ai', jobScraperRoutes); // LinkedIn job scraping with Anthropic & Google Sheets
+router.use('/api/ai', leadIntelligenceRoutes); // Lead summary & intelligence for CRM dashboard
 router.use('/api/chat', chatHistoryRoutes); // Chat history management
 router.use('/candidateForm', viewsRoutes);
 router.use('/admin', adminRoutes);

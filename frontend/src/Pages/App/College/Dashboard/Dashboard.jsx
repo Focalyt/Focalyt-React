@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import axios from 'axios';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, Doughnut } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 // import {Doughnut } from 'react-chartjs-2';
 // Add Bootstrap 5 CSS to your index.html or import it in your main app file
@@ -495,6 +495,13 @@ const LeadAnalyticsDashboard = () => {
     verifiedCount: 0
   });
   const [weeklyStats, setWeeklyStats] = useState([]);
+  const [followupCounts, setFollowupCounts] = useState({
+    done: 0,
+    planned: 0,
+    missed: 0
+  });
+  const [followupCountsByCounselor, setFollowupCountsByCounselor] = useState([]);
+  const [followupCountsByCounselorLoading, setFollowupCountsByCounselorLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [showPreVerificationDatePicker, setShowPreVerificationDatePicker] = useState(false);
@@ -937,6 +944,11 @@ const LeadAnalyticsDashboard = () => {
     fetchCounselorMatrixData();
   }, [token, backendUrl, startDate, endDate, selectedCenter, filterData, formData]);
 
+  // Fetch follow-up counts by counsellor (cards = total of all counsellors, table = per counsellor)
+  useEffect(() => {
+    fetchFollowupCountsByCounselor();
+  }, [token, startDate, endDate, formData, filterData]);
+
   const fetchProfileData = async (filters = filterData) => {
     try {
       setIsLoading(true);
@@ -1035,6 +1047,98 @@ const LeadAnalyticsDashboard = () => {
       setCounselorMatrixData({});
     } finally {
       setCounselorMatrixLoading(false);
+    }
+  };
+
+  const fetchFollowupCounts = async () => {
+    try {
+      if (!token) {
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+        return;
+      }
+
+      // Today's activity: followups set today (createdAt) + done/missed today (statusUpdatedAt), counsellor-wise
+      const queryParams = new URLSearchParams({
+        filterBy: 'activity',
+        ...(startDate && { fromDate: startDate }),
+        ...(endDate && { toDate: endDate }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+
+      const response = await axios.get(
+        `${backendUrl}/college/followupcounts?${queryParams.toString()}`,
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (response.data?.success && response.data.data) {
+        setFollowupCounts({
+          done: response.data.data.done || 0,
+          planned: response.data.data.planned || 0,
+          missed: response.data.data.missed || 0
+        });
+      } else {
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching followup counts:', error);
+      setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+    }
+  };
+
+  const fetchFollowupCountsByCounselor = async () => {
+    try {
+      if (!token) {
+        setFollowupCountsByCounselor([]);
+        return;
+      }
+      setFollowupCountsByCounselorLoading(true);
+      const effectiveFrom =
+        filterData?.createdFromDate
+          ? filterData.createdFromDate.toISOString()
+          : startDate;
+      const effectiveTo =
+        filterData?.createdToDate
+          ? filterData.createdToDate.toISOString()
+          : endDate;
+
+      const queryParams = new URLSearchParams({
+        ...(effectiveFrom && { fromDate: effectiveFrom }),
+        ...(effectiveTo && { toDate: effectiveTo }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+      const response = await axios.get(
+        `${backendUrl}/college/followupcounts-by-counselor?${queryParams.toString()}`,
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data?.success && Array.isArray(response.data.data)) {
+        const list = response.data.data;
+        setFollowupCountsByCounselor(list);
+        // Cards = total across all counsellors (counsellor-wise totals)
+        setFollowupCounts({
+          done: list.reduce((s, r) => s + (Number(r.done) || 0), 0),
+          planned: list.reduce((s, r) => s + (Number(r.planned) || 0), 0),
+          missed: list.reduce((s, r) => s + (Number(r.missed) || 0), 0)
+        });
+      } else {
+        setFollowupCountsByCounselor([]);
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching followup counts by counselor:', error);
+      setFollowupCountsByCounselor([]);
+      setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+    } finally {
+      setFollowupCountsByCounselorLoading(false);
     }
   };
 
@@ -1340,39 +1444,15 @@ const LeadAnalyticsDashboard = () => {
     return centerData;
   };
 
-  // Get followup analytics
-  const getFollowupAnalytics = () => {
-    let totalFollowups = 0;
-    let doneFollowups = 0;
-    let missedFollowups = 0;
-    let plannedFollowups = 0;
-
-    // Apply center filter if selected
-    let dataToProcess = filteredData;
-    if (selectedCenter !== 'all') {
-      dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
-    }
-
-    dataToProcess.forEach(lead => {
-      if (lead && lead.followups && Array.isArray(lead.followups) && lead.followups.length > 0) {
-        lead.followups.forEach(followup => {
-          if (followup && followup.status) {
-            totalFollowups++;
-            if (followup.status === 'Done') doneFollowups++;
-            else if (followup.status === 'Missed') missedFollowups++;
-            else if (followup.status === 'Planned') plannedFollowups++;
-          }
-        });
-      }
-    });
-
-    return { totalFollowups, doneFollowups, missedFollowups, plannedFollowups };
-  };
-
   // Use API data for counselor matrix instead of local calculation
   const counselorMatrix = counselorMatrixData;
   const centerAnalytics = getCenterAnalytics();
-  const followupStats = getFollowupAnalytics();
+  const followupStats = {
+    totalFollowups: followupCounts.done + followupCounts.missed + followupCounts.planned,
+    doneFollowups: followupCounts.done,
+    missedFollowups: followupCounts.missed,
+    plannedFollowups: followupCounts.planned
+  };
   const dailyAdmissions = getDailyAdmissions();
 
   // Prepare chart data
@@ -2470,6 +2550,143 @@ const LeadAnalyticsDashboard = () => {
                     <AlertTriangle className="text-danger opacity-50" size={32} />
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Follow-up Metrics — total = sum of all rows in table below (not duplicate) */}
+          <p className="text-muted small mb-2">Summary (sum of all counsellors in table below). Uses selected date range above — works for today or any past range.</p>
+          <div className="row g-3 mb-4">
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">Done <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-success mb-0">
+                        {followupCounts.done}
+                      </p>
+                    </div>
+                    <CheckCircle className="text-success opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">Planned <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-primary mb-0">
+                        {followupCounts.planned}
+                      </p>
+                    </div>
+                    <Clock className="text-primary opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">Missed <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-danger mb-0">
+                        {followupCounts.missed}
+                      </p>
+                    </div>
+                    <AlertCircle className="text-danger opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">Total Followups</p>
+                      <p className="h3 fw-bold text-dark mb-0">
+                        {(Number(followupCounts.done) || 0) + (Number(followupCounts.planned) || 0) + (Number(followupCounts.missed) || 0)}
+                      </p>
+                    </div>
+                    <Users className="text-dark opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Follow-up counts by counsellor (detail) */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h5 fw-semibold mb-1 d-flex align-items-center gap-2">
+                <UserCheck className="text-primary" size={20} />
+                Follow-ups by Counsellor
+              </h2>
+              {/* <p className="text-muted small mb-3">Followups set / done / missed in the <strong>selected date range</strong> (today or past — change date filter above to see different periods). Counsellor-wise breakdown below.</p> */}
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{ minWidth: '160px' }}>Counsellor</th>
+                      <th className="text-center text-success">Done</th>
+                      <th className="text-center text-primary">Planned</th>
+                      <th className="text-center text-danger">Missed</th>
+                      <th className="text-center">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {followupCountsByCounselorLoading ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-4">
+                          <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                          <span className="ms-2">Loading...</span>
+                        </td>
+                      </tr>
+                    ) : followupCountsByCounselor.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-4 text-muted">No follow-up data.</td>
+                      </tr>
+                    ) : (
+                      followupCountsByCounselor.map((row) => (
+                        <tr key={row.counselorId}>
+                          <td className="fw-medium">
+                            {row.counselorName || row.counsellorName || 'Unknown'}
+                          </td>
+                          <td className="text-center text-success">{row.done ?? 0}</td>
+                          <td className="text-center text-primary">{row.planned ?? 0}</td>
+                          <td className="text-center text-danger">{row.missed ?? 0}</td>
+                          <td className="text-center">{row.total ?? (row.done + row.planned + row.missed)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {!followupCountsByCounselorLoading && followupCountsByCounselor.length > 0 && (
+                    <tfoot className="table-light">
+                      <tr className="fw-semibold">
+                        <td style={{ minWidth: '160px' }}>Total follow-up</td>
+                        <td className="text-center text-success">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.done) || 0), 0)}
+                        </td>
+                        <td className="text-center text-primary">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.planned) || 0), 0)}
+                        </td>
+                        <td className="text-center text-danger">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.missed) || 0), 0)}
+                        </td>
+                        <td className="text-center">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.total) || (Number(r.done) || 0) + (Number(r.planned) || 0) + (Number(r.missed) || 0)), 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
             </div>
           </div>

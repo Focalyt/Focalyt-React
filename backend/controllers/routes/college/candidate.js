@@ -66,7 +66,8 @@ const {
 	CandidateVisitCalender,
 	Center,
 	StatusLogs,
-	ReEnquire
+	ReEnquire,
+	PreVerification,
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const { statusLogHelper } = require("../../../helpers/college");
@@ -1885,21 +1886,30 @@ router.post('/questionAnswer', [isCollege], async (req, res) => {
 		}
 
 
-		const response = responses.map(response => {
-			if (response.question === 'Are you Going to Attend Center for Physical Counselling' && visitDate) {
-				return {
-					...response,
-					visitDate: visitDate
-				};
+		const visitAnswerValues = ['Visit', 'Joining', 'Both'];
+		let visitQuestionText = null;
+		const visitQuestion = await PreVerification.findOne({ type: 'visit', isActive: true }).select('questionText').lean();
+		if (visitQuestion && visitQuestion.questionText) {
+			visitQuestionText = visitQuestion.questionText;
+		}
+
+		const response = responses.map(resp => {
+			if (!visitDate) return resp;
+			const isVisitTypeQuestion = visitQuestionText && resp.question === visitQuestionText;
+			const isVisitAnswer = visitAnswerValues.includes(String(resp.answer || '').trim());
+			if (isVisitTypeQuestion && isVisitAnswer) {
+				return { ...resp, visitDate: new Date(visitDate) };
 			}
-			return response;
+			if (!visitQuestionText && isVisitAnswer) {
+				return { ...resp, visitDate: new Date(visitDate) };
+			}
+			return resp;
 		});
 
 		// Check if question answer already exists for this applied course
 		const existingQuestionAnswer = await QuestionAnswer.findOne({ appliedcourse });
 		if (existingQuestionAnswer) {
-			// Update existing record
-			existingQuestionAnswer.responses = responses;
+			existingQuestionAnswer.responses = response;
 			await existingQuestionAnswer.save();
 
 			return res.status(200).json({
@@ -1974,6 +1984,123 @@ router.get('/questionAnswer/:appliedcourseId', [isCollege], async (req, res) => 
 		return res.status(500).json({
 			status: false,
 			message: error.message || 'Error fetching question answers'
+		});
+	}
+});
+
+// Get configurable pre‑verification questions (all)
+router.get('/preVerification/questions', [isCollege], async (req, res) => {
+	try {
+		const questions = await PreVerification.find({}).sort({ order: 1 });
+
+		return res.status(200).json({
+			status: true,
+			message: 'Pre‑verification questions retrieved successfully',
+			data: questions,
+		});
+	} catch (error) {
+		console.error('Error fetching pre‑verification questions:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error fetching pre‑verification questions',
+		});
+	}
+});
+
+// Create a new pre‑verification question
+router.post('/preVerification/questions', [isCollege], async (req, res) => {
+	try {
+		const { questionText, options, order, isActive, type } = req.body;
+
+		if (!questionText || !options || !Array.isArray(options) || options.length === 0) {
+			return res.status(400).json({
+				status: false,
+				message: 'questionText and at least one option are required',
+			});
+		}
+
+		const question = new PreVerification({
+			questionText,
+			options,
+			order: typeof order === 'number' ? order : 0,
+			isActive: typeof isActive === 'boolean' ? isActive : true,
+			type: type || 'default',
+		});
+
+		await question.save();
+
+		return res.status(201).json({
+			status: true,
+			message: 'Pre‑verification question created successfully',
+			data: question,
+		});
+	} catch (error) {
+		console.error('Error creating pre‑verification question:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error creating pre‑verification question',
+		});
+	}
+});
+
+// Update an existing pre‑verification question
+router.put('/preVerification/questions/:id', [isCollege], async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { questionText, options, order, isActive, type } = req.body;
+
+		const question = await PreVerification.findById(id);
+		if (!question) {
+			return res.status(404).json({
+				status: false,
+				message: 'Pre‑verification question not found',
+			});
+		}
+
+		if (typeof questionText === 'string') question.questionText = questionText;
+		if (Array.isArray(options) && options.length > 0) question.options = options;
+		if (typeof order === 'number') question.order = order;
+		if (typeof isActive === 'boolean') question.isActive = isActive;
+		if (typeof type === 'string') question.type = type;
+
+		await question.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Pre‑verification question updated successfully',
+			data: question,
+		});
+	} catch (error) {
+		console.error('Error updating pre‑verification question:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error updating pre‑verification question',
+		});
+	}
+});
+
+// Delete a pre‑verification question
+router.delete('/preVerification/questions/:id', [isCollege], async (req, res) => {
+	try {
+		const { id } = req.params;
+
+		const question = await PreVerification.findByIdAndDelete(id);
+		if (!question) {
+			return res.status(404).json({
+				status: false,
+				message: 'Pre‑verification question not found',
+			});
+		}
+
+		return res.status(200).json({
+			status: true,
+			message: 'Pre‑verification question deleted successfully',
+		});
+	} catch (error) {
+		console.error('Error deleting pre‑verification question:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error deleting pre‑verification question',
 		});
 	}
 });
