@@ -2836,10 +2836,58 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
           </div>
+          {/* Admission Post  */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
+                <UserCheck className="text-primary" size={20} />
+                Admission Post Performance Matrix
+              </h2>
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>Counselor</th>
+                      <th className="text-center">Total KYC</th>
+                      <th className="text-center">Done KYC</th>
+                      <th className="text-center">Pending KYC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {counselorMatrixLoading ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4">
+                          <div className="d-flex justify-content-center align-items-center">
+                            <div className="spinner-border spinner-border-sm me-2" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            Loading admission post counselor performance data...
+                          </div>
+                        </td>
+                      </tr>
+                    ) : Object.keys(counselorMatrix).length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-muted">
+                          No admission post counselor performance data available for the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      Object.entries(counselorMatrix).map(([counselorName, data]) => (
+                        <tr key={counselorName}>
+                          <td style={{ position: 'sticky', left: 0, zIndex: 1, backgroundColor: 'white', fontWeight: 500 }}>{counselorName}</td>
+                          <td className="text-center fw-medium">{data.TotalKYC ?? data.KYCStage ?? 0}</td>
+                          <td className="text-center text-success fw-medium">{data.KYCDone ?? 0}</td>
+                          <td className="text-center text-warning fw-medium">{data.PendingKYC ?? 0}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
 
-          {/* Charts Row */}
-          <div className="row g-4 mb-4">
-            {/* Conversion vs Dropout Chart */}
+          {/* <div className="row g-4 mb-4">
             <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -2862,7 +2910,6 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
 
-            {/* Status Distribution */}
             <div className="col-lg-6">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -2892,10 +2939,10 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Course-wise Document Status Table */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h5 fw-semibold mb-4">Course-wise Document Status</h2>
               <div className="table-responsive">
@@ -2921,10 +2968,10 @@ const LeadAnalyticsDashboard = () => {
                 </table>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Course-wise Pending Documents Table */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h5 fw-semibold mb-4">Course-wise Pending Documents</h2>
               <div className="table-responsive">
@@ -2950,10 +2997,9 @@ const LeadAnalyticsDashboard = () => {
                 </table>
               </div>
             </div>
-          </div>
+          </div> */}
 
-          {/* Center-wise Analytics */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <Building className="text-purple" size={20} />
@@ -2982,7 +3028,7 @@ const LeadAnalyticsDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Center-wise Bar Chart */}
+                      
                       <div className="row g-3 mb-3">
                         <div className="col-12">
                           <ResponsiveContainer width="100%" height={180}>
@@ -3003,7 +3049,7 @@ const LeadAnalyticsDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Center-wise Pie Chart for Status Distribution */}
+      
                       <div className="row g-3 mb-3">
                         <div className="col-12">
                           <ResponsiveContainer width="100%" height={180}>
@@ -3046,11 +3092,10 @@ const LeadAnalyticsDashboard = () => {
                 ))}
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Daily Admissions Analytics */}
-          <div className="row g-4 mb-4">
-            {/* Daily Admissions Table */}
+          {/* <div className="row g-4 mb-4">
             <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -3128,7 +3173,6 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
 
-            {/* Daily Admissions Chart */}
             <div className="col-lg-6">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -3190,10 +3234,10 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Followup Analytics */}
-          <div className="card shadow-sm">
+          {/* <div className="card shadow-sm">
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <Clock className="text-warning" size={20} />
@@ -3218,7 +3262,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* ====== NEW: Course-Counsellor Status Table ====== */}
           <div className="card shadow-sm mb-4">
@@ -3488,7 +3532,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div> */}
 
-              <div className="col-md-6">
+              {/* <div className="col-md-6">
                 <div className="row">
                   <div className="col-12">
                     <div className="card shadow-sm mb-4">
@@ -3501,7 +3545,6 @@ const LeadAnalyticsDashboard = () => {
 
                         </div>
 
-                        {/* Enhanced Lead Sources Summary Cards */}
                         <div className="row g-3 mb-4">
                           {leadData.loading && (
                             <div className="col-12 text-center">
@@ -3522,7 +3565,6 @@ const LeadAnalyticsDashboard = () => {
                           )}
                         </div>
 
-                        {/* Detailed Lead Sources Table */}
                         <div className="table-responsive">
                           <table className="table table-hover align-middle">
                             <thead className="table-light">
@@ -3554,7 +3596,6 @@ const LeadAnalyticsDashboard = () => {
                           </table>
                         </div>
 
-                        {/* Lead Source Performance Charts */}
                         <div className="row mt-4">
                           <div className="col-md-8">
                             <div className="card border-0 bg-light">
@@ -3682,7 +3723,6 @@ const LeadAnalyticsDashboard = () => {
                                         </div>
                                       </div>
 
-                                      {/* Top Sources Breakdown */}
                                       {leadData.leadStats?.topSources?.slice(0, 3).map((source, index) => (
                                         <div key={index}>
                                           <div className="d-flex justify-content-between align-items-center mb-1">
@@ -3721,7 +3761,7 @@ const LeadAnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
 
           </div>

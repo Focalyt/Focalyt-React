@@ -100,6 +100,8 @@ import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
+import Target from './Pages/App/College/Target/Target';
+
 
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
@@ -307,6 +309,7 @@ const Layout = () => {
           <Route path='whatsappChat' element={<WhatsappChat/>}/>
           <Route path='whatsappWallet' element={<WhatsappWallet/>}/>
           <Route path='emailTemplate' element={<EmailTemplate/>}/>
+          <Route path='target' element={<Target/>}/>
         </Route>
 
         {/* company  */}

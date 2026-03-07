@@ -499,6 +499,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [uploadedByUser, setUploadedByUser] = useState(null);
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
+  const [kycMarkingProfileId, setKycMarkingProfileId] = useState(null);
 
   //course history
   const [courseHistory, setCourseHistory] = useState([]);
@@ -1389,11 +1390,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
       if (response.data.success) {
         // If KYC was updated, show a success message
-        if (response.data.kycUpdated) {
-          alert('All documents verified! KYC status has been updated.');
-        } else {
-          alert(`Document ${status.toLowerCase()} successfully!`);
-        }
+          // if (response.data.kycUpdated) {
+          //   alert('All documents verified! KYC status has been updated.');
+          // } else {
+          // }
+        alert(`Document ${status.toLowerCase()} successfully!`);
+
 
         // Refresh the profile data
         await fetchProfileData();
@@ -1404,6 +1406,36 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     } catch (error) {
       console.error('Error updating document status:', error);
       alert('Failed to update document status');
+    }
+  };
+
+  const handleMarkKycDone = async (profile) => {
+    if (!profile || !profile._id) return;
+    if (profile.kyc === true) {
+      alert('KYC is already marked as done for this candidate.');
+      return;
+    }
+    if (!window.confirm('Mark KYC as done for this candidate? All mandatory documents must be verified.')) {
+      return;
+    }
+    setKycMarkingProfileId(profile._id);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/kycDone/${profile._id}`,
+        {},
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.success) {
+        alert('KYC marked as done successfully.');
+        await fetchProfileData();
+      } else {
+        alert(response.data.message || 'Failed to mark KYC done');
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Failed to mark KYC done';
+      alert(msg);
+    } finally {
+      setKycMarkingProfileId(null);
     }
   };
 
@@ -1468,32 +1500,31 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
 
   const handleCrmFilterClick = (filter, index) => {
+    // 0: Pending for Documents, 1: Pending for Verification, 2: Reject Documents, 3: Verified, 4: All
     if (index === 0) {
-      setFilterData({
-        ...filterData,
-        kyc: false,
-      })
+      setFilterData(prev => ({ ...prev, kyc: false }));
       setActiveCrmFilter(index);
       return;
     }
     if (index === 1) {
-      // Filter profiles where kyc is true
-      setFilterData({
-        ...filterData,
-        kyc: true,
-      })
-      setActiveCrmFilter(index);
-      return;
-    } else if (index === 2) {
-      setFilterData({
-        ...filterData,
-        kyc: 'all',
-      })
+      setFilterData(prev => ({ ...prev, kyc: false })); // Pending for Verification = not yet verified
       setActiveCrmFilter(index);
       return;
     }
+    if (index === 2) {
+      setFilterData(prev => ({ ...prev, kyc: 'all' }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    if (index === 3) {
+      // Verified tab - only kyc done
+      setFilterData(prev => ({ ...prev, kyc: true }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    // index === 4: All
+    setFilterData(prev => ({ ...prev, kyc: 'all' }));
     setActiveCrmFilter(index);
-
   };
 
   // Filter state from Registration component
@@ -2126,7 +2157,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         page: page.toString(),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.kyc && { kyc: filters.kyc }),
+        ...(filters.kyc !== undefined && filters.kyc !== 'all' && { kyc: String(filters.kyc) }),
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
@@ -3996,7 +4027,26 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                               <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '0.35rem' }}>
                                                 <i className="fas fa-phone"></i>
                                               </button>
-                                              <img
+
+                                              <button
+                                                className='btn btn-outline-primary btn-sm border-0'
+                                                title='Mark KYC Done'
+                                                style={{
+                                                  fontSize: '20px',
+                                                  marginBottom: '0.35rem',
+                                                  backgroundColor: profile.kyc === true ? '#90EE90' : '#fc2b5a',
+                                                  color: profile.kyc === true ? '#1a5f1a' : 'white'
+                                                }}
+                                                disabled={profile.kyc === true || kycMarkingProfileId === profile._id}
+                                                onClick={() => handleMarkKycDone(profile)}
+                                              >
+                                                {kycMarkingProfileId === profile._id ? (
+                                                  <><i className="fas fa-spinner fa-spin me-1"></i> Marking...</>
+                                                ) : (
+                                                  <><i className="fas fa-check"></i> Mark KYC Done</>
+                                                )}
+                                              </button>
+                                              {/* <img
                                                 src="/Assets/public_assets/images/kyc_done.png"
                                                 alt="ekyc done"
                                                 className='ekycimg'
@@ -4007,7 +4057,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 alt="ekyc pending"
                                                 className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
-                                              />
+                                              /> */}
                                             </div>
 
                                             {profile.batch && (

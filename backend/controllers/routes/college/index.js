@@ -8466,6 +8466,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
 		}
 
+		// Filter by KYC status when tab is "Pending for Documents" (kyc=false) or "Verified" (kyc=true)
+		if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
+			baseMatchStage.kyc = kyc === 'true' || kyc === true;
+		}
+
 		// Add base match stage
 		aggregationPipeline.push({ $match: baseMatchStage });
 
@@ -9966,35 +9971,35 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		});
 
 		// Check each mandatory document
-		for (const reqDoc of updatedRequiredDocs) {
-			if (reqDoc.mandatory) {
-				const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
-				// If mandatory doc is not uploaded or not verified, set flag to false
-				if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
-					allMandatoryDocsVerified = false;
-					break;
-				}
-			}
-		}
+		// for (const reqDoc of updatedRequiredDocs) {
+		// 	if (reqDoc.mandatory) {
+		// 		const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
+		// 		// If mandatory doc is not uploaded or not verified, set flag to false
+		// 		if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
+		// 			allMandatoryDocsVerified = false;
+		// 			break;
+		// 		}
+		// 	}
+		// }
 
 		// If all mandatory docs are verified, update KYC status to true
-		if (allMandatoryDocsVerified && !updatedProfile.kyc) {
-			updatedProfile.kyc = true;
-			await updatedProfile.save();
+		// if (allMandatoryDocsVerified && !updatedProfile.kyc) {
+		// 	updatedProfile.kyc = true;
+		// 	await updatedProfile.save();
 
 
-			const newStatusLogs = await statusLogHelper(id, {
-				kycApproved: true
-			});
+		// 	const newStatusLogs = await statusLogHelper(id, {
+		// 		kycApproved: true
+		// 	});
 
 
-		}
+		// }
 
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
-			kycUpdated: profile.kyc === true,
-			verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
+			// kycUpdated: profile.kyc === true,
+			// verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
 			requiredCount,
 			allMandatoryDocsVerified: allMandatoryDocsVerified
 		});
@@ -10004,6 +10009,59 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		return res.status(500).json({
 			success: false,
 			message: err.message || "Error verifying document",
+			error: err.message
+		});
+	}
+});
+
+router.post("/kycDone/:profileId", isCollege, async (req, res) => {
+	try {
+		const { profileId } = req.params;
+		const userId = req.user?._id;
+		if (!userId) {
+			return res.status(401).json({ success: false, message: "Unauthorized" });
+		}
+		const appliedCourse = await AppliedCourses.findById(profileId)
+			.populate("_course", "docsRequired");
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: "Applied course not found" });
+		}
+		const course = appliedCourse._course;
+		if (!course || !course.docsRequired || !Array.isArray(course.docsRequired)) {
+			return res.status(400).json({ success: false, message: "Course or docs configuration not found" });
+		}
+		const mandatoryDocs = course.docsRequired.filter(
+			(d) => d.mandatory === true && d.status !== false
+		);
+		const mandatoryDocIds = mandatoryDocs.map((d) => d._id.toString());
+		const uploadedDocs = appliedCourse.uploadedDocs || [];
+		for (const docId of mandatoryDocIds) {
+			const uploaded = uploadedDocs.find(
+				(u) => u.docsId && u.docsId.toString() === docId
+			);
+			if (!uploaded || uploaded.status !== "Verified") {
+				return res.status(400).json({
+					success: false,
+					message: "All mandatory documents must be verified before marking KYC done",
+					missingOrUnverifiedMandatory: true
+				});
+			}
+		}
+		appliedCourse.kyc = true;
+		appliedCourse.kycDoneAt = new Date();
+		appliedCourse.kycDoneBy = userId;
+		await appliedCourse.save();
+		return res.json({
+			success: true,
+			message: "KYC marked as done",
+			kycDoneAt: appliedCourse.kycDoneAt,
+			kycDoneBy: appliedCourse.kycDoneBy
+		});
+	} catch (err) {
+		console.error("Error marking KYC done:", err);
+		return res.status(500).json({
+			success: false,
+			message: err.message || "Error marking KYC done",
 			error: err.message
 		});
 	}
@@ -13941,6 +13999,18 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 								0
 							]
 						}
+					},
+					totalKYC: { $sum: { $cond: ['$kycStage', 1, 0] } },
+					kycDone: { $sum: { $cond: ['$kyc', 1, 0] } },
+					pendingKYC: { $sum: { $cond: [{ $and: ['$kycStage', { $ne: ['$kyc', true] }] }, 1, 0] } },
+					rejectedDoc: {
+						$sum: {
+							$cond: [
+								{ $gt: [{ $size: { $ifNull: [{ $filter: { input: '$uploadedDocs', cond: { $eq: ['$$this.status', 'Rejected'] } } }, []] } }, 0] },
+								1,
+								0
+							]
+						}
 					}
 				}
 			}
@@ -14193,14 +14263,31 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			}
 		]);
 
-		// Create lookup maps for total leads and untouch leads
+		// Create lookup maps by counselorName and by counselorId (for reliable KYC matching)
 		const totalLeadsMap = {};
 		const untouchLeadsMap = {};
+		const totalKYCMap = {};
+		const kycDoneMap = {};
+		const pendingKYCMap = {};
+		const rejectedDocMap = {};
+		const totalKYCMapById = {};
+		const kycDoneMapById = {};
+		const pendingKYCMapById = {};
 
 		appliedCoursesLeads.forEach(item => {
 			const counselorName = item._id.counselorName || 'Unknown';
+			const counselorIdStr = item._id.counselorId ? item._id.counselorId.toString() : '';
 			totalLeadsMap[counselorName] = item.totalLeads;
 			untouchLeadsMap[counselorName] = item.untouchLeads || 0;
+			totalKYCMap[counselorName] = item.totalKYC || 0;
+			kycDoneMap[counselorName] = item.kycDone || 0;
+			pendingKYCMap[counselorName] = item.pendingKYC || 0;
+			rejectedDocMap[counselorName] = item.rejectedDoc || 0;
+			if (counselorIdStr) {
+				totalKYCMapById[counselorIdStr] = item.totalKYC || 0;
+				kycDoneMapById[counselorIdStr] = item.kycDone || 0;
+				pendingKYCMapById[counselorIdStr] = item.pendingKYC || 0;
+			}
 		});
 
 		// Transform data to match frontend format - Counselor-wise with status and sub-status breakdowns
@@ -14208,21 +14295,30 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 
 		counselorMatrixData.forEach(counselor => {
 			const counselorName = counselor.counselorName || 'Unknown';
+			const counselorIdStr = counselor.counselorId ? counselor.counselorId.toString() : '';
 			const totalLeads = totalLeadsMap[counselorName] || 0;
 			const untouchLeads = untouchLeadsMap[counselorName] || 0;
+			// Prefer KYC from AppliedCourses by counselorId (reliable), then by name, then StatusLogs; ensure Total = Done + Pending when possible
+			const kycDone = kycDoneMapById[counselorIdStr] ?? kycDoneMap[counselorName] ?? counselor.totalKycApproved ?? 0;
+			const pendingKYC = pendingKYCMapById[counselorIdStr] ?? pendingKYCMap[counselorName] ?? 0;
+			let totalKYC = totalKYCMapById[counselorIdStr] ?? totalKYCMap[counselorName] ?? counselor.totalKycStage ?? 0;
+			if (totalKYC === 0 && (kycDone > 0 || pendingKYC > 0)) totalKYC = kycDone + pendingKYC;
 
-			// Initialize counselor data
+			// Initialize counselor data (KYC metrics from AppliedCourses - counsellor wise)
 			transformedData[counselorName] = {
-				Leads: totalLeads, // Use total leads from AppliedCourses as 1st column
-				Untouch: untouchLeads, // Add untouch leads count
-				KYCDone: counselor.totalKycApproved,
+				Leads: totalLeads,
+				Untouch: untouchLeads,
+				TotalKYC: totalKYC,
+				KYCDone: kycDone,
+				PendingKYC: pendingKYC,
+				RejectedDoc: rejectedDocMap[counselorName] ?? 0,
 				KYCStage: counselor.totalKycStage,
 				Admissions: counselor.totalAdmissions,
 				Dropouts: counselor.totalDropouts,
 				BatchAssigned: counselor.totalBatchAssigned,
 				BatchFreezed: counselor.totalBatchFreezed,
 				ZeroPeriod: counselor.totalZeroPeriodAssigned,
-				Paid: counselor.totalAdmissions, // Assuming admissions are paid
+				Paid: counselor.totalAdmissions,
 				Unpaid: totalLeads - counselor.totalAdmissions,
 				ConversionRate: totalLeads > 0 ? parseFloat(((counselor.totalAdmissions / totalLeads) * 100).toFixed(1)) : 0,
 				DropoutRate: totalLeads > 0 ? parseFloat(((counselor.totalDropouts / totalLeads) * 100).toFixed(1)) : 0
@@ -14233,7 +14329,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 				const statusTitle = statusData.statusTitle || 'Unknown';
 				const subStatusTitle = statusData.subStatusTitle || 'Unknown';
 
-				// Initialize status if not exists
 				if (!transformedData[counselorName][statusTitle]) {
 					transformedData[counselorName][statusTitle] = {
 						count: 0,
@@ -14241,15 +14336,38 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 					};
 				}
 
-				// Add to status count
 				transformedData[counselorName][statusTitle].count += statusData.count;
 
-				// Add to sub-status
 				if (!transformedData[counselorName][statusTitle].substatuses[subStatusTitle]) {
 					transformedData[counselorName][statusTitle].substatuses[subStatusTitle] = 0;
 				}
 				transformedData[counselorName][statusTitle].substatuses[subStatusTitle] += statusData.count;
 			});
+		});
+
+		// Include all counselors from AppliedCourses so KYC data is always counsellor-wise (even if no StatusLogs)
+		appliedCoursesLeads.forEach(item => {
+			const counselorName = item._id.counselorName || 'Unknown';
+			if (transformedData[counselorName]) return; // already added from StatusLogs
+			const totalLeads = totalLeadsMap[counselorName] || item.totalLeads || 0;
+			transformedData[counselorName] = {
+				Leads: totalLeads,
+				Untouch: untouchLeadsMap[counselorName] || 0,
+				TotalKYC: totalKYCMap[counselorName] || 0,
+				KYCDone: kycDoneMap[counselorName] || 0,
+				PendingKYC: pendingKYCMap[counselorName] || 0,
+				RejectedDoc: rejectedDocMap[counselorName] || 0,
+				KYCStage: 0,
+				Admissions: 0,
+				Dropouts: 0,
+				BatchAssigned: 0,
+				BatchFreezed: 0,
+				ZeroPeriod: 0,
+				Paid: 0,
+				Unpaid: totalLeads,
+				ConversionRate: 0,
+				DropoutRate: 0
+			};
 		});
 
 		return res.json({
