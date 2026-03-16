@@ -625,7 +625,7 @@ async function runOnceIfMain() {
 }
 
 function counselorPerformanceEmailScheduler() {
-  
+  //  sendDailyCounselorPerformanceEmail();
   cron.schedule(
     "35 18 * * *",
     async () => {

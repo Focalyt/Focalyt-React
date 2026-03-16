@@ -2514,13 +2514,6 @@ router.get('/dashboard', isCollege, async (req, res) => {
 			}));
 		}
 
-		// Base query with ownership conditions
-		const baseQuery = {
-			$and: [
-				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
-			]
-		};
-
 		// Date range filter
 		let dateFilter = {};
 		if (startDate && endDate) {
@@ -2538,9 +2531,20 @@ router.get('/dashboard', isCollege, async (req, res) => {
 			};
 		}
 
-		const finalQuery = {
-			$and: [baseQuery, dateFilter]
-		};
+		
+		const andConditions = [];
+
+		if (ownershipConditions.length > 0) {
+			andConditions.push({
+				$or: ownershipConditions.flatMap(c => c.$or || [c])
+			});
+		}
+
+		if (Object.keys(dateFilter).length > 0) {
+			andConditions.push(dateFilter);
+		}
+
+		const finalQuery = andConditions.length > 0 ? { $and: andConditions } : {};
 
 		// Get overview statistics
 		const overviewStats = await Lead.aggregate([

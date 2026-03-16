@@ -4934,7 +4934,7 @@ const DashboardWrapper = () => {
       <div className="d-flex justify-content-between align-items-center flex-wrap mb-3">
         <div>
           <h1 className="display-5 fw-bold text-dark mb-1">{t('dashboard')}</h1>
-          <p className="text-muted mb-0">{t('dashboard_subtitle')}</p>
+          {/* <p className="text-muted mb-0">{t('dashboard_subtitle')}</p> */}
         </div>
         <div className="btn-group mt-2 mt-md-0">
           <button
@@ -4951,13 +4951,13 @@ const DashboardWrapper = () => {
           >
             {t('dashboard_tab_ai')}
           </button>
-          <button
+          {/* <button
             type="button"
             className={`btn btn-sm ${activeSection === 'counselor' ? 'btn-primary' : 'btn-outline-primary'}`}
             onClick={() => setActiveSection('counselor')}
           >
             {t('dashboard_tab_counsellor')}
-          </button>
+          </button> */}
         </div>
       </div>
 
