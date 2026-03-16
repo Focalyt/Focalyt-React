@@ -186,13 +186,13 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose, t }) => {
         <table className="table table-sm">
           <thead>
             <tr>
-              <th className="text-center text-muted small">Sun</th>
-              <th className="text-center text-muted small">Mon</th>
-              <th className="text-center text-muted small">Tue</th>
-              <th className="text-center text-muted small">Wed</th>
-              <th className="text-center text-muted small">Thu</th>
-              <th className="text-center text-muted small">Fri</th>
-              <th className="text-center text-muted small">Sat</th>
+              <th className="text-center text-muted small">{t('sun')}</th>
+              <th className="text-center text-muted small">{t('mon')}</th>
+              <th className="text-center text-muted small">{t('tue')}</th>
+              <th className="text-center text-muted small">{t('wed')}</th>
+              <th className="text-center text-muted small">{t('thu')}</th>
+              <th className="text-center text-muted small">{t('fri')}</th>
+              <th className="text-center text-muted small">{t('sat')}</th>
             </tr>
           </thead>
           <tbody>
@@ -510,6 +510,8 @@ const LeadAnalyticsDashboard = () => {
   const [followupCountsByCounselorLoading, setFollowupCountsByCounselorLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
+  const [preVerificationStartDate, setPreVerificationStartDate] = useState('');
+  const [preVerificationEndDate, setPreVerificationEndDate] = useState('');
   const [showPreVerificationDatePicker, setShowPreVerificationDatePicker] = useState(false);
 
   // Lead tracking state
@@ -522,6 +524,7 @@ const LeadAnalyticsDashboard = () => {
 
     fetchWeeklyStats();
     fetchSourceLeads();
+    fetchPreVerificationStats();
   }, []);
 
   const fetchWeeklyStats = async () => {
@@ -547,19 +550,23 @@ const LeadAnalyticsDashboard = () => {
 
   const handleSearch = () => {
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   const handleClearFilters = () => {
     setSelectedDate('');
+    setPreVerificationStartDate('');
+    setPreVerificationEndDate('');
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   const handleShowAll = () => {
     setSelectedDate('');
+    setPreVerificationStartDate('');
+    setPreVerificationEndDate('');
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   // Keyboard shortcut for search (Enter key)
@@ -571,8 +578,54 @@ const LeadAnalyticsDashboard = () => {
 
   const handlePreVerificationDateSelect = (startDate, endDate) => {
     setSelectedDate(startDate);
+    setPreVerificationStartDate(startDate);
+    setPreVerificationEndDate(endDate || startDate);
     setShowPreVerificationDatePicker(false);
-    fetchStats();
+    fetchPreVerificationStats({ startDate, endDate: endDate || startDate });
+  };
+
+  const fetchPreVerificationStats = async (range) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      if (!token) {
+        setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+        return;
+      }
+
+      setLoading(true);
+
+      const start =
+        (range && range.startDate) || preVerificationStartDate || selectedDate;
+      const end =
+        (range && range.endDate) || preVerificationEndDate || selectedDate;
+
+      const queryParams = new URLSearchParams({
+        ...(start && { startDate: start }),
+        ...(end && { endDate: end }),
+      });
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerifieedCount?${queryParams.toString()}`,
+        { headers: { "x-auth": token } }
+      );
+
+      if (response.data?.success) {
+        const data = response.data?.data || {};
+        setStats({
+          totalCount: (Number(data.verifiedCount) || 0) + (Number(data.unverifiedCount) || 0),
+          unverifiedCount: Number(data.unverifiedCount) || 0,
+          verifiedCount: Number(data.verifiedCount) || 0,
+        });
+      } else {
+        setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+      }
+    } catch (error) {
+      console.error("Error fetching pre-verification stats:", error);
+      setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+    } finally {
+      setLoading(false);
+    }
   };
   //filter stats
 
@@ -1904,14 +1957,14 @@ const LeadAnalyticsDashboard = () => {
         style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
         <div className="bg-white rounded-lg shadow-lg" style={{ maxWidth: '700px', width: '95%' }}>
           <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
-            <h5 className="mb-0">Select Date Range</h5>
+            <h5 className="mb-0">{t('select_date_range')}</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
 
           <div className="d-flex">
             {/* Left Panel - Quick Select Options */}
             <div className="border-end p-3" style={{ width: '180px', backgroundColor: '#f8f9fa' }}>
-              <h6 className="mb-3 small fw-bold">Quick Select</h6>
+              <h6 className="mb-3 small fw-bold">{t('quick_select')}</h6>
               <div className="d-flex flex-column gap-1">
                 {quickRanges.map((range) => (
                   <div key={range.id} className="form-check">
@@ -1955,13 +2008,13 @@ const LeadAnalyticsDashboard = () => {
               <table className="w-100 table table-borderless">
                 <thead>
                   <tr>
-                    <th className="p-1 text-center text-muted small fw-normal">Sun</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Mon</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Tue</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Wed</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Thu</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Fri</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Sat</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('sun')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('mon')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('tue')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('wed')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('thu')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('fri')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('sat')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1986,29 +2039,29 @@ const LeadAnalyticsDashboard = () => {
           <div className="border-top p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div className="d-flex align-items-center gap-2">
-                <span className="text-muted small">Selected Range:</span>
+                <span className="text-muted small">{t('selected_range')}</span>
                 <span className="fw-bold small">
                   {selectedStartDate && selectedEndDate
                     ? `${formatDisplayDate(selectedStartDate)} - ${formatDisplayDate(selectedEndDate)}`
-                    : 'No date range selected'
+                    : t('no_date_range_selected')
                   }
                 </span>
               </div>
               <div className="d-flex gap-2">
                 <button className="btn btn-outline-secondary btn-sm" onClick={handleCancel}>
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleApply}
                   disabled={!selectedStartDate || !selectedEndDate}
                 >
-                  Update
+                  {t('update')}
                 </button>
               </div>
             </div>
             <div className="mt-2">
-              <small className="text-muted">Dates are shown in local timezone</small>
+              <small className="text-muted">{t('dates_shown_local_timezone')}</small>
             </div>
           </div>
         </div>
@@ -2027,7 +2080,7 @@ const LeadAnalyticsDashboard = () => {
       setDrilldown(prev => ({ ...prev, loading: false, leads: res.data.data || [] }));
     } catch (err) {
       setDrilldown(prev => ({ ...prev, loading: false, leads: [] }));
-      alert('Failed to fetch lead details');
+      alert(t('failed_to_fetch_lead_details'));
     }
   };
 
@@ -2265,9 +2318,9 @@ const LeadAnalyticsDashboard = () => {
       {isLoading && activeSection === 'main' && (
         <div className="text-center py-5">
           <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
+            <span className="visually-hidden">{t('loading')}</span>
           </div>
-          <p className="mt-3 text-muted">Loading analytics data...</p>
+          <p className="mt-3 text-muted">{t('loading_analytics_data')}</p>
         </div>
       )}
 
@@ -2657,7 +2710,7 @@ const LeadAnalyticsDashboard = () => {
                       <th className="text-center text-success">{t('followup_done_total')}</th>
                       <th className="text-center text-primary">{t('followup_planned_total')}</th>
                       <th className="text-center text-danger">{t('followup_missed_total')}</th>
-                      <th className="text-center">Total</th>
+                      <th className="text-center">{t('total')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2665,20 +2718,20 @@ const LeadAnalyticsDashboard = () => {
                       <tr>
                         <td colSpan={5} className="text-center py-4">
                           <div className="spinner-border spinner-border-sm text-primary" role="status">
-                            <span className="visually-hidden">Loading...</span>
+                            <span className="visually-hidden">{t('loading')}</span>
                           </div>
-                          <span className="ms-2">Loading...</span>
+                          <span className="ms-2">{t('loading')}</span>
                         </td>
                       </tr>
                     ) : followupCountsByCounselor.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-4 text-muted">No follow-up data.</td>
+                        <td colSpan={5} className="text-center py-4 text-muted">{t('no_follow_up_data')}</td>
                       </tr>
                     ) : (
                       followupCountsByCounselor.map((row) => (
                         <tr key={row.counselorId}>
                           <td className="fw-medium">
-                            {row.counsellorName || row.counselorName || row.name || 'Unknown'}
+                            {row.counsellorName || row.counselorName || row.name || t('unknown')}
                           </td>
                           <td className="text-center text-success">{row.done ?? 0}</td>
                           <td className="text-center text-primary">{row.planned ?? 0}</td>
@@ -2717,15 +2770,15 @@ const LeadAnalyticsDashboard = () => {
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <UserCheck className="text-primary" size={20} />
-                Counselor Performance Matrix
+                {t('counselor_performance_matrix')}
               </h2>
               <div className="table-responsive" style={{ overflowX: 'auto' }}>
                 <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
                   <thead className="table-light">
                     <tr>
-                      <th rowSpan={expandedStatus ? 2 : 1} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>Counselor</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Leads</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Untouch</th>
+                      <th rowSpan={expandedStatus ? 2 : 1} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>{t('counsellor')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('leads')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('untouch')}</th>
                       {allStatuses.map(status => (
                         <th
                           key={status}
@@ -2741,14 +2794,14 @@ const LeadAnalyticsDashboard = () => {
                           {status} <span style={{ fontWeight: 'normal' }}>{expandedStatus === status ? '▲' : '▼'}</span>
                         </th>
                       ))}
-                      <th rowSpan={expandedStatus ? 2 : 1}>KYC</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Admissions</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Dropouts</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Assigned</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Freezed</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Zero Period</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Revenue</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Conv. Rate</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('kyc')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('admissions')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('dropouts')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('batch_assigned')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('batch_freezed')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('zero_period')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('revenue')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('conversion_rate')}</th>
                     </tr>
                     {expandedStatus && allSubstatuses[expandedStatus]?.length > 0 && (
                       <tr>
@@ -2759,7 +2812,7 @@ const LeadAnalyticsDashboard = () => {
                                 {allSubstatuses[status].map(sub => (
                                   <th key={sub} className="text-center small text-muted">{sub}</th>
                                 ))}
-                                <th className="text-center small text-muted">Total</th>
+                                <th className="text-center small text-muted">{t('total')}</th>
                               </>
                             )
                             : <th key={status}></th>
@@ -2773,16 +2826,16 @@ const LeadAnalyticsDashboard = () => {
                         <td colSpan={allStatuses.length + 10} className="text-center py-4">
                           <div className="d-flex justify-content-center align-items-center">
                             <div className="spinner-border spinner-border-sm me-2" role="status">
-                              <span className="visually-hidden">Loading...</span>
+                              <span className="visually-hidden">{t('loading')}</span>
                             </div>
-                            Loading counselor performance data...
+                            {t('loading_counsellor_performance_data')}
                           </div>
                         </td>
                       </tr>
                     ) : Object.keys(counselorMatrix).length === 0 ? (
                       <tr>
                         <td colSpan={allStatuses.length + 10} className="text-center py-4 text-muted">
-                          No counselor performance data available for the selected filters.
+                          {t('no_counsellor_performance_data')}
                         </td>
                       </tr>
                     ) : (
@@ -2862,16 +2915,16 @@ const LeadAnalyticsDashboard = () => {
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <UserCheck className="text-primary" size={20} />
-                Admission Post Performance Matrix
+                {t('admission_post_performance_matrix')}
               </h2>
               <div className="table-responsive" style={{ overflowX: 'auto' }}>
                 <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
                   <thead className="table-light">
                     <tr>
-                      <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>Counselor</th>
-                      <th className="text-center">Total KYC</th>
-                      <th className="text-center">Done KYC</th>
-                      <th className="text-center">Pending KYC</th>
+                      <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>{t('counsellor')}</th>
+                      <th className="text-center">{t('total_kyc')}</th>
+                      <th className="text-center">{t('done_kyc')}</th>
+                      <th className="text-center">{t('pending_kyc')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2880,16 +2933,16 @@ const LeadAnalyticsDashboard = () => {
                         <td colSpan={4} className="text-center py-4">
                           <div className="d-flex justify-content-center align-items-center">
                             <div className="spinner-border spinner-border-sm me-2" role="status">
-                              <span className="visually-hidden">Loading...</span>
+                              <span className="visually-hidden">{t('loading')}</span>
                             </div>
-                            Loading admission post counselor performance data...
+                            {t('loading_admission_post_counsellor_performance_data')}
                           </div>
                         </td>
                       </tr>
                     ) : Object.keys(counselorMatrix).length === 0 ? (
                       <tr>
                         <td colSpan={4} className="text-center py-4 text-muted">
-                          No admission post counselor performance data available for the selected filters.
+                          {t('no_admission_post_counsellor_performance_data')}
                         </td>
                       </tr>
                     ) : (
@@ -3289,7 +3342,7 @@ const LeadAnalyticsDashboard = () => {
           <div className="card shadow-sm mb-4">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-4 card-flex">
-                <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
+                <h2 className="h5 fw-semibold mb-0">{t('course_counsellor_status_table')}</h2>
 
                 {/* Date Filter Controls */}
                 <div className="d-flex gap-2 align-items-center car-elements">
@@ -3300,8 +3353,8 @@ const LeadAnalyticsDashboard = () => {
                   >
                     <CalendarDays size={16} />
                     {counsellorStatusDateFrom && counsellorStatusDateTo
-                      ? `${counsellorStatusDateFrom} to ${counsellorStatusDateTo}`
-                      : 'Select Date Range'
+                      ? t('date_range_to', { from: counsellorStatusDateFrom, to: counsellorStatusDateTo })
+                      : t('select_date_range')
                     }
                   </button>
                   <button
@@ -3309,14 +3362,14 @@ const LeadAnalyticsDashboard = () => {
                     onClick={showAllTimeData}
                     disabled={counsellorStatusLoading}
                   >
-                    All Time
+                    {t('all_time')}
                   </button>
                   <button
                     className="btn btn-outline-secondary btn-sm  card-select-date"
                     onClick={clearCounsellorStatusDateFilter}
                     disabled={counsellorStatusLoading}
                   >
-                    Today
+                    {t('today')}
                   </button>
 
                   {/* Download Button */}
@@ -3332,7 +3385,7 @@ const LeadAnalyticsDashboard = () => {
                       disabled={counsellorStatusLoading || Object.keys(groupedStatusData).length === 0}
                     >
                       <i className="fas fa-download"></i>
-                      Download
+                      {t('download')}
                       <i className="fas fa-chevron-down ms-1"></i>
                     </button>
                   </div>
@@ -3341,9 +3394,9 @@ const LeadAnalyticsDashboard = () => {
               {counsellorStatusLoading ? (
                 <div className="text-center py-4">
                   <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <span className="visually-hidden">{t('loading')}</span>
                   </div>
-                  <p className="mt-3 text-muted">Loading counsellor status data...</p>
+                  <p className="mt-3 text-muted">{t('loading_counsellor_status_data')}</p>
                 </div>
               ) : counsellorStatusError ? (
                 <div className="alert alert-danger">{counsellorStatusError}</div>
@@ -3352,10 +3405,10 @@ const LeadAnalyticsDashboard = () => {
                   <table className="table table-bordered align-middle table-fixed">
                     <thead className="table-light sticky-header">
                       <tr>
-                        <th style={{ minWidth: '120px', width: '120px' }}>Project</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Course</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Center</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Counsellor Name</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('project')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('course')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('center')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('counsellor_name')}</th>
                         <th style={{ minWidth: '120px', width: '120px' }}>{t('total_leads')}</th>
                         <th style={{ minWidth: '140px', width: '140px' }}>{t('pending_for_kyc')}</th>
                         <th style={{ minWidth: '120px', width: '120px' }}>{t('kyc_done')}</th>
@@ -3363,14 +3416,14 @@ const LeadAnalyticsDashboard = () => {
                         <th style={{ minWidth: '140px', width: '140px' }}>{t('batch_assigned')}</th>
                         <th style={{ minWidth: '180px', width: '180px' }}>{t('in_zero_period')}</th>
                         <th style={{ minWidth: '150px', width: '150px' }}>{t('in_batch_freezed')}</th>
-                        <th style={{ minWidth: '120px', width: '120px' }}>DropOut</th>
-                        <th style={{ minWidth: '160px', width: '160px' }}>Leads vs Admission %</th>
-                        <th style={{ minWidth: '180px', width: '180px' }}>Admission vs AtCenter %</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('dropouts')}</th>
+                        <th style={{ minWidth: '160px', width: '160px' }}>{t('leads_vs_admission')}</th>
+                        <th style={{ minWidth: '180px', width: '180px' }}>{t('admission_vs_atcenter')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(groupedStatusData).length === 0 ? (
-                        <tr><td colSpan={14} className="text-center">No data found</td></tr>
+                        <tr><td colSpan={14} className="text-center">{t('no_data_found')}</td></tr>
                       ) : (
                         Object.entries(groupedStatusData).map(([courseName, centers]) => {
                           const courseRowSpan = Object.values(centers).reduce((sum, arr) => sum + arr.length, 0);
@@ -3395,13 +3448,13 @@ const LeadAnalyticsDashboard = () => {
                                   )}
                                   <td>{row.counsellorName}</td>
                                   <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, t('total_leads'))}>{row.totalLeads}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, 'Batch Assigned')}>{row.batchAssigned}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, 'In Zero Period')}>{row.inZeroPeriod}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, 'In Batch Freezed')}>{row.inBatchFreezed}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, 'DropOut')}>{row.dropOut}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, t('pending_for_kyc'))}>{row.pendingKYC}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, t('kyc_done'))}>{row.kycDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, t('admission_done'))}>{row.admissionDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, t('batch_assigned'))}>{row.batchAssigned}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, t('in_zero_period'))}>{row.inZeroPeriod}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, t('in_batch_freezed'))}>{row.inBatchFreezed}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, t('dropouts'))}>{row.dropOut}</td>
                                   <td className="text-center">
                                     {row.totalLeads > 0
                                       ? ((row.admissionDoneIds.length / row.totalLeads) * 100).toFixed(1) + '%'
@@ -3438,7 +3491,7 @@ const LeadAnalyticsDashboard = () => {
 
                 <div className="row">
                   <div className="col-12">
-                    <h2 className="mb-4">Pre-Verification Dashboard</h2>
+                    <h2 className="mb-4">{t('pre_verification_dashboard')}</h2>
                   </div>
                 </div>
 
@@ -3446,7 +3499,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-md-6 preVarification">
                     <div className="card bg-primary text-white">
                       <div className="card-body">
-                        <h5 className="card-title">Total Pre Verified</h5>
+                        <h5 className="card-title">{t('total_pre_verified')}</h5>
                         <h2 className="card-text">{loading ? '...' : stats.verifiedCount}</h2>
                       </div>
                     </div>
@@ -3454,7 +3507,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-md-6 preVarification">
                     <div className="card bg-success text-white">
                       <div className="card-body">
-                        <h5 className="card-title">Total Pre Unverified</h5>
+                        <h5 className="card-title">{t('total_pre_unverified')}</h5>
                         <h2 className="card-text">{loading ? '...' : stats.unverifiedCount}</h2>
                       </div>
                     </div>
@@ -3464,19 +3517,19 @@ const LeadAnalyticsDashboard = () => {
                       <div className="col-md-12">
                         <div className="card">
                           <div className="card-body">
-                            <h5 className="card-title">Verified vs Unverified</h5>
+                            <h5 className="card-title">{t('verified_vs_unverified')}</h5>
                             {loading ? (
                               <div className="text-center py-4">
                                 <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading...</span>
+                                  <span className="visually-hidden">{t('loading')}</span>
                                 </div>
                               </div>
                             ) : stats.verifiedCount > 0 ? (
                               <PieChart width={300} height={300}>
                                 <Pie
                                   data={[
-                                    { name: 'Verified', value: stats.verifiedCount ? stats.verifiedCount : 0 },
-                                    { name: 'Unverified', value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
+                                    { name: t('verified'), value: stats.verifiedCount ? stats.verifiedCount : 0 },
+                                    { name: t('unverified'), value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
                                   ]}
                                   cx={150}
                                   cy={150}
@@ -3491,7 +3544,7 @@ const LeadAnalyticsDashboard = () => {
                               </PieChart>
                             ) : (
                               <div className="text-center py-4 text-muted">
-                                No data available
+                                {t('no_data_available')}
                               </div>
                             )}
                           </div>
@@ -3998,12 +4051,12 @@ const LeadAnalyticsDashboard = () => {
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <h5 className="mb-0">{drilldown.statusLabel} - Lead Details</h5>
+              <h5 className="mb-0">{t('lead_details_title', { status: drilldown.statusLabel })}</h5>
               <button
                 className="btn btn-sm btn-outline-secondary"
                 onClick={() => setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' })}
               >
-                Close
+                {t('close')}
               </button>
             </div>
             {drilldown.loading ? (
@@ -4011,7 +4064,7 @@ const LeadAnalyticsDashboard = () => {
                 <div className="spinner-border text-primary" role="status"></div>
               </div>
             ) : drilldown.leads.length === 0 ? (
-              <div className="text-center text-muted">No leads found.</div>
+              <div className="text-center text-muted">{t('no_leads_found')}</div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-bordered align-middle">
@@ -4028,7 +4081,7 @@ const LeadAnalyticsDashboard = () => {
                       <tr key={idx}>
                         <td>{lead.candidateName}</td>
                         <td>{lead.candidateMobile}</td>
-                        <td>{lead.candidateEmail ? lead.candidateEmail : 'NA'}</td>
+                        <td>{lead.candidateEmail ? lead.candidateEmail : t('na')}</td>
 
                       </tr>
                     ))}
@@ -4058,10 +4111,10 @@ const LeadAnalyticsDashboard = () => {
                 <div className="d-flex justify-content-between align-items-center w-100">
                   <div className="d-flex align-items-center">
                     <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                    <h5 className="fw-bold mb-0 text-dark">{t('advanced_filters')}</h5>
                     {totalSelected > 0 && (
                       <span className="badge bg-primary ms-2">
-                        {totalSelected} Active
+                        {t('active_count', { count: totalSelected })}
                       </span>
                     )}
                   </div>
@@ -4071,7 +4124,7 @@ const LeadAnalyticsDashboard = () => {
                       onClick={clearAllFilters}
                     >
                       <i className="fas fa-times-circle me-1"></i>
-                      Clear All
+                      {t('clear_all')}
                     </button>
                     <button
                       className="btn-close"
@@ -4089,7 +4142,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-md-3">
                     <label className="form-label small fw-bold text-dark CourseType">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
+                      {t('course_type')}
                     </label>
                     <div className="position-relative">
                       <select
@@ -4098,9 +4151,9 @@ const LeadAnalyticsDashboard = () => {
                         value={filterData.courseType}
                         onChange={handleFilterChange}
                       >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
+                        <option value="">{t('all_types')}</option>
+                        <option value="Free">🆓 {t('free')}</option>
+                        <option value="Paid">💰 {t('paid')}</option>
                       </select>
                     </div>
                   </div>
@@ -4181,7 +4234,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-12">
                     <h6 className="text-dark fw-bold mb-3">
                       <i className="fas fa-calendar-alt me-2 text-primary"></i>
-                      Date Range Filters
+                      {t('date_range_filters')}
                     </h6>
                   </div>
 
@@ -4189,12 +4242,12 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-calendar-plus me-1 text-success"></i>
-                      Date Range
+                      {t('date_range')}
                     </label>
                     <div className="card border-0 bg-light p-0">
                       <div className="row g-2">
                         <div className="col-6 fromDate">
-                          <label className="form-label small">From Date</label>
+                          <label className="form-label small">{t('from_date')}</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
                             value={filterData.createdFromDate}
@@ -4206,7 +4259,7 @@ const LeadAnalyticsDashboard = () => {
                           />
                         </div>
                         <div className="col-6 fromDate">
-                          <label className="form-label small">To Date</label>
+                          <label className="form-label small">{t('to_date')}</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
                             value={filterData.createdToDate}
@@ -4225,10 +4278,12 @@ const LeadAnalyticsDashboard = () => {
                         <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
                           <small className="text-success">
                             <i className="fas fa-info-circle me-1"></i>
-                            <strong>Selected:</strong>
-                            {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                            <strong>{t('selected_label')}</strong>
+                            {filterData.createdFromDate &&
+                              ` ${t('from_date_value', { date: formatDate(filterData.createdFromDate) })}`}
                             {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                            {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                            {filterData.createdToDate &&
+                              ` ${t('to_date_value', { date: formatDate(filterData.createdToDate) })}`}
                           </small>
                         </div>
                       )}
@@ -4241,7 +4296,7 @@ const LeadAnalyticsDashboard = () => {
                           disabled={!filterData.createdFromDate && !filterData.createdToDate}
                         >
                           <i className="fas fa-times me-1"></i>
-                          Clear Date Filter
+                          {t('clear_date_filter')}
                         </button>
                       </div>
                     </div>
@@ -4269,7 +4324,7 @@ const LeadAnalyticsDashboard = () => {
                                 // Auto-trigger search when date changes
                                 if (formattedDate) {
                                   setLoading(true);
-                                  setTimeout(() => fetchStats(), 100);
+                                  setTimeout(() => fetchPreVerificationStats(), 100);
                                 }
                               }}
                               onKeyPress={handleKeyPress}

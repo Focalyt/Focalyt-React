@@ -18,6 +18,7 @@
     "testEnvironment": "node"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@google-cloud/translate": "^7.2.1",
     "aws-sdk": "^2.506.0",
     "axios": "^0.19.2",

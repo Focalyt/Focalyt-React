@@ -28,6 +28,8 @@ const LanguageSwitcher = () => {
         <option value="en">English</option>
         <option value="hi">हिंदी</option>
         <option value="pa">ਪੰਜਾਬੀ</option>
+        <option value="fr">Français</option>
+
       </select>
     </div>
   );

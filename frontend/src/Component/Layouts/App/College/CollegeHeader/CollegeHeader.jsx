@@ -215,9 +215,9 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                           <li>
                             <span className="user-status text-white">{t('available')}</span>
                           </li>
-                          <li>
+                          {/* <li>
                             <span className="user-status text-white"><LanguageSwitcher/></span>
-                          </li>
+                          </li> */}
                         </ul>
                         
                       </span>

@@ -445,8 +445,8 @@ module.exports.sendMails = async (subject, message, email, options = {}) => {
     secure: true,
     port: 465,
     auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASS,
+      user: "focalytportal@gmail.com",
+      pass: "sgymepbsvctmday",
     },
     tls: { rejectUnauthorized: false },
   });
