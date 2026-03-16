@@ -7,8 +7,12 @@ const { Vacancy, FAQ, Courses, BotTraining, BotTrainingRule } = require("../../m
 // Load training data helper (from DB)
 const loadTrainingData = async () => {
   const [examples, rules] = await Promise.all([
-    BotTraining.find({}).sort({ createdAt: -1 }).lean(),
-    BotTrainingRule.find({}).sort({ priority: -1, createdAt: -1 }).lean(),
+    BotTraining && typeof BotTraining.find === "function"
+      ? BotTraining.find({}).sort({ createdAt: -1 }).lean()
+      : Promise.resolve([]),
+    BotTrainingRule && typeof BotTrainingRule.find === "function"
+      ? BotTrainingRule.find({}).sort({ priority: -1, createdAt: -1 }).lean()
+      : Promise.resolve([]),
   ]);
 
   const mapExample = (doc) => ({
@@ -683,39 +687,40 @@ For job-related queries, please browse available jobs using the search filters.`
       });
     }
 
+    let rankedJobs = allJobs;
+    let aiAnalysis = null;
+
+    try {
     // Step 2: Prepare job data for AI
-    const jobsForAI = allJobs.map((job) => ({
-      id: job._id.toString(),
+    const jobsForAI = (allJobs || []).map((job) => ({
+      id: (job && job._id && job._id.toString()) || "",
       title: job.title || job.name || "N/A",
-      company: job._company?.name || job.displayCompanyName || "N/A",
+      company: (job._company && job._company.name) || job.displayCompanyName || "N/A",
       location: {
-        state: job.state?.name || "N/A",
-        city: job.city?.name || "N/A",
+        state: (job.state && job.state.name) || "N/A",
+        city: (job.city && job.city.name) || "N/A",
       },
       salary: job.isFixed
         ? { type: "fixed", amount: job.amount }
         : { type: "range", min: job.min, max: job.max },
       experience: {
-        years: job.experience || 0,
-        months: job.experienceMonths || 0,
+        years: Number(job.experience) || 0,
+        months: Number(job.experienceMonths) || 0,
       },
-      qualification: job._qualification?.name || "N/A",
-      industry: job._industry?.name || "N/A",
+      qualification: (job._qualification && job._qualification.name) || "N/A",
+      industry: (job._industry && job._industry.name) || "N/A",
       skills: {
-        tech: (job._techSkills || []).map((s) => s.name),
-        nonTech: (job._nonTechSkills || []).map((s) => s.name),
+        tech: (job._techSkills || []).map((s) => s && s.name).filter(Boolean),
+        nonTech: (job._nonTechSkills || []).map((s) => s && s.name).filter(Boolean),
       },
       workMode: job.work || "N/A",
-      description: job.jobDescription?.substring(0, 500) || "", // First 500 chars
+      description: (job.jobDescription && String(job.jobDescription).substring(0, 500)) || "",
     }));
 
     // Step 3: Build AI prompt
     const aiPrompt = buildAIPrompt(userQuery, preferences, userProfile, jobsForAI);
 
     // Step 4: Try AI API, fallback to simple search if fails
-    let rankedJobs = allJobs;
-    let aiAnalysis = null;
-
     try {
       console.log(`[AI] Processing ${allJobs.length} jobs for user query: "${userQuery || 'N/A'}"`);
       const aiResponse = await callAnthropicAPI(anthropicApiKey, aiPrompt);
@@ -862,6 +867,33 @@ For job-related queries, please browse available jobs using the search filters.`
       requestedCity: preferences.cityName || preferences.city,
       actualLocation: rankedJobs.length > 0 ? rankedJobs[0]?.state?.name : null,
     });
+    } catch (innerError) {
+      // When we already have allJobs, never return 500 – return 200 with jobs so user sees results
+      console.error("[AI] Job ranking/response error, returning available jobs:", innerError.message);
+      const coursesForFallback = (allCourses || []).map((c) => ({
+        _id: c._id,
+        name: c.name,
+        description: (c.description || "").substring(0, 200),
+        duration: c.duration,
+        city: c.city,
+        state: c.state,
+        courseFee: c.courseFee,
+        courseFeeType: c.courseFeeType,
+        thumbnail: c.thumbnail,
+        sectorNames: (c.sectors || []).map((s) => s?.name).filter(Boolean),
+      }));
+      return res.json({
+        status: true,
+        jobs: (allJobs || []).slice(0, 20),
+        courses: normalizedIntent === "jobs" ? [] : coursesForFallback,
+        totalJobs: (allJobs || []).length,
+        aiAnalysis: { reasoning: "Showing available jobs", matchedCriteria: [] },
+        message: "Showing available jobs",
+        showNearbyMessage: false,
+        requestedCity: preferences.cityName || preferences.city,
+        actualLocation: null,
+      });
+    }
   } catch (error) {
     console.error("❌ AI Job Recommendations Error:", error);
     return res.status(500).json({

@@ -437,6 +437,47 @@ module.exports.authChat = async (req, res, next) => {
 };
 
 
+module.exports.sendMails = async (subject, message, email, options = {}) => {
+  const nodemailer = require("nodemailer");
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    secure: true,
+    port: 465,
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+    tls: { rejectUnauthorized: false },
+  });
+
+  const mailOptions = {
+    from: options.from || "Focalyt Portal <focalytportal@gmail.com>",
+    to: email,
+    subject,
+    html: message,
+  };
+
+  if (options.cc) {
+    mailOptions.cc = options.cc;
+  }
+  if (options.bcc) {
+    mailOptions.bcc = options.bcc;
+  }
+  if (options.attachments) {
+    mailOptions.attachments = options.attachments;
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[sendMails] Email sent:", info.response || info);
+    return info;
+  } catch (error) {
+    console.log("[sendMails] Error:", error.message);
+    throw error;
+  }
+};
+
 module.exports.sendMail = async (subject, message, email) => {
   const nodemailer = require("nodemailer");
   var transporter = nodemailer.createTransport({

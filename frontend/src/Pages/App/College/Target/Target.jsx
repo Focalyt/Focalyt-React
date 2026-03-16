@@ -301,17 +301,123 @@ function Target() {
   const { widthRef, width } = useMainWidth([isFilterCollapsed]);
 
   // const totalSelected = Object.values(formData).reduce((total, filter) => total + (filter.values.length || 0), 0);
+ 
+  const [permissions, setPermissions] = useState([]);
+  const [viewMode, setViewMode] = useState('grid');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+       try {
+ 
+         const res = await axios.get(`${backendUrl}/college/filters-data`, {
+           headers: { 'x-auth': token }
+         });
+         if (res.data.status) {
+           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+           // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+           // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
+           try {
+             const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+               headers: { 'x-auth': token }
+             });
+             if (centersRes.data.success && centersRes.data.data) {
+               const allCentersMapped = centersRes.data.data.map(c => ({ 
+                 value: c._id, 
+                 label: c.name 
+               }));
+               // console.log('🏢 ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
+               setCenterOptions(allCentersMapped);
+             } else {
+               // Fallback to centers from filters-data if list_all_centers fails
+               const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+               // console.log('🏢 CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
+               setCenterOptions(centersMapped);
+             }
+           } catch (centerErr) {
+             console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
+             // Fallback to centers from filters-data
+             const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+             setCenterOptions(centersMapped);
+           }
+           
+           setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+         }
+       } catch (err) {
+         console.error('Failed to fetch filter options:', err);
+       }
+     };
+     fetchFilterOptions();
+   }, []);
+ 
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
+
+
+  const initialActivities = [];
+  const [activities, setActivities] = useState(initialActivities);
+  const [filteredActivities, setFilteredActivities] = useState(initialActivities);
+
+  // Multi-select / advanced filters state
+  const [formData, setFormData] = useState({
+    projects: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+    center: {
+      type: "includes",
+      values: []
+    },
+    counselor: {
+      type: "includes",
+      values: []
+    },
+    sector: {
+      type: "includes",
+      values: []
+    },
+  });
+
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + (filter.values.length || 0), 0);
+  const [crmFilters, setCrmFilters] = useState([
+    { _id: '', name: '', count: 0, milestone: '' },
+
+  ]);
+    const [statuses, setStatuses] = useState([
+      { _id: '', name: '', count: 0 },
+  
+    ]);
+  const [subStatuses, setSubStatuses] = useState([]);
   const [verticalOptions, setVerticalOptions] = useState([]);
   const [projectOptions, setProjectOptions] = useState([]);
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
-  const [viewMode, setViewMode] = useState('grid');
-  const [isMobile, setIsMobile] = useState(false);
-  const [allProfiles, setAllProfiles] = useState([]);
+
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-
 
   const [dropdownStates, setDropdownStates] = useState({
     projects: false,
@@ -340,8 +446,99 @@ function Target() {
     nextActionToDate: null,
     subStatuses: null,
     statuses: null,
-
   });
+ const [seletectedStatus, setSelectedStatus] = useState('');
+  const activeFilterCount = Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected;
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(0);
+
+  const formatDate = (date) => {
+    if (!date || !(date instanceof Date)) return '';
+    return date.toLocaleDateString('en-GB');
+  };
+
+  const fetchTargetData = async (filters = filterData, form = formData, page = currentPage) => {
+    if (!token) return;
+
+    setIsLoading(true);
+
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999);
+      } else {
+        d.setHours(0, 0, 0, 0);
+      }
+      return d.toISOString();
+    };
+
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
+    const statusParam = filters.statuses || (filters.status && filters.status !== 'true' ? filters.status : null);
+
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(statusParam && { status: statusParam }),
+      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      // Multi-select filters
+      ...(form.projects.values.length > 0 && { projects: JSON.stringify(form.projects.values) }),
+      ...(form.verticals.values.length > 0 && { verticals: JSON.stringify(form.verticals.values) }),
+      ...(form.course.values.length > 0 && { course: JSON.stringify(form.course.values) }),
+      ...(form.center.values.length > 0 && { center: JSON.stringify(form.center.values) }),
+      ...(form.counselor.values.length > 0 && { counselor: JSON.stringify(form.counselor.values) })
+    });
+
+    try {
+      const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success && response.data.data) {
+        const data = response.data;
+        setActivities(data.data);
+        setFilteredActivities(data.data);
+        setTotalPages(data.totalPages || 1);
+        setPageSize(data.limit || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching target data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyFilters = (filters = filterData, form = formData) => {
+    setCurrentPage(1);
+    fetchTargetData(filters, form, 1);
+  };
+
+  useEffect(() => {
+    // Load initial data on mount
+    fetchTargetData(filterData, formData, currentPage);
+  }, []);
+  useEffect(() => {
+    fetchStatus()
+
+  }, []);
+
+  useEffect(() => {
+    if (seletectedStatus || filterData.statuses) {
+      fetchSubStatus()
+    }
+  }, [seletectedStatus, filterData.statuses]);
   const clearAllFilters = () => {
     const clearedFilters = {
       name: '',
@@ -359,20 +556,21 @@ function Target() {
       statuses: null,
     };
 
-    setFilterData(clearedFilters);
-    // setFormData({
-    //   projects: { type: "includes", values: [] },
-    //   verticals: { type: "includes", values: [] },
-    //   course: { type: "includes", values: [] },
-    //   center: { type: "includes", values: [] },
-    //   counselor: { type: "includes", values: [] },
-    //   sector: { type: "includes", values: [] },
-    // });
+    const clearedForm = {
+      projects: { type: 'includes', values: [] },
+      verticals: { type: 'includes', values: [] },
+      course: { type: 'includes', values: [] },
+      center: { type: 'includes', values: [] },
+      counselor: { type: 'includes', values: [] },
+      sector: { type: 'includes', values: [] }
+    };
 
+    setFilterData(clearedFilters);
+    setFormData(clearedForm);
     setCurrentPage(1);
-    
-    // fetchProfileData(clearedFilters, 1);
+    fetchTargetData(clearedFilters, clearedForm, 1);
   };
+
   const handleFilterChange = (e) => {
     try {
       const { name, value } = e.target;
@@ -382,19 +580,19 @@ function Target() {
       console.error('Filter change error:', error);
     }
   };
-  const handleCriteriaChange = (criteria, values) => {
 
-    // setFormData((prevState) => ({
-    //   ...prevState,
-    //   [criteria]: {
-    //     type: "includes",
-    //     values: values
-    //   }
-    // }));
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prev) => ({
+      ...prev,
+      [criteria]: {
+        ...prev[criteria],
+        values
+      }
+    }));
   };
+
   const toggleDropdown = (filterName) => {
-    setDropdownStates(prev => {
-      // Close all other dropdowns and toggle the current one
+    setDropdownStates((prev) => {
       const newState = Object.keys(prev).reduce((acc, key) => {
         acc[key] = key === filterName ? !prev[key] : false;
         return acc;
@@ -402,6 +600,7 @@ function Target() {
       return newState;
     });
   };
+
   const handleDateFilterChange = (date, fieldName) => {
     const newFilterData = {
       ...filterData,
@@ -426,6 +625,63 @@ function Target() {
     setFilterData(newFilterData);
 
   }
+    const fetchStatus = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/college/status`, {
+          headers: { 'x-auth': token }
+        });
+  
+  
+        if (response.data.success) {
+          const status = response.data.data;
+          const allFilter = { _id: 'all', name: 'All' };
+  
+  
+          setCrmFilters([allFilter, ...status.map(r => ({
+            _id: r._id,
+            name: r.title,
+            milestone: r.milestone,  // agar backend me count nahi hai to 0
+          }))]);
+  
+          setStatuses(status.map(r => ({
+            _id: r._id,
+            name: r.title,
+            count: r.count || 0,  // agar backend me count nahi hai to 0
+          })));
+  
+  
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+        alert('Failed to fetch Status');
+      }
+    };
+      const fetchSubStatus = async () => {
+        try {
+          const status = seletectedStatus || filterData.statuses;
+    
+          if (!status) {
+            alert('Please select a status');
+            return;
+          }
+          const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
+            headers: { 'x-auth': token }
+          });
+    
+    
+          if (response.data.success) {
+            const status = response.data.data;
+    
+    
+            setSubStatuses(response.data.data);
+    
+    
+          }
+        } catch (error) {
+          console.error('Error fetching roles:', error);
+          alert('Failed to fetch SubStatus');
+        }
+      };
   return (
     <>
      <style>
@@ -677,6 +933,368 @@ function Target() {
     .text-warning { color:#c95d00 !important; }
     .text-danger  { color:var(--accent) !important; }
 
+
+      
+    /* Enhanced Multi-Select Dropdown Styles */
+.multi-select-container-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-dropdown-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-trigger {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: white !important;
+  border: 1px solid #ced4da !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  min-height: 38px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  width: 100% !important;
+}
+
+.multi-select-trigger:hover {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+}
+
+.multi-select-trigger.open {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.select-display-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #495057;
+  font-weight: normal;
+}
+
+.dropdown-arrow {
+  color: #6c757d;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.multi-select-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.multi-select-options-new {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  background: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+    
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.options-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.select-all-btn,
+.clear-all-btn {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+  border: 1px solid !important;
+}
+
+.select-all-btn {
+  border-color: #0d6efd !important;
+  color: #0d6efd !important;
+}
+
+.clear-all-btn {
+  border-color: #6c757d !important;
+  color: #6c757d !important;
+}
+
+.select-all-btn:hover {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+.clear-all-btn:hover {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.options-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+.options-list-new {
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.options-list-new::-webkit-scrollbar {
+  width: 6px;
+}
+
+.options-list-new::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.options-list-new::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.options-list-new::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.option-item-new {
+  display: flex !important;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.option-item-new:last-child {
+  border-bottom: none;
+}
+
+.option-item-new:hover {
+  background-color: #f8f9fa;
+}
+
+.option-item-new input[type="checkbox"] {
+  margin: 0 0.5rem 0 0 !important;
+  cursor: pointer;
+  accent-color: #0d6efd;
+}
+
+.option-label-new {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #495057;
+  cursor: pointer;
+}
+
+.options-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.no-options {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Close dropdown when clicking outside */
+.multi-select-container-new.dropdown-open::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* Focus states for accessibility */
+.multi-select-trigger:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.option-item-new input[type="checkbox"]:focus {
+  outline: 2px solid #86b7fe;
+  outline-offset: 2px;
+}
+
+/* Selected state styling */
+.option-item-new input[type="checkbox"]:checked + .option-label-new {
+  font-weight: 500;
+  color: #0d6efd;
+}
+
+/* Badge styling for multi-select */
+.badge.bg-primary {
+  background-color: #0d6efd !important;
+  font-size: 0.75rem;
+  padding: 0.25em 0.4em;
+}
+/* Animation for dropdown open/close */
+.multi-select-options-new {
+  transform-origin: top;
+  animation: dropdownOpen 0.15s ease-out;
+}
+
+@keyframes dropdownOpen {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Prevent text selection on dropdown trigger */
+.multi-select-trigger {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced visual feedback */
+.multi-select-trigger:active {
+  transform: translateY(1px);
+}
+
+/* Loading state (if needed) */
+.multi-select-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.multi-select-loading .dropdown-arrow {
+  animation: spin 1s linear infinite;
+}
+/* Desktop Date Picker Styles */
+.firstDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(0px)!important;
+}
+// .translateX .react-calendar {
+//   height: min-content !important;
+//     transform: translateX(-110px) !important;
+//     width: 250px !important;
+// }
+.react-calendar{
+    height: min-content !important;
+    width: 250px !important;
+}
+@media (max-width: 768px) {
+  .multi-select-options-new {
+    max-height: 250px;
+  }
+  
+  .options-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    width: 100%;
+  }
+  
+  .options-list-new {
+    max-height: 150px;
+  }
+  .marginTopMobile {
+    margin-top: 340px !important;
+  }
+   .nav-tabs-main{
+                  white-space: nowrap;
+                  flex-wrap: nowrap;
+                  overflow: scroll;
+                  scrollbar-width: none;
+                  -ms-overflow-style: none;
+                  &::-webkit-scrollbar {
+                    display: none;
+                  }
+              }
+  //             .nav-tabs-main > li > button{
+  //             padding: 15px 9px;
+  //             }
+  
+  .firstDatepicker .react-calendar,
+  .translateX .react-calendar,
+  // .react-calendar {
+  //   // width: calc(100vw - 40px) !important;
+  //   max-width: 300px !important;
+  //   // position: fixed !important;
+  //   z-index: 9999 !important;
+  //   left: 50% !important;
+  //   right: 50% !important;
+  //   transform: translateX(-50%) translateY(-50%) !important;
+  //   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  // }
+  
+  .row.g-4 > .col-12.col-md-4 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .row.g-4 > .col-12.col-md-6 {
+    margin-bottom: 1rem !important;
+  }
+  
+  .card.bg-light .row.g-2 > .col-12 {
+    margin-bottom: 0.75rem;
+  }
+  
+  .modal-body.p-4 {
+    padding: 1rem !important;
+  }
+  
+  .modal-body .row.g-4 {
+    margin-left: -0.5rem !important;
+    margin-right: -0.5rem !important;
+  }
+  
+  .modal-body .row.g-4 > [class*="col-"] {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}
+
+
       `
     }
   </style>
@@ -704,11 +1322,11 @@ function Target() {
                       <div className="d-flex align-items-center">
                         <i className="fas fa-filter text-primary me-2"></i>
                         <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                        {/* {totalSelected > 0 && (
+                        {activeFilterCount > 0 && (
                           <span className="badge bg-primary ms-2">
-                            {totalSelected} Active
+                            {activeFilterCount} Active
                           </span>
-                        )} */}
+                        )}
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <button
@@ -754,9 +1372,9 @@ function Target() {
                       <div className="col-md-3">
                         <MultiSelectCheckbox
                           title="Project"
-                          // options={projectOptions}
-                          // selectedValues={formData.projects.values}
-                          // onChange={(values) => handleCriteriaChange('projects', values)}
+                          options={projectOptions}
+                          selectedValues={formData.projects.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
                           icon="fas fa-sitemap"
                           isOpen={dropdownStates.projects}
                           onToggle={() => toggleDropdown('projects')}
@@ -767,9 +1385,9 @@ function Target() {
                       <div className="col-md-3">
                         <MultiSelectCheckbox
                           title="Verticals"
-                          // options={verticalOptions}
-                          // selectedValues={formData.verticals.values}
-                          // icon="fas fa-sitemap"
+                          options={verticalOptions}
+                          selectedValues={formData.verticals.values}
+                          icon="fas fa-sitemap"
                           isOpen={dropdownStates.verticals}
                           onToggle={() => toggleDropdown('verticals')}
                           onChange={(values) => handleCriteriaChange('verticals', values)}
@@ -780,9 +1398,9 @@ function Target() {
                       <div className="col-md-3">
                         <MultiSelectCheckbox
                           title="Course"
-                          // options={courseOptions}
-                          // selectedValues={formData.course.values}
-                          // onChange={(values) => handleCriteriaChange('course', values)}
+                          options={courseOptions}
+                          selectedValues={formData.course.values}
+                          onChange={(values) => handleCriteriaChange('course', values)}
                           icon="fas fa-graduation-cap"
                           isOpen={dropdownStates.course}
                           onToggle={() => toggleDropdown('course')}
@@ -793,9 +1411,9 @@ function Target() {
                       <div className="col-md-3">
                         <MultiSelectCheckbox
                           title="Center"
-                          // options={centerOptions}
-                          // selectedValues={formData.center.values}
-                          // onChange={(values) => handleCriteriaChange('center', values)}
+                          options={centerOptions}
+                          selectedValues={formData.center.values}
+                          onChange={(values) => handleCriteriaChange('center', values)}
                           icon="fas fa-building"
                           isOpen={dropdownStates.center}
                           onToggle={() => toggleDropdown('center')}
@@ -806,9 +1424,9 @@ function Target() {
                       <div className="col-md-3">
                         <MultiSelectCheckbox
                           title="Counselor"
-                          // options={counselorOptions}
-                          // selectedValues={formData.counselor.values}
-                          // onChange={(values) => handleCriteriaChange('counselor', values)}
+                          options={counselorOptions}
+                          selectedValues={formData.counselor.values}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
                           icon="fas fa-user-tie"
                           isOpen={dropdownStates.counselor}
                           onToggle={() => toggleDropdown('counselor')}
@@ -842,9 +1460,9 @@ function Target() {
                           onChange={(e) => handleFilterChange(e)}
 
                         >
-                          {/* <option value="">Select Status</option>
-                          {statuses.map((filter, index) => (
-                            <option value={filter._id}>{filter.name}</option>))} */}
+                          <option value="">Select Status</option>
+                          {statuses.map((filter) => (
+                            <option key={filter._id} value={filter._id}>{filter.name}</option>))}
                         </select>
                       </div>
 
@@ -865,9 +1483,9 @@ function Target() {
                           onChange={(e) => handleFilterChange(e)}
 
                         >
-                          {/* <option value="">Select Sub-Status</option>
-                          {subStatuses.map((filter, index) => (
-                            <option value={filter._id}>{filter.title}</option>))} */}
+                          <option value="">Select Sub-Status</option>
+                          {subStatuses.map((filter) => (
+                            <option key={filter._id} value={filter._id}>{filter.title}</option>))}
                         </select>
                       </div>
 
@@ -924,9 +1542,9 @@ function Target() {
                               <small className="text-success">
                                 <i className="fas fa-info-circle me-1"></i>
                                 <strong>Selected:</strong>
-                                {/* {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
                                 {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`} */}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
                               </small>
                             </div>
                           )}
@@ -1048,9 +1666,9 @@ function Target() {
                               <small className="text-info">
                                 <i className="fas fa-info-circle me-1"></i>
                                 <strong>Selected:</strong>
-                                {/* {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
                                 {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`} */}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
                               </small>
                             </div>
                           )}
@@ -1090,7 +1708,7 @@ function Target() {
                           <div className="d-flex align-items-center">
                             <i className="fas fa-info-circle me-2"></i>
                             <div>
-                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+                              <strong>Results Summary:</strong> Showing {filteredActivities.length} results on page {currentPage} of {totalPages}
 
                               {/* Active filter indicators */}
                               <div className="mt-2">
@@ -1115,12 +1733,12 @@ function Target() {
                                   </span>
                                 )}
 
-                                {/* {totalSelected > 0 && (
+                                {totalSelected > 0 && (
                                   <span className="badge bg-primary me-2">
                                     <i className="fas fa-filter me-1"></i>
                                     {totalSelected} Multi-Select Filters Active
                                   </span>
-                                )} */}
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1134,7 +1752,7 @@ function Target() {
                     <div className="d-flex justify-content-between align-items-center w-100">
                       <div className="text-muted small">
                         <i className="fas fa-filter me-1"></i>
-                        {/* {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied */}
+                        {activeFilterCount} filters applied
                       </div>
                       <div className="d-flex gap-2">
                         <button
@@ -1146,10 +1764,10 @@ function Target() {
                         </button>
                         <button
                           className="btn btn-primary"
-                          // onClick={() => {
-                          //   fetchProfileData(filterData, 1);
-                          //   setIsFilterCollapsed(true);
-                          // }}
+                          onClick={() => {
+                            applyFilters();
+                            setIsFilterCollapsed(true);
+                          }}
                         >
                           <i className="fas fa-search me-1"></i>
                           Apply Filters
@@ -1179,41 +1797,23 @@ function Target() {
             {/* <!-- ── Filters ── --> */}
             <div className="filters-bar mb-4">
               <i className="bi bi-funnel text-muted"></i>
-              <select className="form-select-dark form-select form-select-sm" style={{ width: "130px" }}>
-                <option>March 2025</option>
-                <option>February 2025</option>
-                <option>January 2025</option>
-              </select>
-              <select className="form-select-dark form-select form-select-sm" style={{ width: "140px" }}>
-                <option>All Counselors</option>
-                <option>Priya Sharma</option>
-                <option>Rohit Mehta</option>
-                <option>Anjali Patel</option>
-              </select>
-              <select className="form-select-dark form-select form-select-sm" style={{ width: "160px" }}>
-                <option>All Activities</option>
-                <option>KYC</option>
-                <option>Admissions</option>
-                <option>Follow-Ups</option>
-                <option>Lead Assignment</option>
-                <option>Document Verification</option>
-                <option>Course Counseling</option>
-                <option>Job Counseling</option>
-                <option>Payment Collection</option>
-              </select>
-              <select className="form-select-dark form-select form-select-sm" style={{ width: "130px" }}>
-                <option>All Centers</option>
-                <option>Mumbai HQ</option>
-                <option>Delhi Branch</option>
-                <option>Pune Center</option>
-              </select>
-              <select className="form-select-dark form-select form-select-sm" style={{ width: "140px" }}>
-                <option>All Courses</option>
-                <option>Data Science</option>
-                <option>Full Stack Dev</option>
-                <option>Digital Marketing</option>
-              </select>
-              <button className="btn-accent btn ms-auto"><i className="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+              <button
+                className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'} btn-sm ms-2`}
+                style={{ whiteSpace: 'nowrap' }}
+                onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+              >
+                <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="bg-light text-dark ms-1">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              <button className="btn-accent btn ms-auto" onClick={() => applyFilters()}>
+                <i className="bi bi-arrow-clockwise me-1"></i>
+                Refresh
+              </button>
             </div>
 
             {/* <!-- ── KPI Cards ── --> */}
@@ -1299,147 +1899,40 @@ function Target() {
                         </tr>
                       </thead>
                       <tbody>
-                        {/* <!-- rows --> */}
-                        <tr>
-                          <td><i className="bi bi-person-vcard me-2 text-accent" style={{ color: "var(--accent)" }}></i>KYC Verification</td>
-                          <td>150</td><td className="text-success">132</td><td className="text-warning">18</td><td className="text-danger">4</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "88%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>88%</span>
-                          </td>
-                          <td><span className="tag tag-green">On Track</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-mortarboard me-2" style={{ color: "var(--accent3)" }}></i>Admissions</td>
-                          <td>80</td><td className="text-success">61</td><td className="text-warning">19</td><td className="text-danger">8</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-blue" style={{ width: "76%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>76%</span>
-                          </td>
-                          <td><span className="tag tag-blue">Active</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-telephone-forward me-2" style={{ color: "var(--warn)" }}></i>Follow-Ups</td>
-                          <td>500</td><td className="text-success">310</td><td className="text-warning">190</td><td className="text-danger">22</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-warn" style={{ width: "62%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>62%</span>
-                          </td>
-                          <td><span className="tag tag-warn">At Risk</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-send me-2" style={{ color: "var(--accent2)" }}></i>Lead Assignment</td>
-                          <td>200</td><td className="text-success">198</td><td className="text-warning">2</td><td className="text-danger">0</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "99%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>99%</span>
-                          </td>
-                          <td><span className="tag tag-green">Excellent</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-file-earmark-check me-2" style={{ color: "var(--accent3)" }}></i>Document Verification</td>
-                          <td>120</td><td className="text-success">74</td><td className="text-warning">46</td><td className="text-danger">14</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-warn" style={{ width: "62%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>62%</span>
-                          </td>
-                          <td><span className="tag tag-warn">At Risk</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-chat-left-dots me-2" style={{ color: "var(--accent)" }}></i>Course Counseling</td>
-                          <td>300</td><td className="text-success">280</td><td className="text-warning">20</td><td className="text-danger">2</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "93%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>93%</span>
-                          </td>
-                          <td><span className="tag tag-green">On Track</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-briefcase me-2" style={{ color: "var(--gold)" }}></i>Job Counseling</td>
-                          <td>90</td><td className="text-success">42</td><td className="text-warning">48</td><td className="text-danger">18</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-danger" style={{ width: "47%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>47%</span>
-                          </td>
-                          <td><span className="tag tag-danger">Critical</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-calendar2-check me-2" style={{ color: "var(--accent3)" }}></i>Attendance Mgmt</td>
-                          <td>400</td><td className="text-success">376</td><td className="text-warning">24</td><td className="text-danger">0</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "94%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>94%</span>
-                          </td>
-                          <td><span className="tag tag-green">On Track</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-cash-stack me-2" style={{ color: "var(--accent2)" }}></i>Payment Collection</td>
-                          <td>180</td><td className="text-success">122</td><td className="text-warning">58</td><td className="text-danger">11</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-blue" style={{ width: "68%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>68%</span>
-                          </td>
-                          <td><span className="tag tag-blue">Active</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-arrow-left-right me-2" style={{ color: "var(--danger)" }}></i>Dropout Mgmt</td>
-                          <td>30</td><td className="text-success">8</td><td className="text-warning">22</td><td className="text-danger">6</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-danger" style={{ width: "27%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>27%</span>
-                          </td>
-                          <td><span className="tag tag-danger">Critical</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-grid-3x3-gap me-2" style={{ color: "var(--accent)" }}></i>Batch Assignment</td>
-                          <td>200</td><td className="text-success">187</td><td className="text-warning">13</td><td className="text-danger">1</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "94%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>94%</span>
-                          </td>
-                          <td><span className="tag tag-green">On Track</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-megaphone me-2" style={{ color: "var(--warn)" }}></i>Drip Marketing</td>
-                          <td>600</td><td className="text-success">420</td><td className="text-warning">180</td><td className="text-danger">30</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-warn" style={{ width: "70%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>70%</span>
-                          </td>
-                          <td><span className="tag tag-warn">At Risk</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-arrow-counterclockwise me-2" style={{ color: "var(--accent3)" }}></i>Re-Enquiry</td>
-                          <td>100</td><td className="text-success">88</td><td className="text-warning">12</td><td className="text-danger">2</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-green" style={{ width: "88%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>88%</span>
-                          </td>
-                          <td><span className="tag tag-green">On Track</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
-                        <tr>
-                          <td><i className="bi bi-shield-check me-2" style={{ color: "var(--accent2)" }}></i>Pre-Verification</td>
-                          <td>250</td><td className="text-success">190</td><td className="text-warning">60</td><td className="text-danger">9</td>
-                          <td>
-                            <div className="prog-bar-wrap"><div className="prog-bar-fill prog-blue" style={{ width: "76%" }}></div></div>
-                            <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>76%</span>
-                          </td>
-                          <td><span className="tag tag-blue">Active</span></td>
-                          <td><span className="btn-icon blue" title="Edit"><i className="bi bi-pencil"></i></span></td>
-                        </tr>
+                        {filteredActivities.length === 0 ? (
+                          <tr>
+                            <td colSpan="8" className="text-center py-4">
+                              No activities match the active filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredActivities.map((activity) => (
+                            <tr key={activity.id}>
+                              <td>
+                                <i className={`bi ${activity.icon} me-2`} style={{ color: activity.iconColor }}></i>
+                                {activity.name}
+                              </td>
+                              <td>{activity.target}</td>
+                              <td className="text-success">{activity.done}</td>
+                              <td className="text-warning">{activity.pending}</td>
+                              <td className="text-danger">{activity.overdue}</td>
+                              <td>
+                                <div className="prog-bar-wrap">
+                                  <div className={`prog-bar-fill ${activity.progressClass}`} style={{ width: `${activity.progress}%` }}></div>
+                                </div>
+                                <span style={{ fontSize: ".67rem", color: "var(--muted)" }}>{activity.progress}%</span>
+                              </td>
+                              <td>
+                                <span className={`tag ${activity.statusTagClass}`}>{activity.status}</span>
+                              </td>
+                              <td>
+                                <span className="btn-icon blue" title="Edit">
+                                  <i className="bi bi-pencil"></i>
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>

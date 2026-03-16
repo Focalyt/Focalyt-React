@@ -2130,11 +2130,11 @@ const B2BSales = () => {
               Change Status for {selectedProfile?.businessName || 'Lead'}
             </h6>
           </div>
-          <div>
+          <div className='d-flex align-items-center'>
             {userData.googleAuthToken?.accessToken && (
               <button
                 type="button"
-                className="btn btn-outline-danger btn-sm me-2"
+                className="btn btn-outline-danger btn-sm me-2 google-btn"
                 onClick={handleGoogleLogout}
               >
                 Disconnect Google Calendar
@@ -2202,12 +2202,12 @@ const B2BSales = () => {
                 <div className="mb-3">
                   <h6 className="text-dark mb-2">Follow-up Details</h6>
                   <div className="row">
-                    <div className="col-6">
+                    <div className="col-6 ps-3">
                       <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
                         Next Action Date <span className="text-danger">*</span>
                       </label>
                       <DatePicker
-                        className="form-control border-0 bgcolor"
+                        className="form-control border-0 bgcolor small-date"
                         onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
                         value={followupFormData.followupDate}
                         format="dd/MM/yyyy"
@@ -2334,11 +2334,11 @@ const B2BSales = () => {
               Set Follow-up for {selectedProfile?.businessName || 'Lead'}
             </h6>
           </div>
-          <div>
+          <div class="d-flex align-item-center">
             {userData.googleAuthToken?.accessToken && (
               <button
                 type="button"
-                className="btn btn-outline-danger btn-sm me-2"
+                className="btn btn-outline-danger btn-sm me-2 google-btn"
                 onClick={handleGoogleLogout}
                 style={{
                   fontSize: '12px',
@@ -5065,13 +5065,19 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     }
     
     .lead-contact-info {
-      gap: 0.4rem;
-      margin-top: 0.4rem;
+    display:flex;
+    flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
     }
     
     .lead-contact-item {
-      font-size: 0.65rem;
-      max-width: 100%;
+      display:flex;
+      align-item:center;
+      gap: 0.25rem;
+      font-size:0.7rem;
+      opacity: 0.9;
+      max-width: 262px;
     }
     
     .lead-content {
@@ -5279,7 +5285,118 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     margin-bottom: 0.5rem !important;
   }
 `}</style>
+<style>
+{`
+@media (max-width:992px){
+.react-calendar {
+  transform: translateY(-200px) !important;
+}
+}
+/* ===== Small Date Input ===== */
+.small-date {
+  font-size: 14px;
+  height: 32px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
 
+/* ===== React Date Picker (react-date-picker) ===== */
+.react-date-picker {
+  height: 32px;
+  box-sizing:content-box;
+}
+
+.react-date-picker__wrapper {
+  height: 100%;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex;
+  align-items: center;
+}
+
+.react-date-picker__inputGroup {
+  height: 100%;
+  font-size: 15px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.react-date-picker__button {
+  padding: 0;
+  margin: 0;
+}
+
+.react-date-picker__calendar-button {
+  padding: 0 4px;
+}
+
+/* Hide clear button if needed */
+/* .react-date-picker__clear-button {
+  display: none;
+} */
+
+/* ===== React Datepicker (react-datepicker) ===== */
+.react-datepicker-wrapper,
+.react-datepicker__input-container,
+.react-datepicker__input-container input {
+  width: 100%;
+}
+  .react-date-picker__inputGroup {
+  min-width: unset !important;   /* removes calc width */
+  flex-grow: 1;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+  
+
+/* ===== Lead Buttons ===== */
+.LeadButtons {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.SerachClear {
+  position: absolute;   /* IMPORTANT */
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px;
+  background-color: #dc3545;
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+  cursor: pointer;
+}
+.google-btn{
+    white-space: nowrap;
+    width: 90px !important;
+    overflow: hidden;
+}
+/* Tablet */
+@media (max-width: 768px) {
+
+  .SerachClear {
+            width: 22px !important;
+        height: 22px !important;
+        right: 10px !important;
+        top: 15px !important;
+  }
+}
+}
+`}
+</style>
     </div >
   );
 };

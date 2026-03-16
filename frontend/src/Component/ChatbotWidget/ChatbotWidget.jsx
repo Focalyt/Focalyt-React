@@ -719,18 +719,12 @@ function ChatbotWidget({
         // Filter based on query context
         if (queryContext === 'courses') {
           jobs = [];
-          // Only update parent if courses are found
-          if (onJobsUpdate && courses.length > 0) {
-            onJobsUpdate(courses);
-          }
         } else if (queryContext === 'jobs') {
           courses = [];
-          // Update jobs list in parent if callback provided
           if (onJobsUpdate && jobs.length > 0) {
             onJobsUpdate(jobs);
           }
         } else {
-          // Both - update parent with jobs if available
           if (onJobsUpdate && jobs.length > 0) {
             onJobsUpdate(jobs);
           }
@@ -1347,20 +1341,15 @@ function ChatbotWidget({
         let courses = response.data.courses || [];
 
         // Filter based on query context
+        // Only ever pass JOBS to onJobsUpdate - never courses (Jobs page shows job cards only)
         if (queryContext === 'courses') {
           jobs = [];
-          // Only update parent if courses are found
-          if (onJobsUpdate && courses.length > 0) {
-            onJobsUpdate(courses);
-          }
         } else if (queryContext === 'jobs') {
           courses = [];
-          // Update jobs list in parent if callback provided
           if (onJobsUpdate && jobs.length > 0) {
             onJobsUpdate(jobs);
           }
         } else {
-          // Both - update parent with jobs if available
           if (onJobsUpdate && jobs.length > 0) {
             onJobsUpdate(jobs);
           }

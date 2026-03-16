@@ -1006,6 +1006,11 @@ const CRMDashboard = () => {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
+ 
+  const [leadIntelMap, setLeadIntelMap] = useState({});
+  const [loadingLeadIntel, setLoadingLeadIntel] = useState(false);
+  const [bulkSelectCount, setBulkSelectCount] = useState('50');
+
   // WhatsApp Panel states
   const [whatsappMessages, setWhatsappMessages] = useState([
   ]);
@@ -1026,6 +1031,24 @@ const CRMDashboard = () => {
     remainingTimeMs: 0
   });
   const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
+  const [aiWhatsappSummary, setAiWhatsappSummary] = useState(null);
+  const [aiWhatsappLoading, setAiWhatsappLoading] = useState(false);
+  const [aiWhatsappError, setAiWhatsappError] = useState(null);
+  const [aiSuggestedReplyDraft, setAiSuggestedReplyDraft] = useState('');
+
+  // Unified AI Supervision view (one place for lead + WhatsApp insights)
+  const [showAiSupervision, setShowAiSupervision] = useState(false);
+  const [waSummaryByProfileId, setWaSummaryByProfileId] = useState({});
+  const [waSummaryLoadingByProfileId, setWaSummaryLoadingByProfileId] = useState({});
+  const [waSummaryErrorByProfileId, setWaSummaryErrorByProfileId] = useState({});
+  const [nextActionsByProfileId, setNextActionsByProfileId] = useState({});
+  const [nextActionsLoadingByProfileId, setNextActionsLoadingByProfileId] = useState({});
+  const [nextActionsErrorByProfileId, setNextActionsErrorByProfileId] = useState({});
+  const [aiSupervisionCount, setAiSupervisionCount] = useState('10');
+  const [leadSummaryByProfileId, setLeadSummaryByProfileId] = useState({});
+  const [leadSummaryLoadingByProfileId, setLeadSummaryLoadingByProfileId] = useState({});
+  const [leadSummaryErrorByProfileId, setLeadSummaryErrorByProfileId] = useState({});
+  const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
 
  
   const [modalType, setModalType] = useState(null); 
@@ -2649,12 +2672,26 @@ const CRMDashboard = () => {
         }
 
 
+       
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'bulk_status_change',
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
+
         // Prepare the request body
         const data = {
           selectedProfiles,
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
-          remarks: remarks || ''
+          remarks: (remarks || '').trim()
         };
 
         // Check if backend URL and token exist
@@ -2745,12 +2782,27 @@ const CRMDashboard = () => {
           }
         }
 
+        // Weak remark detection (optional improvement)
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'single_status_change',
+              candidate: selectedProfile?._candidate?.name,
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
+
         // Prepare the request body
         const data = {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
           followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
+          remarks: (remarks || '').trim()
         };
 
 
@@ -3143,6 +3195,120 @@ console.log('API Response:', response.data);
 
     }
   };
+
+  const buildLeadIntelPayload = useCallback((p) => ({
+    _id: p._id,
+    _candidate: p._candidate,
+    _course: p._course,
+    _leadStatus: p._leadStatus,
+    followupDate: p.followupDate,
+    followups: p.followups,
+    selectedSubstatus: p.selectedSubstatus,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  }), []);
+
+  const checkAndImproveRemarkIfWeak = useCallback(async ({ remarkText, context }) => {
+    const text = String(remarkText || '').trim();
+    if (!text || !token) return { finalRemark: text, changed: false };
+    try {
+      const res = await axios.post(
+        `${backendUrl}/api/ai/remark-quality`,
+        { remark: text, context: context || {} },
+        { headers: { 'x-auth': token } }
+      );
+      const data = res.data?.data;
+      if (res.data?.success && data?.isWeak && data?.improvedRemark) {
+        const ok = window.confirm(
+          `Remark looks too short/weak.\n\nSuggested improved remark:\n\n${data.improvedRemark}\n\nUse this improved remark?`
+        );
+        if (ok) return { finalRemark: data.improvedRemark, changed: true };
+      }
+      return { finalRemark: text, changed: false };
+    } catch (err) {
+      console.warn('Remark quality check failed:', err?.message || err);
+      return { finalRemark: text, changed: false };
+    }
+  }, [backendUrl, token]);
+
+  const chunkArray = useCallback((arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+    return chunks;
+  }, []);
+
+  const selectFirstNVisibleLeads = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(bulkSelectCount || '').trim(), 10) || 0));
+    setSelectedProfiles((allProfiles || []).slice(0, n).map(p => p._id));
+  }, [allProfiles, bulkSelectCount]);
+
+  const clearSelectedLeads = useCallback(() => {
+    setSelectedProfiles([]);
+  }, []);
+
+  // Fetch AI lead intelligence (score, intent, suggested action) in BULK (auto-batched by 5)
+  const fetchLeadIntelBulk = useCallback(async (profiles = []) => {
+    if (!profiles?.length || loadingLeadIntel || !token) return;
+    const batches = chunkArray(profiles, 5); // backend endpoint processes up to 5 per call
+    setLoadingLeadIntel(true);
+    try {
+      for (const batch of batches) {
+        const leadsToFetch = batch.map(buildLeadIntelPayload);
+        const res = await axios.post(
+          `${backendUrl}/api/ai/lead-intel/bulk`,
+          { leads: leadsToFetch },
+          { headers: { 'x-auth': token } }
+        );
+        if (res.data?.success && res.data?.data) {
+          setLeadIntelMap((prev) => ({ ...prev, ...res.data.data }));
+        }
+      }
+    } catch (err) {
+      console.error('Lead intel bulk fetch failed:', err);
+    } finally {
+      setLoadingLeadIntel(false);
+    }
+  }, [backendUrl, buildLeadIntelPayload, chunkArray, loadingLeadIntel, token]);
+
+  // Bulk input box UX: click/focus should trigger AI supervision for first N visible leads
+  const runAiSupervisionForFirstN = useCallback(async () => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(input1Value || '').trim(), 10) || 0));
+    if (n <= 0) return;
+    const selected = (allProfiles || []).slice(0, n);
+    setSelectedProfiles(selected.map(p => p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, input1Value]);
+
+  // Bulk: all leads visible in current list
+  const fetchLeadIntelAll = useCallback(async () => {
+    await fetchLeadIntelBulk(allProfiles || []);
+  }, [allProfiles, fetchLeadIntelBulk]);
+
+  // Bulk: only selected leads (checkbox selection)
+  const fetchLeadIntelSelected = useCallback(async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, selectedProfiles]);
+
+  // Single lead: fetch intel for one lead (uses same bulk API with 1 lead)
+  const fetchLeadIntelSingle = useCallback(async (profile) => {
+    if (!profile?._id) return;
+    await fetchLeadIntelBulk([profile]);
+  }, [fetchLeadIntelBulk]);
+
+  // Overdue: followupDate is in the past (start of today)
+  const overdueLeads = useMemo(() => {
+    if (!allProfiles?.length) return [];
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return allProfiles.filter((p) => {
+      const fd = p.followupDate ? new Date(p.followupDate) : null;
+      return fd && fd < todayStart;
+    });
+  }, [allProfiles]);
 
   const downloadLeads = async (filters = filterData, page = currentPage) => {
 
@@ -3859,6 +4025,10 @@ console.log('API Response:', response.data);
         })));
 
         setWhatsappMessages(formattedMessages);
+        // reset AI summary when chat changes
+        setAiWhatsappSummary(null);
+        setAiWhatsappError(null);
+        setAiSuggestedReplyDraft('');
       }
     } catch (error) {
       console.error('❌ Error fetching chat history:', error.response?.data || error.message);
@@ -3878,6 +4048,218 @@ console.log('API Response:', response.data);
       setIsLoadingChatHistory(false);
     }
   };
+
+  const generateAiWhatsappSummary = async () => {
+    try {
+      if (!token) return;
+      if (!selectedProfile?._candidate?.mobile) return;
+      if (!Array.isArray(whatsappMessages) || whatsappMessages.length === 0) return;
+
+      setAiWhatsappLoading(true);
+      setAiWhatsappError(null);
+
+      const payloadMessages = whatsappMessages.map((m) => ({
+        timestamp: m.timestamp || m.sentAt || m.time || '',
+        sender: m.sender,
+        text: m.text,
+        direction: m.sender === 'agent' ? 'outgoing' : 'incoming',
+      }));
+
+      const leadContext = {
+        candidateName: selectedProfile?._candidate?.name,
+        mobile: selectedProfile?._candidate?.mobile,
+        leadStatus: selectedProfile?._leadStatus?.title,
+        substatus: selectedProfile?.selectedSubstatus?.title,
+        course: selectedProfile?._course?.name,
+      };
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        {
+          phone: selectedProfile._candidate.mobile,
+          leadContext,
+          messages: payloadMessages,
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (res.data?.success && res.data?.data) {
+        setAiWhatsappSummary(res.data.data);
+        setAiSuggestedReplyDraft(res.data.data.suggestedReply || '');
+      } else {
+        setAiWhatsappError(res.data?.message || 'Failed to generate AI summary');
+      }
+    } catch (err) {
+      console.error('AI whatsapp summary failed:', err);
+      setAiWhatsappError(err.response?.data?.message || err.message || 'Failed to generate AI summary');
+    } finally {
+      setAiWhatsappLoading(false);
+    }
+  };
+
+  const generateAiWhatsappSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      const mobile = profile?._candidate?.mobile;
+      if (!mobile) return;
+
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      // fetch chat history first
+      const chatRes = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${mobile}`,
+        { headers: { 'x-auth': token } }
+      );
+      const chatMessages = chatRes.data?.data || [];
+      if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: 'No WhatsApp messages found for this lead.' }));
+        return;
+      }
+
+      const leadContext = {
+        candidateName: profile?._candidate?.name,
+        mobile: profile?._candidate?.mobile,
+        leadStatus: profile?._leadStatus?.title,
+        substatus: profile?.selectedSubstatus?.title,
+        course: profile?._course?.name,
+      };
+
+      const aiRes = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        { phone: mobile, leadContext, messages: chatMessages },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (aiRes.data?.success && aiRes.data?.data) {
+        setWaSummaryByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data.data }));
+      } else {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI WhatsApp summary (profile) failed:', err);
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = {
+        _id: profile._id,
+        _candidate: profile._candidate,
+        _course: profile._course,
+        _leadStatus: profile._leadStatus,
+        selectedSubstatus: profile.selectedSubstatus,
+        followupDate: profile.followupDate,
+        followups: profile.followups,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      };
+      const notes = (profile.followups || [])
+        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
+        .filter(Boolean);
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/next-best-action`,
+        { leadProfile, notes },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && Array.isArray(res.data?.data?.actions)) {
+        setNextActionsByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data.actions }));
+      } else {
+        setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate actions' }));
+      }
+    } catch (err) {
+      console.error('AI next-best-action (profile) failed:', err);
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate actions' }));
+    } finally {
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (nextActionsByProfileId[p._id] || nextActionsLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateNextBestActionsForProfile(p);
+    }
+  };
+
+  const generateAiWhatsappSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      // skip if already generated
+      if (waSummaryByProfileId[p._id] || waSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateAiWhatsappSummaryForProfile(p);
+    }
+  };
+
+  const generateLeadSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = {
+        _id: profile._id,
+        _candidate: profile._candidate,
+        _course: profile._course,
+        _leadStatus: profile._leadStatus,
+        selectedSubstatus: profile.selectedSubstatus,
+        followupDate: profile.followupDate,
+        followups: profile.followups,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      };
+      const notes = (profile.followups || [])
+        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
+        .filter(Boolean);
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/lead-summary`,
+        { leadId: profile._id, leadProfile, notes, messages: [] },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && res.data?.data) {
+        setLeadSummaryByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data }));
+      } else {
+        setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI lead-summary (profile) failed:', err);
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateLeadSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (leadSummaryByProfileId[p._id] || leadSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateLeadSummaryForProfile(p);
+    }
+  };
+
+  const selectFirstNForAiSupervision = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(aiSupervisionCount || '').trim(), 10) || 0));
+    const ids = (allProfiles || []).slice(0, n).map(p => p._id);
+    setSelectedProfiles(ids);
+    return (allProfiles || []).slice(0, n);
+  }, [aiSupervisionCount, allProfiles]);
 
   // Check WhatsApp 24-hour session window status
   const checkSessionWindow = async (phoneNumber) => {
@@ -10636,7 +11018,7 @@ useEffect(() => {
             <section className="list-view">
               <div className="row">
                 {/* Desktop Layout */}
-                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2 crm-sticky-action">
                  
                   {/* Left side - Buttons */}
                   <div style={{ display: "flex", gap: "8px" }}>
@@ -10734,6 +11116,25 @@ useEffect(() => {
                         Bulk Action
                       </button>
                     </>)}
+
+                  <button
+                    className="btn btn-sm btn-outline-dark"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => setShowAiSupervision(true)}
+                    title="Open unified AI Supervision view"
+                    disabled={allProfiles.length === 0}
+                  >
+                    <i className="fas fa-layer-group" style={{ fontSize: "10px" }}></i>
+                    AI Supervision
+                  </button>
+                  
                   </div>
 
                   {/* Right side - Input Fields */}
@@ -10753,6 +11154,16 @@ useEffect(() => {
                         type="text"
                         placeholder="Input 1"
                         value={input1Value}
+                        onFocus={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
+                        onClick={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
                         onKeyDown={(e) => {
                           // Allow numbers, backspace, delete, arrows, tab, enter
                           if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
@@ -10921,6 +11332,18 @@ useEffect(() => {
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
 
+                        {/* Overdue follow-up alert */}
+                        {!isLoadingProfiles && overdueLeads.length > 0 && (
+                          <div className="col-12 mb-2">
+                            <div className="alert alert-warning d-flex align-items-center justify-content-between flex-wrap py-2 mb-0" role="alert">
+                              <span>
+                                <i className="fas fa-exclamation-triangle me-2"></i>
+                                <strong>{overdueLeads.length} lead{overdueLeads.length !== 1 ? 's' : ''}</strong> with overdue follow-up (next action date passed). Prioritize contact to reduce drop risk.
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Loading State */}
                         {isLoadingProfiles && (
                           <div className="col-12 text-center py-5">
@@ -10935,6 +11358,7 @@ useEffect(() => {
                         )}
 
                         {/* Profiles List */}
+                        <div className="crm-leads-scrolls col-12">
                         {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
@@ -11044,6 +11468,51 @@ useEffect(() => {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* Overdue badge: next action date passed */}
+                                  {/* {(profile.followupDate && new Date(profile.followupDate) < new Date(new Date().setHours(0, 0, 0, 0))) && (
+                                    <div className="col-12 col-md-auto mt-1 mt-md-0">
+                                      <span className="badge bg-danger" title="Next action date has passed">
+                                        <i className="fas fa-clock me-1"></i>Overdue follow-up
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="col-12 mt-1">
+                                    {leadIntelMap[profile._id] ? (
+                                      <div className="d-flex flex-wrap align-items-center gap-2 small">
+                                        <span className="badge bg-primary">AI Score: {leadIntelMap[profile._id].score}/100</span>
+                                        <span className="text-muted">Intent: {leadIntelMap[profile._id].intent}</span>
+                                        {leadIntelMap[profile._id].suggestedAction && (
+                                          <span className="text-dark" title="Suggested action">
+                                            <i className="fas fa-lightbulb text-warning me-1"></i>
+                                            {leadIntelMap[profile._id].suggestedAction}
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline-secondary"
+                                          style={{ padding: '2px 8px', fontSize: '11px' }}
+                                          onClick={() => fetchLeadIntelSingle(profile)}
+                                          disabled={loadingLeadIntel}
+                                          title="Refresh AI for this lead"
+                                        >
+                                          <i className="fas fa-robot me-1"></i>Refresh
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline-secondary"
+                                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        onClick={() => fetchLeadIntelSingle(profile)}
+                                        disabled={loadingLeadIntel}
+                                        title="Load AI for this lead"
+                                      >
+                                        <i className="fas fa-robot me-1"></i>AI for this lead
+                                      </button>
+                                    )}
+                                  </div> */}
 
                                   <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
@@ -12563,7 +13032,7 @@ useEffect(() => {
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
+                                      <CandidateProfile ref={candidateRef} leadData={selectedProfile} />
                                     </div>
                                     <div className="modal-footer">
                                       <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
@@ -12895,6 +13364,7 @@ useEffect(() => {
 
 
                         ))}
+                        </div>
 
 
 
@@ -12999,6 +13469,510 @@ useEffect(() => {
         {renderActionsModal()}
       </div>
       <UploadModal />
+
+      {/* Unified AI Supervision Modal */}
+      {showAiSupervision && (
+        <div
+          className="modal show fade d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAiSupervision(false);
+          }}
+        >
+          <div className="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">AI Supervision (Leads + WhatsApp)</h5>
+                <button type="button" className="btn-close" onClick={() => setShowAiSupervision(false)}></button>
+              </div>
+              <div className="modal-body">
+                {/* Top info + segmented controls */}
+                <div className="mb-3">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                    <div className="small text-muted">
+                      Visible leads: <strong>{allProfiles?.length || 0}</strong> · Selected:{' '}
+                      <strong>{selectedProfiles?.length || 0}</strong>
+                    </div>
+                    <div className="badge bg-light text-dark border small">
+                      AI Tools · Bulk Actions · WhatsApp
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-column flex-lg-row gap-2">
+                    {/* AI tools / first N */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                          <span className="small fw-semibold text-muted text-uppercase">AI tools · First N leads</span>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="small text-muted">First N</span>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              value={aiSupervisionCount}
+                              onChange={(e) =>
+                                setAiSupervisionCount((e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4))
+                              }
+                              style={{ width: 72 }}
+                              placeholder="10"
+                              title="Run AI for first N visible leads"
+                            />
+                          </div>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              await fetchLeadIntelBulk(leads);
+                            }}
+                          >
+                            <i className="fas fa-robot me-1"></i> AI score
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateLeadSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-dark"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateNextBestActionsForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateAiWhatsappSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bulk for all / selected */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="small fw-semibold text-muted text-uppercase mb-2">Bulk for all / selected</div>
+                        <div className="btn-group w-100 mb-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={fetchLeadIntelAll}
+                          >
+                            <i className="fas fa-layer-group me-1"></i> AI (all)
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !selectedProfiles?.length}
+                            onClick={fetchLeadIntelSelected}
+                          >
+                            <i className="fas fa-check-square me-1"></i> AI (selected)
+                          </button>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateLeadSummaryForSelected}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateNextBestActionsForSelected}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateAiWhatsappSummaryForSelected}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main layout: leads table + AI insights panel */}
+                <div className="row g-3">
+                  <div className="col-12 col-lg-7">
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Lead</th>
+                        <th>Status</th>
+                        <th>AI Score</th>
+                        <th>Intent</th>
+                        <th>Next step</th>
+                        <th style={{ width: 140 }}>Quick actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(allProfiles || []).map((p) => {
+                        const intel = leadIntelMap[p._id];
+                        const leadSummary = leadSummaryByProfileId[p._id];
+                        const leadSummaryLoading = !!leadSummaryLoadingByProfileId[p._id];
+                        const leadSummaryErr = leadSummaryErrorByProfileId[p._id];
+                        const wa = waSummaryByProfileId[p._id];
+                        const waLoading = !!waSummaryLoadingByProfileId[p._id];
+                        const waErr = waSummaryErrorByProfileId[p._id];
+                        const actions = nextActionsByProfileId[p._id];
+                        const actionsLoading = !!nextActionsLoadingByProfileId[p._id];
+                        const actionsErr = nextActionsErrorByProfileId[p._id];
+                        const nextAction = p.followupDate ? new Date(p.followupDate).toLocaleDateString() : '—';
+                        const overdue = p.followupDate && new Date(p.followupDate) < new Date(new Date().setHours(0, 0, 0, 0));
+                        return (
+                          <tr
+                            key={p._id}
+                            style={{ cursor: 'pointer' }}
+                            className={aiSupervisionActiveLeadId === p._id ? 'table-primary' : ''}
+                            onClick={() => setAiSupervisionActiveLeadId(p._id)}
+                          >
+                            <td>
+                              <div className="fw-semibold">{p._candidate?.name || '—'}</div>
+                              <div className="small text-muted">{p._candidate?.mobile || '—'}</div>
+                            </td>
+                            <td className="small">
+                              <div>
+                                <span
+                                  className={`badge rounded-pill ${
+                                    (p._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {p._leadStatus?.title || '—'}
+                                </span>
+                              </div>
+                              {p.selectedSubstatus?.title && (
+                                <div className="small text-muted mt-1">{p.selectedSubstatus.title}</div>
+                              )}
+                            </td>
+                            <td className="small">
+                              {intel ? (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    intel.score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : intel.score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                >
+                                  {intel.score}/100
+                                </span>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="small">{intel?.intent || '—'}</td>
+                            <td className="small">
+                              {overdue && <span className="badge bg-danger me-1">Overdue</span>}
+                              <span className="text-muted">{nextAction}</span>
+                            </td>
+                            <td>
+                              <div className="d-flex flex-wrap gap-1">
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Call"
+                                  type="button"
+                                  onClick={() => {
+                                    const phone = p._candidate?.mobile;
+                                    if (phone) window.open(`tel:${phone}`, '_self');
+                                  }}
+                                >
+                                  <i className="fas fa-phone"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Open WhatsApp chat"
+                                  type="button"
+                                  // onClick={() => {
+                                  //   setSelectedProfile(p);
+                                  //   openWhatsappPanel();
+                                  //   setShowAiSupervision(false);
+                                  // }}
+                                >
+                                  <i className="fab fa-whatsapp text-success"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Email (from candidate record)"
+                                  type="button"
+                                  onClick={() => {
+                                    const email = p._candidate?.email;
+                                    if (email) window.open(`mailto:${email}`);
+                                  }}
+                                >
+                                  <i className="fas fa-envelope"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Run AI for this lead"
+                                  type="button"
+                                  onClick={() => fetchLeadIntelSingle(p)}
+                                  disabled={loadingLeadIntel}
+                                >
+                                  <i className="fas fa-robot"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-lg-5">
+                    {(() => {
+                      const activeId = aiSupervisionActiveLeadId || allProfiles?.[0]?._id;
+                      const active = (allProfiles || []).find(p => p._id === activeId) || null;
+                      if (!active) return (
+                        <div className="text-muted">Select a lead to view details.</div>
+                      );
+
+                      const summary = leadSummaryByProfileId[active._id];
+                      const summaryLoading = !!leadSummaryLoadingByProfileId[active._id];
+                      const summaryErr = leadSummaryErrorByProfileId[active._id];
+
+                      const actions = nextActionsByProfileId[active._id] || [];
+                      const actionsLoading = !!nextActionsLoadingByProfileId[active._id];
+                      const actionsErr = nextActionsErrorByProfileId[active._id];
+
+                      const wa = waSummaryByProfileId[active._id];
+                      const waLoading = !!waSummaryLoadingByProfileId[active._id];
+                      const waErr = waSummaryErrorByProfileId[active._id];
+
+                      return (
+                        <div className="position-sticky" style={{ top: 0 }}>
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-user me-2 text-secondary"></i>
+                                <strong>{active._candidate?.name || 'Lead'}</strong>
+                              </div>
+                              <div className="small text-muted">{active._candidate?.mobile || ''}</div>
+                            </div>
+                            <div className="card-body py-2 px-3 small text-muted d-flex justify-content-between align-items-center">
+                              <div>
+                                <span
+                                  className={`badge rounded-pill me-2 ${
+                                    (active._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {active._leadStatus?.title || '—'}
+                                </span>
+                                {active.selectedSubstatus?.title && (
+                                  <span className="text-muted">{active.selectedSubstatus.title}</span>
+                                )}
+                              </div>
+                              {leadIntelMap[active._id]?.score != null && (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    leadIntelMap[active._id].score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : leadIntelMap[active._id].score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                  title="AI score"
+                                >
+                                  AI {leadIntelMap[active._id].score}/100
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Candidate Summary (AI) - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-robot text-primary me-2"></i>
+                                <strong>Candidate Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => generateLeadSummaryForProfile(active)}
+                                disabled={summaryLoading}
+                                title="Generate summary"
+                              >
+                                {summaryLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {summaryLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {summaryLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating summary…
+                                </div>
+                              )}
+                              {!summaryLoading && summaryErr && (
+                                <div className="text-danger small">{summaryErr}</div>
+                              )}
+                              {!summaryLoading && summary && (
+                                <div className="small">
+                                  <p className="mb-2">{summary.summary}</p>
+                                  {summary.goal && <p className="mb-1"><strong>Goal:</strong> {summary.goal}</p>}
+                                  {summary.interestArea && <p className="mb-1"><strong>Interest:</strong> {summary.interestArea}</p>}
+                                  {summary.budgetRange && <p className="mb-1"><strong>Budget:</strong> {summary.budgetRange}</p>}
+                                  {summary.urgency && <p className="mb-1"><strong>Urgency:</strong> {summary.urgency}</p>}
+                                  {Array.isArray(summary.concerns) && summary.concerns.length > 0 && (
+                                    <p className="mb-0"><strong>Concerns:</strong> {summary.concerns.join('; ')}</p>
+                                  )}
+                                </div>
+                              )}
+                              {!summaryLoading && !summary && !summaryErr && (
+                                <span className="text-muted small">Summary not available.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recommended actions - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-lightbulb text-warning me-2"></i>
+                                <strong>Recommended actions</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-dark"
+                                onClick={() => generateNextBestActionsForProfile(active)}
+                                disabled={actionsLoading}
+                                title="Generate actions"
+                              >
+                                {actionsLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-bolt me-1" />}
+                                {actionsLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {actionsLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating actions…
+                                </div>
+                              )}
+                              {!actionsLoading && actionsErr && (
+                                <div className="text-danger small">{actionsErr}</div>
+                              )}
+                              {!actionsLoading && Array.isArray(actions) && actions.length > 0 && (
+                                <ul className="mb-0 ps-3 small">
+                                  {actions.map((action, i) => (
+                                    <li key={i}>{action}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {!actionsLoading && (!actions || actions.length === 0) && !actionsErr && (
+                                <span className="text-muted small">No suggestions right now.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* WhatsApp AI summary card */}
+                          <div className="card border-0 shadow-sm">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fab fa-whatsapp text-success me-2"></i>
+                                <strong>WhatsApp Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => generateAiWhatsappSummaryForProfile(active)}
+                                disabled={waLoading}
+                                title="Generate WhatsApp summary"
+                              >
+                                {waLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {waLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3 small">
+                              {waLoading && <div className="text-muted d-flex align-items-center"><span className="spinner-border spinner-border-sm me-2" />Generating…</div>}
+                              {!waLoading && waErr && <div className="text-danger">{waErr}</div>}
+                              {!waLoading && wa && (
+                                <>
+                                  <div className="text-muted" style={{ whiteSpace: 'pre-line' }}>{wa.summary}</div>
+                                  {Array.isArray(wa.objections) && wa.objections.length > 0 && (
+                                    <div className="mt-2"><strong>Objections:</strong> {wa.objections.join(', ')}</div>
+                                  )}
+                                  {wa.suggestedReply && (
+                                    <div className="mt-2">
+                                      <strong>Suggested reply:</strong>
+                                      <div className="d-flex gap-2 align-items-start mt-1">
+                                        <textarea className="form-control form-control-sm" rows={2} value={wa.suggestedReply} readOnly />
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-primary"
+                                          onClick={() => {
+                                            try { navigator.clipboard.writeText(wa.suggestedReply); } catch (_) {}
+                                          }}
+                                          title="Copy reply"
+                                        >
+                                          <i className="fas fa-copy"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {!waLoading && !wa && !waErr && <span className="text-muted">No summary yet.</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAiSupervision(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
@@ -16685,6 +17659,22 @@ margin-left:15px;
 
           .btn-group .btn:not(:last-child) {
               margin-right: 0.25rem;
+          }
+
+          .crm-sticky-actions {
+              position: sticky;
+              top: 0;
+              z-index: 8;
+              background: #fff;
+              padding-top: 6px;
+              padding-bottom: 6px;
+              border-bottom: 1px solid #eee;
+          }
+
+          .crm-leads-scroll {
+              max-height: calc(100vh - 260px);
+              overflow-y: auto;
+              padding-right: 4px;
           }
 
           .card {

@@ -127,6 +127,362 @@ Return JSON with exactly this shape:
   }
 });
 
+router.post("/next-best-action", async (req, res) => {
+  try {
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({
+        success: false,
+        message: "ANTHROPIC_API_KEY is not configured on server",
+      });
+    }
+
+    const { leadProfile = {}, notes = [] } = req.body || {};
+
+    const systemPrompt = `
+You are an AI assistant for a counsellor CRM. Given a student lead's profile and notes, suggest the next best action(s) for the counsellor.
+Return ONLY a JSON object with a single key "actions" which is an array of 1–4 short, concrete action strings.
+Examples: "Call candidate today", "Send course brochure", "Ask for documents", "Schedule demo session", "Follow up on fee concern", "Confirm parent approval".
+Be specific and actionable. No explanations outside JSON.`;
+
+    const userPrompt = `
+Lead profile (JSON):
+${JSON.stringify(leadProfile, null, 2)}
+
+Recent notes/remarks:
+${(notes || []).join("\n\n")}
+
+Return JSON: { "actions": ["action1", "action2", ...] }
+`;
+
+    const message = await anthropic.messages.create({
+      model: getModel(),
+      max_tokens: 300,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message?.content?.[0]?.text || "";
+    let parsed;
+    try {
+      let jsonStr = raw;
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = raw.slice(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("[AI next-best-action] Failed to parse JSON:", e.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse AI response",
+        raw,
+      });
+    }
+
+    const actions = Array.isArray(parsed.actions)
+      ? parsed.actions.map((a) => String(a).trim()).filter(Boolean)
+      : [];
+
+    return res.status(200).json({
+      success: true,
+      data: { actions },
+    });
+  } catch (err) {
+    console.error("[AI next-best-action] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating next best action",
+    });
+  }
+});
+
+router.post("/whatsapp-summary", async (req, res) => {
+  try {
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({
+        success: false,
+        message: "ANTHROPIC_API_KEY is not configured on server",
+      });
+    }
+
+    const { phone, leadContext = {}, messages = [] } = req.body || {};
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "messages array is required",
+      });
+    }
+
+    const systemPrompt = `
+You are an AI assistant helping counsellors in an admissions CRM.
+Given a WhatsApp conversation, return ONLY JSON with:
+- "summary": 2–5 bullet-style lines as a single string (\\n separated ok)
+- "objections": array of short strings (fees, timing, parents, location, eligibility, etc.)
+- "suggestedReply": one professional WhatsApp-ready reply (short, polite, with a clear next step)
+
+Rules:
+- Keep it counsellor-friendly.
+- Do not include any extra text outside JSON.
+- If there are no objections, return an empty array.
+`;
+
+    const cleanedMsgs = (messages || [])
+      .slice(-80) // limit context
+      .map((m) => ({
+        timestamp: m.sentAt || m.timestamp || "",
+        from:
+          m.sender === "agent" || m.direction === "outgoing"
+            ? "counsellor"
+            : "candidate",
+        text: m.text || m.message || "",
+      }))
+      .filter((m) => String(m.text || "").trim());
+
+    const userPrompt = `
+Phone: ${phone || ""}
+Lead context (optional JSON):
+${JSON.stringify(leadContext || {}, null, 2)}
+
+Conversation messages (chronological):
+${cleanedMsgs
+  .map((m) => `[${m.timestamp}] ${m.from}: ${m.text}`)
+  .join("\n")}
+
+Return JSON in exactly this shape:
+{
+  "summary": string,
+  "objections": string[],
+  "suggestedReply": string
+}
+`;
+
+    const message = await anthropic.messages.create({
+      model: getModel(),
+      max_tokens: 500,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message?.content?.[0]?.text || "";
+    let parsed;
+    try {
+      let jsonStr = raw;
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = raw.slice(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("[AI whatsapp-summary] Failed to parse JSON:", e.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse AI response",
+        raw,
+      });
+    }
+
+    const data = {
+      summary: String(parsed.summary || "").trim(),
+      objections: Array.isArray(parsed.objections)
+        ? parsed.objections.map((o) => String(o).trim()).filter(Boolean)
+        : [],
+      suggestedReply: String(parsed.suggestedReply || "").trim(),
+    };
+
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error("[AI whatsapp-summary] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating WhatsApp summary",
+    });
+  }
+});
+
+router.post("/dashboard-daily-summary", async (req, res) => {
+  try {
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({
+        success: false,
+        message: "ANTHROPIC_API_KEY is not configured on server",
+      });
+    }
+
+    const { date = null, stats = {}, highlights = [] } = req.body || {};
+
+    const systemPrompt = `
+You are an AI operations supervisor for an admissions CRM.
+You receive daily metrics such as:
+- Total leads
+- KYC pending count (stats.kycPending)
+- KYC done count (stats.kycDone)
+- Admissions
+- Overdue follow-ups
+
+Your primary focus is KYC pipeline health and conversions:
+- If KYC pending is high relative to KYC done or admissions, explicitly call this out.
+- Always mention KYC status (pending vs done) in the summary when numbers are non-zero.
+- In the "risks" list, include KYC-related risks whenever relevant.
+- In "suggestedFocus", include at least one concrete, KYC-focused action when there is any pending KYC.
+
+Return ONLY JSON with this shape:
+{
+  "title": string,
+  "summary": string,        // 4-8 short bullets as ONE string (\\n separated ok)
+  "risks": string[],        // 0-5 short risk bullets
+  "suggestedFocus": string[] // 3-6 short action bullets for the team
+}
+No extra text outside JSON.`;
+
+    const userPrompt = `
+Date: ${date || ""}
+
+Stats (JSON):
+${JSON.stringify(stats || {}, null, 2)}
+
+Highlights (optional list):
+${Array.isArray(highlights) ? highlights.join("\n") : ""}
+`;
+
+    const message = await anthropic.messages.create({
+      model: getModel(),
+      max_tokens: 600,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message?.content?.[0]?.text || "";
+    let parsed;
+    try {
+      let jsonStr = raw;
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = raw.slice(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("[AI dashboard-daily-summary] Failed to parse JSON:", e.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse AI response",
+        raw,
+      });
+    }
+
+    const data = {
+      title: String(parsed.title || "Today's AI Insights").trim(),
+      summary: String(parsed.summary || "").trim(),
+      risks: Array.isArray(parsed.risks)
+        ? parsed.risks.map((r) => String(r).trim()).filter(Boolean)
+        : [],
+      suggestedFocus: Array.isArray(parsed.suggestedFocus)
+        ? parsed.suggestedFocus.map((s) => String(s).trim()).filter(Boolean)
+        : [],
+    };
+
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error("[AI dashboard-daily-summary] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating dashboard daily summary",
+    });
+  }
+});
+
+router.post("/remark-quality", async (req, res) => {
+  try {
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({
+        success: false,
+        message: "ANTHROPIC_API_KEY is not configured on server",
+      });
+    }
+
+    const { remark = "", context = {} } = req.body || {};
+    const text = String(remark || "").trim();
+    if (!text) {
+      return res.status(400).json({ success: false, message: "remark is required" });
+    }
+
+    const systemPrompt = `
+You are an AI supervisor improving CRM remark quality.
+Classify the remark as weak or strong.
+Weak examples: "Interested", "Call later", "Not picking", "Maybe", "Ok", "Done".
+
+Return ONLY JSON:
+{
+  "isWeak": boolean,
+  "improvedRemark": string,  // if isWeak true, rewrite into a strong remark (2-4 short lines). Otherwise may return original.
+  "tags": string[]           // optional: fees, timing, documents, parents, followup, etc.
+}
+No extra text outside JSON.`;
+
+    const userPrompt = `
+Context (optional JSON):
+${JSON.stringify(context || {}, null, 2)}
+
+Remark:
+${text}
+`;
+
+    const message = await anthropic.messages.create({
+      model: getModel(),
+      max_tokens: 250,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message?.content?.[0]?.text || "";
+    let parsed;
+    try {
+      let jsonStr = raw;
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = raw.slice(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("[AI remark-quality] Failed to parse JSON:", e.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse AI response",
+        raw,
+      });
+    }
+
+    const isWeak = !!parsed.isWeak;
+    const improvedRemark = String(parsed.improvedRemark || "").trim() || text;
+    const tags = Array.isArray(parsed.tags)
+      ? parsed.tags.map((t) => String(t).trim()).filter(Boolean)
+      : [];
+
+    return res.status(200).json({
+      success: true,
+      data: { isWeak, improvedRemark, tags },
+    });
+  } catch (err) {
+    console.error("[AI remark-quality] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while checking remark quality",
+    });
+  }
+});
+
 router.post("/lead-intel/bulk", async (req, res) => {
   try {
     const anthropic = getAnthropicClient();
@@ -155,6 +511,10 @@ For ONE student lead, you must return VERY COMPACT JSON with:
 - "summary": MAX 1 short sentence
 - "score": integer 0–100 (higher = more likely to convert soon)
 - "priority": "High" | "Medium" | "Low"
+- "intent": "High" | "Medium" | "Low" (conversion intent)
+- "suggestedAction": ONE concrete action for the counsellor, e.g. "Call today before 6 PM", "Send course brochure", "Ask for documents", "Schedule demo session". Be specific and time-bound when relevant.
+
+Consider: last contacted date, next action date, lead status, number of follow-ups, course interest, and any remarks.
 
 IMPORTANT:
 - DO NOT add any explanations like "Here is the JSON".
@@ -162,7 +522,9 @@ IMPORTANT:
 {
   "summary": "...",
   "score": 80,
-  "priority": "High"
+  "priority": "High",
+  "intent": "High",
+  "suggestedAction": "Call today before 6 PM"
 }`;
 
     // Call Anthropic for each lead separately so a partial failure doesn't break all
@@ -212,11 +574,18 @@ ${JSON.stringify(lead, null, 2)}
           else if (score >= 40) priority = "Medium";
           else priority = "Low";
         }
+        let intent = parsed.intent;
+        if (!["High", "Medium", "Low"].includes(intent)) {
+          intent = priority;
+        }
+        const suggestedAction = String(parsed.suggestedAction || "").trim() || null;
 
         cleaned[lead._id] = {
           summary: String(parsed.summary || "").trim(),
           score,
           priority,
+          intent: intent || priority,
+          suggestedAction,
         };
       } catch (err) {
         console.warn(
