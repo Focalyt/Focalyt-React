@@ -9,6 +9,7 @@ import axios from 'axios'
 
 import useWebsocket from '../../../../utils/websocket';
 import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
+import { useLocation } from 'react-router-dom';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -702,6 +703,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 const WhatsappChat = () => {
 
   const candidateRef = useRef();
+  const location = useLocation();
   // Refs
   const addressInputRef = useRef(null);
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -985,6 +987,22 @@ const WhatsappChat = () => {
 
   const [unreadMessageCounts, setUnreadMessageCounts] = useState({});
   const [lastMessageTime, setLastMessageTime] = useState({}); // Track last message time for each profile
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const draftMessage = params.get('draft');
+
+    if (draftMessage) {
+      setWhatsappNewMessage(draftMessage);
+
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('draft');
+      nextParams.delete('source');
+
+      const nextSearch = nextParams.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`);
+    }
+  }, [location.search]);
   
   // Normalize phone number for comparison
   const normalizePhone = useCallback((phone) => {

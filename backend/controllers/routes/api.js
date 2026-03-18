@@ -139,6 +139,43 @@ commonRoutes.post("/getgoogleauth", async (req, res) => {
 });
 
 
+commonRoutes.post("/gettrainergoogleauth", async (req, res) => {
+  try {
+    const { code, redirectUri, user } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        error: 'Authorization code is required'
+      });
+    }
+
+    const payload = {
+      ...req.body,
+      redirectUri,
+      user: (user && user._id) ? user : req.user
+    };
+
+    const userData = await getGoogleAuthToken(payload);
+
+	if (userData.error) {
+		return res.status(400).json({
+			error: userData.error
+		});
+	}
+
+    res.json({
+      success: true,
+      data: userData
+    });
+
+  } catch (error) {
+    console.error('Google OAuth Error:', error);
+    res.status(500).json({
+      error: 'Failed to exchange authorization code',
+      message: error.message
+    });
+  }
+});
 
 commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 	try {

@@ -581,8 +581,67 @@ const LeadAnalyticsDashboard = () => {
         return [...remarkNotes, ...followupNotes].slice(-10);
     };
 
+    const getLeadFollowupSummary = (lead) => {
+        const followups = Array.isArray(lead?.followups) ? lead.followups : [];
+        const totalAttempts = followups.length;
+
+        let doneCount = 0;
+        let missedCount = 0;
+        let plannedCount = 0;
+
+        followups.forEach((item) => {
+            const normalizedStatus = String(item?.status || '').trim().toLowerCase();
+            if (normalizedStatus === 'done') doneCount += 1;
+            else if (normalizedStatus === 'missed') missedCount += 1;
+            else if (normalizedStatus === 'planned') plannedCount += 1;
+        });
+
+        let sufficiency = 'Not Enough';
+        let sufficiencyScore = 1;
+        let guidance = 'Lead has very limited follow-up history. Increase contact attempts.';
+
+        if (totalAttempts >= 4) {
+            sufficiency = 'Enough';
+            sufficiencyScore = 3;
+            guidance = 'Follow-up attempts look sufficient. Focus on quality, closure, or escalation.';
+        } else if (totalAttempts >= 2) {
+            sufficiency = 'Moderate';
+            sufficiencyScore = 2;
+            guidance = 'Lead has some follow-up history, but may still need more structured attempts.';
+        }
+
+        return {
+            totalAttempts,
+            doneCount,
+            missedCount,
+            plannedCount,
+            sufficiency,
+            sufficiencyScore,
+            guidance,
+        };
+    };
+
+    const getLowFollowupActionPlan = (lead) => {
+        const leadName = getLeadDisplayName(lead);
+        const courseName = lead?._course?.name || lead?.courseName || 'the selected course';
+        const followupSummary = getLeadFollowupSummary(lead);
+
+        if (followupSummary.totalAttempts >= 2) {
+            return [];
+        }
+
+        return [
+            `Call ${leadName} and confirm current interest in ${courseName}.`,
+            'Check the main objection: fee, location, timing, documents, or no response.',
+            'Send one clear WhatsApp follow-up with course value, next step, and counselor name.',
+            'Set the next action date immediately after the conversation or outreach attempt.',
+            'If there is still no response after repeated attempts, escalate to the counselor supervisor.'
+        ];
+    };
+
     const buildAiLeadProfile = useCallback((lead) => {
         const documentSnapshot = getLeadDocumentSnapshot(lead);
+        const followupSummary = getLeadFollowupSummary(lead);
         const followupDate = lead?.followupDate || null;
         const isOverdue = followupDate ? new Date(followupDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
@@ -619,6 +678,11 @@ const LeadAnalyticsDashboard = () => {
                 verifiedDocs: documentSnapshot.verifiedDocs,
                 pendingVerificationDocs: documentSnapshot.pendingVerificationDocs,
                 kycBucket: documentSnapshot.category,
+                followupAttempts: followupSummary.totalAttempts,
+                followupDoneCount: followupSummary.doneCount,
+                followupMissedCount: followupSummary.missedCount,
+                followupPlannedCount: followupSummary.plannedCount,
+                followupSufficiency: followupSummary.sufficiency,
             },
         };
     }, []);
@@ -1205,6 +1269,7 @@ const LeadAnalyticsDashboard = () => {
 
         const queue = aiScopedLeads.flatMap((lead) => {
             const documentSnapshot = getLeadDocumentSnapshot(lead);
+            const followupSummary = getLeadFollowupSummary(lead);
             const leadName = getLeadDisplayName(lead);
             const courseName = lead?._course?.name || lead?.courseName || 'Not specified';
             const centerName = getLeadCenterName(lead);
@@ -1234,6 +1299,8 @@ const LeadAnalyticsDashboard = () => {
                     feeStatus: lead?.registrationFee || 'Unknown',
                     batchName,
                     kycBucket: documentSnapshot.category,
+                    followupAttempts: followupSummary.totalAttempts,
+                    followupSufficiency: followupSummary.sufficiency,
                     sourceStatus: lead?._leadStatus?.title || lead?.leadStatus || 'Unknown',
                     ...extra,
                 });
@@ -1311,6 +1378,20 @@ const LeadAnalyticsDashboard = () => {
                 );
             }
 
+            if (!lead?.admissionDone && !lead?.dropout && followupSummary.totalAttempts < 2) {
+                pushItem(
+                    'insufficientFollowup',
+                    followupSummary.totalAttempts === 0 ? 'High' : 'Medium',
+                    'Insufficient Follow-up',
+                    `Only ${followupSummary.totalAttempts} follow-up attempt(s) found. Current level: ${followupSummary.sufficiency}.`,
+                    `Necessary steps: ${getLowFollowupActionPlan(lead).join(' ')}`,
+                    {
+                        followupAttempts: followupSummary.totalAttempts,
+                        followupSufficiency: followupSummary.sufficiency,
+                    }
+                );
+            }
+
             return rows;
         });
 
@@ -1334,6 +1415,7 @@ const LeadAnalyticsDashboard = () => {
         admissionNoBatch: aiSupervisionQueue.filter((item) => item.type === 'admissionNoBatch').length,
         dropoutRisk: aiSupervisionQueue.filter((item) => item.type === 'dropoutRisk').length,
         overdueFollowup: aiSupervisionQueue.filter((item) => item.type === 'overdueFollowup').length,
+        insufficientFollowup: aiSupervisionQueue.filter((item) => item.type === 'insufficientFollowup').length,
     }), [aiSupervisionQueue]);
 
     const filteredAiSupervisionQueue = useMemo(() => {
@@ -1488,6 +1570,7 @@ const LeadAnalyticsDashboard = () => {
 
             const leadProfile = buildAiLeadProfile(targetLead);
             const notes = leadProfile.notes;
+            const lowFollowupActionPlan = getLowFollowupActionPlan(targetLead);
 
             const [summaryRes, actionsRes] = await Promise.all([
                 axios.post(
@@ -1517,9 +1600,13 @@ const LeadAnalyticsDashboard = () => {
             }
 
             if (actionsRes.data?.success) {
-                setAiLeadActions(actionsRes.data.data?.actions || []);
+                const aiActions = actionsRes.data.data?.actions || [];
+                const mergedActions = lowFollowupActionPlan.length > 0
+                    ? [...lowFollowupActionPlan, ...aiActions]
+                    : aiActions;
+                setAiLeadActions(Array.from(new Set(mergedActions)));
             } else {
-                setAiLeadActions([]);
+                setAiLeadActions(lowFollowupActionPlan);
             }
         } catch (err) {
             setAiLeadDetail(null);
@@ -3233,6 +3320,9 @@ const LeadAnalyticsDashboard = () => {
                                 <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'dropoutRisk' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('dropoutRisk')}>
                                     Dropouts ({aiQueueCounts.dropoutRisk})
                                 </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'insufficientFollowup' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setAiSupervisionQueueFilter('insufficientFollowup')}>
+                                    Low Follow-up ({aiQueueCounts.insufficientFollowup})
+                                </button>
                                 <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'overdueFollowup' ? 'btn-outline-dark active' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('overdueFollowup')}>
                                     Overdue ({aiQueueCounts.overdueFollowup})
                                 </button>
@@ -3273,7 +3363,15 @@ const LeadAnalyticsDashboard = () => {
                                                     <td>{item.courseName}</td>
                                                     <td>{item.centerName}</td>
                                                     <td>{item.label}</td>
-                                                    <td className="small text-muted">{item.reason}</td>
+                                                    <td className="small text-muted">
+                                                        {item.reason}
+                                                        {typeof item.followupAttempts === 'number' && (
+                                                            <div className="mt-1">
+                                                                Attempts: {item.followupAttempts}
+                                                                {item.followupSufficiency ? ` | ${item.followupSufficiency}` : ''}
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td className="small">{item.action}</td>
                                                     <td>
                                                         <button
@@ -3470,6 +3568,10 @@ const LeadAnalyticsDashboard = () => {
                                 <div className="row g-3">
                                     <div className="col-12 col-lg-4">
                                         <div className="border rounded-3 p-3 h-100 bg-light">
+                                            {(() => {
+                                                const followupSummary = getLeadFollowupSummary(selectedAiLead);
+                                                return (
+                                                    <>
                                             <div className="fw-semibold mb-2">{getLeadDisplayName(selectedAiLead)}</div>
                                             <div className="small text-muted mb-2">{getLeadCenterName(selectedAiLead)} | {getLeadCounselorName(selectedAiLead)}</div>
                                             <div className="small mb-1"><strong>Course:</strong> {selectedAiLead?._course?.name || selectedAiLead?.courseName || 'Not specified'}</div>
@@ -3480,7 +3582,23 @@ const LeadAnalyticsDashboard = () => {
                                             <div className="small mb-1"><strong>Registration Fee:</strong> {selectedAiLead?.registrationFee || 'Unknown'}</div>
                                             <div className="small mb-1"><strong>Batch:</strong> {getLeadBatchName(selectedAiLead) || 'Unassigned'}</div>
                                             <div className="small mb-1"><strong>Follow-up Date:</strong> {selectedAiLead?.followupDate ? new Date(selectedAiLead.followupDate).toLocaleDateString('en-IN') : 'N/A'}</div>
+                                            <div className="small mb-1"><strong>Follow-up Attempts:</strong> {followupSummary.totalAttempts}</div>
+                                            <div className="small mb-1"><strong>Follow-up Sufficiency:</strong> {followupSummary.sufficiency}</div>
+                                            <div className="small mb-1"><strong>Done / Missed / Planned:</strong> {followupSummary.doneCount} / {followupSummary.missedCount} / {followupSummary.plannedCount}</div>
                                             <div className="small mb-0"><strong>Recent Notes:</strong> {getLeadNotes(selectedAiLead).length}</div>
+                                            {followupSummary.totalAttempts < 2 && (
+                                                <div className="mt-3 border-top pt-2">
+                                                    <div className="small fw-semibold mb-1">Necessary Follow-up Steps</div>
+                                                    <ul className="small mb-0 ps-3">
+                                                        {getLowFollowupActionPlan(selectedAiLead).map((step, index) => (
+                                                            <li key={index}>{step}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
 

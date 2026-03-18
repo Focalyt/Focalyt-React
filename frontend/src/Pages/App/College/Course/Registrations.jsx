@@ -2304,7 +2304,7 @@ const CRMDashboard = () => {
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
-  const [followupDate, setFollowupDate] = useState('');
+  const [followupDate, setFollowupDate] = useState(null);
   const [followupTime, setFollowupTime] = useState('');
   const [remarks, setRemarks] = useState('');
 
@@ -2600,51 +2600,9 @@ const CRMDashboard = () => {
     return isRequired ? 'border-danger' : '';
   };
 
-  const createGoogleCalendarEventForFollowup = async (followupDateTime) => {
-    try {
-      if (!userData.googleAuthToken?.accessToken) {
-        return;
-      }
-
-      const scheduledDateTime = new Date(followupDateTime);
-
-      const event = {
-        summary: `B2C Follow-up: ${selectedProfile?._candidate?.name || 'Unknown'}`,
-        description: `Follow-up with ${selectedProfile?._candidate?.name || 'Unknown'}\n\nMobile: ${selectedProfile?._candidate?.mobile || 'N/A'}\nEmail: ${selectedProfile?._candidate?.email || 'N/A'}\nCourse: ${selectedProfile?._course?.name || 'N/A'}\nCenter: ${selectedProfile?._center?.name || 'N/A'}\n\nRemarks: ${remarks || 'No remarks'}`,
-        start: {
-          dateTime: scheduledDateTime.toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        end: {
-          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 60 },
-          ],
-        },
-      };
-
-      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-        user: userData,
-        event,
-      });
-
-      if (response.data.success) {
-        console.log('Followup added to Google Calendar');
-      } else {
-        console.error('Failed to add to Google Calendar:', response.data.message);
-      }
-    } catch (error) {
-      console.error('Error in createGoogleCalendarEventForFollowup:', error);
-    }
-  };
-
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
+    let shouldClosePanel = false;
 
     try {
       if (showPanel === 'bulkstatuschange') {
@@ -2722,11 +2680,12 @@ const CRMDashboard = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
+          shouldClosePanel = true;
 
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
@@ -2804,6 +2763,7 @@ const CRMDashboard = () => {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
           followup: followupDateTime ? followupDateTime.toISOString() : null,
+          googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken),
           remarks: (remarks || '').trim()
         };
 
@@ -2836,14 +2796,10 @@ console.log('API Response:', response.data);
         if (response.data.success) {
           alert('Status updated successfully!');
 
-          if (followupDateTime && userData.googleAuthToken?.accessToken) {
-            await createGoogleCalendarEventForFollowup(followupDateTime);
-          }
-
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
@@ -2913,13 +2869,15 @@ console.log('API Response:', response.data);
             appliedCourseId: selectedProfile._id,
             followupDate: followupDateTime ? followupDateTime.toISOString() : null,
             remarks: remarks || '',
-            folloupType: 'update'
+            folloupType: 'update',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
           }
           : {
             appliedCourseId: selectedProfile._id,
             followupDate: followupDateTime ? followupDateTime.toISOString() : null,
             remarks: remarks || '',
-            folloupType: 'new'
+            folloupType: 'new',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
           };
 
         // Check if backend URL and token exist
@@ -2947,10 +2905,9 @@ console.log('API Response:', response.data);
         // Backend returns status: true (not success: true)
         if (response.data.status === true || response.data.success === true) {
           alert('Followup updated successfully!');
+          shouldClosePanel = true;
+          closePanel();
 
-          if (userData.googleAuthToken?.accessToken && followupDateTime) {
-            await createGoogleCalendarEventForFollowup(followupDateTime);
-          }
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update followup');
@@ -2978,11 +2935,15 @@ console.log('API Response:', response.data);
       }
     }
     finally {
-      setSelectedStatus('');
-      setSelectedSubStatus(null);
-      setFollowupDate('');
-      setFollowupTime('');
-      setRemarks('');
+      if (shouldClosePanel) {
+        closePanel();
+      } else {
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate(null);
+        setFollowupTime('');
+        setRemarks('');
+      }
 
       // Refresh data and close panel
       await fetchProfileData();
@@ -3999,12 +3960,12 @@ console.log('API Response:', response.data);
                 const minutes = String(existing.getMinutes()).padStart(2, '0');
                 setFollowupTime(`${hours}:${minutes}`);
               } else {
-                setFollowupDate('');
+                setFollowupDate(null);
                 setFollowupTime('');
               }
               setRemarks(fullProfile.followup.remarks || '');
             } else {
-              setFollowupDate('');
+              setFollowupDate(null);
               setFollowupTime('');
               setRemarks('');
             }
@@ -4046,6 +4007,9 @@ console.log('API Response:', response.data);
     setSelectedProfile(null);
     setSelectedStatus(null)
     setSelectedSubStatus(null)
+    setFollowupDate(null);
+    setFollowupTime('');
+    setRemarks('');
     if (!isMobile) {
       setMainContentClass('col-12');
     } else {

@@ -120,20 +120,35 @@ const getGoogleAuthCode = async (options = {}) => {
 };
 
 const getGoogleRefreshToken = async (data) => {
-  let { code, redirectUri, user } = data;
-  if(!code || !user){
-    return;
+  let { code, redirectUri, user, endpoint } = data;
+  const storedUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+  const resolvedUser = user && Object.keys(user).length > 0 ? user : storedUser;
+  const token = JSON.parse(sessionStorage.getItem('token') || 'null');
+  const googleAuthEndpoint = endpoint || '/api/getgoogleauth';
+
+  if(!code || !resolvedUser?._id){
+    throw new Error('User session not found for Google Calendar connection');
   }
 
   
-  const response = await axios.post(`${backendUrl}/api/getgoogleauth`, {
-    code,
-    redirectUri : redirectUri || window.location.origin,
-    user: user
-  });
+  try {
+    const response = await axios.post(`${backendUrl}${googleAuthEndpoint}`, {
+      code,
+      redirectUri : redirectUri || window.location.origin,
+      user: resolvedUser
+    }, {
+      headers: token ? { 'x-auth': token } : {}
+    });
 
-  console.log(response,'response');
-  return response.data;
+    if (!response?.data?.success || !response?.data?.data) {
+      throw new Error(response?.data?.error || response?.data?.message || 'Failed to connect Google Calendar');
+    }
+
+    return response.data;
+  } catch (error) {
+    const backendMessage = error?.response?.data?.error || error?.response?.data?.message;
+    throw new Error(backendMessage || error.message || 'Failed to connect Google Calendar');
+  }
 }
 
 // Export functions

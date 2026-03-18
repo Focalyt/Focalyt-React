@@ -49,6 +49,53 @@ const placementRoutes = require("./placement");
 const router = express.Router();
 const moment = require('moment')
 
+const createB2cGoogleCalendarFollowup = async ({ reqUser, appliedCourseId, followupDate, remarks }) => {
+	const { createGoogleCalendarEvent } = require('../services/googleservice');
+	const appliedCourse = await AppliedCourses.findById(appliedCourseId)
+		.populate('_candidate', 'name mobile email')
+		.populate('_course', 'name')
+		.populate('_center', 'name');
+
+	if (!appliedCourse) {
+		return { error: 'Applied course not found for follow-up calendar event' };
+	}
+
+	const scheduledDateTime = new Date(followupDate);
+	const event = {
+		summary: `B2C Follow-up: ${appliedCourse?._candidate?.name || 'Unknown'}`,
+		description: [
+			`Follow-up with ${appliedCourse?._candidate?.name || 'Unknown'}`,
+			'',
+			`Mobile: ${appliedCourse?._candidate?.mobile || 'N/A'}`,
+			`Email: ${appliedCourse?._candidate?.email || 'N/A'}`,
+			`Course: ${appliedCourse?._course?.name || 'N/A'}`,
+			`Center: ${appliedCourse?._center?.name || 'N/A'}`,
+			'',
+			`Remarks: ${remarks || 'No remarks'}`
+		].join('\n'),
+		start: {
+			dateTime: scheduledDateTime.toISOString(),
+			timeZone: 'Asia/Kolkata',
+		},
+		end: {
+			dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+			timeZone: 'Asia/Kolkata',
+		},
+		reminders: {
+			useDefault: false,
+			overrides: [
+				{ method: 'email', minutes: 24 * 60 },
+				{ method: 'popup', minutes: 60 },
+			],
+		},
+	};
+
+	return createGoogleCalendarEvent({
+		user: reqUser,
+		event
+	});
+};
+
 router.use("/b2b", isCollege, b2bRoutes);
 router.use("/statusB2b", statusB2bRoutes);
 router.use("/placementStatus", placementRoutes);
@@ -6719,6 +6766,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			_leadSubStatus,
 			remarks,
 			followup,  // combined date and time
+			googleCalendarEvent = false,
 		} = req.body;
 		console.log("req", req.body)
 		console.log('[Lead Status Change] Step 2: Params & body', { appliedCourseId: id, _leadStatus, _leadSubStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
@@ -6769,10 +6817,11 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		}
 
 		// If followup date and time is set or updated, log the change and update the followup
+		let newFollowup = null;
 		if (followup && lastFollowup?.followupDate?.toISOString() !== new Date(followup).toISOString()) {
 			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
 			// Push a new followup object
-			const newFollowup = new B2cFollowup({
+			newFollowup = new B2cFollowup({
 				appliedCourseId: doc._id,
 				followupDate: new Date(followup),
 				remarks: remarks,
@@ -6783,6 +6832,35 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			});
 			console.log("newFollowup",newFollowup)
 			await newFollowup.save();
+		}
+
+		if (googleCalendarEvent && newFollowup && req.user.googleAuthToken?.accessToken) {
+			try {
+				const googleEvent = await createB2cGoogleCalendarFollowup({
+					reqUser: req.user,
+					appliedCourseId: doc._id,
+					followupDate: newFollowup.followupDate,
+					remarks
+				});
+
+				if (googleEvent?.event?.id) {
+					newFollowup.googleCalendarEventId = googleEvent.event.id;
+					await newFollowup.save();
+				}
+
+				if (googleEvent?.error) {
+					return res.status(400).json({
+						success: false,
+						message: googleEvent.error
+					});
+				}
+			} catch (googleError) {
+				console.error('[Lead Status Change] Google Calendar Error:', googleError);
+				return res.status(400).json({
+					success: false,
+					message: googleError.message || 'Failed to add follow-up to Google Calendar'
+				});
+			}
 		}
 
 
@@ -8904,7 +8982,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		const paginatedResult = results.slice(skip, skip + limit);
 
 		for (const result of paginatedResult) {
-			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
+			const followup = await B2cFollowup
+				.findOne({ appliedCourseId: result._id, status: 'planned' })
+				.sort({ createdAt: -1 });
 			result.followup = followup
 		}
 
@@ -9342,7 +9422,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		const user = req.user;
 		const collegeId = req.college._id;
 		// console.log("req", req.college._id);
-		let { appliedCourseId, followupDate, remarks, folloupType, id } = req.body;
+		let { appliedCourseId, followupDate, remarks, folloupType, id, googleCalendarEvent = false } = req.body;
 
 
 		if (!folloupType) {
@@ -9366,6 +9446,24 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			if (!followup) {
 				return res.status(400).json({ status: false, message: "Followup not created" });
+			}
+
+			if (googleCalendarEvent && req.user.googleAuthToken?.accessToken) {
+				const googleEvent = await createB2cGoogleCalendarFollowup({
+					reqUser: req.user,
+					appliedCourseId,
+					followupDate,
+					remarks
+				});
+
+				if (googleEvent?.event?.id) {
+					followup.googleCalendarEventId = googleEvent.event.id;
+					await followup.save();
+				}
+
+				if (googleEvent?.error) {
+					return res.status(400).json({ status: false, message: googleEvent.error });
+				}
 			}
 
 			let actionParts = [];
@@ -9426,6 +9524,24 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				collegeId: collegeId,
 				counsellorId: user._id
 			});
+
+			if (googleCalendarEvent && req.user.googleAuthToken?.accessToken) {
+				const googleEvent = await createB2cGoogleCalendarFollowup({
+					reqUser: req.user,
+					appliedCourseId,
+					followupDate,
+					remarks
+				});
+
+				if (googleEvent?.event?.id) {
+					newFollowup.googleCalendarEventId = googleEvent.event.id;
+					await newFollowup.save();
+				}
+
+				if (googleEvent?.error) {
+					return res.status(400).json({ status: false, message: googleEvent.error });
+				}
+			}
 			let actionParts = [];
 			actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
 			if (remarks) {
@@ -9444,7 +9560,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				$push: { logs: newLogEntry }
 			});
 
-			return res.status(200).json({ status: true, message: "Followup updated successfully", data: updatedFollowup });
+			return res.status(200).json({ status: true, message: "Followup updated successfully", data: newFollowup });
 
 
 		}
@@ -10441,7 +10557,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 		const paginatedResult = results.slice(skip, skip + limit);
 		for (const result of paginatedResult) {
-			const followup = await B2cFollowup.findOne({ appliedCourseId: result._id, status: 'planned' })
+			const followup = await B2cFollowup
+				.findOne({ appliedCourseId: result._id, status: 'planned' })
+				.sort({ createdAt: -1 });
 			result.followup = followup
 		}
 		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
@@ -14468,7 +14586,18 @@ router.post('/trainee/login', async (req, res) => {
 		// console.log("Is Match", isMatch)
 
 		const token = await user.generateAuthToken();
-		return res.status(200).json({ status: true, message: "Login successful", token, role: 4 });
+		const userData = {
+			_id: user._id,
+			name: user.name,
+			role: 4,
+			email: user.email,
+			mobile: user.mobile,
+			designation: user.designation,
+			token,
+			googleAuthToken: user.googleAuthToken,
+			collegeId: user.collegeId
+		};
+		return res.status(200).json({ status: true, message: "Login successful", token, role: 4, userData });
 		// console.log("Token" , token)
 
 		// const isMatch = user.validPassword(password);
@@ -15002,7 +15131,8 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			color,
 			isRecurring,
 			recurringType,
-			recurringEndDate
+			recurringEndDate,
+			createGoogleMeet = false
 		} = req.body;
 
 		const trainerId = req.user._id;
@@ -15037,6 +15167,13 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			});
 		}
 
+		if (createGoogleMeet && !req.user.googleAuthToken?.accessToken) {
+			return res.status(400).json({
+				status: false,
+				message: 'Please connect Google Calendar before creating a live class'
+			});
+		}
+
 		const trainerTimeTable = new TrainerTimeTable({
 			trainerId,
 			collegeId,
@@ -15062,6 +15199,78 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			trainerTimeTable.weekTopics = weekTopics;
 		} else if (scheduleType === 'monthly') {
 			trainerTimeTable.monthTopics = monthTopics;
+		}
+
+		if (createGoogleMeet) {
+			try {
+				const { createGoogleCalendarEvent } = require('../services/googleservice');
+				const startDateTime = new Date(date);
+				const [startHours, startMinutes] = String(startTime).split(':');
+				startDateTime.setHours(parseInt(startHours, 10), parseInt(startMinutes, 10), 0, 0);
+
+				const endDateTime = new Date(date);
+				const [endHours, endMinutes] = String(endTime).split(':');
+				endDateTime.setHours(parseInt(endHours, 10), parseInt(endMinutes, 10), 0, 0);
+
+				const event = {
+					summary: `Live Class: ${title}`,
+					description: [
+						`Course: ${courseName || 'N/A'}`,
+						`Batch: ${batchName || 'N/A'}`,
+						`Subject: ${subject || 'N/A'}`,
+						`Trainer: ${req.user.name || 'Trainer'}`,
+						'',
+						description || 'Live class session'
+					].join('\n'),
+					start: {
+						dateTime: startDateTime.toISOString(),
+						timeZone: 'Asia/Kolkata',
+					},
+					end: {
+						dateTime: endDateTime.toISOString(),
+						timeZone: 'Asia/Kolkata',
+					},
+					conferenceData: {
+						createRequest: {
+							requestId: `trainer-live-class-${Date.now()}-${trainerId}`,
+							conferenceSolutionKey: { type: 'hangoutsMeet' }
+						}
+					}
+				};
+
+				const googleEvent = await createGoogleCalendarEvent({
+					user: req.user,
+					event
+				});
+
+				if (googleEvent?.event) {
+					const entryPoints = Array.isArray(googleEvent.event.conferenceData?.entryPoints)
+						? googleEvent.event.conferenceData.entryPoints
+						: [];
+					const videoEntry = entryPoints.find((item) => item.entryPointType === 'video');
+					const meetCode = videoEntry?.meetingCode
+						|| googleEvent.event.conferenceData?.conferenceId
+						|| '';
+
+					trainerTimeTable.googleCalendarEventId = googleEvent.event.id || '';
+					trainerTimeTable.googleMeetLink = videoEntry?.uri || googleEvent.event.hangoutLink || '';
+					trainerTimeTable.googleMeetCode = meetCode;
+					trainerTimeTable.liveClassPlatform = trainerTimeTable.googleMeetLink ? 'google_meet' : 'none';
+				}
+
+				if (googleEvent?.error) {
+					return res.status(400).json({
+						status: false,
+						message: googleEvent.error
+					});
+				}
+			} catch (googleError) {
+				console.log('Error creating Google Meet live class:', googleError.message);
+				return res.status(400).json({
+					status: false,
+					message: googleError.message || 'Failed to create Google Meet live class'
+				});
+			}
 		}
 
 		await trainerTimeTable.save();

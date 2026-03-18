@@ -13,6 +13,35 @@ const carrertabName ='Carrer Page';
 const labValues ='Lab Page';
 const {User} = require('../../../controllers/models')
 
+function parseGoogleExpiryTimestamp(expiresAt) {
+  if (!expiresAt) {
+    return 0;
+  }
+
+  if (expiresAt instanceof Date) {
+    const timestamp = expiresAt.getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+
+  if (typeof expiresAt === 'number') {
+    return expiresAt;
+  }
+
+  if (typeof expiresAt === 'string') {
+    const asDate = new Date(expiresAt);
+    if (!Number.isNaN(asDate.getTime())) {
+      return asDate.getTime();
+    }
+
+    const match = expiresAt.match(/(\d{13})/);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return 0;
+}
+
 module.exports = {
   updateSpreadSheetValues,
   updateSpreadSheetLabLeadsValues,
@@ -118,9 +147,14 @@ async function getGoogleAuthToken(data) {
     };
   }
 
+  if (!user || !user._id) {
+    return {
+      error: 'Authenticated user is required for Google OAuth'
+    };
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  console.log(clientId, clientSecret, 'clientId, clientSecret');
 
   if(!clientId || !clientSecret){
     return {
@@ -128,7 +162,6 @@ async function getGoogleAuthToken(data) {
     };
   }
 
-  console.log(data, 'data');
   console.log('Received authorization code:', code.substring(0, 20) + '...');
 
   try {
@@ -154,7 +187,12 @@ async function getGoogleAuthToken(data) {
     }
   
   
-    const updateUser = await User.findByIdAndUpdate(user._id,updatedData,{new: true});
+    const updateUser = await User.findByIdAndUpdate(user._id, updatedData, { new: true });
+    if (!updateUser) {
+      return {
+        error: 'User not found for Google OAuth update'
+      };
+    }
   
     const userData = updateUser.googleAuthToken;
 
@@ -241,21 +279,7 @@ console.log(timeMin, timeMax,'timeMin, timeMax');
   const refreshToken = user.googleAuthToken.refreshToken;
 
 
-  // Fix expiry date format - ensure it's a proper timestamp
-  let expiryTimestamp;
-  if (typeof expiresAt === 'string') {
-    const match = expiresAt.match(/(\d{13})/);
-    if (match) {
-      expiryTimestamp = parseInt(match[1]);
-    } else {
-      expiryTimestamp = 0;
-    }
-  } else if (typeof expiresAt === 'number') {
-    expiryTimestamp = expiresAt;
-  } else {
-    console.log('Unknown expiry format, treating as expired');
-    expiryTimestamp = 0;
-  }
+  let expiryTimestamp = parseGoogleExpiryTimestamp(expiresAt);
 
  
 
@@ -446,22 +470,7 @@ async function createGoogleCalendarEvent(data) {
   console.log('- Refresh Token:', refreshToken ? `${refreshToken.substring(0, 20)}...` : 'MISSING');
   console.log('- Current Time:', Date.now());
 
-  // Fix expiry date format - ensure it's a proper timestamp
-  let expiryTimestamp;
-  if (typeof expiresAt === 'string') {
-    // If it's a string, try to parse it or extract timestamp
-    const match = expiresAt.match(/(\d{13})/); // Look for 13-digit timestamp
-    if (match) {
-      expiryTimestamp = parseInt(match[1]);
-    } else {
-      expiryTimestamp = 0; // Force refresh
-    }
-  } else if (typeof expiresAt === 'number') {
-    expiryTimestamp = expiresAt;
-  } else {
-    console.log('Unknown expiry format, treating as expired');
-    expiryTimestamp = 0; // Force refresh
-  }
+  let expiryTimestamp = parseGoogleExpiryTimestamp(expiresAt);
 
   console.log('- Parsed Expiry Timestamp:', expiryTimestamp);
   console.log('- Is Expired:', expiryTimestamp < Date.now());
@@ -541,10 +550,16 @@ async function createGoogleCalendarEvent(data) {
       return { error: 'Authentication failed during test: ' + authError.message };
     }
     
-    const newEvent = await calendar.events.insert({
+    const insertParams = {
       calendarId: 'primary',
       resource: event,
-    });
+    };
+
+    if (event?.conferenceData) {
+      insertParams.conferenceDataVersion = 1;
+    }
+
+    const newEvent = await calendar.events.insert(insertParams);
 
     console.log('Event created successfully:', newEvent.data.id);
     return { 
@@ -579,10 +594,16 @@ async function createGoogleCalendarEvent(data) {
             expiry_date: newTokenData.expiresAt
           });
           
-          const retryEvent = await calendar.events.insert({
+          const retryParams = {
             calendarId: 'primary',
             resource: event,
-          });
+          };
+
+          if (event?.conferenceData) {
+            retryParams.conferenceDataVersion = 1;
+          }
+
+          const retryEvent = await calendar.events.insert(retryParams);
           
           return { 
             success: true, 
@@ -612,16 +633,7 @@ async function validateAndRefreshGoogleToken(user) {
 
   const { accessToken, refreshToken, expiresAt } = user.googleAuthToken;
   
-  // Parse expiry timestamp
-  let expiryTimestamp = 0;
-  if (typeof expiresAt === 'string') {
-    const match = expiresAt.match(/(\d{13})/);
-    if (match) {
-      expiryTimestamp = parseInt(match[1]);
-    }
-  } else if (typeof expiresAt === 'number') {
-    expiryTimestamp = expiresAt;
-  }
+  let expiryTimestamp = parseGoogleExpiryTimestamp(expiresAt);
 
   // Check if token needs refresh (with 5 minute buffer)
   const bufferTime = 5 * 60 * 1000;

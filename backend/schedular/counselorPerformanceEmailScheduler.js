@@ -12,6 +12,10 @@ const {
 
 const helpers = require("../helpers");
 const sendMails = helpers.sendMails || helpers.sendMail;
+const {
+  getManagerWiseAiReports,
+  buildAiSupervisionEmailSection,
+} = require("../helpers/aiSupervisionReport");
 
 if (!sendMails) {
   console.warn(
@@ -318,7 +322,7 @@ PendingKYC: pendingKYCMap[counselorId] || 0,
   return { data: transformedData, summary };
 }
 
-function buildHtmlReport({ data, summary, managerName }) {
+function buildHtmlReport({ data, summary, managerName, extraSectionsHtml = "" }) {
   const dateLabel = moment().format("DD MMM YYYY");
   const rows = Array.isArray(data) ? data : Object.values(data);
 
@@ -398,6 +402,7 @@ function buildHtmlReport({ data, summary, managerName }) {
             ${rowsHtml || `<tr><td colspan="10" style="padding:10px;text-align:center;color:#9ca3af;">No data for today.</td></tr>`}
           </tbody>
         </table>
+        ${extraSectionsHtml || ""}
       </div>
     </body>
   </html>
@@ -540,6 +545,11 @@ async function sendDailyCounselorPerformanceEmail() {
 
   try {
     const { data } = await buildCounselorMatrixForToday();
+    const aiManagerWiseReports = await getManagerWiseAiReports();
+    const aiManagerReportMap = {};
+    aiManagerWiseReports.forEach((report) => {
+      aiManagerReportMap[String(report.managerId)] = report;
+    });
 
     // console.log("==== transformed counselor data keys ====");
     // console.log(Object.keys(data || {}));
@@ -548,19 +558,36 @@ async function sendDailyCounselorPerformanceEmail() {
     // console.log(JSON.stringify(data, null, 2));
 
     const managerWiseReports = await getManagerWiseReports(data);
+    const managerReportMap = {};
+    managerWiseReports.forEach((report) => {
+      managerReportMap[String(report.managerId)] = report;
+    });
 
     // console.log("==== managerWiseReports ====");
     // console.log(JSON.stringify(managerWiseReports, null, 2));
 
-    if (!managerWiseReports.length) {
+    const allManagerIds = [...new Set([
+      ...Object.keys(managerReportMap),
+      ...Object.keys(aiManagerReportMap),
+    ])];
+
+    if (!allManagerIds.length) {
       // console.warn("[CounselorPerformanceEmailScheduler] No manager-wise reports found.");
       return;
     }
 
-    const subject = `Daily Counsellor Performance – ${moment().format("DD MMM YYYY")}`;
+    const subject = `Daily Counsellor Performance + AI Supervision – ${moment().format("DD MMM YYYY")}`;
 
-    for (const managerReport of managerWiseReports) {
-      const rows = managerReport.counselors;
+    for (const managerId of allManagerIds) {
+      const managerReport = managerReportMap[String(managerId)] || null;
+      const aiReport = aiManagerReportMap[String(managerId)] || null;
+      const rows = managerReport?.counselors || [];
+      const managerName = managerReport?.managerName || aiReport?.managerName || "Manager";
+      const managerEmail = managerReport?.managerEmail || aiReport?.managerEmail;
+
+      if (!managerEmail) {
+        continue;
+      }
 
       const summary = {
         totalCounselors: rows.length,
@@ -573,16 +600,35 @@ async function sendDailyCounselorPerformanceEmail() {
             : rows.reduce((sum, r) => sum + Number(r.ConversionRate || 0), 0) / rows.length,
       };
 
+      const extraSectionsHtml = buildAiSupervisionEmailSection({
+        summary: aiReport?.summary || {
+          totalLeads: 0,
+          totalActionItems: 0,
+          kycRejected: 0,
+          kycPendingVerification: 0,
+          kycNoUpload: 0,
+          admissionUnpaid: 0,
+          admissionNoBatch: 0,
+          dropoutRisk: 0,
+          overdueFollowup: 0,
+          insufficientFollowup: 0,
+        },
+        items: aiReport?.items || [],
+        managerName,
+      });
+
       const html = buildHtmlReport({
         data: rows,
         summary,
-        managerName: managerReport.managerName,
+        managerName,
+        extraSectionsHtml,
       });
 
       try {
-        await sendMails(subject, html, managerReport.managerEmail, {
+        await sendMails(subject, html, managerEmail, {
           from: "Focalyt Portal <focalytportal@gmail.com>",
           cc: "parveen.bansal@focalyt.com",
+          // cc:"akash.gaurav@focalyt.com"
         });
 
         
@@ -625,7 +671,7 @@ async function runOnceIfMain() {
 }
 
 function counselorPerformanceEmailScheduler() {
-  //  sendDailyCounselorPerformanceEmail();
+  // sendDailyCounselorPerformanceEmail();
   cron.schedule(
     "35 18 * * *",
     async () => {
