@@ -1049,6 +1049,8 @@ const CRMDashboard = () => {
   const [leadSummaryLoadingByProfileId, setLeadSummaryLoadingByProfileId] = useState({});
   const [leadSummaryErrorByProfileId, setLeadSummaryErrorByProfileId] = useState({});
   const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
+  const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
+  const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
 
  
   const [modalType, setModalType] = useState(null); 
@@ -3196,17 +3198,200 @@ console.log('API Response:', response.data);
     }
   };
 
-  const buildLeadIntelPayload = useCallback((p) => ({
-    _id: p._id,
-    _candidate: p._candidate,
-    _course: p._course,
-    _leadStatus: p._leadStatus,
-    followupDate: p.followupDate,
-    followups: p.followups,
-    selectedSubstatus: p.selectedSubstatus,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-  }), []);
+  const getProfileDisplayName = useCallback((profile) => (
+    profile?._candidate?.name
+    || profile?._candidate?.fullName
+    || [profile?.firstName, profile?.middleName, profile?.lastName].filter(Boolean).join(' ').trim()
+    || profile?.candidateName
+    || 'Unknown Lead'
+  ), []);
+
+  const getProfileCenterName = useCallback((profile) => (
+    profile?._center?.name
+    || profile?.centerName
+    || 'Unknown Center'
+  ), []);
+
+  const getProfileCounselorName = useCallback((profile) => {
+    const latestAssignment = Array.isArray(profile?.leadAssignment) && profile.leadAssignment.length > 0
+      ? profile.leadAssignment[profile.leadAssignment.length - 1]
+      : null;
+
+    return latestAssignment?.counsellorName
+      || latestAssignment?.name
+      || profile?.assignedTo?.name
+      || 'Unassigned';
+  }, []);
+
+  const getProfileBatchName = useCallback((profile) => (
+    profile?._batch?.name
+    || profile?.batchName
+    || profile?._course?.batchName
+    || ''
+  ), []);
+
+  const getProfileNotes = useCallback((profile) => {
+    const followupNotes = Array.isArray(profile?.followups)
+      ? profile.followups.map((item) => item?.remarks || item?.remark || item?.note || item?.comment).filter(Boolean)
+      : [];
+    const remarkNotes = Array.isArray(profile?.remarks)
+      ? profile.remarks.map((item) => item?.remark || item?.text || item?.comment).filter(Boolean)
+      : [];
+
+    return [...remarkNotes, ...followupNotes].slice(-10);
+  }, []);
+
+  const getProfileDocumentSnapshot = useCallback((profile) => {
+    const documents = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
+    const normalizedDocuments = documents.map((doc) => {
+      const latestUpload = Array.isArray(doc?.uploads) && doc.uploads.length > 0
+        ? doc.uploads[doc.uploads.length - 1]
+        : null;
+
+      const rawStatus = latestUpload?.status || doc?.status || '';
+      const hasUpload = Boolean(
+        latestUpload?.fileUrl
+        || doc?.fileUrl
+        || (Array.isArray(doc?.uploads) && doc.uploads.length > 0)
+      );
+
+      const status = rawStatus || (hasUpload ? 'Uploaded' : 'Not Uploaded');
+
+      return {
+        name: doc?.Name || doc?.name || 'Unknown Document',
+        status,
+        hasUpload,
+      };
+    });
+
+    const rejectedDocs = normalizedDocuments.filter((doc) => doc.status === 'Rejected').length;
+    const verifiedDocs = normalizedDocuments.filter((doc) => doc.status === 'Verified').length;
+    const pendingVerificationDocs = normalizedDocuments.filter((doc) => doc.status === 'Pending').length;
+    const pendingDocs = normalizedDocuments.filter((doc) =>
+      ['Not Uploaded', 'No Uploads', 'Pending', 'Uploaded'].includes(doc.status) && !['Verified', 'Rejected'].includes(doc.status)
+    ).length;
+    const hasAnyUploads = normalizedDocuments.some((doc) => doc.hasUpload);
+
+    const category = rejectedDocs > 0
+      ? 'Rejected'
+      : pendingVerificationDocs > 0
+        ? 'Pending Verification'
+        : !profile?.kyc && (pendingDocs > 0 || !hasAnyUploads)
+          ? 'Pending KYC'
+          : profile?.kyc
+            ? 'Verified'
+            : 'Review';
+
+    return {
+      documents: normalizedDocuments,
+      pendingDocs,
+      rejectedDocs,
+      verifiedDocs,
+      pendingVerificationDocs,
+      hasAnyUploads,
+      category,
+    };
+  }, []);
+
+  const normalizeWhatsappMessages = useCallback((messages = []) => (
+    (messages || []).map((m) => ({
+      timestamp: m.timestamp || m.sentAt || m.createdAt || m.time || '',
+      sender: m.sender || (m.direction === 'outgoing' ? 'agent' : 'user'),
+      text: m.text || m.message || m.body || '',
+      direction: m.direction || ((m.sender === 'agent' || m.sender === 'admin') ? 'outgoing' : 'incoming'),
+    }))
+  ), []);
+
+  const buildAiSupervisionProfile = useCallback((profile) => {
+    const documentSnapshot = getProfileDocumentSnapshot(profile);
+    const followupDate = profile?.followupDate || null;
+    const isOverdue = followupDate
+      ? new Date(followupDate) < new Date(new Date().setHours(0, 0, 0, 0))
+      : false;
+    const contactNumbers = [
+      profile?.mobile,
+      profile?.phone,
+      profile?.whatsappNumber,
+      profile?._candidate?.mobile,
+      profile?._candidate?.phone,
+      profile?._candidate?.whatsappNumber,
+      profile?._candidate?.personalInfo?.mobile,
+      profile?._candidate?.personalInfo?.phone,
+    ].filter(Boolean);
+
+    return {
+      _id: profile?._id,
+      _candidate: profile?._candidate,
+      _course: profile?._course,
+      _center: profile?._center,
+      _leadStatus: profile?._leadStatus,
+      selectedSubstatus: profile?.selectedSubstatus,
+      leadAssignment: profile?.leadAssignment,
+      followupDate,
+      followups: profile?.followups || [],
+      remarks: profile?.remarks || [],
+      createdAt: profile?.createdAt,
+      updatedAt: profile?.updatedAt,
+      admissionDate: profile?.admissionDate || null,
+      admissionDone: !!profile?.admissionDone,
+      registrationFee: profile?.registrationFee || 'Unknown',
+      dropout: !!profile?.dropout,
+      kyc: !!profile?.kyc,
+      kycStage: !!profile?.kycStage,
+      studentName: getProfileDisplayName(profile),
+      centerName: getProfileCenterName(profile),
+      counselorName: getProfileCounselorName(profile),
+      courseName: profile?._course?.name || profile?.courseName || 'Not specified',
+      batchName: getProfileBatchName(profile) || 'Unassigned',
+      contactNumbers,
+      notes: getProfileNotes(profile),
+      riskContext: {
+        isOverdueFollowup: isOverdue,
+        kycBucket: documentSnapshot.category,
+        pendingDocs: documentSnapshot.pendingDocs,
+        rejectedDocs: documentSnapshot.rejectedDocs,
+        verifiedDocs: documentSnapshot.verifiedDocs,
+        pendingVerificationDocs: documentSnapshot.pendingVerificationDocs,
+        hasNoUploads: !documentSnapshot.hasAnyUploads,
+      },
+    };
+  }, [
+    getProfileCenterName,
+    getProfileCounselorName,
+    getProfileDisplayName,
+    getProfileBatchName,
+    getProfileDocumentSnapshot,
+    getProfileNotes,
+  ]);
+
+  const buildLeadIntelPayload = useCallback((p) => {
+    const aiProfile = buildAiSupervisionProfile(p);
+    return {
+      _id: aiProfile._id,
+      _candidate: aiProfile._candidate,
+      _course: aiProfile._course,
+      _center: aiProfile._center,
+      _leadStatus: aiProfile._leadStatus,
+      selectedSubstatus: aiProfile.selectedSubstatus,
+      followupDate: aiProfile.followupDate,
+      followups: aiProfile.followups,
+      remarks: aiProfile.remarks,
+      createdAt: aiProfile.createdAt,
+      updatedAt: aiProfile.updatedAt,
+      admissionDone: aiProfile.admissionDone,
+      admissionDate: aiProfile.admissionDate,
+      registrationFee: aiProfile.registrationFee,
+      dropout: aiProfile.dropout,
+      kyc: aiProfile.kyc,
+      kycStage: aiProfile.kycStage,
+      centerName: aiProfile.centerName,
+      counselorName: aiProfile.counselorName,
+      courseName: aiProfile.courseName,
+      batchName: aiProfile.batchName,
+      notes: aiProfile.notes,
+      riskContext: aiProfile.riskContext,
+    };
+  }, [buildAiSupervisionProfile]);
 
   const checkAndImproveRemarkIfWeak = useCallback(async ({ remarkText, context }) => {
     const text = String(remarkText || '').trim();
@@ -4058,19 +4243,17 @@ console.log('API Response:', response.data);
       setAiWhatsappLoading(true);
       setAiWhatsappError(null);
 
-      const payloadMessages = whatsappMessages.map((m) => ({
-        timestamp: m.timestamp || m.sentAt || m.time || '',
-        sender: m.sender,
-        text: m.text,
-        direction: m.sender === 'agent' ? 'outgoing' : 'incoming',
-      }));
+      const payloadMessages = normalizeWhatsappMessages(whatsappMessages);
+      const aiProfile = buildAiSupervisionProfile(selectedProfile);
 
       const leadContext = {
-        candidateName: selectedProfile?._candidate?.name,
+        candidateName: aiProfile.studentName,
         mobile: selectedProfile?._candidate?.mobile,
         leadStatus: selectedProfile?._leadStatus?.title,
         substatus: selectedProfile?.selectedSubstatus?.title,
-        course: selectedProfile?._course?.name,
+        course: aiProfile.courseName,
+        center: aiProfile.centerName,
+        counselor: aiProfile.counselorName,
       };
 
       const res = await axios.post(
@@ -4117,17 +4300,20 @@ console.log('API Response:', response.data);
         return;
       }
 
+      const aiProfile = buildAiSupervisionProfile(profile);
       const leadContext = {
-        candidateName: profile?._candidate?.name,
+        candidateName: aiProfile.studentName,
         mobile: profile?._candidate?.mobile,
         leadStatus: profile?._leadStatus?.title,
         substatus: profile?.selectedSubstatus?.title,
-        course: profile?._course?.name,
+        course: aiProfile.courseName,
+        center: aiProfile.centerName,
+        counselor: aiProfile.counselorName,
       };
 
       const aiRes = await axios.post(
         `${backendUrl}/api/ai/whatsapp-summary`,
-        { phone: mobile, leadContext, messages: chatMessages },
+        { phone: mobile, leadContext, messages: normalizeWhatsappMessages(chatMessages) },
         { headers: { 'x-auth': token } }
       );
 
@@ -4150,20 +4336,8 @@ console.log('API Response:', response.data);
       setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
       setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
 
-      const leadProfile = {
-        _id: profile._id,
-        _candidate: profile._candidate,
-        _course: profile._course,
-        _leadStatus: profile._leadStatus,
-        selectedSubstatus: profile.selectedSubstatus,
-        followupDate: profile.followupDate,
-        followups: profile.followups,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt,
-      };
-      const notes = (profile.followups || [])
-        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
-        .filter(Boolean);
+      const leadProfile = buildAiSupervisionProfile(profile);
+      const notes = leadProfile.notes;
 
       const res = await axios.post(
         `${backendUrl}/api/ai/next-best-action`,
@@ -4210,20 +4384,8 @@ console.log('API Response:', response.data);
       setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
       setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
 
-      const leadProfile = {
-        _id: profile._id,
-        _candidate: profile._candidate,
-        _course: profile._course,
-        _leadStatus: profile._leadStatus,
-        selectedSubstatus: profile.selectedSubstatus,
-        followupDate: profile.followupDate,
-        followups: profile.followups,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt,
-      };
-      const notes = (profile.followups || [])
-        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
-        .filter(Boolean);
+      const leadProfile = buildAiSupervisionProfile(profile);
+      const notes = leadProfile.notes;
 
       const res = await axios.post(
         `${backendUrl}/api/ai/lead-summary`,
@@ -4260,6 +4422,166 @@ console.log('API Response:', response.data);
     setSelectedProfiles(ids);
     return (allProfiles || []).slice(0, n);
   }, [aiSupervisionCount, allProfiles]);
+
+  const aiSupervisionQueue = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const queue = (allProfiles || []).flatMap((profile) => {
+      const aiProfile = buildAiSupervisionProfile(profile);
+      const followupDate = aiProfile.followupDate;
+      const isOverdue = followupDate ? new Date(followupDate) < todayStart : false;
+      const items = [];
+
+      const pushItem = (type, severity, label, reason, action) => {
+        items.push({
+          _id: `${profile._id}-${type}`,
+          leadId: profile._id,
+          type,
+          severity,
+          label,
+          reason,
+          action,
+          studentName: aiProfile.studentName,
+          centerName: aiProfile.centerName,
+          counselorName: aiProfile.counselorName,
+          courseName: aiProfile.courseName,
+          contactNumbers: aiProfile.contactNumbers,
+          batchName: aiProfile.batchName,
+          followupDate: aiProfile.followupDate,
+          feeStatus: aiProfile.registrationFee,
+          kycBucket: aiProfile.riskContext.kycBucket,
+        });
+      };
+
+      if (aiProfile.riskContext.rejectedDocs > 0) {
+        pushItem(
+          'kycRejected',
+          'High',
+          'KYC Rejected',
+          `${aiProfile.riskContext.rejectedDocs} rejected document(s) need correction.`,
+          'Call the lead and ask for corrected document upload today.'
+        );
+      }
+
+      if (aiProfile.riskContext.pendingVerificationDocs > 0) {
+        pushItem(
+          'kycPendingVerification',
+          'Medium',
+          'Pending Verification',
+          `${aiProfile.riskContext.pendingVerificationDocs} uploaded document(s) are waiting for verification.`,
+          'Review and verify documents to avoid blocking the admission journey.'
+        );
+      }
+
+      if (aiProfile.riskContext.hasNoUploads && !aiProfile.kyc) {
+        pushItem(
+          'kycNoUpload',
+          'Medium',
+          'No KYC Upload',
+          'No document upload found for this lead.',
+          'Send checklist and follow up for upload completion.'
+        );
+      }
+
+      if ((aiProfile.admissionDone || aiProfile.admissionDate) && aiProfile.registrationFee !== 'Paid') {
+        pushItem(
+          'admissionUnpaid',
+          'High',
+          'Admission Unpaid',
+          'Admission is marked but fee is still unpaid.',
+          'Take payment follow-up and confirm proof before batch movement.'
+        );
+      }
+
+      if ((aiProfile.admissionDone || aiProfile.admissionDate) && (!aiProfile.batchName || aiProfile.batchName === 'Unassigned')) {
+        pushItem(
+          'admissionNoBatch',
+          'Medium',
+          'Batch Not Assigned',
+          'Admission exists but no batch is assigned.',
+          'Assign batch quickly to reduce post-admission drop-off.'
+        );
+      }
+
+      if (aiProfile.dropout) {
+        pushItem(
+          'dropoutRisk',
+          'High',
+          'Dropout',
+          'Lead is already marked as dropout.',
+          'Review dropout reason and check if recovery is possible.'
+        );
+      }
+
+      if (isOverdue) {
+        pushItem(
+          'overdueFollowup',
+          'Medium',
+          'Overdue Follow-up',
+          'Follow-up date has passed.',
+          'Reconnect with the lead and update next action date.'
+        );
+      }
+
+      return items;
+    });
+
+    return queue.sort((a, b) => {
+      const severityOrder = { High: 3, Medium: 2, Low: 1 };
+      const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+      if (severityDiff !== 0) return severityDiff;
+
+      const dateA = a.followupDate ? new Date(a.followupDate).getTime() : 0;
+      const dateB = b.followupDate ? new Date(b.followupDate).getTime() : 0;
+      return dateA - dateB;
+    });
+  }, [allProfiles, buildAiSupervisionProfile]);
+
+  const aiQueueCounts = useMemo(() => ({
+    all: aiSupervisionQueue.length,
+    kycRejected: aiSupervisionQueue.filter((item) => item.type === 'kycRejected').length,
+    kycPendingVerification: aiSupervisionQueue.filter((item) => item.type === 'kycPendingVerification').length,
+    kycNoUpload: aiSupervisionQueue.filter((item) => item.type === 'kycNoUpload').length,
+    admissionUnpaid: aiSupervisionQueue.filter((item) => item.type === 'admissionUnpaid').length,
+    admissionNoBatch: aiSupervisionQueue.filter((item) => item.type === 'admissionNoBatch').length,
+    dropoutRisk: aiSupervisionQueue.filter((item) => item.type === 'dropoutRisk').length,
+    overdueFollowup: aiSupervisionQueue.filter((item) => item.type === 'overdueFollowup').length,
+  }), [aiSupervisionQueue]);
+
+  const filteredAiSupervisionQueue = useMemo(() => {
+    const query = String(aiSupervisionSearchTerm || '').trim().toLowerCase();
+    const normalizedQueryDigits = query.replace(/\D/g, '');
+
+    return aiSupervisionQueue.filter((item) => {
+      const matchesFilter = aiSupervisionQueueFilter === 'all' || item.type === aiSupervisionQueueFilter;
+      if (!matchesFilter) return false;
+
+      if (!query) return true;
+
+      const haystack = [
+        item.studentName,
+        item.centerName,
+        item.counselorName,
+        item.courseName,
+        item.label,
+        item.reason,
+        item.action,
+        ...(Array.isArray(item.contactNumbers) ? item.contactNumbers : []),
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const matchesText = haystack.includes(query);
+      if (matchesText) return true;
+
+      if (!normalizedQueryDigits) return false;
+
+      const contactDigits = (Array.isArray(item.contactNumbers) ? item.contactNumbers : [])
+        .map((value) => String(value).replace(/\D/g, ''))
+        .filter(Boolean);
+
+      return contactDigits.some((digits) => digits.includes(normalizedQueryDigits));
+    });
+  }, [aiSupervisionQueue, aiSupervisionQueueFilter, aiSupervisionSearchTerm]);
 
   // Check WhatsApp 24-hour session window status
   const checkSessionWindow = async (phoneNumber) => {
@@ -13623,6 +13945,98 @@ useEffect(() => {
                   </div>
                 </div>
 
+                <div className="card border-0 bg-light mb-3">
+                  <div className="card-body py-3">
+                    <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+                      <div>
+                        <div className="fw-semibold">AI Supervision Action Queue</div>
+                        <div className="small text-muted">
+                          Showing {filteredAiSupervisionQueue.length} action item(s)
+                          {aiSupervisionSearchTerm ? ` for "${aiSupervisionSearchTerm}"` : ''}.
+                        </div>
+                      </div>
+                      <div className="d-flex gap-2 flex-wrap">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          style={{ minWidth: 240 }}
+                          placeholder="Search student, course, reason, phone..."
+                          value={aiSupervisionSearchTerm}
+                          onChange={(e) => setAiSupervisionSearchTerm(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => {
+                            setAiSupervisionQueueFilter('all');
+                            setAiSupervisionSearchTerm('');
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'all' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('all')}>All ({aiQueueCounts.all})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycRejected' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('kycRejected')}>Rejected ({aiQueueCounts.kycRejected})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycPendingVerification' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setAiSupervisionQueueFilter('kycPendingVerification')}>Pending Verification ({aiQueueCounts.kycPendingVerification})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycNoUpload' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setAiSupervisionQueueFilter('kycNoUpload')}>No Upload ({aiQueueCounts.kycNoUpload})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionUnpaid' ? 'btn-warning text-dark' : 'btn-outline-warning'}`} onClick={() => setAiSupervisionQueueFilter('admissionUnpaid')}>Unpaid ({aiQueueCounts.admissionUnpaid})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionNoBatch' ? 'btn-info text-dark' : 'btn-outline-info'}`} onClick={() => setAiSupervisionQueueFilter('admissionNoBatch')}>No Batch ({aiQueueCounts.admissionNoBatch})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'dropoutRisk' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('dropoutRisk')}>Dropouts ({aiQueueCounts.dropoutRisk})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'overdueFollowup' ? 'btn-outline-dark active' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('overdueFollowup')}>Overdue ({aiQueueCounts.overdueFollowup})</button>
+                    </div>
+
+                    {filteredAiSupervisionQueue.length > 0 ? (
+                      <div className="table-responsive">
+                        <table className="table table-sm align-middle mb-0">
+                          <thead className="table-light">
+                            <tr>
+                              <th>Severity</th>
+                              <th>Student</th>
+                              <th>Course</th>
+                              <th>Center</th>
+                              <th>Issue</th>
+                              <th>Reason</th>
+                              <th>Recommended Action</th>
+                              <th>Open</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredAiSupervisionQueue.map((item) => (
+                              <tr key={item._id}>
+                                <td>
+                                  <span className={`badge ${item.severity === 'High' ? 'bg-danger' : item.severity === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                                    {item.severity}
+                                  </span>
+                                </td>
+                                <td className="fw-semibold">{item.studentName}</td>
+                                <td>{item.courseName}</td>
+                                <td>{item.centerName}</td>
+                                <td>{item.label}</td>
+                                <td className="small text-muted">{item.reason}</td>
+                                <td className="small">{item.action}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => setAiSupervisionActiveLeadId(item.leadId)}
+                                  >
+                                    Open
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="small text-muted">No action items found for the current queue filter.</div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Main layout: leads table + AI insights panel */}
                 <div className="row g-3">
                   <div className="col-12 col-lg-7">
@@ -13631,6 +14045,7 @@ useEffect(() => {
                     <thead className="table-light">
                       <tr>
                         <th>Lead</th>
+                        <th>Course</th>
                         <th>Status</th>
                         <th>AI Score</th>
                         <th>Intent</th>
@@ -13663,7 +14078,11 @@ useEffect(() => {
                               <div className="fw-semibold">{p._candidate?.name || '—'}</div>
                               <div className="small text-muted">{p._candidate?.mobile || '—'}</div>
                             </td>
-                            <td className="small">
+                              <td className="small">
+                                <div>{p?._course?.name || 'â€”'}</div>
+                                <div className="text-muted">{getProfileCenterName(p)}</div>
+                              </td>
+                              <td className="small">
                               <div>
                                 <span
                                   className={`badge rounded-pill ${
@@ -13790,11 +14209,12 @@ useEffect(() => {
                               </div>
                               <div className="small text-muted">{active._candidate?.mobile || ''}</div>
                             </div>
-                            <div className="card-body py-2 px-3 small text-muted d-flex justify-content-between align-items-center">
-                              <div>
-                                <span
-                                  className={`badge rounded-pill me-2 ${
-                                    (active._leadStatus?.title || '').toLowerCase().includes('hot')
+                              <div className="card-body py-2 px-3 small text-muted d-flex justify-content-between align-items-center">
+                                <div>
+                                  <div className="mb-1">{getProfileCenterName(active)} | {getProfileCounselorName(active)}</div>
+                                  <span
+                                    className={`badge rounded-pill me-2 ${
+                                      (active._leadStatus?.title || '').toLowerCase().includes('hot')
                                       ? 'bg-danger-subtle text-danger border border-danger-subtle'
                                       : (active._leadStatus?.title || '').toLowerCase().includes('warm')
                                       ? 'bg-warning-subtle text-warning border border-warning-subtle'
@@ -13819,12 +14239,18 @@ useEffect(() => {
                                       : 'bg-danger-subtle text-danger border border-danger-subtle'
                                   }`}
                                   title="AI score"
-                                >
-                                  AI {leadIntelMap[active._id].score}/100
-                                </span>
-                              )}
+                                  >
+                                    AI {leadIntelMap[active._id].score}/100
+                                  </span>
+                                )}
+                              </div>
+                              <div className="px-3 pb-3 small">
+                                <div><strong>Course:</strong> {active?._course?.name || 'N/A'}</div>
+                                <div><strong>Batch:</strong> {getProfileBatchName(active) || 'Unassigned'}</div>
+                                <div><strong>KYC Bucket:</strong> {getProfileDocumentSnapshot(active).category}</div>
+                                <div><strong>Fee Status:</strong> {active?.registrationFee || 'Unknown'}</div>
+                              </div>
                             </div>
-                          </div>
 
                           {/* Candidate Summary (AI) - same style as CandidateProfile */}
                           <div className="card border-0 shadow-sm mb-3">
