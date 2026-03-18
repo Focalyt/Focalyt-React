@@ -11788,7 +11788,32 @@ useEffect(() => {
                                           readOnly
                                         />
                                       </div>
+<div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                    <div className="btn-group">
+                                      {/* Three-dot button for mobile - Opens Modal */}
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => togglePopup(profileIndex)}
+                                        aria-label="Options"
+                                      >
+                                        <i className="fas fa-ellipsis-v"></i>
+                                      </button>
+
+                                      {/* Expand/Collapse button */}
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => toggleLeadDetails(profileIndex)}
+                                      >
+                                        {leadDetailsVisible === profileIndex ? (
+                                          <i className="fas fa-chevron-up"></i>
+                                        ) : (
+                                          <i className="fas fa-chevron-down"></i>
+                                        )}
+                                      </button>
                                     </div>
+                                  </div>
+
+                                    </div>  
                                   </div>
 
                                   {/* Overdue badge: next action date passed */}
@@ -11836,30 +11861,7 @@ useEffect(() => {
                                     )}
                                   </div> */}
 
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
-                                      {/* Three-dot button for mobile - Opens Modal */}
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => togglePopup(profileIndex)}
-                                        aria-label="Options"
-                                      >
-                                        <i className="fas fa-ellipsis-v"></i>
-                                      </button>
-
-                                      {/* Expand/Collapse button */}
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(profileIndex)}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
+                                  
 
                                   <div className="col-md-1 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
