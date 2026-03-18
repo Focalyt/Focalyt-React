@@ -596,7 +596,7 @@ For job-related queries, please browse available jobs using the search filters.`
     }
     
     console.log(`[AI] 🔍 Not a Q&A query, proceeding with job search...`);
-
+console.log("anthropicApiKey", anthropicApiKey)
     if (!anthropicApiKey) {
       console.error("[AI] ❌ ANTHROPIC_API_KEY not found in environment variables");
       return res.status(500).json({
