@@ -346,23 +346,28 @@ const CandidateManagementPortal = () => {
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4>Verticals</h4>
-        <div>
-          <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+        <div className='d-flex'>
+          <button className="btn btn-outline-secondary me-2 visibility" style={{
+            fontSize:"clamp(12px,2vw,.8rem)",whiteSpace:"nowrap"
+          }} onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
 
           {((permissions?.custom_permissions?.can_add_vertical && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-            <button className="btn btn-danger" onClick={handleAdd}>Add Vertical</button>
+            <button className="btn btn-danger" onClick={handleAdd}
+            style={{
+              fontSize:"clamp(12px,2vw,.8rem)",whiteSpace:"nowrap"
+            }}>Add Vertical</button>
           )}
         </div>
       </div>
 
-      <div className="d-flex justify-content-between mb-3">
-        <ul className="nav nav-pills">
+      <div className="d-flex justify-content-between mb-3 allCenter">
+        <ul className="nav nav-pills allCenterBtn">
           {['Active Verticals', 'Inactive Verticals', 'All Verticals'].map(tab => (
-            <li className="nav-item" key={tab}>
-              <button
-                className={`nav-link ${activeVerticalTab === tab ? 'active' : ''}`}
+            <li className="nav-item me-1" key={tab}>
+              <button style={{fontSize:"clamp(12px,1.8vw,15px)"}}
+                className={`nav-link navBTn ${activeVerticalTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveVerticalTab(tab)}
               >
                 {tab}
@@ -372,7 +377,7 @@ const CandidateManagementPortal = () => {
         </ul>
         <input
           type="text"
-          className="form-control w-25"
+          className="form-control w-25 searchBar"
           placeholder="Search verticals..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -569,19 +574,88 @@ const CandidateManagementPortal = () => {
       )}
 
       <style>
-        {
-          `
-          @media (max-width: 768px) {
-            .verticalActionBtn{
-              display: flex;
-            }
-          }
-            .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
-    background-color: #fc2b5a;
+{`
+/* ================== Base Styles ================== */
+
+.searchBar {
+  height: 30px;
+  width: 25%;
 }
-          `
-        }
-      </style>
+
+.centerBtnResponsive {
+  display: flex;
+}
+
+.verticalActionBtn {
+  display: none;
+}
+
+.nav-pills .nav-link.active, 
+.nav-pills .show > .nav-link {
+  background-color: #fc2b5a;
+}
+
+/* ================== 992px ================== */
+@media (max-width: 992px) {
+
+  .subBtnRes {
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+
+  .centerBtnResponsive {
+    display: flex;
+  }
+}
+
+/* ================== 768px ================== */
+@media (max-width: 768px) {
+
+  .visibility {
+    display: none !important;
+  }
+
+  .allCenter {
+    display: block !important;
+  }
+
+  .allCenterBtn {
+    margin-bottom: 10px !important;
+  }
+
+  .verticalActionBtn {
+    display: flex;
+  }
+}
+
+/* ================== 525px ================== */
+@media (max-width: 525px) {
+
+  .searchBar {
+    width: 85px !important;
+  }
+}
+
+/* ================== 450px ================== */
+@media (max-width: 450px) {
+
+  .navBTn {
+    padding: 4px;
+    width: 80px;
+    border: 1px solid #d5d5d5;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: clamp(12px, 1.8vw, 15px);
+  }
+}
+`}
+</style>
     </div>
   );
 };

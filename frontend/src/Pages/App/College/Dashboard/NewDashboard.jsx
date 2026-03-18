@@ -316,6 +316,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
 };
 
 
+
 const MultiSelectCheckbox = ({
     title,
     options,
@@ -436,6 +437,9 @@ const LeadAnalyticsDashboard = () => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+    const [aiDailySummary, setAiDailySummary] = useState(null);
+    const [aiDailySummaryLoading, setAiDailySummaryLoading] = useState(false);
+    const [aiDailySummaryError, setAiDailySummaryError] = useState(null);
     // Initialize with today's date
     const getInitialDates = () => {
         const today = new Date();
@@ -765,6 +769,60 @@ const LeadAnalyticsDashboard = () => {
 
     // Data is now filtered by backend, so we use it directly
     const filteredData = appliedCoursesData;
+
+    const dashboardAiStats = useMemo(() => {
+        const totalLeads = filteredData.length;
+        const newLeads = totalLeads; // API already filtered by date range; treat as "new in period"
+        const kycPending = filteredData.filter(l => l.kycStage && !l.kyc).length;
+        const kycDone = filteredData.filter(l => l.kyc).length;
+        const admissions = filteredData.filter(l => l.admissionDone).length;
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const overdueFollowups = filteredData.filter(l => l.followupDate && new Date(l.followupDate) < todayStart).length;
+
+        return {
+            totalLeads,
+            newLeads,
+            kycPending,
+            kycDone,
+            admissions,
+            overdueFollowups,
+        };
+    }, [filteredData]);
+
+    const generateDailyAiSummary = async () => {
+        try {
+            if (!token || !backendUrl) return;
+            setAiDailySummaryLoading(true);
+            setAiDailySummaryError(null);
+            const dateLabel = useCustomDate && startDate && endDate
+                ? `${new Date(startDate).toLocaleDateString('en-IN')} - ${new Date(endDate).toLocaleDateString('en-IN')}`
+                : (selectedPeriod || 'today');
+
+            const res = await axios.post(
+                `${backendUrl}/api/ai/dashboard-daily-summary`,
+                {
+                    date: dateLabel,
+                    stats: dashboardAiStats,
+                    highlights: [
+                        `Center filter: ${selectedCenter}`,
+                        `Period: ${dateLabel}`
+                    ]
+                },
+                { headers: { 'x-auth': token } }
+            );
+            if (res.data?.success && res.data?.data) {
+                setAiDailySummary(res.data.data);
+            } else {
+                setAiDailySummaryError(res.data?.message || 'Failed to generate AI summary');
+            }
+        } catch (err) {
+            setAiDailySummaryError(err.response?.data?.message || err.message || 'Failed to generate AI summary');
+        } finally {
+            setAiDailySummaryLoading(false);
+        }
+    };
 
     // Get daily admissions data
     const getDailyAdmissions = () => {
@@ -1578,10 +1636,10 @@ const LeadAnalyticsDashboard = () => {
     return (
         <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
             {/* Header */}
-            <div className="mb-4">
+            {/* <div className="mb-4">
                 <h1 className="display-5 fw-bold text-dark mb-2">Dashboard</h1>
                 <p className="text-muted">Real-time analytics based on Applied Courses data</p>
-            </div>
+            </div> */}
 
             {/* Loading State */}
             {isLoading && (
@@ -1763,6 +1821,84 @@ const LeadAnalyticsDashboard = () => {
                             </button>
                         </div>
                     )}
+
+                    {/* AI Dashboard Daily Summary */}
+                    <div className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <AlertCircle className="text-primary" size={18} />
+                                <strong>Today's AI Insights</strong>
+                            </div>
+                            <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={generateDailyAiSummary}
+                                disabled={aiDailySummaryLoading}
+                            >
+                                {aiDailySummaryLoading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                        Generating…
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-robot me-2"></i>
+                                        Generate
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            <div className="row g-3">
+                                <div className="col-12 col-lg-4">
+                                    <div className="small text-muted mb-2"><strong>Snapshot</strong></div>
+                                    <ul className="small mb-0 ps-3">
+                                        <li>Total leads: {dashboardAiStats.totalLeads}</li>
+                                        <li>KYC pending: {dashboardAiStats.kycPending}</li>
+                                        <li>KYC done: {dashboardAiStats.kycDone}</li>
+                                        <li>
+                                            KYC completion rate:&nbsp;
+                                            {dashboardAiStats.totalLeads > 0
+                                                ? `${Math.round((dashboardAiStats.kycDone / dashboardAiStats.totalLeads) * 100)}%`
+                                                : '0%'}
+                                        </li>
+                                        <li>Admissions: {dashboardAiStats.admissions}</li>
+                                        <li>Overdue follow-ups: {dashboardAiStats.overdueFollowups}</li>
+                                    </ul>
+                                </div>
+                                <div className="col-12 col-lg-8">
+                                    {aiDailySummaryError && (
+                                        <div className="alert alert-danger py-2 mb-2">{aiDailySummaryError}</div>
+                                    )}
+                                    {aiDailySummary ? (
+                                        <div className="small">
+                                            <div className="fw-semibold mb-2">{aiDailySummary.title}</div>
+                                            <div className="text-muted" style={{ whiteSpace: 'pre-line' }}>{aiDailySummary.summary}</div>
+                                            {Array.isArray(aiDailySummary.risks) && aiDailySummary.risks.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Risks</div>
+                                                    <ul className="mb-0 ps-3">
+                                                        {aiDailySummary.risks.map((r, i) => <li key={i}>{r}</li>)}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {Array.isArray(aiDailySummary.suggestedFocus) && aiDailySummary.suggestedFocus.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Suggested focus</div>
+                                                    <ul className="mb-0 ps-3">
+                                                        {aiDailySummary.suggestedFocus.map((s, i) => <li key={i}>{s}</li>)}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-muted small">
+                                            Click <strong>Generate</strong> to create a management-ready summary for the selected period.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Key Metrics Cards */}
                     <div className="row g-3 mb-4">

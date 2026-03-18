@@ -563,36 +563,63 @@ const updatedPermission = async () => {
 
 
 
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                <div className='d-md-block d-none'>
+            <div className="d-flex justify-content-between align-items-center mb-3 mobileHead">
+                <div className='d-md-block d-block mb-4'>
                     <div className="d-flex align-items-center gap-3">
 
                         <div className='d-flex align-items-center'>
-                            <h4 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
+                            <h4 style={{ cursor: 'pointer',
+                                         whiteSpace:"nowrap",
+                                         textOverflow:"ellipsis",
+                                         overflow:"hidden",
+                                         maxWidth:"110px",
+                                         fontSize:"clam(15px,2vw,1.1rem)"
+                             }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
                             <span className="mx-2"> &gt; </span>
-                            <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedProject.name} Project
+                            <h5 style={{ cursor: 'pointer',
+                                         whiteSpace:"nowrap",
+                                         textOverflow:"ellipsis",
+                                         overflow:"hidden",
+                                         maxWidth:"90px",
+                                         fontSize:"clam(15px,2vw,1.1rem)"
+                                          }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                               {selectedProject.name} Project
                             </h5>
                             <span className="mx-2"> &gt; </span>
-                            <h5 className="breadcrumb-item mb-0" aria-current="page">
+                            <h5 className="breadcrumb-item mb-0" aria-current="page"
+                            style={{
+                                         cursor: 'pointer',
+                                         whiteSpace:"nowrap",
+                                         textOverflow:"ellipsis",
+                                         overflow:"hidden",
+                                         maxWidth:"110px",
+                                         fontSize:"clam(15px,2vw,1.1rem)"
+                            }}>
                                 Centers
                             </h5>
                         </div>
                     </div>
                 </div>
-                <div className='centerBtnResponsive'>
+                <div className='centerBtnResponsive width100'>
 
                     {onBackToProjects && (
                         <button
                             onClick={onBackToProjects}
-                            className="btn btn-light me-2 d-md-block d-none subBtnRes"
+                            className="btn btn-light  d-md-block d-block subBtnRes BAckBtn"
                             title="Back to Verticals"
+                            style={{
+                                fontSize:"clamp(12px,1.8vw,15px)"
+                            }}
                         >
                             <i className="bi bi-arrow-left"></i>
-                            <span>Back</span>
+                            <span
+                            style={{
+                                fontSize:"clamp(13px,2vw,.9rem)"
+                            }}
+                            >Back</span>
                         </button>
                     )}
-                    {onBackToProjects && (
+                    {/* {onBackToProjects && (
                         <button
                             onClick={onBackToProjects}
                             className="btn btn-light me-2 d-md-none d-block subBtnRes"
@@ -600,28 +627,33 @@ const updatedPermission = async () => {
                         >
                             <i className="bi bi-arrow-left"></i>
                         </button>
-                    )}
+                    )} */}
 
 
 
-                    <button className="btn btn-outline-secondary me-2 subBtnRes" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+                    <button className="btn btn-outline-secondary me-2 subBtnRes visibility" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
                         <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
                     </button>
-                    <button className="btn btn-primary me-2 subBtnRes" onClick={handleAlign}>Align Exsting Center</button>
+                    <button className="btn btn-primary me-2 subBtnRes TextToDot"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="Align Exsting Center"
+                    onClick={handleAlign}>Align Exsting Center</button>
                     {((permissions?.custom_permissions?.can_add_center && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
     
-                    <button className="btn btn-primary subBtnRes" onClick={handleAdd}>Add New Center</button>
+                    <button className="btn btn-primary subBtnRes TextToDot" onClick={handleAdd}>Add New Center</button>
                     )}
                 </div>
             </div>
 
 
-            <div className="d-flex justify-content-between mb-3">
-                <ul className="nav nav-pills">
+            <div className="d-flex justify-content-between mb-3 allCenter">
+                <ul className="nav nav-pills allCenterBtn">
                     {['Active Centers', 'Inactive Centers', 'All Centers'].map(tab => (
-                        <li className="nav-item" key={tab}>
+                        <li className="nav-item me-1" key={tab}>
                             <button
-                                className={`nav-link ${activeCenterTab === tab ? 'active' : ''}`}
+                            style={{fontSize:"clamp(12px,1.8vw,15px)"}}
+                                className={`nav-link navBTn ${activeCenterTab === tab ? 'active' : ''}`}
                                 onClick={() => setActiveCenterTab(tab)}
                             >
                                 {tab}
@@ -631,7 +663,7 @@ const updatedPermission = async () => {
                 </ul>
                 <input
                     type="text"
-                    className="form-control w-25"
+                    className="form-control w-25 searchBar"
                     placeholder="Search centers..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -928,36 +960,107 @@ const updatedPermission = async () => {
                 </div>
             )}
 
+           
             <style>
-                {
-                    `
-                    .overflowY{
-                    overflow-y: scroll!important}
+{`
+/* ================= Base Styles ================= */
 
-            .breadcrumb-h4{
-            font-size: 1.5rem;
-                margin-top: 0;
-    margin-bottom: .5rem;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--bs-heading-color);
-            }  
-    .centerBtnResponsive{
-      display: flex;
-    }          
-            @media (max-width: 768px) {
-                .centerBtnResponsive{
-                    display: flex;
-                }
-                .subBtnRes{
-                white-space: nowrap;
-                padding: 0.25rem 0.5rem;
-                font-size: 12px;
-                }
-            }
-            `
-                }
-            </style>
+.overflowY {
+  overflow-y: scroll !important;
+}
+
+.breadcrumb-h4 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--bs-heading-color);
+}
+
+.centerBtnResponsive {
+  display: flex;
+}
+
+.searchBar {
+  height: 30px;
+  width: 25%;
+}
+
+/* ================= 992px ================= */
+
+@media (max-width: 992px) {
+
+  .subBtnRes {
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+
+  .BAckBtn {
+    margin-right: clamp(12px, 5vw, 100px);
+  }
+
+  .width100 {
+    width: 100%;
+  }
+
+  .TextToDot {
+    width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobileHead {
+    display: block !important;
+  }
+}
+
+/* ================= 768px ================= */
+
+@media (max-width: 768px) {
+
+  .visibility {
+    display: none !important;
+  }
+
+  .allCenter {
+    display: block !important;
+  }
+
+  .allCenterBtn {
+    margin-bottom: 10px !important;
+  }
+}
+
+/* ================= 525px ================= */
+
+@media (max-width: 525px) {
+  .searchBar {
+    width: 85px !important;
+  }
+}
+
+/* ================= 450px ================= */
+
+@media (max-width: 450px) {
+
+  .navBTn {
+    padding: 4px;
+    width: 70px;
+    border: 1px solid #d5d5d5;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: clamp(12px, 1.8vw, 15px);
+  }
+}
+`}
+</style>
         </div>
     );
 };

@@ -1,20 +1,22 @@
 import React, { useEffect , useState} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { useTranslation } from 'react-i18next';
 import "./CollegeHeader.css";
+import LanguageSwitcher from '../../../../LanguageSwitcher'
+
 const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const { t } = useTranslation();
   const [collegeAccountNo, setCollegeAccountNo] = useState(null);
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     const name = localStorage.getItem('name');
     if (name) {
-      const userNameElement = document.getElementById('user-name');
-      if (userNameElement) {
-        userNameElement.textContent = `Welcome ${name}`;
-      }
+      setUserName(name);
     }
 
     const userData = sessionStorage.getItem('user');
@@ -49,7 +51,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const copyAccountNo = async () => {
     try {
       await navigator.clipboard.writeText(collegeAccountNo);
-      toast.success('Account number copied to clipboard!', {
+      toast.success(t('account_number_copied'), {
         position: "top-right",
         autoClose: 2000,
         hideProgressBar: false,
@@ -59,7 +61,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
       });
     } catch (error) {
       console.error('Failed to copy:', error);
-      toast.error('Failed to copy account number', {
+      toast.error(t('failed_to_copy_account_number'), {
         position: "top-right",
         autoClose: 2000,
         hideProgressBar: false,
@@ -99,7 +101,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                   </li>
                 </ul>
                 {collegeAccountNo && (
-                  <ul className="nav navbar-nav" style={{ marginLeft: '20px' }}>
+                  <ul className="nav navbar-nav d-none d-md-block" style={{ marginLeft: '20px' }}>
                     <li className="nav-item">
                       <div style={{ 
                         display: 'flex', 
@@ -114,13 +116,16 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                         border: '1px solid rgba(255, 255, 255, 0.2)',
                         transition: 'all 0.3s ease'
                       }}>
-                        <span className="text-white" style={{ 
-                          fontSize: '13px', 
-                          fontWeight: '600',
-                          letterSpacing: '0.3px',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          Account No:
+                        <span
+                          className="text-white"
+                          style={{ 
+                            fontSize: '13px', 
+                            fontWeight: '600',
+                            letterSpacing: '0.3px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {t('account_no')}
                         </span>
                         <span className="text-white" style={{ 
                           fontSize: '13px', 
@@ -164,7 +169,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
                             e.currentTarget.style.transform = 'scale(1)';
                           }}
-                          title="Copy Account Number"
+                          title={t('copy_account_number')}
                         >
                           <i className="fas fa-copy" style={{ fontSize: '13px' }}></i>
                         </button>
@@ -187,7 +192,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                     <div className="search-input-icon">
                       <i className="feather icon-search primary"></i>
                     </div>
-                    <input className="input" type="text" placeholder="Explore Vuexy..." />
+                    <input className="input" type="text" placeholder={t('explore_vuexy')} />
                     <div className="search-input-close">
                       <i className="feather icon-x"></i>
                     </div>
@@ -202,13 +207,19 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                     onClick={handleDropdownToggle}
                   >
                     <div className="user-nav d-sm-flex d-flex">
-                      <span id="user-name" className="user-name text-bold-600 text-white text-capitalize mb-0"></span>
+                      <span className="user-name text-bold-600 text-white text-capitalize mb-0">
+                        {userName ? t('welcome', { name: userName }) : ''}
+                      </span>
                       <span className="text-white">
-                        <ul className="list-unstyled">
+                        <ul className="list-unstyled LanguageSwitcher">
                           <li>
-                            <span className="user-status text-white">Available</span>
+                            <span className="user-status text-white">{t('available')}</span>
                           </li>
+                          {/* <li>
+                            <span className="user-status text-white"><LanguageSwitcher/></span>
+                          </li> */}
                         </ul>
+                        
                       </span>
                     </div>
                     <span>
@@ -219,11 +230,11 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
 
                   <div className="dropdown-menu dropdown-menu-right" id="logout-div">
                     <a className="dropdown-item" href="/institute/myProfile" style={{display: "flex", alignItems: "center", gap: "8px"}}>
-                      <i className="fa-solid fa-user-pen" style={{width: "16px"}}></i> Edit Profile
+                      <i className="fa-solid fa-user-pen" style={{width: "16px"}}></i> {t('edit_profile')}
                     </a>
                     <div className="dropdown-divider"></div>
                     <a className="dropdown-item" href="#" onClick={logout} style={{cursor: "pointer", color: "#dc3545", display: "flex", alignItems: "center", gap: "8px"}}>
-                      <i className="fa-solid fa-power-off" style={{width: "16px"}}></i> Logout
+                      <i className="fa-solid fa-power-off" style={{width: "16px"}}></i> {t('logout')}
                     </a>
                   </div>
                 </li>
@@ -286,6 +297,12 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
     #logout-div .dropdown-item i {
     width: 16px;
     text-align: center;
+    }
+    .LanguageSwitcher{
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-direction: row-reverse;
     }
           `
         }

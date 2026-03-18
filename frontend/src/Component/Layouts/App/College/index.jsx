@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios';
 import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
+import { useTranslation } from 'react-i18next';
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
@@ -18,8 +19,10 @@ import {
   faCircle as farCircle, faCirclePlay as farCirclePlay, faShareFromSquare as farShareFromSquare, faBell as farBell, faMoneyBill1 as farMoneyBill1,
 } from "@fortawesome/free-regular-svg-icons";
 
+
 function CollegeLayout({ children }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const userData = JSON.parse(sessionStorage.getItem('user'))
   const isUser = JSON.parse(sessionStorage.getItem('user'))?.role === 2 ? true : false
   // const permissions = userData?.permissions
@@ -212,6 +215,17 @@ function CollegeLayout({ children }) {
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
+  const [showAiCounsellor, setShowAiCounsellor] = useState(false);
+  const [aiCounsellorLanguage, setAiCounsellorLanguage] = useState(() => {
+    try {
+      return localStorage.getItem('aiCounsellorLanguage') || 'en';
+    } catch (e) {
+      return 'en';
+    }
+  });
+  const [aiCounsellorMessages, setAiCounsellorMessages] = useState([]);
+  const [aiCounsellorInput, setAiCounsellorInput] = useState('');
+  const [aiCounsellorLoading, setAiCounsellorLoading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -247,6 +261,70 @@ function CollegeLayout({ children }) {
       setIsSidebarOpen(false);
     }
   }
+
+  // Persist AI counsellor language preference
+  useEffect(() => {
+    try {
+      localStorage.setItem('aiCounsellorLanguage', aiCounsellorLanguage);
+    } catch (e) {
+      // ignore
+    }
+  }, [aiCounsellorLanguage]);
+
+  const handleSendAiCounsellorMessage = async () => {
+    const text = (aiCounsellorInput || '').trim();
+    if (!text || aiCounsellorLoading) return;
+
+    const nextMessages = [
+      ...aiCounsellorMessages,
+      { role: 'user', content: text, ts: Date.now() },
+    ];
+    setAiCounsellorMessages(nextMessages);
+    setAiCounsellorInput('');
+    setAiCounsellorLoading(true);
+
+    try {
+      const body = {
+        message: text,
+        language: aiCounsellorLanguage,
+        conversationHistory: nextMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      };
+
+      const config = token
+        ? { headers: { 'x-auth': token } }
+        : undefined;
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/counsellor-chat`,
+        body,
+        config
+      );
+
+      const reply = res.data?.data?.reply || res.data?.data?.message;
+      if (reply) {
+        setAiCounsellorMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: reply, ts: Date.now() },
+        ]);
+      }
+    } catch (err) {
+      console.error('[AI counsellor] Error:', err);
+      setAiCounsellorMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Sorry, I was unable to respond. Please try again in a moment.',
+          ts: Date.now(),
+        },
+      ]);
+    } finally {
+      setAiCounsellorLoading(false);
+    }
+  };
 
   // const toggleSidebar = () => {
   //   setExpanded(!expanded);
@@ -401,7 +479,7 @@ function CollegeLayout({ children }) {
     <div className="min-h-screen flex flex-col">
       <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
-          <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
+          <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
             <ul className="nav navbar-nav flex-row" style={{ width: '100%', justifyContent: 'center', alignItems: 'center' }}>
               <li className="nav-item" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                 <Link to="/institute/myprofile" className="navbar-brand" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -409,7 +487,7 @@ function CollegeLayout({ children }) {
                     <img 
                       className="img-fluid logocs" 
                       src={`${bucketUrl}/${collegeLogo}?t=${Date.now()}`} 
-                      alt="College Logo"
+                      alt={t('college_logo')}
                       style={{ maxWidth: '180px', width: 'auto', height: 'auto', display: 'block' }}
                       onError={(e) => {
                         e.target.src = "/Assets/images/logo/logo.png";
@@ -417,17 +495,104 @@ function CollegeLayout({ children }) {
                       }}
                     />
                   ) : (
-                    <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Focalyt Logo" style={{ maxWidth: '180px', width: 'auto', height: 'auto', display: 'block' }} />
+                    <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt={t('focalyt_logo')} style={{ maxWidth: '180px', width: 'auto', height: 'auto', display: 'block' }} />
                   )}
                 </Link>
               </li>
-              <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px' }}>
+              <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px', top: '15px' }}>
                 <a className="nav-link modern-nav-toggle pr-0" onClick={toggleSidebar}>
                   <i className={`icon-x d-block d-xl-none font-medium-4 primary toggle-icon feather ${expanded ? 'icon-disc' : 'icon-circle'}`}></i>
                   <i className={`toggle-icon icon-disc font-medium-4 d-none d-xl-block collapse-toggle-icon primary feather`}></i>
                 </a>
               </li>
             </ul>
+            {/* Account Number - Mobile View Only */}
+            {userData?.collegeId && (
+              <div className="d-md-none w-100 mt-3" style={{ padding: '0 10px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(252, 43, 90, 0.08)',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(252, 43, 90, 0.15)',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: '600',
+                    color: '#fc2b5a',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}>
+                    {t('account_no')}
+                  </span>
+                  <span style={{ 
+                    fontSize: '10px', 
+                    fontWeight: 'bold',
+                    color: '#fc2b5a',
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'monospace',
+                    background: 'rgba(252, 43, 90, 0.12)',
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.2px',
+                    textAlign: 'left',
+                    minWidth: 0
+                  }}>
+                    {userData.collegeId}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(userData.collegeId);
+                        if (window.toast) {
+                          window.toast.success('Account number copied to clipboard!', {
+                            position: "top-right",
+                            autoClose: 2000,
+                          });
+                        } else {
+                          alert('Account number copied!');
+                        }
+                      } catch (error) {
+                        console.error('Failed to copy:', error);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(252, 43, 90, 0.15)',
+                      border: '1px solid rgba(252, 43, 90, 0.25)',
+                      color: '#fc2b5a',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '32px',
+                      height: '32px',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(252, 43, 90, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(252, 43, 90, 0.15)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title={t('copy_account_number')}
+                  >
+                    <i className="fas fa-copy" style={{ fontSize: '12px' }}></i>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="shadow-bottom"></div>
           <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 0px)' }}>
@@ -437,7 +602,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/myProfile' ? 'active' : ''}`}>
                 <Link to="/institute/myProfile" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faUser} />
-                  <span className="menu-title">Your Profile</span>
+                  <span className="menu-title">{t('your_profile')}</span>
                 </Link>
               </li>
 
@@ -445,7 +610,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
                   <FontAwesomeIcon icon={faBookOpen} />
-                  <span className="menu-title">Courses</span>
+                  <span className="menu-title">{t('courses')}</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faCaretDown}
@@ -471,13 +636,13 @@ function CollegeLayout({ children }) {
                           color: location.pathname === '/institute/addcourse' ? 'white' : 'black'
                         }}
                       />
-                      <span className="menu-title">Add Courses</span>
+                      <span className="menu-title">{t('add_courses')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/viewcourse' ? 'active' : ''}`}>
                     <Link to="/institute/viewcourse" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faEye} />
-                      <span className="menu-title">View Courses</span>
+                      <span className="menu-title">{t('view_courses')}</span>
                     </Link>
                   </li>
                 </ul>
@@ -489,7 +654,7 @@ function CollegeLayout({ children }) {
                 <li className={`nav-item has-sub dropdown-sales ${openSubmenu.sales ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('sales')}>
                     <FontAwesomeIcon icon={faShoppingCart} />
-                    <span className="menu-title">Sales (B2C)</span>
+                    <span className="menu-title">{t('sales_b2c')}</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -510,25 +675,25 @@ function CollegeLayout({ children }) {
                     <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
                       <Link to="/institute/dashboard" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faChartLine} />
-                        <span className="menu-title">Dashboard</span>
+                        <span className="menu-title">{t('dashboard')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
                       <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
-                        <span className="menu-title">Admission Cycle Pre</span>
+                        <span className="menu-title">{t('admission_cycle_pre')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
-                        <span className="menu-title">Admission Cycle Post</span>
+                        <span className="menu-title">{t('admission_cycle_post')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/whatsappchat' ? 'active' : ''}`}>
                       <Link to="/institute/whatsappchat" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faWhatsapp} />
-                        <span className="menu-title">Whatsapp Chat</span>
+                        <span className="menu-title">{t('whatsapp_chat')}</span>
                         {totalUnreadCount > 0 && (
                           <span className="badge bg-danger rounded-pill ms-2" style={{ fontSize: '0.75rem', minWidth: '20px', padding: '2px 6px' , position: 'absolute', top: '3px', left: '43px'}}>
                             {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
@@ -539,13 +704,13 @@ function CollegeLayout({ children }) {
                     <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
                       <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faCalendarAlt} />
-                        <span className="menu-title">Candidate Visit Calender</span>
+                        <span className="menu-title">{t('candidate_visit_calendar')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />
-                        <span className="menu-title">Follow up</span>
+                        <span className="menu-title">{t('follow_up')}</span>
                       </Link>
                     </li>
                     {/* <li className={`nav-item ${location.pathname === '/institute/re-enquire' ? 'active' : ''}`}>
@@ -559,11 +724,11 @@ function CollegeLayout({ children }) {
               )}
 
               {/* Sales (B2B) */}
-              {((permissions?.custom_permissions?.can_view_sales_b2b && permissions?.permission_type === 'custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
+              {((permissions?.custom_permissions?.can_view_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
                 <li className={`nav-item has-sub dropdown-salesb2b ${openSubmenu.salesb2b ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('salesb2b')}>
                     <FontAwesomeIcon icon={faHandshake} />
-                    <span className="menu-title">Sales (B2B)</span>
+                    <span className="menu-title">{t('sales_b2b')}</span>
                     <span className="dropdown-arrow">
                       <FontAwesomeIcon
                         icon={faCaretDown}
@@ -584,25 +749,25 @@ function CollegeLayout({ children }) {
                     <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
                       <Link to="/institute/dashboardb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faChartLine} />
-                        <span className="menu-title">Dashboard</span>
+                        <span className="menu-title">{t('dashboard')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
                       <a href="/institute/sales" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faTasks} />
-                        <span className="menu-title">Sales (B2B)</span>
+                        <span className="menu-title">{t('sales_b2b')}</span>
                       </a>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowupb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />
-                        <span className="menu-title">Follow up</span>
+                        <span className="menu-title">{t('follow_up')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
                       <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faCalendarAlt} />
-                        <span className="menu-title">Calendar Follow-up</span>
+                        <span className="menu-title">{t('calendar_follow_up')}</span>
                       </Link>
                     </li>
                   </ul>
@@ -611,7 +776,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item has-sub dropdown-placements ${openSubmenu.placements ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('placements')}>
                   <FontAwesomeIcon icon={faHandshake} />
-                  <span className="menu-title">Placements</span>
+                  <span className="menu-title">{t('placements')}</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faCaretDown}
@@ -632,19 +797,19 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/dashboardplacements' ? 'active' : ''}`}>
                     <Link to="/institute/dashboardplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faChartLine} />
-                      <span className="menu-title">Dashboard</span>
+                      <span className="menu-title">{t('dashboard')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/placements' ? 'active' : ''}`}>
                     <a href="/institute/placements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faTasks} />
-                      <span className="menu-title">Placements</span>
+                      <span className="menu-title">{t('placements')}</span>
                     </a>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/placementfollowup' ? 'active' : ''}`}>
                     <Link to="/institute/placementfollowup" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faBell} />
-                      <span className="menu-title">Follow up</span>
+                      <span className="menu-title">{t('follow_up')}</span>
                     </Link>
                   </li>
                   {/* <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
@@ -659,7 +824,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item has-sub dropdown-training ${openSubmenu.trainerManagement ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('trainerManagement')}>
                   <FontAwesomeIcon icon={faHandshake} />
-                  <span className="menu-title">Training</span>
+                  <span className="menu-title">{t('training')}</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faCaretDown}
@@ -680,13 +845,13 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
                 <a href="/institute/candidatemanagment" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faTasks} />
-                  <span className="menu-title">Training management</span>
+                  <span className="menu-title">{t('training_management')}</span>
                 </a>
               </li>
               <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
                     <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserTie} />
-                      <span className="menu-title">Add Trainer</span>
+                      <span className="menu-title">{t('add_trainer')}</span>
                     </Link>
                   </li>
                   {/* <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
@@ -703,7 +868,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/uploadCandidates' ? 'active' : ''}`}>
                 <Link to="/institute/uploadCandidates" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faClipboardList} />
-                  <span className="menu-title">Upload Candidates</span>
+                  <span className="menu-title">{t('upload_candidates')}</span>
                 </Link>
               </li>
 
@@ -711,7 +876,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/uploadTemplates' ? 'active' : ''}`}>
                 <Link to="/institute/uploadTemplates" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faFileUpload} />
-                  <span className="menu-title">Upload Templates</span>
+                  <span className="menu-title">{t('upload_templates')}</span>
                 </Link>
               </li>
 
@@ -719,7 +884,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/myStudents' ? 'active' : ''}`}>
                 <Link to="/institute/myStudents" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faGraduationCap} />
-                  <span className="menu-title">My Students</span>
+                  <span className="menu-title">{t('my_students')}</span>
                 </Link>
               </li>
 
@@ -727,7 +892,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/availablejobs' ? 'active' : ''}`}>
                 <Link to="/institute/availablejobs" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faBuilding} />
-                  <span className="menu-title">Available Jobs</span>
+                  <span className="menu-title">{t('available_jobs')}</span>
                 </Link>
               </li>
 
@@ -735,7 +900,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item has-sub dropdown-events ${openSubmenu.events ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('events')}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
-                  <span className="menu-title">Events</span>
+                  <span className="menu-title">{t('events')}</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faCaretDown}
@@ -756,7 +921,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/viewEvent' ? 'active' : ''}`}>
                     <Link to="/institute/viewEvent" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faEye} />
-                      <span className="menu-title">View Events</span>
+                      <span className="menu-title">{t('view_events')}</span>
                     </Link>
                   </li>
                 </ul>
@@ -766,7 +931,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/approvalManagement' ? 'active' : ''}`}>
                 <Link to="/institute/approvalManagement" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faCheckCircle} />
-                  <span className="menu-title">Approval Request </span>
+                  <span className="menu-title">{t('approval_request')}</span>
                 </Link>
               </li>
 
@@ -774,7 +939,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item has-sub dropdown-settings ${openSubmenu.settings ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('settings')}>
                   <FontAwesomeIcon icon={faCogs} />
-                  <span className="menu-title">Settings</span>
+                  <span className="menu-title">{t('settings')}</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faCaretDown}
@@ -795,50 +960,56 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/accessManagement' ? 'active' : ''}`}>
                     <Link to="/institute/accessManagement" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserShield} />
-                      <span className="menu-title">Access Management</span>
+                      <span className="menu-title">{t('access_management')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faSitemap} />
-                      <span className="menu-title">Status Design (B2B)</span>
+                      <span className="menu-title">{t('status_design_b2b')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesignb2c" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
-                      <span className="menu-title">Status Design (B2C)</span>
+                      <span className="menu-title">{t('status_design_b2c')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
                     <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
-                      <span className="menu-title">Status Design (Placements)</span>
+                      <span className="menu-title">{t('status_design_placements')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
                     <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWhatsapp} />
-                      <span className="menu-title">Whatapp</span>
+                      <span className="menu-title">{t('whatsapp')}</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatappTemplate' ? 'active' : ''}`}>
                     <Link to="/institute/whatappTemplate" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faFileAlt} />
-                      <span className="menu-title">Create Template</span>
+                      <span className="menu-title">{t('create_template')}</span>
                     </Link>
                   </li>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/emailTemplate' ? 'active' : ''}`}>
+                    <Link to="/institute/emailTemplate" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faFileAlt} />
+                      <span className="menu-title">Create Email Template</span>
+                    </Link>
+                  </li> */}
                   <li className={`nav-item ${location.pathname === '/institute/whatsappWallet' ? 'active' : ''}`}>
                     <Link to="/institute/whatsappWallet" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faWallet} />
-                      <span className="menu-title">Whatsapp Wallet</span>
+                      <span className="menu-title">{t('whatsapp_wallet')}</span>
                     </Link>
                   </li>
                  
                   <li className={`nav-item has-sub ${openSubmenu.dropdown ? 'open' : ''}`}>
                     <a href="#" onClick={() => toggleSubmenu('dropdown')}>
                       <FontAwesomeIcon icon={faCaretDown} />
-                      <span className="menu-title">Dropdown</span>
+                      <span className="menu-title">{t('dropdown')}</span>
                       <span className="dropdown-arrow">
                         <FontAwesomeIcon
                           icon={faCaretDown}
@@ -859,19 +1030,19 @@ function CollegeLayout({ children }) {
                       <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
                         <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faIndustry} />
-                          <span className="menu-title">Type of B2B</span>
+                          <span className="menu-title">{t('type_of_b2b')}</span>
                         </Link>
                       </li>
                       <li className={`nav-item ${location.pathname === '/institute/typeOfCategory' ? 'active' : ''}`}>
                         <Link to="/institute/typeOfCategory" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faTags} />
-                          <span className="menu-title">Type of Category</span>
+                          <span className="menu-title">{t('type_of_category')}</span>
                         </Link>
                       </li>
                       <li className={`nav-item ${location.pathname === '/institute/source' ? 'active' : ''}`}>
                         <Link to="/institute/source" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faGlobe} />
-                          <span className="menu-title">Source</span>
+                          <span className="menu-title">{t('source')}</span>
                         </Link>
                       </li>
                     </ul>
@@ -882,7 +1053,7 @@ function CollegeLayout({ children }) {
                       {/* <FontAwesomeIcon icon={} /> */}
                       {/* <FontAwesomeIcon icon={faDrip} /> */}
                       <FontAwesomeIcon icon={faBullhorn} />
-                      <span className="menu-title">Drip Marketing</span>
+                      <span className="menu-title">{t('drip_marketing')}</span>
                     </Link>
                   </li>
                 </ul>
@@ -902,7 +1073,7 @@ function CollegeLayout({ children }) {
                 <img 
                   className="img-fluid" 
                   src="/Assets/images/logo/logo.png" 
-                  alt="Focalyt Logo"
+                  alt={t('focalyt_logo')}
                   style={{ maxWidth: '100px', height: 'auto', display: 'block', margin: '0 auto' }}
                 />
               </div>
@@ -927,6 +1098,160 @@ function CollegeLayout({ children }) {
         </div>
       </main>
 
+      {/* Global AI Counsellor (English / Hindi / Punjabi) */}
+      {/* <button
+        type="button"
+        className="btn btn-primary rounded-circle shadow-lg"
+        style={{
+          position: 'fixed',
+          right: '1.75rem',
+          bottom: '1.75rem',
+          zIndex: 1060,
+          width: '52px',
+          height: '52px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background:
+            'linear-gradient(135deg, #fc2b5a 0%, #ff7a8e 60%, #ffb199 100%)',
+          border: 'none',
+        }}
+        onClick={() => setShowAiCounsellor((prev) => !prev)}
+        title="AI Counsellor (English / Hindi / Punjabi)"
+      >
+        <i className="fas fa-headset" />
+      </button> */}
+
+      {showAiCounsellor && (
+        <div
+          className="position-fixed"
+          style={{
+            right: '1.5rem',
+            bottom: '5rem',
+            zIndex: 1060,
+            width: '360px',
+            maxWidth: '95vw',
+          }}
+        >
+          <div className="card shadow-lg border-0">
+            <div className="card-header bg-white border-0 py-2 px-3 d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <span
+                  className="d-inline-flex align-items-center justify-content-center rounded-circle"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    background: '#fff5f7',
+                    border: '1px solid #ffd0da',
+                  }}
+                >
+                  <i className="fas fa-robot text-danger" style={{ fontSize: 13 }} />
+                </span>
+                <div>
+                  <div className="fw-semibold small">AI Counsellor</div>
+                  <div className="text-muted" style={{ fontSize: 11 }}>
+                    Admissions helper in your language
+                  </div>
+                </div>
+              </div>
+              <div className="d-flex align-items-center gap-1">
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: 130 }}
+                  value={aiCounsellorLanguage}
+                  onChange={(e) => setAiCounsellorLanguage(e.target.value)}
+                >
+                  <option value="en">English</option>
+                  <option value="hi">Hindi / हिंदी</option>
+                  <option value="pa">Punjabi / ਪੰਜਾਬੀ</option>
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setShowAiCounsellor(false)}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+            <div
+              className="card-body p-2"
+              style={{
+                maxHeight: '280px',
+                overflowY: 'auto',
+                background: '#fafafa',
+              }}
+            >
+              {aiCounsellorMessages.length === 0 && (
+                <div className="text-muted small">
+                  Ask about leads, admissions, fees or documents in English, Hindi or Punjabi.
+                  The assistant will reply only in your selected language.
+                </div>
+              )}
+              {aiCounsellorMessages.map((m) => (
+                <div
+                  key={m.ts}
+                  className={`mb-2 d-flex ${
+                    m.role === 'user' ? 'justify-content-end' : 'justify-content-start'
+                  }`}
+                >
+                  <div
+                    className={`px-2 py-1 rounded-3 small ${
+                      m.role === 'user'
+                        ? 'bg-primary text-white'
+                        : 'bg-white border text-dark'
+                    }`}
+                    style={{ maxWidth: '80%' }}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {aiCounsellorLoading && (
+                <div className="text-muted small d-flex align-items-center">
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    role="status"
+                  />
+                  Thinking…
+                </div>
+              )}
+            </div>
+            <div className="card-footer border-0 p-2">
+              <div className="input-group input-group-sm">
+                <textarea
+                  className="form-control"
+                  rows={1}
+                  placeholder="Type your question..."
+                  value={aiCounsellorInput}
+                  onChange={(e) => setAiCounsellorInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendAiCounsellorMessage();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={aiCounsellorLoading || !aiCounsellorInput.trim()}
+                  onClick={handleSendAiCounsellorMessage}
+                >
+                  {aiCounsellorLoading ? (
+                    <span
+                      className="spinner-border spinner-border-sm"
+                      role="status"
+                    />
+                  ) : (
+                    <i className="fas fa-paper-plane" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>
         {`
@@ -1406,11 +1731,13 @@ function CollegeLayout({ children }) {
   margin-left: 10px;
 }
 
-.nav-item.has-sub .menu-content .nav-item > a {
-  padding-left: 2.5rem !important;
-  font-size: 0.9rem;
+@media(max-width:768px){
+html body .content .content-wrapper {
+    margin-top: 6rem;
+    // padding: 1.8rem 2.2rem 0;
 }
-        
+ 
+}   
         `}
       </style>
 
@@ -1639,6 +1966,10 @@ span#notification {
     }
     .float-right{
         flex-direction: row!important;
+    }
+    .navbar-header {
+        height: 135px !important;
+        min-height: 135px !important;
     }
  
 }

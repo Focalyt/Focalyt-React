@@ -1791,10 +1791,9 @@ const MyFollowups = () => {
 
       let followupDateTime = '';
       if (followupDate && followupTime) {
-        // Create proper datetime string
-        const dateStr = followupDate instanceof Date
-          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-          : followupDate;
+        // Use LOCAL date so 21 Feb stays 21 Feb (toISOString() would give UTC and can shift to 20 Feb)
+        const d = followupDate instanceof Date ? followupDate : new Date(followupDate);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
         followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
@@ -1840,8 +1839,9 @@ const MyFollowups = () => {
       );
 
 
-      if (response.data.success) {
-        alert('Status updated successfully!');
+      // Backend returns status: true (not success: true)
+      if (response.data.status === true || response.data.success === true) {
+        alert('Followup updated successfully!');
 
         // Reset form
         setSelectedStatus('');
@@ -1850,12 +1850,12 @@ const MyFollowups = () => {
         setFollowupTime('');
         setRemarks('');
 
-        // Refresh data and close panel
+        // Refresh list so NEXT ACTION DATE shows updated 21 Feb
         await fetchProfileData();
         closePanel();
       } else {
         console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to update status');
+        alert(response.data.message || 'Failed to update followup');
       }
 
 
@@ -3051,8 +3051,7 @@ const MyFollowups = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-              Update Followup for
-              {selectedProfile?._candidate?.name || 'Unknown'}
+              Update Followup for {selectedProfile?.name || selectedProfile?._candidate?.name || 'Unknown'}
             </h6>
           </div>
           <div>
@@ -3122,11 +3121,10 @@ const MyFollowups = () => {
                 className="form-control border-0 bgcolor"
                 id="comment"
                 rows="4"
+                value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-
                 style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-
-              ></textarea>
+              />
             </div>
 
 

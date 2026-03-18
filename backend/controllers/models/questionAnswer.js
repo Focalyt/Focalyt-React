@@ -2,10 +2,10 @@ const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
 const answerSchema = new Schema({
-  question: { type: String, required: true },  
+  question: { type: String, required: true },
   answer: { type: String, required: true },
-  rejectionReason: { type: String, default: null } 
-  
+  rejectionReason: { type: String, default: null },
+  visitDate: { type: Date, default: null }
 });
 
 const preQVSchema = new Schema({

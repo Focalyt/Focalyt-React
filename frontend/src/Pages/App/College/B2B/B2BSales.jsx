@@ -323,6 +323,27 @@ const B2BSales = () => {
     updatedPermission()
   }, [])
 
+  // Console: logged-in institute user and all permissions (for debugging)
+  useEffect(() => {
+    if (permissions != null && userData?._id) {
+      const instituteUser = {
+        _id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        mobile: userData.mobile,
+        role: userData.role,
+        collegeId: userData.collegeId,
+        collegeName: userData.collegeName,
+        isDefaultAdmin: userData.isDefaultAdmin,
+      };
+      console.log('[Institute] Logged-in user:', instituteUser);
+      console.log('[Institute] User permissions:', permissions);
+      if (permissions?.custom_permissions) {
+        console.log('[Institute] Custom permissions:', permissions.custom_permissions);
+      }
+    }
+  }, [permissions, userData]);
+
   const updatedPermission = async () => {
 
     const respose = await axios.get(`${backendUrl}/college/permission`, {
@@ -383,6 +404,17 @@ const B2BSales = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
+  const [bulkUploadMessage, setBulkUploadMessage] = useState('');
+  const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
+  const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
+  
+  // Bulk inputs state
+  const [showBulkInputs, setShowBulkInputs] = useState(false);
+  const [bulkMode, setBulkMode] = useState('');
+  const [input1Value, setInput1Value] = useState('');
 
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
@@ -442,6 +474,7 @@ const B2BSales = () => {
   const businessNameInputRef = useRef(null);
   const cityInputRef = useRef(null);
   const stateInputRef = useRef(null);
+  const bulkUploadFileInputRef = useRef(null);
   const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
@@ -490,6 +523,28 @@ const B2BSales = () => {
     // initiateGoogleAuth();
   };
 
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+
+      // Clear any stored Google auth token from sessionStorage
+      sessionStorage.removeItem('googleAuthToken');
+
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
+      alert('Disconnected from Google Calendar successfully.');
+    } catch (err) {
+      console.error('Error while disconnecting Google Calendar:', err);
+    }
+  };
+
   // Simple function to add follow-up to Google Calendar
   // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
@@ -516,69 +571,64 @@ const B2BSales = () => {
         return;
       }
 
-      // Handle status change first
+      // Determine whether follow-up fields are filled
+      const hasFollowup =
+        (showPanel === 'followUp') ||
+        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+
+      const hasFollowupData =
+        hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
+
+      // Normalise date value for API (string or Date instance)
+      const followupDateValue = followupFormData.followupDate instanceof Date
+        ? followupFormData.followupDate.toISOString()
+        : followupFormData.followupDate;
+
+      // 1) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
       if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
         const statusData = {
           status: seletectedStatus,
           subStatus: seletectedSubStatus?._id || null,
           remarks: followupFormData.remarks || 'Status updated via B2B panel'
         };
+
+        if (hasFollowupData) {
+          statusData.followUpDate = followupDateValue;
+          statusData.followUpTime = followupFormData.followupTime;
+          statusData.googleCalendarEvent = true;
+        }
+
         await updateLeadStatus(selectedProfile._id, statusData);
+
+        if (hasFollowupData) {
+          alert('✅ Status and follow-up updated successfully!');
+        } else {
+          alert('✅ Status updated successfully!');
+        }
       }
 
-      // Check if followup is required (either from followup panel or status change with followup)
-      const hasFollowup = (showPanel === 'followUp') ||
-        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
-
-      if (hasFollowup && followupFormData.followupDate && followupFormData.followupTime) {
-        // Get data from followupFormData
-        const scheduledDateTime = new Date(followupFormData.followupDate);
-        const [hours, minutes] = followupFormData.followupTime.split(':');
-        scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-        // Create calendar event data
-        const event = {
-          summary: `B2B Follow-up: ${selectedProfile?.businessName || 'Unknown'}`,
-          description: `Follow-up with ${selectedProfile?.concernPersonName || 'Unknown'} (${selectedProfile?.designation || 'N/A'})\n\nBusiness: ${selectedProfile?.businessName || 'Unknown'}\nContact: ${selectedProfile?.mobile || 'N/A'}\nEmail: ${selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
-          start: {
-            dateTime: scheduledDateTime.toISOString(),
-            timeZone: 'Asia/Kolkata',
+      // 2) Standalone follow-up panel: create follow-up (and Google Calendar event) via B2B follow-up API
+      if (showPanel === 'followUp' && selectedProfile && hasFollowupData) {
+        await axios.post(
+          `${backendUrl}/college/b2b/leads/${selectedProfile._id}/followup`,
+          {
+            scheduledDate: followupDateValue,
+            scheduledTime: followupFormData.followupTime,
+            remarks: followupFormData.remarks || '',
+            googleCalendarEvent: true
           },
-          end: {
-            dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
-            timeZone: 'Asia/Kolkata',
-          },
-          reminders: {
-            useDefault: false,
-            overrides: [
-              { method: 'email', minutes: 24 * 60 }, // 1 day before
-              { method: 'popup', minutes: 60 }, // 1 hour before
-            ],
-          },
-        };
+          {
+            headers: { 'x-auth': token }
+          }
+        );
 
-        // Call backend API to create calendar event
-        const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-          user: userData,
-          event: event
-        });
-
-        if (response.data.success) {
-          alert('✅ Follow-up added to Google Calendar!');
-        } else {
-          alert('❌ Failed to add to Google Calendar');
-          console.error('❌ Failed to add to Google Calendar:', response.data.message);
-        }
-      } else if (showPanel === 'editPanel') {
-        // Status change without followup
-        alert('✅ Status updated successfully!');
+        alert('✅ Follow-up saved and scheduled successfully!');
       }
 
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
       alert('❌ Error processing request');
-    }
-    finally {
+    } finally {
       closePanel();
     }
   };
@@ -762,26 +812,30 @@ const B2BSales = () => {
       const token = userData.token;
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-      // Fetch Lead Categories
-      const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories`, {
+      // Fetch Lead Categories (only active)
+      const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories?status=true`, {
         headers: { 'x-auth': token }
       });
       if (leadCategoriesRes.data.status) {
-        setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
-          value: cat._id,
-          label: cat.name || cat.title
-        })));
+        setLeadCategoryOptions(leadCategoriesRes.data.data
+          .filter(cat => cat.isActive === true) // Filter only active items
+          .map(cat => ({
+            value: cat._id,
+            label: cat.name || cat.title
+          })));
       }
 
-      // Fetch Type of B2B
-      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b`, {
+      // Fetch Type of B2B (only active)
+      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b?status=true`, {
         headers: { 'x-auth': token }
       });
       if (typeOfB2BRes.data.status) {
-        setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({
-          value: type._id,
-          label: type.name
-        })));
+        setTypeOfB2BOptions(typeOfB2BRes.data.data
+          .filter(type => type.isActive === true) // Filter only active items
+          .map(type => ({
+            value: type._id,
+            label: type.name
+          })));
       }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
@@ -987,8 +1041,84 @@ const B2BSales = () => {
     fetchLeads(null, 1);
   }, []);
 
+  // Auto-select leads based on Input 1 value for bulk refer
+  useEffect(() => {
+    if (bulkMode !== 'bulkrefer') {
+      return;
+    }
+
+    if (!leads || leads.length === 0) {
+      return;
+    }
+
+    const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
+    
+    if (isNaN(numValue) || numValue < 1) {
+      setSelectedProfiles([]);
+      return;
+    }
+
+    // Get total available leads
+    const totalAvailableLeads = totalLeads || leads.length;
+    const validNumValue = Math.min(numValue, totalAvailableLeads);
+
+    // If user wants more leads than currently loaded, fetch them
+    if (validNumValue > leads.length && validNumValue > 0) {
+      const fetchLeadsForSelection = async () => {
+        if (!token) return;
+
+        try {
+          const eff = { ...filters };
+          const params = {
+            page: 1,
+            limit: validNumValue.toString(),
+            ...(selectedStatusFilter && { status: selectedStatusFilter }),
+            ...(eff.search && { search: eff.search }),
+            ...(eff.leadCategory && { leadCategory: eff.leadCategory }),
+            ...(eff.typeOfB2B && { typeOfB2B: eff.typeOfB2B }),
+            ...(eff.leadOwner && { leadOwner: eff.leadOwner }),
+            ...(eff.dateRange?.start && { startDate: eff.dateRange.start }),
+            ...(eff.dateRange?.end && { endDate: eff.dateRange.end }),
+            ...(eff.status && { status: eff.status }),
+            ...(eff.subStatus && { subStatus: eff.subStatus })
+          };
+
+          const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+            headers: { 'x-auth': token },
+            params: params
+          });
+
+          if (response.data.status && response.data.data.leads) {
+            const fetchedLeads = response.data.data.leads;
+            const selectedLeadsData = fetchedLeads.slice(0, validNumValue);
+            const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+            setSelectedProfiles(leadsToSelect);
+          }
+        } catch (error) {
+          console.error('Error fetching leads for selection:', error);
+          // Fallback: select from current leads
+          const selectedLeadsData = leads.slice(0, Math.min(validNumValue, leads.length));
+          const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+          setSelectedProfiles(leadsToSelect);
+        }
+      };
+
+      fetchLeadsForSelection();
+    } else {
+      // Select from current leads
+      const selectedLeadsData = leads.slice(0, validNumValue);
+      const leadsToSelect = selectedLeadsData.map(lead => lead._id);
+      setSelectedProfiles(leadsToSelect);
+    }
+  }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
+
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
+    // console.log('🎯 [FRONTEND] Status Card Clicked:', {
+    //   statusId,
+    //   currentFilters: filters,
+    //   leadOwnerFilter: filters.leadOwner
+    // });
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
     fetchLeads(statusId, 1);
@@ -996,6 +1126,10 @@ const B2BSales = () => {
 
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
+    // console.log('📊 [FRONTEND] Total Card Clicked:', {
+    //   currentFilters: filters,
+    //   leadOwnerFilter: filters.leadOwner
+    // });
     setSelectedStatusFilter(null);
     setCurrentPage(1);
     fetchLeads(null, 1);
@@ -1019,9 +1153,10 @@ const B2BSales = () => {
     }));
   };
 
-  const applyFilters = () => {
+  const applyFilters = (filterOverrides = {}) => {
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1);
+    fetchLeads(selectedStatusFilter, 1, filterOverrides);
+    fetchStatusCounts(filterOverrides); // Update status counts with current filters
   };
 
   const clearFilters = () => {
@@ -1039,12 +1174,15 @@ const B2BSales = () => {
     });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
+    fetchStatusCounts(); // Update status counts after clearing filters
   };
 
-  const fetchLeads = async (statusFilter = null, page = 1) => {
+  const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
     try {
       closePanel();
       setLoadingLeads(true);
+
+      const eff = { ...filters, ...filterOverrides };
 
       // Build query parameters
       const params = {
@@ -1056,31 +1194,40 @@ const B2BSales = () => {
         params.status = statusFilter;
       }
 
-      // Add filter parameters
-      if (filters.search) {
-        params.search = filters.search;
+      // Add filter parameters (use effective filters so clearing search refetches all)
+      if (eff.search) {
+        params.search = eff.search;
       }
-      if (filters.leadCategory) {
-        params.leadCategory = filters.leadCategory;
+      if (eff.leadCategory) {
+        params.leadCategory = eff.leadCategory;
       }
-      if (filters.typeOfB2B) {
-        params.typeOfB2B = filters.typeOfB2B;
+      if (eff.typeOfB2B) {
+        params.typeOfB2B = eff.typeOfB2B;
       }
-      if (filters.leadOwner) {
-        params.leadOwner = filters.leadOwner;
+      if (eff.leadOwner) {
+        params.leadOwner = eff.leadOwner;
       }
-      if (filters.dateRange.start) {
-        params.startDate = filters.dateRange.start;
+      if (eff.dateRange?.start) {
+        params.startDate = eff.dateRange.start;
       }
-      if (filters.dateRange.end) {
-        params.endDate = filters.dateRange.end;
+      if (eff.dateRange?.end) {
+        params.endDate = eff.dateRange.end;
       }
-      if (filters.status) {
-        params.status = filters.status;
+      if (eff.status) {
+        params.status = eff.status;
       }
-      if (filters.subStatus) {
-        params.subStatus = filters.subStatus;
+      if (eff.subStatus) {
+        params.subStatus = eff.subStatus;
       }
+
+      // console.log('🔍 [FRONTEND] fetchLeads called:', {
+      //   statusFilter,
+      //   page,
+      //   filters: filters,
+      //   params: params,
+      //   leadOwnerInFilters: filters.leadOwner,
+      //   leadOwnerInParams: params.leadOwner
+      // });
 
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
@@ -1088,15 +1235,51 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        setLeads(response.data.data.leads || []);
+        const fetchedLeads = response.data.data.leads || [];
+        
+        // console.log('📥 [FRONTEND] Response received:', {
+        //   status: response.data.status,
+        //   leadsCount: fetchedLeads.length,
+        //   pagination: response.data.data?.pagination,
+        //   message: response.data.message,
+        //   appliedFilter: filters.leadOwner ? `leadOwner: ${filters.leadOwner}` : 'No filter'
+        // });
+        
+        // Debug: Log leadOwner data from response
+        // if (fetchedLeads.length > 0) {
+        //   console.log('👤 [FRONTEND] Lead Owner Data Received:');
+        //   fetchedLeads.slice(0, 3).forEach((lead, index) => {
+        //     console.log(`  Lead ${index + 1}:`, {
+        //       businessName: lead.businessName,
+        //       leadOwner: lead.leadOwner,
+        //       leadOwnerId: lead.leadOwner?._id || lead.leadOwner || 'null',
+        //       leadOwnerName: lead.leadOwner?.name || 'No Owner',
+        //       leadOwnerEmail: lead.leadOwner?.email || 'N/A',
+        //       leadAddedBy: lead.leadAddedBy,
+        //       leadAddedByName: lead.leadAddedBy?.name || 'No Added By'
+        //     });
+        //   });
+        // } else {
+        //   console.log('⚠️ [FRONTEND] No leads in response - Setting empty array');
+        // }
+        
+        // console.log('🔄 [FRONTEND] Updating leads state:', {
+        //   previousLeadsCount: leads.length,
+        //   newLeadsCount: fetchedLeads.length,
+        //   willClear: fetchedLeads.length === 0
+        // });
+        
+        setLeads(fetchedLeads);
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
           setPageSize(response.data.data.pagination.totalLeads || 0);
         }
+        
+        // console.log('✅ [FRONTEND] Leads state updated');
       } else {
-        console.error('Failed to fetch leads:', response.data.message);
+        console.error('❌ [FRONTEND] Failed to fetch leads:', response.data.message);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -1106,13 +1289,24 @@ const B2BSales = () => {
   };
 
   // Fetch status counts
-  const fetchStatusCounts = async () => {
+  const fetchStatusCounts = async (filterOverrides = {}) => {
     try {
       setLoadingStatusCounts(true);
+      const eff = { ...filters, ...filterOverrides };
+      // Build params with current filters (except status filter, as we're counting by status)
+      const params = {};
+      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
+      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
+      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (eff.search) params.search = eff.search;
+      if (eff.subStatus) params.subStatus = eff.subStatus;
+      if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+      
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: params
       });
-
 
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
@@ -1130,6 +1324,23 @@ const B2BSales = () => {
 
 
 
+  // Check if user can update a lead
+  const canUpdateLead = (lead) => {
+    if (!lead || !userData?._id) return false;
+    
+    // Admin can always update - check both permissions state and userData
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    if (permissionType === 'Admin') return true;
+    
+    // Check if user is the lead owner or lead added by
+    const userId = userData._id;
+    const leadAddedById = lead.leadAddedBy?._id || lead.leadAddedBy;
+    const leadOwnerId = lead.leadOwner?._id || lead.leadOwner;
+    
+    return leadAddedById?.toString() === userId?.toString() || 
+           leadOwnerId?.toString() === userId?.toString();
+  };
+
   // Update lead status
   const updateLeadStatus = async (leadId, statusData) => {
     try {
@@ -1139,15 +1350,11 @@ const B2BSales = () => {
       const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
       const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
 
-
-
       const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
         headers: { 'x-auth': token }
       });
 
       if (response.data.status) {
-        alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
-
         // Refresh the leads list
         fetchLeads(selectedStatusFilter, currentPage);
 
@@ -1161,7 +1368,8 @@ const B2BSales = () => {
       }
     } catch (error) {
       console.error('Error updating lead status:', error);
-      alert('Failed to update lead status. Please try again.');
+      const errorMessage = error.response?.data?.message || 'Failed to update lead status. Please try again.';
+      alert(errorMessage);
     }
   };
 
@@ -1289,6 +1497,137 @@ const B2BSales = () => {
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
     setShowAddLeadModal(true);
+  };
+
+  // Bulk Upload Functions
+  const handleBulkFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      // Validate file type
+      const validTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'text/csv' // .csv
+      ];
+      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(fileExtension)) {
+        setBulkUploadMessage('Please select a valid Excel file (.xlsx, .xls) or CSV file');
+        e.target.value = '';
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (selectedFile.size > maxSize) {
+        setBulkUploadMessage('File size should not exceed 10MB');
+        e.target.value = '';
+        return;
+      }
+      
+      setBulkUploadFile(selectedFile);
+      setBulkUploadMessage('');
+      setBulkUploadErrors([]);
+      setBulkUploadSuccess(false);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    // Get file directly from input element
+    const fileInput = bulkUploadFileInputRef.current;
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      setBulkUploadMessage('Please select a file');
+      return;
+    }
+
+    const selectedFile = fileInput.files[0];
+
+    // Validate file object
+    if (!(selectedFile instanceof File)) {
+      setBulkUploadMessage('Invalid file object. Please select the file again.');
+      return;
+    }
+
+    setBulkUploadLoading(true);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+
+    // Create FormData and append file
+    const formData = new FormData();
+    formData.append('file', selectedFile, selectedFile.name);
+
+    // Debug: Log FormData contents
+    console.log('File to upload:', selectedFile);
+    console.log('File name:', selectedFile?.name);
+    console.log('File size:', selectedFile?.size);
+    console.log('File type:', selectedFile?.type);
+    console.log('Is File instance:', selectedFile instanceof File);
+    
+    // Verify FormData
+    console.log('FormData entries:');
+    for (let pair of formData.entries()) {
+      console.log('  -', pair[0], ':', pair[1]);
+    }
+
+    try {
+      const response = await axios.post(`${backendUrl}/college/b2b/leads/import`, formData, {
+        headers: {
+          'x-auth': token
+          // Don't set Content-Type - axios will automatically set it with boundary for FormData
+        }
+      });
+
+      if (response.data.status) {
+        setBulkUploadSuccess(true);
+        const successCount = response.data.data?.inserted || 0;
+        const errorCount = response.data.data?.errors || 0;
+        const errorDetails = response.data.data?.errorDetails || [];
+        
+        setBulkUploadMessage(
+          `✅ ${successCount} leads imported successfully${errorCount > 0 ? `. ${errorCount} errors found.` : ''}`
+        );
+        
+        if (errorDetails.length > 0) {
+          setBulkUploadErrors(errorDetails);
+        }
+
+        // Refresh the leads list and status counts
+        fetchLeads(selectedStatusFilter, currentPage);
+        fetchStatusCounts();
+
+        // Clear file after 3 seconds
+        setTimeout(() => {
+          setBulkUploadFile(null);
+          const fileInput = document.getElementById('bulkUploadFile');
+          if (fileInput) {
+            fileInput.value = '';
+          }
+        }, 3000);
+      } else {
+        setBulkUploadMessage(response.data.message || 'Failed to upload file');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setBulkUploadMessage(
+        error.response?.data?.message || 'Failed to upload file. Please try again.'
+      );
+    } finally {
+      setBulkUploadLoading(false);
+    }
+  };
+
+  const handleCloseBulkUploadModal = () => {
+    setShowBulkUploadModal(false);
+    setBulkUploadFile(null);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+    const fileInput = document.getElementById('bulkUploadFile');
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   const getPaginationPages = () => {
@@ -1511,6 +1850,14 @@ const B2BSales = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
+    // Check permission before opening panel
+    if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
+      if (!canUpdateLead(profile)) {
+        alert('You do not have permission to update this lead. Only the lead owner or the person who added the lead can update it.');
+        return;
+      }
+    }
+
     setSelectedProfile(null)
     setShowPanel('')
     setSelectedStatus(null)
@@ -1566,6 +1913,13 @@ const B2BSales = () => {
 
 
   const closePanel = () => {
+    // Hide bulk inputs when bulk refer panel is closed
+    if (showPanel === 'RefferAllLeads') {
+      setShowBulkInputs(false);
+      setBulkMode('');
+      setInput1Value('');
+      setSelectedProfiles([]);
+    }
     setShowPanel('');
     clearFollowupFormData();
     setShowPopup(null);
@@ -1583,16 +1937,17 @@ const B2BSales = () => {
 
     if (profile) {
       setSelectedProfile(profile);
-
-
     }
 
-    setShowPopup(null)
+    setShowPopup(null);
 
     if (panel === 'RefferAllLeads') {
-
       setShowPanel('RefferAllLeads');
-
+      // Ensure bulk mode is enabled for "Refer All Leads"
+      setShowBulkInputs(true);
+      setBulkMode('bulkrefer');
+      setInput1Value('');
+      setSelectedProfiles([]);
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
     }
@@ -1605,11 +1960,7 @@ const B2BSales = () => {
           window.dispatchEvent(new Event('resize'));
         }
       }, 200);
-
     }
-
-
-
   };
 
 
@@ -1619,32 +1970,96 @@ const B2BSales = () => {
 
   const handleReferLead = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post(`${backendUrl}/college/b2b/refer-lead`, {
-        counselorId: selectedConcernPerson,
-        leadId: selectedProfile._id
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
+    
+    // Validation
+    if (!selectedConcernPerson) {
+      alert('Please select a counselor');
+      return;
+    }
 
-      if (response.data.status) {
-        const message = alert('Lead referred successfully!');
-        if (message) {
-
-
-        }
-      } else {
-        alert(response.data.message || 'Failed to refer lead');
+    if (showPanel === 'RefferAllLeads') {
+      if (!selectedProfiles || selectedProfiles.length === 0) {
+        alert('Please select at least one lead to refer. Enter a number in Input 1 to select leads.');
+        return;
       }
-      closePanel();
+    } else {
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('Please select a lead to refer');
+        return;
+      }
+    }
 
+    try {
+      const isBulk = showPanel === 'RefferAllLeads';
+      
+      if (isBulk) {
+        // Bulk route (backend supports array)
+        try {
+          const bulkRes = await axios.post(
+            `${backendUrl}/college/b2b/refer-leads`,
+            { counselorId: selectedConcernPerson, leadIds: selectedProfiles },
+            { headers: { 'x-auth': token } }
+          );
 
+          if (bulkRes?.data?.status) {
+            const modified = bulkRes?.data?.data?.modified;
+            const okCount = typeof modified === 'number' ? modified : (selectedProfiles?.length || 0);
+            alert(`Referred ${okCount} lead(s) successfully!`);
+            await fetchLeads(selectedStatusFilter, currentPage);
+            await fetchStatusCounts();
+            closePanel();
+            return;
+          }
+        } catch (bulkErr) {
+          // If bulk endpoint not available yet, fallback below
+          console.warn('Bulk refer endpoint failed, falling back to single calls:', bulkErr?.response?.status);
+        }
 
+        // Fallback: call single endpoint per lead
+        const results = await Promise.allSettled(
+          (selectedProfiles || []).map((id) =>
+            axios.post(
+              `${backendUrl}/college/b2b/refer-lead`,
+              { counselorId: selectedConcernPerson, leadId: id, type: 'single' },
+              { headers: { 'x-auth': token } }
+            )
+          )
+        );
+
+        const ok = results.filter((r) => r.status === 'fulfilled' && r.value?.data?.status).length;
+        const failed = results.length - ok;
+
+        if (ok > 0) {
+          alert(`Referred ${ok} lead(s) successfully${failed ? `, ${failed} failed` : ''}.`);
+          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchStatusCounts();
+          closePanel();
+          return;
+        }
+
+        alert('Failed to refer selected leads');
+        return;
+      }
+
+      // Single refer
+      const response = await axios.post(
+        `${backendUrl}/college/b2b/refer-lead`,
+        { counselorId: selectedConcernPerson, leadId: selectedProfile._id, type: 'single' },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response?.data?.status) {
+        alert('Lead referred successfully!');
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        closePanel();
+        return;
+      }
+
+      alert(response?.data?.message || 'Failed to refer lead');
     } catch (error) {
       console.error('Error referring lead:', error);
-      alert('Failed to refer lead');
+      alert(error.response?.data?.message || 'Failed to refer lead. Please try again.');
     }
   }
   const openleadHistoryPanel = async (profile = null) => {
@@ -1657,7 +2072,7 @@ const B2BSales = () => {
     setShowPopup(null);
     setShowPanel('leadHistory');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -1674,7 +2089,7 @@ const B2BSales = () => {
     setShowPopup(null);
     setShowPanel('ProfileEdit');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -1715,7 +2130,16 @@ const B2BSales = () => {
               Change Status for {selectedProfile?.businessName || 'Lead'}
             </h6>
           </div>
-          <div>
+          <div className='d-flex align-items-center'>
+            {userData.googleAuthToken?.accessToken && (
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm me-2 google-btn"
+                onClick={handleGoogleLogout}
+              >
+                Disconnect Google Calendar
+              </button>
+            )}
             <button className="btn-close" type="button" onClick={closePanel}></button>
           </div>
         </div>
@@ -1778,12 +2202,12 @@ const B2BSales = () => {
                 <div className="mb-3">
                   <h6 className="text-dark mb-2">Follow-up Details</h6>
                   <div className="row">
-                    <div className="col-6">
+                    <div className="col-6 ps-3">
                       <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
                         Next Action Date <span className="text-danger">*</span>
                       </label>
                       <DatePicker
-                        className="form-control border-0 bgcolor"
+                        className="form-control border-0 bgcolor small-date"
                         onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
                         value={followupFormData.followupDate}
                         format="dd/MM/yyyy"
@@ -1910,7 +2334,21 @@ const B2BSales = () => {
               Set Follow-up for {selectedProfile?.businessName || 'Lead'}
             </h6>
           </div>
-          <div>
+          <div class="d-flex align-item-center">
+            {userData.googleAuthToken?.accessToken && (
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm me-2 google-btn"
+                onClick={handleGoogleLogout}
+                style={{
+                  fontSize: '12px',
+                  padding: '4px 10px',
+                  borderRadius: '999px'
+                }}
+              >
+                Disconnect Google Calendar
+              </button>
+            )}
             <button className="btn-close" type="button" onClick={closePanel} style={{
               fontSize: '14px',
               padding: '4px',
@@ -2093,10 +2531,8 @@ const B2BSales = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-
-              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?._candidate?.name || 'Unknown'} to Counselor`)}
-              {showPanel === 'RefferAllLeads' && (`Refer All Lead to Counselor`)}
-
+              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?.businessName || 'Unknown'} to Counselor`)}
+              {showPanel === 'RefferAllLeads' && (`Refer All Leads to Counselor`)}
             </h6>
           </div>
           <div>
@@ -2140,6 +2576,24 @@ const B2BSales = () => {
               </div>
             </>
 
+            {/* Bulk refer info (selection happens from the bulk bar above the cards) */} 
+            {showPanel === 'RefferAllLeads' && (
+              <div className="mb-3 p-2 bg-light rounded" style={{ fontSize: '13px' }}>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-muted">
+                    <i className="fas fa-users me-1"></i>
+                    Selected Leads:
+                  </span>
+                  <span className="fw-semibold text-primary">
+                    {selectedProfiles?.length || 0}
+                  </span>
+                </div>
+                <small className="text-muted d-block mt-1">
+                  Type a number in the bulk bar above the lead cards to auto-select.
+                </small>
+              </div>
+            )}
+
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
                 type="button"
@@ -2150,11 +2604,21 @@ const B2BSales = () => {
                 CLOSE
               </button>
               <button
+                type="button"
                 className="btn text-white"
                 onClick={(e) => handleReferLead(e)}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                disabled={
+                  !selectedConcernPerson || 
+                  (showPanel === 'RefferAllLeads' && (selectedProfiles.length === 0 && !input1Value))
+                }
+                style={{ 
+                  backgroundColor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : '#fd7e14', 
+                  border: 'none', 
+                  padding: '8px 24px', 
+                  fontSize: '14px',
+                  cursor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? 'not-allowed' : 'pointer'
+                }}
               >
-
                 {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
@@ -2413,116 +2877,558 @@ const B2BSales = () => {
                   </div>
 
                   <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      {/* Quick Search */}
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="position-relative">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Quick search..."
-                            value={filters.search}
-                            onChange={(e) => handleFilterChange('search', e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                applyFilters();
-                              }
-                            }}
-                            style={{
-                              width: '200px',
-                              paddingRight: '30px',
-                              paddingLeft: '12px',
-                              paddingTop: '8px',
-                              paddingBottom: '8px',
-                              backgroundColor: '#ffffff',
-                              border: '1.5px solid #ced4da',
-                              color: '#212529',
-                              fontSize: '13px',
-                              borderRadius: '6px',
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              transition: 'all 0.2s ease'
-                            }}
-                          />
-                          {filters.search && (
-                            <button
-                              type="button"
-                              className="btn btn-sm position-absolute"
-                              onClick={() => {
-                                handleFilterChange('search', '');
-                                applyFilters();
+                    {/* Desktop Layout */}
+                    <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                      {/* Left side - Buttons */}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {/* Quick Search */}
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="position-relative">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder="Quick search..."
+                              value={filters.search}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleFilterChange('search', val);
+                                if (val === '') applyFilters({ search: '' });
+                              }}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  applyFilters();
+                                }
                               }}
                               style={{
-                                right: '2px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                padding: '2px 6px',
-                                backgroundColor: '#dc3545',
-                                border: 'none',
-                                color: 'white',
-                                borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                                width: '200px',
+                                paddingRight: '30px',
+                                paddingLeft: '12px',
+                                paddingTop: '8px',
+                                paddingBottom: '8px',
+                                backgroundColor: '#ffffff',
+                                border: '1.5px solid #ced4da',
+                                color: '#212529',
+                                fontSize: '13px',
+                                borderRadius: '6px',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                transition: 'all 0.2s ease'
                               }}
-                            >
-                              <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
-                            </button>
-                          )}
+                            />
+                            {filters.search && (
+                              <button
+                                type="button"
+                                className="btn btn-sm position-absolute"
+                                onClick={() => {
+                                  handleFilterChange('search', '');
+                                  applyFilters({ search: '' });
+                                }}
+                                style={{
+                                  right: '2px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  padding: '2px 6px',
+                                  backgroundColor: '#dc3545',
+                                  border: 'none',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={applyFilters}
+                            disabled={!filters.search}
+                            style={{
+                              backgroundColor: '#007bff',
+                              borderColor: '#007bff',
+                              color: 'white',
+                              fontWeight: '500',
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                          </button>
                         </div>
+
                         <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          onClick={applyFilters}
-                          disabled={!filters.search}
+                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          onClick={() => setShowFilters(!showFilters)}
                           style={{
-                            backgroundColor: '#007bff',
-                            borderColor: '#007bff',
-                            color: 'white',
+                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
+                            color: showFilters ? '#ffffff' : '#6c757d',
                             fontWeight: '500',
                             padding: '8px 16px',
                             borderRadius: '6px',
                             fontSize: '13px',
-                            boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            borderWidth: '1.5px'
                           }}
                         >
-                          <i className="fas fa-search me-1"></i>
-
+                          <i className="fas fa-filter me-1"></i>
                         </button>
+                        
+                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
+                          <>
+                            <button className="btn btn-sm btn-outline-primary" style={{
+                              padding: "6px 12px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                              onClick={handleOpenLeadModal}
+                            >
+                              <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                              Add Lead
+                            </button>
+                            <button 
+                              className="btn btn-sm btn-outline-primary" 
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              onClick={() => {
+                                setShowBulkInputs(true);
+                                setBulkMode('bulkupload');
+                                setInput1Value('');
+                                setShowBulkUploadModal(true);
+                              }}
+                            >
+                              <i className="fas fa-file-upload" style={{ fontSize: "10px" }}></i>
+                              Bulk Upload
+                            </button>
+                          </>
+                        )}
+                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                          <button 
+                            className="btn btn-sm btn-outline-primary" 
+                            disabled={loadingLeads || leads.length === 0}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                            Refer All Leads
+                          </button>
+                        )}
                       </div>
 
-                      <button
-                        className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        onClick={() => setShowFilters(!showFilters)}
-                        style={{
-                          backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                          color: showFilters ? '#ffffff' : '#6c757d',
-                          fontWeight: '500',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          transition: 'all 0.2s ease',
-                          borderWidth: '1.5px'
-                        }}
-                      >
-                        <i className="fas fa-filter me-1"></i>
-
-                      </button>
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
- 
-                      <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
-                        <i className="fas fa-plus me-1"></i> Add Lead
-                      </button>
-                    )}  
+                      {/* Right side - Input Fields for Bulk Refer */}
+                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "stretch",
+                          border: "1px solid #dee2e6",
+                          borderRadius: "4px",
+                          backgroundColor: "#fff",
+                          overflow: "hidden",
+                          width: "200px",
+                          height: "32px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Input 1"
+                            value={input1Value}
+                            onChange={(e) => {
+                              const maxValue = totalLeads || leads?.length || 0;
+                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                              
+                              if (inputValue === '') {
+                                setInput1Value('');
+                                return;
+                              }
+                              
+                              const numValue = parseInt(inputValue, 10);
+                              
+                              if (numValue < 1 || isNaN(numValue)) {
+                                inputValue = '1';
+                              } else if (numValue > maxValue) {
+                                inputValue = maxValue.toString();
+                              }
+                              
+                              setInput1Value(inputValue);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              borderRight: "1px solid #dee2e6",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Input 2"
+                            value={totalLeads || leads?.length || 0}
+                            readOnly
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box",
+                              cursor: "default"
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
+                  {/* Mobile Layout */}
+                  <div className="col-12 d-md-none mt-2">
+                    <div className="row g-2">
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
+                        <>
+                          <div className="col-6">
+                            <button className="btn w-100" style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: '#007bff',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                              onClick={handleOpenLeadModal}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+                              }}
+                            >
+                              <i className="fas fa-plus" style={{ fontSize: "14px" }}></i>
+                              Add Lead
+                            </button>
+                          </div>
+                          <div className="col-6">
+                            <button className="btn w-100" style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                              onClick={() => {
+                                setShowBulkInputs(true);
+                                setBulkMode('bulkupload');
+                                setInput1Value('');
+                                setShowBulkUploadModal(true);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
+                              }}
+                            >
+                              <i className="fas fa-file-upload" style={{ fontSize: "14px" }}></i>
+                              Bulk Upload
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <div className="col-6">
+                          <button 
+                            className="btn w-100" 
+                            disabled={loadingLeads || leads.length === 0}
+                            style={{
+                              padding: "12px 8px",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              backgroundColor: loadingLeads || leads.length === 0 ? '#ccc' : '#6c757d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              boxShadow: '0 2px 8px rgba(108, 117, 125, 0.3)',
+                              transition: 'all 0.2s ease',
+                              cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loadingLeads && leads.length > 0) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(108, 117, 125, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(108, 117, 125, 0.3)';
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "14px" }}></i>
+                            Refer Leads
+                          </button>
+                        </div>
+                      )}
+                      {/* Mobile Bulk Input Fields for Bulk Refer */}
+                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                        <div className="col-12 mt-2">
+                          <div style={{
+                            display: "flex",
+                            alignItems: "stretch",
+                            border: "1px solid #dee2e6",
+                            borderRadius: "4px",
+                            backgroundColor: "#fff",
+                            overflow: "hidden",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                          }}>
+                            <input
+                              type="text"
+                              placeholder="Input 1"
+                              value={input1Value}
+                              onChange={(e) => {
+                                const maxValue = totalLeads || leads?.length || 0;
+                                let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                                
+                                if (inputValue === '') {
+                                  setInput1Value('');
+                                  return;
+                                }
+                                
+                                const numValue = parseInt(inputValue, 10);
+                                
+                                if (numValue < 1 || isNaN(numValue)) {
+                                  inputValue = '1';
+                                } else if (numValue > maxValue) {
+                                  inputValue = maxValue.toString();
+                                }
+                                
+                                setInput1Value(inputValue);
+                              }}
+                              onKeyDown={(e) => {
+                                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                  e.preventDefault();
+                                }
+                              }}
+                              style={{
+                                width: "50%",
+                                border: "none",
+                                borderRight: "1px solid #dee2e6",
+                                outline: "none",
+                                padding: "8px 12px",
+                                fontSize: "14px",
+                                backgroundColor: "transparent",
+                                height: "40px",
+                                boxSizing: "border-box"
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Input 2"
+                              value={totalLeads || leads?.length || 0}
+                              readOnly
+                              style={{
+                                width: "50%",
+                                border: "none",
+                                outline: "none",
+                                padding: "8px 12px",
+                                fontSize: "14px",
+                                backgroundColor: "transparent",
+                                height: "40px",
+                                boxSizing: "border-box",
+                                cursor: "default"
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div className="col-12 mt-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="position-relative flex-grow-1">
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="🔍 Search leads..."
+                              value={filters.search}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleFilterChange('search', val);
+                                if (val === '') applyFilters({ search: '' });
+                              }}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  applyFilters();
+                                }
+                              }}
+                              style={{
+                                paddingRight: '35px',
+                                paddingLeft: '14px',
+                                paddingTop: '12px',
+                                paddingBottom: '12px',
+                                backgroundColor: '#ffffff',
+                                border: '1.5px solid #ced4da',
+                                color: '#212529',
+                                fontSize: '14px',
+                                borderRadius: '8px',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                              }}
+                            />
+                            {filters.search && (
+                              <button
+                                type="button"
+                                className="btn btn-sm position-absolute"
+                                onClick={() => {
+                                  handleFilterChange('search', '');
+                                  applyFilters({ search: '' });
+                                }}
+                                style={{
+                                  right: '4px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#dc3545',
+                                  border: 'none',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 2px 4px rgba(220, 53, 69, 0.3)'
+                                }}
+                              >
+                                <i className="fas fa-times" style={{ fontSize: '10px' }}></i>
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={applyFilters}
+                            disabled={!filters.search}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              minWidth: '48px',
+                              height: '48px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!e.currentTarget.disabled) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+                            }}
+                          >
+                            <i className="fas fa-search" style={{ fontSize: '16px' }}></i>
+                          </button>
+                          <button
+                            className={`btn ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                            onClick={() => setShowFilters(!showFilters)}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              minWidth: '48px',
+                              height: '48px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s ease',
+                              borderWidth: '1.5px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
+                            }}
+                          >
+                            <i className="fas fa-filter" style={{ fontSize: '16px' }}></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-1">
-                    <div className="d-flex flex-wrap gap-1 align-items-center">
+                    <div className="d-flex flex-wrap gap-1 align-items-center mt-sm-3 mt-3">
                       {/* Status Count Cards */}
                       {loadingStatusCounts ? (
                         <div className="d-flex gap-2">
@@ -2611,6 +3517,119 @@ const B2BSales = () => {
           }}>
             <section className="list-view">
 
+              {/* Bulk refer bar (shows above lead cards) */}
+              {showBulkInputs && bulkMode === 'bulkrefer' && (
+                <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
+                  <div className="card-body py-2">
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fw-semibold text-dark" style={{ fontSize: '13px' }}>
+                          <i className="fas fa-layer-group me-1 text-secondary"></i>
+                          Bulk Select
+                        </span>
+                        <div style={{
+                          display: "flex",
+                          alignItems: "stretch",
+                          border: "1px solid #dee2e6",
+                          borderRadius: "8px",
+                          backgroundColor: "#fff",
+                          overflow: "hidden",
+                          width: "220px",
+                          height: "36px"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Input 1"
+                            value={input1Value}
+                            onChange={(e) => {
+                              const maxValue = totalLeads || leads?.length || 0;
+                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                              if (inputValue === '') {
+                                setInput1Value('');
+                                return;
+                              }
+                              const numValue = parseInt(inputValue, 10);
+                              if (numValue < 1 || isNaN(numValue)) inputValue = '1';
+                              else if (numValue > maxValue) inputValue = maxValue.toString();
+                              setInput1Value(inputValue);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              borderRight: "1px solid #dee2e6",
+                              outline: "none",
+                              padding: "6px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Total"
+                            value={totalLeads || leads?.length || 0}
+                            readOnly
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              outline: "none",
+                              padding: "6px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box",
+                              cursor: "default"
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => {
+                            setInput1Value('');
+                            setSelectedProfiles([]);
+                          }}
+                          title="Clear selection"
+                          style={{ height: '36px' }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="text-muted" style={{ fontSize: '13px' }}>
+                          Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => {
+                            if (!selectedProfiles || selectedProfiles.length === 0) {
+                              alert('Please type a number in Input 1 to select leads first.');
+                              return;
+                            }
+                            openRefferPanel(null, 'RefferAllLeads');
+                          }}
+                          style={{ height: '36px', whiteSpace: 'nowrap' }}
+                        >
+                          <i className="fas fa-share me-1"></i>
+                          Refer
+                        </button>
+                      </div>
+                    </div>
+                    <small className="text-muted d-block mt-1" style={{ fontSize: '12px' }}>
+                      Tip: this selects the first N leads from your current filters/status and highlights them below.
+                    </small>
+                  </div>
+                </div>
+              )}
+
               {/* Loading State */}
               {loadingLeads ? (
                 <div className="text-center py-5">
@@ -2633,7 +3652,7 @@ const B2BSales = () => {
                 <div className="row g-2">
                   {leads.map((lead, leadIndex) => (
                     <div key={lead._id || leadIndex} className="col-12">
-                      <div className="lead-card">
+                      <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {/* Card Header */}
                         <div className="lead-header">
                           <div className="lead-title-section">
@@ -2707,14 +3726,26 @@ const B2BSales = () => {
                                   </span>
                                 )}
                               </div>
-                              <button
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => openEditPanel(lead, 'StatusChange')}
-                                title="Change Status"
-                              >
-                                <i className="fas fa-edit me-1"></i>
-                                Change Status
-                              </button>
+                              {canUpdateLead(lead) ? (
+                                <button
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => openEditPanel(lead, 'StatusChange')}
+                                  title="Change Status"
+                                >
+                                  <i className="fas fa-edit me-1"></i>
+                                  Change Status
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  disabled
+                                  title="You don't have permission to update this lead"
+                                  style={{ cursor: 'not-allowed', opacity: 0.6 }}
+                                >
+                                  <i className="fas fa-lock me-1"></i>
+                                  No Permission
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -2742,13 +3773,26 @@ const B2BSales = () => {
                                   <span className="compact-info-value">{lead.leadAddedBy.name}</span>
                                 </div>
                               )}
-                              {lead.remark && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-comment text-success"></i>
-                                  <span className="compact-info-label">Remarks:</span>
-                                  <span className="compact-info-value">{lead.remark}</span>
-                                </div>
-                              )}
+                              {(() => {
+                                let latestRemark = '';
+
+                                if (Array.isArray(lead.logs) && lead.logs.length > 0) {
+                                  const lastLog = lead.logs[lead.logs.length - 1];
+                                  latestRemark = lastLog?.remarks || '';
+                                }
+
+                                if (!latestRemark && typeof lead.remark === 'string' && lead.remark.trim()) {
+                                  latestRemark = lead.remark;
+                                }
+
+                                return latestRemark ? (
+                                  <div className="compact-info-item">
+                                    <i className="fas fa-comment text-success"></i>
+                                    <span className="compact-info-label">Remarks:</span>
+                                    <span className="compact-info-value">{latestRemark}</span>
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -2782,20 +3826,43 @@ const B2BSales = () => {
                             </button>
                           </div>
                           <div className="action-group secondary">
-                            <button
-                              className="action-btn status"
-                              onClick={() => openEditPanel(lead, 'StatusChange')}
-                              title="Change Status"
-                            >
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button
-                              className="action-btn followup"
-                              onClick={() => openEditPanel(lead, 'SetFollowup')}
-                              title="Set Follow-up"
-                            >
-                              <i className="fas fa-calendar-plus"></i>
-                            </button>
+                            {canUpdateLead(lead) ? (
+                              <>
+                                <button
+                                  className="action-btn status"
+                                  onClick={() => openEditPanel(lead, 'StatusChange')}
+                                  title="Change Status"
+                                >
+                                  <i className="fas fa-edit"></i>
+                                </button>
+                                <button
+                                  className="action-btn followup"
+                                  onClick={() => openEditPanel(lead, 'SetFollowup')}
+                                  title="Set Follow-up"
+                                >
+                                  <i className="fas fa-calendar-plus"></i>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="action-btn status"
+                                  disabled
+                                  title="You don't have permission to update this lead"
+                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                >
+                                  <i className="fas fa-lock"></i>
+                                </button>
+                                <button
+                                  className="action-btn followup"
+                                  disabled
+                                  title="You don't have permission to set follow-up for this lead"
+                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                >
+                                  <i className="fas fa-lock"></i>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2904,10 +3971,16 @@ const B2BSales = () => {
       {showFilters && (
         <div
           className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 1060,
+            // Ensure modal overlay can scroll on smaller screens
+            overflowY: 'auto',
+            maxHeight: '100vh'
+          }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow">
+          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content border-0 shadow" style={{ maxHeight: '90vh' }}>
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
@@ -2919,7 +3992,7 @@ const B2BSales = () => {
                   onClick={() => setShowFilters(false)}
                 ></button>
               </div>
-              <div className="modal-body p-4">
+              <div className="modal-body p-4" style={{ overflowY: 'auto' }}>
                 <div className="row g-3">
                   <div className="col-md-4">
                     <label className="form-label fw-medium text-dark mb-2">
@@ -3120,7 +4193,7 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select Lead Category</option>
-                        {leadCategoryOptions.map(category => (
+                        {leadCategoryOptions.filter(category => category).map(category => (
                           <option key={category.value} value={category.value}>
                             {category.label}
                           </option>
@@ -3146,7 +4219,7 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select B2B Type</option>
-                        {typeOfB2BOptions.map(type => (
+                        {typeOfB2BOptions.filter(type => type).map(type => (
                           <option key={type.value} value={type.value}>
                             {type.label}
                           </option>
@@ -3434,6 +4507,167 @@ const B2BSales = () => {
           </div>
         )
       }
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              {/* Modal Header */}
+              <div className="modal-header" style={{ backgroundColor: '#28a745', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-file-upload me-2"></i>
+                  Bulk Upload B2B Leads
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseBulkUploadModal}
+                ></button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="modal-body p-4">
+                {/* Instructions */}
+                <div className="alert alert-info mb-4">
+                  <h6 className="fw-bold mb-2">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Instructions:
+                  </h6>
+                  <ul className="mb-0 small">
+                    <li>Upload CSV or Excel file (.xlsx, .xls, .csv)</li>
+                    <li>Maximum file size: 10MB</li>
+                    <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Category, Type of B2B</li>
+                   
+                  </ul>
+                </div>
+
+                {/* File Upload Section */}
+                <div className="mb-4">
+                  <label className="form-label fw-bold mb-3">
+                    <i className="fas fa-file-excel text-success me-2"></i>
+                    Select File <span className="text-danger">*</span>
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="file"
+                      id="bulkUploadFile"
+                      ref={bulkUploadFileInputRef}
+                      className="form-control"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleBulkFileChange}
+                      disabled={bulkUploadLoading}
+                    />
+                    <button
+                      className="btn btn-outline-secondary"
+                      type="button"
+                      onClick={() => bulkUploadFileInputRef.current?.click()}
+                      disabled={bulkUploadLoading}
+                    >
+                      <i className="fas fa-folder-open me-1"></i>
+                      Browse
+                    </button>
+                  </div>
+                  {bulkUploadFile && (
+                    <div className="mt-2">
+                      <small className="text-success">
+                        <i className="fas fa-check-circle me-1"></i>
+                        Selected: {bulkUploadFile.name} ({(bulkUploadFile.size / 1024).toFixed(2)} KB)
+                      </small>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sample File Download */}
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => {
+                      // Create sample CSV content with proper format
+                      // Note: Lead Category and Type of B2B names should match system values
+                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Category,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
+ABC Company,John Doe,9876543210,john@abc.com,Corporate,Partner,123 Main Street,Mumbai,Maharashtra,Manager,9876543210,0221234567,Owner Name,Sample remark
+XYZ Corp,Jane Smith,9876543211,jane@xyz.com,Individual,Client,456 Park Avenue,Delhi,Delhi,Director,9876543211,0111234567,Owner Name,Another remark
+Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park,Bangalore,Karnataka,CEO,9876543212,0801234567,Owner Name,Technology company`;
+                      
+                      const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', 'b2b_leads_sample.csv');
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <i className="fas fa-download me-1"></i>
+                    Download Sample CSV
+                  </button>
+                </div>
+
+                {/* Message Display */}
+                {bulkUploadMessage && (
+                  <div className={`alert ${bulkUploadSuccess ? 'alert-success' : 'alert-danger'} mb-3`}>
+                    <i className={`fas ${bulkUploadSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
+                    {bulkUploadMessage}
+                  </div>
+                )}
+
+                {/* Error Details */}
+                {bulkUploadErrors.length > 0 && (
+                  <div className="mb-3">
+                    <h6 className="fw-bold text-danger mb-2">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      Error Details:
+                    </h6>
+                    <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f8f9fa' }}>
+                      <ul className="mb-0 small">
+                        {bulkUploadErrors.map((error, index) => (
+                          <li key={index} className="text-danger">{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="d-flex justify-content-end gap-2 mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary px-4"
+                    onClick={handleCloseBulkUploadModal}
+                    disabled={bulkUploadLoading}
+                  >
+                    <i className="fas fa-times me-1"></i>
+                    {bulkUploadSuccess ? 'Close' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success px-4"
+                    onClick={handleBulkUpload}
+                    disabled={!bulkUploadFile || bulkUploadLoading}
+                  >
+                    {bulkUploadLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-upload me-1"></i>
+                        Upload Leads
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
       <style>{`
@@ -3471,6 +4705,12 @@ const B2BSales = () => {
   .lead-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Bulk selection highlight */
+  .lead-card.bulk-selected {
+    outline: 2px solid #0d6efd;
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.25);
   }
 
   /* Header Section */
@@ -3785,17 +5025,99 @@ const B2BSales = () => {
     
     .lead-actions {
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.75rem;
+      padding: 0.75rem;
     }
     
     .action-group {
       width: 100%;
       justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      min-height: 44px;
+    }
+    
+    .action-btn span {
+      font-size: 0.85rem;
     }
     
     .lead-badges {
       position: static;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .lead-header {
+      padding: 1rem 0.75rem;
+    }
+    
+    .lead-business-name {
+      font-size: 1rem;
+    }
+    
+    .lead-contact-person {
+      font-size: 0.8rem;
+    }
+    
+    .lead-contact-info {
+    display:flex;
+    flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .lead-contact-item {
+      display:flex;
+      align-item:center;
+      gap: 0.25rem;
+      font-size:0.7rem;
+      opacity: 0.9;
+      max-width: 262px;
+    }
+    
+    .lead-content {
+      padding: 0.75rem 0.5rem;
+    }
+    
+    .status-section {
+      padding: 10px;
+    }
+    
+    .status-section .badge {
+      font-size: 0.7rem;
+      padding: 3px 6px;
+    }
+    
+    .status-section .btn {
+      font-size: 0.7rem;
+      padding: 4px 10px;
+    }
+    
+    .compact-info-item {
+      font-size: 0.7rem;
+      padding: 0.3rem 0;
+    }
+    
+    .status-count-card {
+      min-width: 100px;
+      height: 50px;
+    }
+    
+    .status-count-card .card-body {
+      padding: 0.4rem;
+    }
+    
+    .status-count-card h6 {
+      font-size: 0.75rem;
+    }
+    
+    .status-count-card small {
+      font-size: 0.65rem;
     }
   }
 
@@ -3963,7 +5285,118 @@ const B2BSales = () => {
     margin-bottom: 0.5rem !important;
   }
 `}</style>
+<style>
+{`
+@media (max-width:992px){
+.react-calendar {
+  transform: translateY(-200px) !important;
+}
+}
+/* ===== Small Date Input ===== */
+.small-date {
+  font-size: 14px;
+  height: 32px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
 
+/* ===== React Date Picker (react-date-picker) ===== */
+.react-date-picker {
+  height: 32px;
+  box-sizing:content-box;
+}
+
+.react-date-picker__wrapper {
+  height: 100%;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex;
+  align-items: center;
+}
+
+.react-date-picker__inputGroup {
+  height: 100%;
+  font-size: 15px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.react-date-picker__button {
+  padding: 0;
+  margin: 0;
+}
+
+.react-date-picker__calendar-button {
+  padding: 0 4px;
+}
+
+/* Hide clear button if needed */
+/* .react-date-picker__clear-button {
+  display: none;
+} */
+
+/* ===== React Datepicker (react-datepicker) ===== */
+.react-datepicker-wrapper,
+.react-datepicker__input-container,
+.react-datepicker__input-container input {
+  width: 100%;
+}
+  .react-date-picker__inputGroup {
+  min-width: unset !important;   /* removes calc width */
+  flex-grow: 1;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+  
+
+/* ===== Lead Buttons ===== */
+.LeadButtons {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.SerachClear {
+  position: absolute;   /* IMPORTANT */
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px;
+  background-color: #dc3545;
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+  cursor: pointer;
+}
+.google-btn{
+    white-space: nowrap;
+    width: 90px !important;
+    overflow: hidden;
+}
+/* Tablet */
+@media (max-width: 768px) {
+
+  .SerachClear {
+            width: 22px !important;
+        height: 22px !important;
+        right: 10px !important;
+        top: 15px !important;
+  }
+}
+}
+`}
+</style>
     </div >
   );
 };

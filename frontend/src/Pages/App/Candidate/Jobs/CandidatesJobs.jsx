@@ -201,7 +201,7 @@ const CandidatesJobs = () => {
   const location = useLocation();
   const mapRef = useRef(null);
   const googleMapsRef = useRef(null);
-
+  const token =  localStorage.getItem('token') 
   // State variables
   const [jobs, setJobs] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -244,10 +244,69 @@ const CandidatesJobs = () => {
 
   // Share job function
   const handleShareJob = async (jobId, jobTitle, companyName) => {
-    const jobUrl = `${window.location.origin}/candidate/job/${jobId}`;
+    let refCode = null;
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    
+   
+    try {
+      const candidateStr = sessionStorage.getItem('candidate');
+      if (candidateStr) {
+        const candidate = JSON.parse(candidateStr);
+        refCode = candidate?._id || candidate?.id;
+      }
+    } catch (error) {
+      
+    }
+    
+    if (!refCode) {
+      refCode = localStorage.getItem('candidateId');
+    }
+    
+    if (!refCode) {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const response = await axios.get(`${backendUrl}/candidate/getCandidateId`, {
+              headers: { 'x-auth': token }
+            });
+            
+            if (response.data?.status && response.data?.candidateId) {
+              refCode = response.data.candidateId;
+              localStorage.setItem('candidateId', refCode);
+              if (response.data.candidate) {
+                sessionStorage.setItem('candidate', JSON.stringify(response.data.candidate));
+              }
+            }
+          } catch (simpleError) {
+            // Fallback to myprofile API
+            const response = await axios.get(`${backendUrl}/candidate/myprofile`, {
+              headers: { 'x-auth': token }
+            });
+            
+            if (response.data) {
+              const candidate = response.data.candidate || response.data;
+              if (candidate?._id) {
+                refCode = candidate._id.toString();
+                localStorage.setItem('candidateId', refCode);
+                sessionStorage.setItem('candidate', JSON.stringify(candidate));
+              }
+            }
+          }
+        }
+      } catch (error) {
+ 
+      }
+    }
+    
+
+    const jobDetailUrl = `/candidate/job/${jobId}`;
+    const returnUrl = refCode ? `${jobDetailUrl}?refCode=${refCode}` : jobDetailUrl;
+    const loginUrl = `${window.location.origin}/candidate/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+    
     const jobTitleText = jobTitle || 'Job Opportunity';
     const companyText = companyName ? ` at ${companyName}` : '';
-    const shareText = `Check out this job opportunity${companyText}: ${jobTitleText}\n\n${jobUrl}\n\nनौकरी का मौका देखें${companyText}: ${jobTitleText}`;
+    const shareText = `Check out this job opportunity${companyText}: ${jobTitleText}\n\n${loginUrl}\n\nनौकरी का मौका देखें${companyText}: ${jobTitleText}`;
 
     // Try Web Share API first (works on mobile devices and modern browsers)
     if (navigator.share) {
@@ -255,7 +314,7 @@ const CandidatesJobs = () => {
         await navigator.share({
           title: jobTitleText,
           text: shareText,
-          url: jobUrl,
+          url: loginUrl,
         });
         return;
       } catch (error) {
@@ -272,6 +331,16 @@ const CandidatesJobs = () => {
   };
 
 
+
+  // ✅ Extract and save refCode from URL (if present)
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const refCode = queryParams.get('refCode');
+    if (refCode) {
+      localStorage.setItem('refCode', refCode);
+      console.log('RefCode saved from searchjob URL:', refCode);
+    }
+  }, [location.search]);
 
   // Parse query parameters on component mount
   useEffect(() => {

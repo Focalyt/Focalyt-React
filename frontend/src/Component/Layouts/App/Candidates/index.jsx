@@ -14,7 +14,7 @@ import {
 
 import {
   faUser as farUser, faFile as farFile,
-  faPaperPlane as farPaperPlane, faMap as farMap, faHand as farHand, faBookmark as farBookmark,
+  faPaperPlane as farPaperPlane, faMap as farMap, faHand as farHand, faBookmark as farBookmark, 
   faCircle as farCircle, faCirclePlay as farCirclePlay, faShareFromSquare as farShareFromSquare, faBell as farBell, faMoneyBill1 as farMoneyBill1,
 } from "@fortawesome/free-regular-svg-icons";
 
@@ -1060,6 +1060,12 @@ function CandidateLayout({ children }) {
                       <span className="menu-title">My Earnings</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/candidate/myAchievement' ? 'active' : ''}`}>
+                    <Link to="/candidate/myAchievement" onClick={() => { handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farMoneyBill1} />
+                      <span className="menu-title">My Achievement</span>
+                    </Link>
+                  </li>
                   <li className={`nav-item ${location.pathname === '/candidate/referral' ? 'active' : ''}`}>
                     <Link to="/candidate/referral" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faForward} />
@@ -1697,7 +1703,10 @@ span#notification {
     }
 }
 @media(max-width:768px){
-    
+     html body .content .content-wrapper {
+    padding: calc(2.2rem - 0.4rem) .8rem 0;
+    margin-top: 6rem;
+}
     .header-navbar.floating-nav{
         width: 100%!important;
         margin: 0;

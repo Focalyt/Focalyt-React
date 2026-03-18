@@ -200,7 +200,7 @@ const CandidateDashboard = () => {
                           <h4 className="card-title mb-0" id="wrapping-bottom">Latest Applied Jobs / नवीनतम लागू नौकरियां</h4>
                         </div>
                         <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right my-auto">
-                          <a href="/candidate/appliedJobs" className="btn btn-outline-primary btn-sm waves-effect waves-light">View All</a>
+                          <a href="/candidate/appliedJobs" className="btn btn-outline-primary btn-sm waves-effect waves-light viewAllBtn">View All</a>
                         </div>
                       </div>
                     </div>
@@ -761,6 +761,24 @@ background-color: #64ccf3;
 `
 }</style>
 
+<style>
+  {
+    `
+   
+    @media (max-width:768px){
+    
+    .viewAllBtn{
+    font-size: 12px;
+    margin: 6px;
+    width: min-content !important;
+    }
+
+    .card{
+      margin-bottom: 1.5rem !important;
+      }
+    }`
+  }
+</style>
           </div>
       
    </>

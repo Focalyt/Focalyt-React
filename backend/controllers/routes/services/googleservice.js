@@ -1,9 +1,11 @@
 const { google } = require('googleapis')
 const axios = require('axios')
+const path = require('path')
 const {sheetId} = require('../../../config')
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
-const serviceAccountKeyFile = "./focalyt-new-key.json";
+// Use absolute path relative to backend folder, not current working directory
+const serviceAccountKeyFile = path.join(__dirname, '../../../focalyt-new-key.json');
 const tabName = 'candidates';
 const futureTechnologyLabstabName = 'FutureTechnology Lab';
 const updateSpreadSheetRequestCallName = 'Request Callback Leads'
@@ -16,6 +18,7 @@ module.exports = {
   updateSpreadSheetLabLeadsValues,
   updateSpreadSheetCarrerValues,
   updateSpreadSheetRequestCallValues,
+  getAuthToken,
   getGoogleAuthToken,
   createGoogleCalendarEvent,
   getAllGoogleCalendarEvents,

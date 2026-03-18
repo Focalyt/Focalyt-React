@@ -1,17 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import axios from 'axios';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, Doughnut } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 // import {Doughnut } from 'react-chartjs-2';
 // Add Bootstrap 5 CSS to your index.html or import it in your main app file
 // <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
+import NewDashboard from './NewDashboard';
+import CounselorPerformance from './CounselorPerformance';
+// 
 
 // Advanced Date Picker Component
 
-const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
+const AdvancedDatePicker = ({ onDateRangeChange, onClose, t }) => {
 
   const today = new Date();
   const todayStr = today.getFullYear() + '-' +
@@ -31,17 +35,17 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
   };
 
   const dateRanges = [
-    { id: 'today', label: 'Today' },
-    { id: 'yesterday', label: 'Yesterday' },
-    { id: 'todayYesterday', label: 'Today and yesterday' },
-    { id: 'last7', label: 'Last 7 days' },
-    { id: 'last30', label: 'Last 30 days' },
-    { id: 'thisWeek', label: 'This week' },
-    { id: 'lastWeek', label: 'Last week' },
-    { id: 'thisMonth', label: 'This month' },
-    { id: 'lastMonth', label: 'Last month' },
-    { id: 'maximum', label: 'Maximum' },
-    { id: 'custom', label: 'Custom' }
+    { id: 'today', label: t('today') },
+    { id: 'yesterday', label: t('yesterday') },
+    { id: 'todayYesterday', label: t('today_yesterday') },
+    { id: 'last7', label: t('last_7_days') },
+    { id: 'last30', label: t('last_30_days') },
+    { id: 'thisWeek', label: t('this_week') },
+    { id: 'lastWeek', label: t('last_week') },
+    { id: 'thisMonth', label: t('this_month') },
+    { id: 'lastMonth', label: t('last_month') },
+    { id: 'maximum', label: t('maximum') },
+    { id: 'custom', label: t('custom') }
   ];
 
   const getDateRange = (rangeId) => {
@@ -182,13 +186,13 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
         <table className="table table-sm">
           <thead>
             <tr>
-              <th className="text-center text-muted small">Sun</th>
-              <th className="text-center text-muted small">Mon</th>
-              <th className="text-center text-muted small">Tue</th>
-              <th className="text-center text-muted small">Wed</th>
-              <th className="text-center text-muted small">Thu</th>
-              <th className="text-center text-muted small">Fri</th>
-              <th className="text-center text-muted small">Sat</th>
+              <th className="text-center text-muted small">{t('sun')}</th>
+              <th className="text-center text-muted small">{t('mon')}</th>
+              <th className="text-center text-muted small">{t('tue')}</th>
+              <th className="text-center text-muted small">{t('wed')}</th>
+              <th className="text-center text-muted small">{t('thu')}</th>
+              <th className="text-center text-muted small">{t('fri')}</th>
+              <th className="text-center text-muted small">{t('sat')}</th>
             </tr>
           </thead>
           <tbody>
@@ -231,7 +235,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
       <div className="position-absolute bg-white rounded shadow" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }}>
         <div className="p-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="mb-0">Select Date Range</h5>
+            <h5 className="mb-0">{t('select_date_range')}</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
 
@@ -269,7 +273,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
                 <div className="row">
                   <div className="col-6">
                     <div className="mb-2">
-                      <label className="form-label small">Start Date</label>
+                      <label className="form-label small">{t('start_date')}</label>
                       <input
                         type="text"
                         className="form-control form-control-sm"
@@ -281,7 +285,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
                   </div>
                   <div className="col-6">
                     <div className="mb-2">
-                      <label className="form-label small">End Date</label>
+                      <label className="form-label small">{t('end_date')}</label>
                       <input
                         type="text"
                         className="form-control form-control-sm"
@@ -306,8 +310,8 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
               paddingBottom: '1rem'
             }}
           >
-            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleUpdate}>Update</button>
+            <button className="btn btn-secondary" onClick={onClose}>{t('cancel')}</button>
+            <button className="btn btn-primary" onClick={handleUpdate}>{t('update')}</button>
           </div>
         </div>
       </div>
@@ -323,8 +327,34 @@ const MultiSelectCheckbox = ({
   onChange,
   icon = "fas fa-list",
   isOpen,
-  onToggle
+  onToggle,
+  t
 }) => {
+  const containerRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        onToggle();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onToggle]);
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
@@ -332,10 +362,15 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
+  const filteredOptions = options.filter(option => {
+    const label = String(option?.label ?? '');
+    return label.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
-      return `Select ${title}`;
+      return `${t('select')} ${title}`;
     } else if (selectedValues.length === 1) {
       const selectedOption = options.find(opt => opt.value === selectedValues[0]);
       return selectedOption ? selectedOption.label : selectedValues[0];
@@ -351,7 +386,7 @@ const MultiSelectCheckbox = ({
   };
 
   return (
-    <div className="multi-select-container-new">
+    <div className="multi-select-container-new" ref={containerRef}>
       <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
         <i className={`${icon} me-1 text-primary`}></i>
         {title}
@@ -384,7 +419,9 @@ const MultiSelectCheckbox = ({
                 <input
                   type="text"
                   className="form-control"
-                  placeholder={`Search ${title.toLowerCase()}...`}
+                  placeholder={`${t('search')} ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -392,7 +429,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -408,10 +445,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `${t('no_options_found')} "${searchTerm}"` : t('no_options_available')}
                 </div>
               )}
             </div>
@@ -420,7 +457,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} {t('selected')}
+                  {searchTerm && ` (${t('filtered_from')} ${options.length} ${t('total')})`}
                 </small>
               </div>
             )}
@@ -433,9 +471,13 @@ const MultiSelectCheckbox = ({
 
 const LeadAnalyticsDashboard = () => {
 
+  const { t } = useTranslation();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+
+  
   // Initialize with today's date
   const getInitialDates = () => {
     const today = new Date();
@@ -459,8 +501,17 @@ const LeadAnalyticsDashboard = () => {
     verifiedCount: 0
   });
   const [weeklyStats, setWeeklyStats] = useState([]);
+  const [followupCounts, setFollowupCounts] = useState({
+    done: 0,
+    planned: 0,
+    missed: 0
+  });
+  const [followupCountsByCounselor, setFollowupCountsByCounselor] = useState([]);
+  const [followupCountsByCounselorLoading, setFollowupCountsByCounselorLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
+  const [preVerificationStartDate, setPreVerificationStartDate] = useState('');
+  const [preVerificationEndDate, setPreVerificationEndDate] = useState('');
   const [showPreVerificationDatePicker, setShowPreVerificationDatePicker] = useState(false);
 
   // Lead tracking state
@@ -473,8 +524,8 @@ const LeadAnalyticsDashboard = () => {
 
     fetchWeeklyStats();
     fetchSourceLeads();
+    fetchPreVerificationStats();
   }, []);
-
 
   const fetchWeeklyStats = async () => {
     try {
@@ -499,19 +550,23 @@ const LeadAnalyticsDashboard = () => {
 
   const handleSearch = () => {
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   const handleClearFilters = () => {
     setSelectedDate('');
+    setPreVerificationStartDate('');
+    setPreVerificationEndDate('');
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   const handleShowAll = () => {
     setSelectedDate('');
+    setPreVerificationStartDate('');
+    setPreVerificationEndDate('');
     setLoading(true);
-    fetchStats();
+    fetchPreVerificationStats();
   };
 
   // Keyboard shortcut for search (Enter key)
@@ -523,8 +578,54 @@ const LeadAnalyticsDashboard = () => {
 
   const handlePreVerificationDateSelect = (startDate, endDate) => {
     setSelectedDate(startDate);
+    setPreVerificationStartDate(startDate);
+    setPreVerificationEndDate(endDate || startDate);
     setShowPreVerificationDatePicker(false);
-    fetchStats();
+    fetchPreVerificationStats({ startDate, endDate: endDate || startDate });
+  };
+
+  const fetchPreVerificationStats = async (range) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      if (!token) {
+        setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+        return;
+      }
+
+      setLoading(true);
+
+      const start =
+        (range && range.startDate) || preVerificationStartDate || selectedDate;
+      const end =
+        (range && range.endDate) || preVerificationEndDate || selectedDate;
+
+      const queryParams = new URLSearchParams({
+        ...(start && { startDate: start }),
+        ...(end && { endDate: end }),
+      });
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerifieedCount?${queryParams.toString()}`,
+        { headers: { "x-auth": token } }
+      );
+
+      if (response.data?.success) {
+        const data = response.data?.data || {};
+        setStats({
+          totalCount: (Number(data.verifiedCount) || 0) + (Number(data.unverifiedCount) || 0),
+          unverifiedCount: Number(data.unverifiedCount) || 0,
+          verifiedCount: Number(data.verifiedCount) || 0,
+        });
+      } else {
+        setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+      }
+    } catch (error) {
+      console.error("Error fetching pre-verification stats:", error);
+      setStats({ totalCount: 0, unverifiedCount: 0, verifiedCount: 0 });
+    } finally {
+      setLoading(false);
+    }
   };
   //filter stats
 
@@ -786,27 +887,35 @@ const LeadAnalyticsDashboard = () => {
       const queryParams = new URLSearchParams({
         ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
-
-
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
-      const response = await axios.get(
-        `${backendUrl}/college/candidate/preVerifieedCount?${queryParams}`,
-        { headers: { 'x-auth': token } }
-      );
-      // const response = await axios.get(
-      //   `${backendUrl}/college/candidate/pre-verification-stats?${queryParams}`,
-      //   { headers: { 'x-auth': token } }
-      // );
-      console.log("response", response.data)
+      // If no date filter is selected, send no parameters (will return all data)
+      console.log(formData.counselor.values, 'queryParams')
+      // Use the new dashboard API with date filtering
+      const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
 
-
-      if (response.data.success) {
-        setStats(response.data.data);
+      if (response.data.success && response.data.data) {
+        setAppliedCoursesData(response.data.data || []);
+      } else {
+        setAppliedCoursesData([]);
       }
+
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      setAppliedCoursesData([]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -828,12 +937,18 @@ const LeadAnalyticsDashboard = () => {
 
         ...(filters?.createdFromDate && { startDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { endDate: filters.createdToDate.toISOString() }),
-
-
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
       console.log(formData.counselor.values, 'queryParams')
-
 
       const response = await axios.get(`${backendUrl}/college/digitalLead/sourceLeadsData?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -900,6 +1015,11 @@ const LeadAnalyticsDashboard = () => {
   useEffect(() => {
     fetchCounselorMatrixData();
   }, [token, backendUrl, startDate, endDate, selectedCenter, filterData, formData]);
+
+  // Fetch follow-up counts by counsellor (cards = total of all counsellors, table = per counsellor)
+  useEffect(() => {
+    fetchFollowupCountsByCounselor();
+  }, [token, startDate, endDate, formData, filterData]);
 
   const fetchProfileData = async (filters = filterData) => {
     try {
@@ -1002,6 +1122,98 @@ const LeadAnalyticsDashboard = () => {
     }
   };
 
+  const fetchFollowupCounts = async () => {
+    try {
+      if (!token) {
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+        return;
+      }
+
+      // Today's activity: followups set today (createdAt) + done/missed today (statusUpdatedAt), counsellor-wise
+      const queryParams = new URLSearchParams({
+        filterBy: 'activity',
+        ...(startDate && { fromDate: startDate }),
+        ...(endDate && { toDate: endDate }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+
+      const response = await axios.get(
+        `${backendUrl}/college/followupcounts?${queryParams.toString()}`,
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (response.data?.success && response.data.data) {
+        setFollowupCounts({
+          done: response.data.data.done || 0,
+          planned: response.data.data.planned || 0,
+          missed: response.data.data.missed || 0
+        });
+      } else {
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching followup counts:', error);
+      setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+    }
+  };
+
+  const fetchFollowupCountsByCounselor = async () => {
+    try {
+      if (!token) {
+        setFollowupCountsByCounselor([]);
+        return;
+      }
+      setFollowupCountsByCounselorLoading(true);
+      const effectiveFrom =
+        filterData?.createdFromDate
+          ? filterData.createdFromDate.toISOString()
+          : startDate;
+      const effectiveTo =
+        filterData?.createdToDate
+          ? filterData.createdToDate.toISOString()
+          : endDate;
+
+      const queryParams = new URLSearchParams({
+        ...(effectiveFrom && { fromDate: effectiveFrom }),
+        ...(effectiveTo && { toDate: effectiveTo }),
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+      const response = await axios.get(
+        `${backendUrl}/college/followupcounts-by-counselor?${queryParams.toString()}`,
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data?.success && Array.isArray(response.data.data)) {
+        const list = response.data.data;
+        setFollowupCountsByCounselor(list);
+        // Cards = total across all counsellors (counsellor-wise totals)
+        setFollowupCounts({
+          done: list.reduce((s, r) => s + (Number(r.done) || 0), 0),
+          planned: list.reduce((s, r) => s + (Number(r.planned) || 0), 0),
+          missed: list.reduce((s, r) => s + (Number(r.missed) || 0), 0)
+        });
+      } else {
+        setFollowupCountsByCounselor([]);
+        setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching followup counts by counselor:', error);
+      setFollowupCountsByCounselor([]);
+      setFollowupCounts({ done: 0, planned: 0, missed: 0 });
+    } finally {
+      setFollowupCountsByCounselorLoading(false);
+    }
+  };
+
   const downloadTableData = () => {
     if (!groupedStatusData || Object.keys(groupedStatusData).length === 0) {
       alert('No data available to download');
@@ -1014,16 +1226,16 @@ const LeadAnalyticsDashboard = () => {
       'Course',
       'Center',
       'Counsellor Name',
-      'Total Leads',
-      'Pending for KYC',
-      'KYC Done',
-      'Admission Done',
-      'Batch Assigned',
-      'In Zero Period (At Center)',
-      'In Batch Freezed',
-      'DropOut',
-      'Leads vs Admission %',
-      'Admission vs AtCenter %'
+      t('total_leads'),
+      t('pending_for_kyc'),
+      t('kyc_done'),
+      t('admission_done'),
+      t('batch_assigned'),
+      t('in_zero_period'),
+      t('in_batch_freezed'),
+      t('dropout'),
+      t('leads_vs_admission'),
+      t('admission_vs_atcenter')
     ];
 
     const csvRows = [headers.join(',')];
@@ -1304,39 +1516,15 @@ const LeadAnalyticsDashboard = () => {
     return centerData;
   };
 
-  // Get followup analytics
-  const getFollowupAnalytics = () => {
-    let totalFollowups = 0;
-    let doneFollowups = 0;
-    let missedFollowups = 0;
-    let plannedFollowups = 0;
-
-    // Apply center filter if selected
-    let dataToProcess = filteredData;
-    if (selectedCenter !== 'all') {
-      dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
-    }
-
-    dataToProcess.forEach(lead => {
-      if (lead && lead.followups && Array.isArray(lead.followups) && lead.followups.length > 0) {
-        lead.followups.forEach(followup => {
-          if (followup && followup.status) {
-            totalFollowups++;
-            if (followup.status === 'Done') doneFollowups++;
-            else if (followup.status === 'Missed') missedFollowups++;
-            else if (followup.status === 'Planned') plannedFollowups++;
-          }
-        });
-      }
-    });
-
-    return { totalFollowups, doneFollowups, missedFollowups, plannedFollowups };
-  };
-
   // Use API data for counselor matrix instead of local calculation
   const counselorMatrix = counselorMatrixData;
   const centerAnalytics = getCenterAnalytics();
-  const followupStats = getFollowupAnalytics();
+  const followupStats = {
+    totalFollowups: followupCounts.done + followupCounts.missed + followupCounts.planned,
+    doneFollowups: followupCounts.done,
+    missedFollowups: followupCounts.missed,
+    plannedFollowups: followupCounts.planned
+  };
   const dailyAdmissions = getDailyAdmissions();
 
   // Prepare chart data
@@ -1769,14 +1957,14 @@ const LeadAnalyticsDashboard = () => {
         style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
         <div className="bg-white rounded-lg shadow-lg" style={{ maxWidth: '700px', width: '95%' }}>
           <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
-            <h5 className="mb-0">Select Date Range</h5>
+            <h5 className="mb-0">{t('select_date_range')}</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
 
           <div className="d-flex">
             {/* Left Panel - Quick Select Options */}
             <div className="border-end p-3" style={{ width: '180px', backgroundColor: '#f8f9fa' }}>
-              <h6 className="mb-3 small fw-bold">Quick Select</h6>
+              <h6 className="mb-3 small fw-bold">{t('quick_select')}</h6>
               <div className="d-flex flex-column gap-1">
                 {quickRanges.map((range) => (
                   <div key={range.id} className="form-check">
@@ -1820,13 +2008,13 @@ const LeadAnalyticsDashboard = () => {
               <table className="w-100 table table-borderless">
                 <thead>
                   <tr>
-                    <th className="p-1 text-center text-muted small fw-normal">Sun</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Mon</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Tue</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Wed</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Thu</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Fri</th>
-                    <th className="p-1 text-center text-muted small fw-normal">Sat</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('sun')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('mon')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('tue')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('wed')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('thu')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('fri')}</th>
+                    <th className="p-1 text-center text-muted small fw-normal">{t('sat')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1851,29 +2039,29 @@ const LeadAnalyticsDashboard = () => {
           <div className="border-top p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div className="d-flex align-items-center gap-2">
-                <span className="text-muted small">Selected Range:</span>
+                <span className="text-muted small">{t('selected_range')}</span>
                 <span className="fw-bold small">
                   {selectedStartDate && selectedEndDate
                     ? `${formatDisplayDate(selectedStartDate)} - ${formatDisplayDate(selectedEndDate)}`
-                    : 'No date range selected'
+                    : t('no_date_range_selected')
                   }
                 </span>
               </div>
               <div className="d-flex gap-2">
                 <button className="btn btn-outline-secondary btn-sm" onClick={handleCancel}>
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleApply}
                   disabled={!selectedStartDate || !selectedEndDate}
                 >
-                  Update
+                  {t('update')}
                 </button>
               </div>
             </div>
             <div className="mt-2">
-              <small className="text-muted">Dates are shown in local timezone</small>
+              <small className="text-muted">{t('dates_shown_local_timezone')}</small>
             </div>
           </div>
         </div>
@@ -1892,7 +2080,7 @@ const LeadAnalyticsDashboard = () => {
       setDrilldown(prev => ({ ...prev, loading: false, leads: res.data.data || [] }));
     } catch (err) {
       setDrilldown(prev => ({ ...prev, loading: false, leads: [] }));
-      alert('Failed to fetch lead details');
+      alert(t('failed_to_fetch_lead_details'));
     }
   };
 
@@ -1911,16 +2099,16 @@ const LeadAnalyticsDashboard = () => {
       'Course',
       'Center',
       'Counsellor Name',
-      'Total Leads',
-      'Pending for KYC',
-      'KYC Done',
-      'Admission Done',
-      'Batch Assigned',
-      'In Zero Period (At Center)',
-      'In Batch Freezed',
-      'DropOut',
-      'Leads vs Admission %',
-      'Admission vs AtCenter %'
+      t('total_leads'),
+      t('pending_for_kyc'),
+      t('kyc_done'),
+      t('admission_done'),
+      t('batch_assigned'),
+      t('in_zero_period'),
+      t('in_batch_freezed'),
+      t('dropout'),
+      t('leads_vs_admission'),
+      t('admission_vs_atcenter')
     ];
 
     const csvRows = [headers.join(',')];
@@ -1986,16 +2174,16 @@ const LeadAnalyticsDashboard = () => {
         'Course',
         'Center',
         'Counsellor Name',
-        'Total Leads',
-        'Pending for KYC',
-        'KYC Done',
-        'Admission Done',
-        'Batch Assigned',
-        'In Zero Period (At Center)',
-        'In Batch Freezed',
-        'DropOut',
-        'Leads vs Admission %',
-        'Admission vs AtCenter %'
+        t('total_leads'),
+        t('pending_for_kyc'),
+        t('kyc_done'),
+        t('admission_done'),
+        t('batch_assigned'),
+        t('in_zero_period'),
+        t('in_batch_freezed'),
+        t('dropout'),
+        t('leads_vs_admission'),
+        t('admission_vs_atcenter')
       ];
 
       worksheetData.push(headers);
@@ -2119,32 +2307,32 @@ const LeadAnalyticsDashboard = () => {
   };
 
 
+  const [activeSection, setActiveSection] = useState('main'); // 'main' | 'ai' | 'counselor'
+
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
-      <div className="mb-4">
-        <h1 className="display-5 fw-bold text-dark mb-2">Dashboard</h1>
-        <p className="text-muted">Real-time analytics based on Applied Courses data</p>
-      </div>
+      {/*  v> */}
 
       {/* Loading State */}
-      {isLoading && (
+      {isLoading && activeSection === 'main' && (
         <div className="text-center py-5">
           <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
+            <span className="visually-hidden">{t('loading')}</span>
           </div>
-          <p className="mt-3 text-muted">Loading analytics data...</p>
+          <p className="mt-3 text-muted">{t('loading_analytics_data')}</p>
         </div>
       )}
 
       {/* Show content only when not loading */}
-      {!isLoading && (
+      {!isLoading && activeSection === 'main' && (
         <>
           {/* Advanced Date Picker Modal */}
           {showDatePicker && (
             <AdvancedDatePicker
               onDateRangeChange={handleDateRangeChange}
               onClose={() => setShowDatePicker(false)}
+              t={t}
             />
           )}
 
@@ -2347,12 +2535,12 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="text-muted small mb-1">Total Leads</p>
+                      <p className="text-muted small mb-1">{t('card_total_leads')}</p>
                       <p className="h3 fw-bold mb-0">
                         {filteredData.length}
                       </p>
                       <p className="small text-muted mb-0">
-                        {filteredData.filter(l => l.courseStatus === 0).length} Due
+                        {filteredData.filter(l => l.courseStatus === 0).length} {t('card_due')}
                       </p>
                     </div>
                     <Users className="text-primary opacity-50" size={32} />
@@ -2366,12 +2554,12 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="text-muted small mb-1">KYC Done</p>
+                      <p className="text-muted small mb-1">{t('card_kyc_done')}</p>
                       <p className="h3 fw-bold text-purple mb-0">
                         {filteredData.filter(l => l.kyc).length}
                       </p>
                       <p className="small text-muted mb-0">
-                        {filteredData.filter(l => l.kycStage && !l.kyc).length} In Progress
+                        {filteredData.filter(l => l.kycStage && !l.kyc).length} {t('card_in_progress')}
                       </p>
                     </div>
                     <FileCheck className="text-purple opacity-50" size={32} />
@@ -2385,12 +2573,12 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="text-muted small mb-1">Admissions</p>
+                      <p className="text-muted small mb-1">{t('card_admissions')}</p>
                       <p className="h3 fw-bold text-success mb-0">
                         {filteredData.filter(l => l.admissionDone).length}
                       </p>
                       <p className="small text-muted mb-0">
-                        {filteredData.length > 0 ? ((filteredData.filter(l => l.admissionDone).length / filteredData.length) * 100).toFixed(0) : 0}% Rate
+                        {filteredData.length > 0 ? ((filteredData.filter(l => l.admissionDone).length / filteredData.length) * 100).toFixed(0) : 0}% {t('card_rate')}
                       </p>
                     </div>
                     <CheckCircle className="text-success opacity-50" size={32} />
@@ -2404,12 +2592,12 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="text-muted small mb-1">Revenue</p>
+                      <p className="text-muted small mb-1">{t('card_revenue')}</p>
                       <p className="h3 fw-bold text-success mb-0">
                         ₹{(filteredData.filter(l => l.registrationFee === 'Paid').length * 15000).toLocaleString()}
                       </p>
                       <p className="small text-muted mb-0">
-                        {filteredData.filter(l => l.registrationFee === 'Paid').length} Paid
+                        {filteredData.filter(l => l.registrationFee === 'Paid').length} {t('card_paid')}
                       </p>
                     </div>
                     <DollarSign className="text-success opacity-50" size={32} />
@@ -2423,7 +2611,7 @@ const LeadAnalyticsDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="text-muted small mb-1">Dropouts</p>
+                      <p className="text-muted small mb-1">{t('card_dropouts')}</p>
                       <p className="h3 fw-bold text-danger mb-0">
                         {filteredData.filter(l => l.dropout).length}
                       </p>
@@ -2438,20 +2626,159 @@ const LeadAnalyticsDashboard = () => {
             </div>
           </div>
 
+          {/* Follow-up Metrics — total = sum of all rows in table below (not duplicate) */}
+          <p className="text-muted small mb-2">{t('followup_summary_note')}</p>
+          <div className="row g-3 mb-4">
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">{t('followup_done_total')} <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-success mb-0">
+                        {followupCounts.done}
+                      </p>
+                    </div>
+                    <CheckCircle className="text-success opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">{t('followup_planned_total')} <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-primary mb-0">
+                        {followupCounts.planned}
+                      </p>
+                    </div>
+                    <Clock className="text-primary opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">{t('followup_missed_total')} <span className="text-muted fw-normal">(total)</span></p>
+                      <p className="h3 fw-bold text-danger mb-0">
+                        {followupCounts.missed}
+                      </p>
+                    </div>
+                    <AlertCircle className="text-danger opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="card shadow-sm h-100">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <p className="text-muted small mb-1">{t('followup_total_followups')}</p>
+                      <p className="h3 fw-bold text-dark mb-0">
+                        {(Number(followupCounts.done) || 0) + (Number(followupCounts.planned) || 0) + (Number(followupCounts.missed) || 0)}
+                      </p>
+                    </div>
+                    <Users className="text-dark opacity-50" size={32} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Follow-up counts by counsellor (detail) */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h5 fw-semibold mb-1 d-flex align-items-center gap-2">
+                <UserCheck className="text-primary" size={20} />
+                {t('followups_by_counsellor')}
+              </h2>
+              {/* <p className="text-muted small mb-3">Followups set / done / missed in the <strong>selected date range</strong> (today or past — change date filter above to see different periods). Counsellor-wise breakdown below.</p> */}
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{ minWidth: '160px' }}>{t('counsellor')}</th>
+                      <th className="text-center text-success">{t('followup_done_total')}</th>
+                      <th className="text-center text-primary">{t('followup_planned_total')}</th>
+                      <th className="text-center text-danger">{t('followup_missed_total')}</th>
+                      <th className="text-center">{t('total')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {followupCountsByCounselorLoading ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-4">
+                          <div className="spinner-border spinner-border-sm text-primary" role="status">
+                            <span className="visually-hidden">{t('loading')}</span>
+                          </div>
+                          <span className="ms-2">{t('loading')}</span>
+                        </td>
+                      </tr>
+                    ) : followupCountsByCounselor.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-4 text-muted">{t('no_follow_up_data')}</td>
+                      </tr>
+                    ) : (
+                      followupCountsByCounselor.map((row) => (
+                        <tr key={row.counselorId}>
+                          <td className="fw-medium">
+                            {row.counsellorName || row.counselorName || row.name || t('unknown')}
+                          </td>
+                          <td className="text-center text-success">{row.done ?? 0}</td>
+                          <td className="text-center text-primary">{row.planned ?? 0}</td>
+                          <td className="text-center text-danger">{row.missed ?? 0}</td>
+                          <td className="text-center">{row.total ?? (row.done + row.planned + row.missed)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {!followupCountsByCounselorLoading && followupCountsByCounselor.length > 0 && (
+                    <tfoot className="table-light">
+                      <tr className="fw-semibold">
+                        <td style={{ minWidth: '160px' }}>{t('total_followup')}</td>
+                        <td className="text-center text-success">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.done) || 0), 0)}
+                        </td>
+                        <td className="text-center text-primary">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.planned) || 0), 0)}
+                        </td>
+                        <td className="text-center text-danger">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.missed) || 0), 0)}
+                        </td>
+                        <td className="text-center">
+                          {followupCountsByCounselor.reduce((s, r) => s + (Number(r.total) || (Number(r.done) || 0) + (Number(r.planned) || 0) + (Number(r.missed) || 0)), 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+
           {/* Main Analytics Matrix */}
           <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <UserCheck className="text-primary" size={20} />
-                Counselor Performance Matrix
+                {t('counselor_performance_matrix')}
               </h2>
               <div className="table-responsive" style={{ overflowX: 'auto' }}>
                 <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
                   <thead className="table-light">
                     <tr>
-                      <th rowSpan={expandedStatus ? 2 : 1} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>Counselor</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Leads</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Untouch</th>
+                      <th rowSpan={expandedStatus ? 2 : 1} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>{t('counsellor')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('leads')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('untouch')}</th>
                       {allStatuses.map(status => (
                         <th
                           key={status}
@@ -2467,14 +2794,14 @@ const LeadAnalyticsDashboard = () => {
                           {status} <span style={{ fontWeight: 'normal' }}>{expandedStatus === status ? '▲' : '▼'}</span>
                         </th>
                       ))}
-                      <th rowSpan={expandedStatus ? 2 : 1}>KYC</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Admissions</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Dropouts</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Assigned</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Batch Freezed</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Zero Period</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Revenue</th>
-                      <th rowSpan={expandedStatus ? 2 : 1}>Conv. Rate</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('kyc')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('admissions')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('dropouts')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('batch_assigned')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('batch_freezed')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('zero_period')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('revenue')}</th>
+                      <th rowSpan={expandedStatus ? 2 : 1}>{t('conversion_rate')}</th>
                     </tr>
                     {expandedStatus && allSubstatuses[expandedStatus]?.length > 0 && (
                       <tr>
@@ -2485,7 +2812,7 @@ const LeadAnalyticsDashboard = () => {
                                 {allSubstatuses[status].map(sub => (
                                   <th key={sub} className="text-center small text-muted">{sub}</th>
                                 ))}
-                                <th className="text-center small text-muted">Total</th>
+                                <th className="text-center small text-muted">{t('total')}</th>
                               </>
                             )
                             : <th key={status}></th>
@@ -2499,16 +2826,16 @@ const LeadAnalyticsDashboard = () => {
                         <td colSpan={allStatuses.length + 10} className="text-center py-4">
                           <div className="d-flex justify-content-center align-items-center">
                             <div className="spinner-border spinner-border-sm me-2" role="status">
-                              <span className="visually-hidden">Loading...</span>
+                              <span className="visually-hidden">{t('loading')}</span>
                             </div>
-                            Loading counselor performance data...
+                            {t('loading_counsellor_performance_data')}
                           </div>
                         </td>
                       </tr>
                     ) : Object.keys(counselorMatrix).length === 0 ? (
                       <tr>
                         <td colSpan={allStatuses.length + 10} className="text-center py-4 text-muted">
-                          No counselor performance data available for the selected filters.
+                          {t('no_counsellor_performance_data')}
                         </td>
                       </tr>
                     ) : (
@@ -2583,14 +2910,62 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
           </div>
+          {/* Admission Post  */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
+                <UserCheck className="text-primary" size={20} />
+                {t('admission_post_performance_matrix')}
+              </h2>
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                <table className="table table-hover align-middle" style={{ minWidth: 'max-content' }}>
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8f9fa' }}>{t('counsellor')}</th>
+                      <th className="text-center">{t('total_kyc')}</th>
+                      <th className="text-center">{t('done_kyc')}</th>
+                      <th className="text-center">{t('pending_kyc')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {counselorMatrixLoading ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4">
+                          <div className="d-flex justify-content-center align-items-center">
+                            <div className="spinner-border spinner-border-sm me-2" role="status">
+                              <span className="visually-hidden">{t('loading')}</span>
+                            </div>
+                            {t('loading_admission_post_counsellor_performance_data')}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : Object.keys(counselorMatrix).length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-muted">
+                          {t('no_admission_post_counsellor_performance_data')}
+                        </td>
+                      </tr>
+                    ) : (
+                      Object.entries(counselorMatrix).map(([counselorName, data]) => (
+                        <tr key={counselorName}>
+                          <td style={{ position: 'sticky', left: 0, zIndex: 1, backgroundColor: 'white', fontWeight: 500 }}>{counselorName}</td>
+                          <td className="text-center fw-medium">{data.TotalKYC ?? data.KYCStage ?? 0}</td>
+                          <td className="text-center text-success fw-medium">{data.KYCDone ?? 0}</td>
+                          <td className="text-center text-warning fw-medium">{data.PendingKYC ?? 0}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
 
-          {/* Charts Row */}
-          <div className="row g-4 mb-4">
-            {/* Conversion vs Dropout Chart */}
-            <div className="col-lg-6">
+          {/* <div className="row g-4 mb-4">
+            <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
-                  <h3 className="h5 fw-semibold mb-4 d-flex align-items-center gap-2">
+                  <h3 className="h5 fw-semibold mb-4 d-flex align-items-center gap-2 con-vs-drop">
                     <Target className="text-success" size={20} />
                     Conversion vs Dropout Rates
                   </h3>
@@ -2609,7 +2984,6 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
 
-            {/* Status Distribution */}
             <div className="col-lg-6">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -2639,20 +3013,20 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Course-wise Document Status Table */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h5 fw-semibold mb-4">Course-wise Document Status</h2>
               <div className="table-responsive">
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Course</th>
-                      <th>Total Leads</th>
-                      <th>Docs Pending</th>
-                      <th>Docs Verified</th>
+                      <th>{t('course')}</th>
+                      <th>{t('total_leads')}</th>
+                      <th>{t('docs_pending')}</th>
+                      <th>{t('docs_verified')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2668,19 +3042,19 @@ const LeadAnalyticsDashboard = () => {
                 </table>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Course-wise Pending Documents Table */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h5 fw-semibold mb-4">Course-wise Pending Documents</h2>
               <div className="table-responsive">
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Course</th>
-                      <th>Document Name</th>
-                      <th>Pending in Leads</th>
+                      <th>{t('course')}</th>
+                      <th>{t('document_name')}</th>
+                      <th>{t('pending_in_leads')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2697,10 +3071,9 @@ const LeadAnalyticsDashboard = () => {
                 </table>
               </div>
             </div>
-          </div>
+          </div> */}
 
-          {/* Center-wise Analytics */}
-          <div className="card shadow-sm mb-4">
+          {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <Building className="text-purple" size={20} />
@@ -2713,7 +3086,7 @@ const LeadAnalyticsDashboard = () => {
                       <h3 className="h5 fw-semibold mb-3">{center}</h3>
                       <div className="row g-3 mb-3">
                         <div className="col-4">
-                          <p className="text-muted small mb-1">Total Leads</p>
+                          <p className="text-muted small mb-1">{t('total_leads')}</p>
                           <p className="h4 fw-bold mb-0">{data.totalLeads}</p>
                           <p className="text-muted small">{data.assigned} assigned</p>
                         </div>
@@ -2729,7 +3102,7 @@ const LeadAnalyticsDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Center-wise Bar Chart */}
+                      
                       <div className="row g-3 mb-3">
                         <div className="col-12">
                           <ResponsiveContainer width="100%" height={180}>
@@ -2750,7 +3123,7 @@ const LeadAnalyticsDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Center-wise Pie Chart for Status Distribution */}
+      
                       <div className="row g-3 mb-3">
                         <div className="col-12">
                           <ResponsiveContainer width="100%" height={180}>
@@ -2793,12 +3166,11 @@ const LeadAnalyticsDashboard = () => {
                 ))}
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Daily Admissions Analytics */}
-          <div className="row g-4 mb-4">
-            {/* Daily Admissions Table */}
-            <div className="col-lg-6">
+          {/* <div className="row g-4 mb-4">
+            <div className="col-lg-6 admissionTrend">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
                   <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
@@ -2875,7 +3247,6 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
 
-            {/* Daily Admissions Chart */}
             <div className="col-lg-6">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -2937,10 +3308,10 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Followup Analytics */}
-          <div className="card shadow-sm">
+          {/* <div className="card shadow-sm">
             <div className="card-body">
               <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                 <Clock className="text-warning" size={20} />
@@ -2965,46 +3336,46 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* ====== NEW: Course-Counsellor Status Table ====== */}
           <div className="card shadow-sm mb-4">
             <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
+              <div className="d-flex justify-content-between align-items-center mb-4 card-flex">
+                <h2 className="h5 fw-semibold mb-0">{t('course_counsellor_status_table')}</h2>
 
                 {/* Date Filter Controls */}
-                <div className="d-flex gap-2 align-items-center">
+                <div className="d-flex gap-2 align-items-center car-elements">
                   <button
-                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 card-select-date"
                     onClick={() => setShowCounsellorDatePicker(true)}
                     disabled={counsellorStatusLoading}
                   >
                     <CalendarDays size={16} />
                     {counsellorStatusDateFrom && counsellorStatusDateTo
-                      ? `${counsellorStatusDateFrom} to ${counsellorStatusDateTo}`
-                      : 'Select Date Range'
+                      ? t('date_range_to', { from: counsellorStatusDateFrom, to: counsellorStatusDateTo })
+                      : t('select_date_range')
                     }
                   </button>
                   <button
-                    className={`btn btn-sm ${showAllTime ? 'btn-success' : 'btn-outline-success'}`}
+                    className={`btn btn-sm ${showAllTime ? 'btn-success' : 'btn-outline-success'}  card-select-date`}
                     onClick={showAllTimeData}
                     disabled={counsellorStatusLoading}
                   >
-                    All Time
+                    {t('all_time')}
                   </button>
                   <button
-                    className="btn btn-outline-secondary btn-sm"
+                    className="btn btn-outline-secondary btn-sm  card-select-date"
                     onClick={clearCounsellorStatusDateFilter}
                     disabled={counsellorStatusLoading}
                   >
-                    Today
+                    {t('today')}
                   </button>
 
                   {/* Download Button */}
                   <div className="position-relative">
                     <button
-                      className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                      className="btn btn-outline-info btn-sm d-flex align-items-center gap-1  card-select-date"
                       type="button"
                       onClick={() => {
                         console.log('Download button clicked, current state:', showDownloadDropdown);
@@ -3014,7 +3385,7 @@ const LeadAnalyticsDashboard = () => {
                       disabled={counsellorStatusLoading || Object.keys(groupedStatusData).length === 0}
                     >
                       <i className="fas fa-download"></i>
-                      Download
+                      {t('download')}
                       <i className="fas fa-chevron-down ms-1"></i>
                     </button>
                   </div>
@@ -3023,9 +3394,9 @@ const LeadAnalyticsDashboard = () => {
               {counsellorStatusLoading ? (
                 <div className="text-center py-4">
                   <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <span className="visually-hidden">{t('loading')}</span>
                   </div>
-                  <p className="mt-3 text-muted">Loading counsellor status data...</p>
+                  <p className="mt-3 text-muted">{t('loading_counsellor_status_data')}</p>
                 </div>
               ) : counsellorStatusError ? (
                 <div className="alert alert-danger">{counsellorStatusError}</div>
@@ -3034,25 +3405,25 @@ const LeadAnalyticsDashboard = () => {
                   <table className="table table-bordered align-middle table-fixed">
                     <thead className="table-light sticky-header">
                       <tr>
-                        <th style={{ minWidth: '120px', width: '120px' }}>Project</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Course</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Center</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>Counsellor Name</th>
-                        <th style={{ minWidth: '120px', width: '120px' }}>Total Leads</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Pending for KYC</th>
-                        <th style={{ minWidth: '120px', width: '120px' }}>KYC Done</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Admission Done</th>
-                        <th style={{ minWidth: '140px', width: '140px' }}>Batch Assigned</th>
-                        <th style={{ minWidth: '180px', width: '180px' }}>In Zero Period (At Center)</th>
-                        <th style={{ minWidth: '150px', width: '150px' }}>In Batch Freezed</th>
-                        <th style={{ minWidth: '120px', width: '120px' }}>DropOut</th>
-                        <th style={{ minWidth: '160px', width: '160px' }}>Leads vs Admission %</th>
-                        <th style={{ minWidth: '180px', width: '180px' }}>Admission vs AtCenter %</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('project')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('course')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('center')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('counsellor_name')}</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('total_leads')}</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>{t('pending_for_kyc')}</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('kyc_done')}</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>{t('admission_done')}</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>{t('batch_assigned')}</th>
+                        <th style={{ minWidth: '180px', width: '180px' }}>{t('in_zero_period')}</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>{t('in_batch_freezed')}</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>{t('dropouts')}</th>
+                        <th style={{ minWidth: '160px', width: '160px' }}>{t('leads_vs_admission')}</th>
+                        <th style={{ minWidth: '180px', width: '180px' }}>{t('admission_vs_atcenter')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(groupedStatusData).length === 0 ? (
-                        <tr><td colSpan={14} className="text-center">No data found</td></tr>
+                        <tr><td colSpan={14} className="text-center">{t('no_data_found')}</td></tr>
                       ) : (
                         Object.entries(groupedStatusData).map(([courseName, centers]) => {
                           const courseRowSpan = Object.values(centers).reduce((sum, arr) => sum + arr.length, 0);
@@ -3076,14 +3447,14 @@ const LeadAnalyticsDashboard = () => {
                                     <td rowSpan={centerRowSpan}>{centerName}</td>
                                   )}
                                   <td>{row.counsellorName}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, 'Batch Assigned')}>{row.batchAssigned}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, 'In Zero Period')}>{row.inZeroPeriod}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, 'In Batch Freezed')}>{row.inBatchFreezed}</td>
-                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, 'DropOut')}>{row.dropOut}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, t('total_leads'))}>{row.totalLeads}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, t('pending_for_kyc'))}>{row.pendingKYC}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, t('kyc_done'))}>{row.kycDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, t('admission_done'))}>{row.admissionDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, t('batch_assigned'))}>{row.batchAssigned}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, t('in_zero_period'))}>{row.inZeroPeriod}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, t('in_batch_freezed'))}>{row.inBatchFreezed}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, t('dropouts'))}>{row.dropOut}</td>
                                   <td className="text-center">
                                     {row.totalLeads > 0
                                       ? ((row.admissionDoneIds.length / row.totalLeads) * 100).toFixed(1) + '%'
@@ -3120,23 +3491,23 @@ const LeadAnalyticsDashboard = () => {
 
                 <div className="row">
                   <div className="col-12">
-                    <h2 className="mb-4">Pre-Verification Dashboard</h2>
+                    <h2 className="mb-4">{t('pre_verification_dashboard')}</h2>
                   </div>
                 </div>
 
                 <div className="row">
-                  <div className="col-md-6">
+                  <div className="col-md-6 preVarification">
                     <div className="card bg-primary text-white">
                       <div className="card-body">
-                        <h5 className="card-title">Total Pre Verified</h5>
+                        <h5 className="card-title">{t('total_pre_verified')}</h5>
                         <h2 className="card-text">{loading ? '...' : stats.verifiedCount}</h2>
                       </div>
                     </div>
                   </div>
-                  <div className="col-md-6">
+                  <div className="col-md-6 preVarification">
                     <div className="card bg-success text-white">
                       <div className="card-body">
-                        <h5 className="card-title">Total Pre Unverified</h5>
+                        <h5 className="card-title">{t('total_pre_unverified')}</h5>
                         <h2 className="card-text">{loading ? '...' : stats.unverifiedCount}</h2>
                       </div>
                     </div>
@@ -3146,19 +3517,19 @@ const LeadAnalyticsDashboard = () => {
                       <div className="col-md-12">
                         <div className="card">
                           <div className="card-body">
-                            <h5 className="card-title">Verified vs Unverified</h5>
+                            <h5 className="card-title">{t('verified_vs_unverified')}</h5>
                             {loading ? (
                               <div className="text-center py-4">
                                 <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading...</span>
+                                  <span className="visually-hidden">{t('loading')}</span>
                                 </div>
                               </div>
                             ) : stats.verifiedCount > 0 ? (
                               <PieChart width={300} height={300}>
                                 <Pie
                                   data={[
-                                    { name: 'Verified', value: stats.verifiedCount ? stats.verifiedCount : 0 },
-                                    { name: 'Unverified', value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
+                                    { name: t('verified'), value: stats.verifiedCount ? stats.verifiedCount : 0 },
+                                    { name: t('unverified'), value: stats.unverifiedCount ? stats.unverifiedCount : 0 },
                                   ]}
                                   cx={150}
                                   cy={150}
@@ -3173,7 +3544,7 @@ const LeadAnalyticsDashboard = () => {
                               </PieChart>
                             ) : (
                               <div className="text-center py-4 text-muted">
-                                No data available
+                                {t('no_data_available')}
                               </div>
                             )}
                           </div>
@@ -3235,7 +3606,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div> */}
 
-              <div className="col-md-6">
+              {/* <div className="col-md-6">
                 <div className="row">
                   <div className="col-12">
                     <div className="card shadow-sm mb-4">
@@ -3248,7 +3619,6 @@ const LeadAnalyticsDashboard = () => {
 
                         </div>
 
-                        {/* Enhanced Lead Sources Summary Cards */}
                         <div className="row g-3 mb-4">
                           {leadData.loading && (
                             <div className="col-12 text-center">
@@ -3269,13 +3639,12 @@ const LeadAnalyticsDashboard = () => {
                           )}
                         </div>
 
-                        {/* Detailed Lead Sources Table */}
                         <div className="table-responsive">
                           <table className="table table-hover align-middle">
                             <thead className="table-light">
                               <tr>
-                                <th>Source Name</th>
-                                <th>Total Leads</th>
+                                <th>{t('source_name')}</th>
+                                <th>{t('total_leads')}</th>
 
                               </tr>
                             </thead>
@@ -3301,12 +3670,11 @@ const LeadAnalyticsDashboard = () => {
                           </table>
                         </div>
 
-                        {/* Lead Source Performance Charts */}
                         <div className="row mt-4">
                           <div className="col-md-8">
                             <div className="card border-0 bg-light">
                               <div className="card-body">
-                                <h6 className="card-title mb-3">Lead Source Performance Trend</h6>
+                                <h6 className="card-title mb-3">Lead Source Performance Trend</h2>
                                 {leadData.loading ? (
                                   <div style={{ height: '250px' }} className="d-flex align-items-center justify-content-center">
                                     <div className="text-center">
@@ -3373,7 +3741,7 @@ const LeadAnalyticsDashboard = () => {
                           <div className="col-md-4">
                             <div className="card border-0 bg-light">
                               <div className="card-body">
-                                <h6 className="card-title mb-3">Source Distribution</h6>
+                                <h6 className="card-title mb-3">Source Distribution</h2>
                                 <div className="d-flex flex-column gap-3">
                                   {leadData.loading ? (
                                     <div className="text-center">
@@ -3429,7 +3797,6 @@ const LeadAnalyticsDashboard = () => {
                                         </div>
                                       </div>
 
-                                      {/* Top Sources Breakdown */}
                                       {leadData.leadStats?.topSources?.slice(0, 3).map((source, index) => (
                                         <div key={index}>
                                           <div className="d-flex justify-content-between align-items-center mb-1">
@@ -3468,7 +3835,7 @@ const LeadAnalyticsDashboard = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
 
           </div>
@@ -3684,12 +4051,12 @@ const LeadAnalyticsDashboard = () => {
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <h5 className="mb-0">{drilldown.statusLabel} - Lead Details</h5>
+              <h5 className="mb-0">{t('lead_details_title', { status: drilldown.statusLabel })}</h5>
               <button
                 className="btn btn-sm btn-outline-secondary"
                 onClick={() => setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' })}
               >
-                Close
+                {t('close')}
               </button>
             </div>
             {drilldown.loading ? (
@@ -3697,15 +4064,15 @@ const LeadAnalyticsDashboard = () => {
                 <div className="spinner-border text-primary" role="status"></div>
               </div>
             ) : drilldown.leads.length === 0 ? (
-              <div className="text-center text-muted">No leads found.</div>
+              <div className="text-center text-muted">{t('no_leads_found')}</div>
             ) : (
               <div className="table-responsive">
                 <table className="table table-bordered align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>Candidate Name</th>
-                      <th>Mobile</th>
-                      <th>Email</th>
+                      <th>{t('candidate_name')}</th>
+                      <th>{t('mobile')}</th>
+                      <th>{t('email')}</th>
 
                     </tr>
                   </thead>
@@ -3714,7 +4081,7 @@ const LeadAnalyticsDashboard = () => {
                       <tr key={idx}>
                         <td>{lead.candidateName}</td>
                         <td>{lead.candidateMobile}</td>
-                        <td>{lead.candidateEmail ? lead.candidateEmail : 'NA'}</td>
+                        <td>{lead.candidateEmail ? lead.candidateEmail : t('na')}</td>
 
                       </tr>
                     ))}
@@ -3744,10 +4111,10 @@ const LeadAnalyticsDashboard = () => {
                 <div className="d-flex justify-content-between align-items-center w-100">
                   <div className="d-flex align-items-center">
                     <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                    <h5 className="fw-bold mb-0 text-dark">{t('advanced_filters')}</h5>
                     {totalSelected > 0 && (
                       <span className="badge bg-primary ms-2">
-                        {totalSelected} Active
+                        {t('active_count', { count: totalSelected })}
                       </span>
                     )}
                   </div>
@@ -3757,7 +4124,7 @@ const LeadAnalyticsDashboard = () => {
                       onClick={clearAllFilters}
                     >
                       <i className="fas fa-times-circle me-1"></i>
-                      Clear All
+                      {t('clear_all')}
                     </button>
                     <button
                       className="btn-close"
@@ -3773,9 +4140,9 @@ const LeadAnalyticsDashboard = () => {
                 <div className="row g-4">
                   {/* Course Type Filter */}
                   <div className="col-md-3">
-                    <label className="form-label small fw-bold text-dark">
+                    <label className="form-label small fw-bold text-dark CourseType">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
+                      {t('course_type')}
                     </label>
                     <div className="position-relative">
                       <select
@@ -3784,9 +4151,9 @@ const LeadAnalyticsDashboard = () => {
                         value={filterData.courseType}
                         onChange={handleFilterChange}
                       >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
+                        <option value="">{t('all_types')}</option>
+                        <option value="Free">🆓 {t('free')}</option>
+                        <option value="Paid">💰 {t('paid')}</option>
                       </select>
                     </div>
                   </div>
@@ -3794,65 +4161,70 @@ const LeadAnalyticsDashboard = () => {
                   {/* Project Filter */}
                   <div className="col-md-3">
                     <MultiSelectCheckbox
-                      title="Project"
+                      title={t('projects')}
                       options={projectOptions}
                       selectedValues={formData?.projects?.values}
                       onChange={(values) => handleCriteriaChange('projects', values)}
                       icon="fas fa-sitemap"
                       isOpen={dropdownStates.projects}
                       onToggle={() => toggleDropdown('projects')}
+                      t={t}
                     />
                   </div>
 
                   {/* Verticals Filter */}
                   <div className="col-md-3">
                     <MultiSelectCheckbox
-                      title="Verticals"
+                      title={t('verticals')}
                       options={verticalOptions}
                       selectedValues={formData?.verticals?.values || []}
                       icon="fas fa-sitemap"
                       isOpen={dropdownStates.verticals}
                       onToggle={() => toggleDropdown('verticals')}
                       onChange={(values) => handleCriteriaChange('verticals', values)}
+                      t={t}
                     />
                   </div>
 
                   {/* Course Filter */}
                   <div className="col-md-3">
                     <MultiSelectCheckbox
-                      title="Course"
+                      title={t('course_type')}
                       options={courseOptions}
                       selectedValues={formData?.course?.values || []}
                       onChange={(values) => handleCriteriaChange('course', values)}
                       icon="fas fa-graduation-cap"
                       isOpen={dropdownStates.course}
                       onToggle={() => toggleDropdown('course')}
+                      t={t}
                     />
                   </div>
 
                   {/* Center Filter */}
                   <div className="col-md-3">
                     <MultiSelectCheckbox
-                      title="Center"
+                      title={t('centers')}
                       options={centerOptions}
                       selectedValues={formData?.center?.values || []}
                       onChange={(values) => handleCriteriaChange('center', values)}
                       icon="fas fa-building"
                       isOpen={dropdownStates.center}
                       onToggle={() => toggleDropdown('center')}
+                      t={t}
                     />
                   </div>
 
                   {/* Counselor Filter */}
                   <div className="col-md-3">
                     <MultiSelectCheckbox
-                      title="Counselor"
+                      title={t('counselors')}
                       options={counselorOptions}
                       selectedValues={formData?.counselor?.values || []}
                       onChange={(values) => handleCriteriaChange('counselor', values)}
                       icon="fas fa-user-tie"
                       isOpen={dropdownStates.counselor}
                       onToggle={() => toggleDropdown('counselor')}
+                      t={t}
                     />
                   </div>
                 </div>
@@ -3862,7 +4234,7 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-12">
                     <h6 className="text-dark fw-bold mb-3">
                       <i className="fas fa-calendar-alt me-2 text-primary"></i>
-                      Date Range Filters
+                      {t('date_range_filters')}
                     </h6>
                   </div>
 
@@ -3870,12 +4242,12 @@ const LeadAnalyticsDashboard = () => {
                   <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-calendar-plus me-1 text-success"></i>
-                      Date Range
+                      {t('date_range')}
                     </label>
-                    <div className="card border-0 bg-light p-3">
+                    <div className="card border-0 bg-light p-0">
                       <div className="row g-2">
-                        <div className="col-6">
-                          <label className="form-label small">From Date</label>
+                        <div className="col-6 fromDate">
+                          <label className="form-label small">{t('from_date')}</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
                             value={filterData.createdFromDate}
@@ -3886,8 +4258,8 @@ const LeadAnalyticsDashboard = () => {
                             maxDate={filterData.createdToDate || new Date()}
                           />
                         </div>
-                        <div className="col-6">
-                          <label className="form-label small">To Date</label>
+                        <div className="col-6 fromDate">
+                          <label className="form-label small">{t('to_date')}</label>
                           <DatePicker
                             onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
                             value={filterData.createdToDate}
@@ -3906,10 +4278,12 @@ const LeadAnalyticsDashboard = () => {
                         <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
                           <small className="text-success">
                             <i className="fas fa-info-circle me-1"></i>
-                            <strong>Selected:</strong>
-                            {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                            <strong>{t('selected_label')}</strong>
+                            {filterData.createdFromDate &&
+                              ` ${t('from_date_value', { date: formatDate(filterData.createdFromDate) })}`}
                             {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                            {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                            {filterData.createdToDate &&
+                              ` ${t('to_date_value', { date: formatDate(filterData.createdToDate) })}`}
                           </small>
                         </div>
                       )}
@@ -3922,7 +4296,7 @@ const LeadAnalyticsDashboard = () => {
                           disabled={!filterData.createdFromDate && !filterData.createdToDate}
                         >
                           <i className="fas fa-times me-1"></i>
-                          Clear Date Filter
+                          {t('clear_date_filter')}
                         </button>
                       </div>
                     </div>
@@ -3950,7 +4324,7 @@ const LeadAnalyticsDashboard = () => {
                                 // Auto-trigger search when date changes
                                 if (formattedDate) {
                                   setLoading(true);
-                                  setTimeout(() => fetchStats(), 100);
+                                  setTimeout(() => fetchPreVerificationStats(), 100);
                                 }
                               }}
                               onKeyPress={handleKeyPress}
@@ -4398,15 +4772,200 @@ font-size: 15px !important;
 width:100%!important;
 height:100%!important;
 }
-   
+@media (max-width: 768px) {
+
+.preVarification{
+padding-bottom:20px
+}
+  
+  .car-elements{
+  overflow: scroll;
+          width: 100%;
+  }
+  .card-select-date{
+ white-space: nowrap;
+        font-size: 11px;
+  }
+  
+  .card-flex {
+    flex-direction: column;
+  }
+
+  .react-date-picker__inputGroup {
+    box-sizing: border-box;
+        font-size: 14px;
+        white-space: nowrap;
+  }
+
+  .con-vs-drop {
+    margin-bottom: 20px;
+  }
+
+  .recharts-legend-wrapper {
+    margin-bottom: 0 !important;
+  }
+
+  .recharts-legend-item-text {
+    margin-right: 54px !important; /* mobile spacing */
+  }
+
+  /* FIXED selector (was invalid before) */
+  .btn.btn-sm.btn-outline-danger {
+    font-size: 9px !important;
+  }
+}
+      
             `
         }
 
       </style>
+
+      <style>{
+        `
+.admissionTrend .recharts-legend-item{
+padding-right:10px!important;
+}
+.varVSunvar{
+padding: 5px;}
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+
+
+.counsolerTable{
+width:100%;
+}
+.ActiveDayFilter{
+margin-right:31%;
+}
+.resetAll{
+font-size:10px;
+box-sizing: content-box;
+margin-left:20px;
+padding:8px;
+
+}
+
+.CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:4px;
+}
+@media (max-width: 768px) {
+    .small {
+        display: block !important;
+    }
+}
+
+
+.CButtton{
+font-size:11px;
+padding:2px;
+}
+
+.preVarification{
+padding-bottom:20px;
+}
+// .varUnvarified{
+// margin-left: 13px;
+// }
+  
+  .car-elements{
+  overflow: scroll;
+          width: 100%;
+  }
+  .card-select-date{
+ white-space: nowrap;
+        font-size: 11px;
+  }
+  
+  .card-flex {
+    flex-direction: column;
+  }
+html body .content .content-wrapper {
+    margin-top: 2rem;
+    padding: 1.8rem 1.2rem 0;
+}
+  .react-date-picker__inputGroup {
+    box-sizing: border-box;
+        font-size: 14px;
+        white-space: nowrap;
+  }
+
+  .con-vs-drop {
+    margin-top: 20px;
+    margin-left: 0px !important;
+  }
+
+  .recharts-legend-wrapper {
+    margin-bottom: 0 !important;
+  }
+
+  
+  /* FIXED selector (was invalid before) */
+  // .btn.btn-sm.btn-outline-danger {
+  //   font-size: 9px !important;
+  // }
+
+}
+  .card-body.li.recharts-legend-item legend-item-0{
+    padding-right: 10px !important; /* mobile spacing */
+  }
+.admissionTrend .recharts-legend-item{
+padding-right:10px
+}
+   
+
+        `
+      }
+
+
+      </style>
     </div>
-
-
   );
 };
 
-export default LeadAnalyticsDashboard;
+const DashboardWrapper = () => {
+  const { t } = useTranslation();
+  const [activeSection, setActiveSection] = useState('main'); // 'main' | 'ai' | 'counselor'
+
+  return (
+    <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <div className="d-flex justify-content-between align-items-center flex-wrap mb-3">
+        <div>
+          <h1 className="display-5 fw-bold text-dark mb-1">{t('dashboard')}</h1>
+          {/* <p className="text-muted mb-0">{t('dashboard_subtitle')}</p> */}
+        </div>
+        <div className="btn-group mt-2 mt-md-0">
+          <button
+            type="button"
+            className={`btn btn-sm ${activeSection === 'main' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveSection('main')}
+          >
+            {t('dashboard_tab_overview')}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${activeSection === 'ai' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveSection('ai')}
+          >
+            {t('dashboard_tab_ai')}
+          </button>
+          {/* <button
+            type="button"
+            className={`btn btn-sm ${activeSection === 'counselor' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setActiveSection('counselor')}
+          >
+            {t('dashboard_tab_counsellor')}
+          </button> */}
+        </div>
+      </div>
+
+      {activeSection === 'main' && <LeadAnalyticsDashboard />}
+      {activeSection === 'ai' && <NewDashboard />}
+      {activeSection === 'counselor' && <CounselorPerformance />}
+    </div>
+  );
+};
+
+export default DashboardWrapper;

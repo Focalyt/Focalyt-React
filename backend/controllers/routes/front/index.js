@@ -42,7 +42,8 @@ const CompanyExecutive = require("../../models/companyExecutive");
 const collegeRepresentative = require("../../models/collegeRepresentative");
 const { generatePassword, sendMail } = require("../../../helpers");
 const { Translate } = require('@google-cloud/translate').v2;
-const { translateProjectId, translateKey } = require('../../../config')
+const { translateProjectId, translateKey } = require('../../../config');
+const { getCourseShareDescription } = require('../ai/courseShareMeta');
 
 AWS.config.update({ accessKeyId, secretAccessKey, region });
 const s3 = new AWS.S3({ region, signatureVersion: "v4" });
@@ -610,8 +611,18 @@ router.get("/coursedetails/:id", async (req, res) => {
 		});
 	  </script>
 	`;
+	// Optional: AI-generated share description for OG/Twitter cards (Anthropic)
+	let coursePayload = course ? (course.toObject ? course.toObject() : { ...course }) : course;
+	if (coursePayload && process.env.ANTHROPIC_API_KEY) {
+		try {
+			const shareDescription = await getCourseShareDescription(coursePayload);
+			if (shareDescription) coursePayload.shareDescription = shareDescription;
+		} catch (e) {
+			// non-blocking; meta still works with truncated description
+		}
+	}
 	return res.json({
-		course,
+		course: coursePayload || course,
 		storageScript: storageScript,
 	});
 });

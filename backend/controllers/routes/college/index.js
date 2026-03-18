@@ -2021,6 +2021,24 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const totalCount = totalCountResult[0]?.total || 0;
 
+		
+		const appliedIds = results.map(r => r._id);
+		const followups = await B2cFollowup
+			.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
+			.sort({ followupDate: -1, createdAt: -1 })
+			.lean();
+		const followupByCourse = new Map();
+		followups.forEach(f => {
+			const key = f.appliedCourseId.toString();
+			if (!followupByCourse.has(key)) {
+				followupByCourse.set(key, {
+					_id: f._id,
+					followupDate: f.followupDate,
+					remarks: f.remarks
+				});
+			}
+		});
+
 		// Process results - sirf essential fields return karenge
 		const processedResults = results.map(doc => {
 			// Calculate doc counts
@@ -2036,6 +2054,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					sub => sub._id.toString() === doc._leadSubStatus.toString()
 				);
 			}
+
+			const followup = followupByCourse.get(doc._id.toString()) || null;
 
 			return {
 				_id: doc._id,
@@ -2057,7 +2077,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 				},
-				docCounts
+				docCounts,
+				followup
 			};
 		});
 
@@ -2555,6 +2576,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
 
 	// Name search
 	if (filters.name && filters.name.trim()) {
@@ -2760,6 +2784,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	}
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -3344,6 +3371,9 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
 
 	// Name search
 	if (filters.name && filters.name.trim()) {
@@ -3614,7 +3644,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			movedInKYCPipeline[0].$match = { ...movedInKYCPipeline[0].$match, ...dateFilters };
 		}
 
-		// Apply other filters if needed
+		// Apply course-related filters (after course lookup)
 		if (appliedFilters.courseType || appliedFilters.projectsArray?.length > 0 ||
 			appliedFilters.verticalsArray?.length > 0 || appliedFilters.courseArray?.length > 0) {
 
@@ -3634,6 +3664,22 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 			basePipeline.push({ $match: filterMatch });
 			movedInKYCPipeline.push({ $match: filterMatch });
+		}
+
+		// Apply center and counselor filters (can be applied directly on AppliedCourses fields)
+		if (appliedFilters.centerArray?.length > 0 || appliedFilters.counselorArray?.length > 0) {
+			const directFilterMatch = {};
+			// Add center filter
+			if (appliedFilters.centerArray?.length > 0) {
+				directFilterMatch['_center'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			// Add counselor filter
+			if (appliedFilters.counselorArray?.length > 0) {
+				directFilterMatch['counsellor'] = { $in: appliedFilters.counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			basePipeline.push({ $match: directFilterMatch });
+			movedInKYCPipeline.push({ $match: directFilterMatch });
 		}
 
 		// Add candidate lookup for name search
@@ -5243,11 +5289,29 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						if (email && email.trim() && can.email) {
 							if (email.toLowerCase().trim() === can.email.toLowerCase().trim()) return true;
 						}
-						// Fallback to name + father name + college (least unique, but still important)
-						return can.name.toLowerCase() === name.toLowerCase() && 
-						       can.fatherName.toLowerCase() === fatherName.toLowerCase() && 
-						       can.collegeName.toLowerCase() === collegeName.toLowerCase();
+						return false;
 					});
+
+					if (dup) {
+						// Find which field matched to give better error message
+						let dupReason = '';
+						if (contactNumber && contactNumber.trim() && dup.contactNumber) {
+							const cleanMobile1 = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							const cleanMobile2 = String(dup.contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
+							if (cleanMobile1.length >= 10 && cleanMobile2.length >= 10 && cleanMobile1 === cleanMobile2) {
+								dupReason = `Contact Number "${contactNumber}"`;
+							}
+						}
+						if (!dupReason && email && email.trim() && dup.email) {
+							if (email.toLowerCase().trim() === dup.email.toLowerCase().trim()) {
+								dupReason = `Email "${email}"`;
+							}
+						}
+						if (dupReason) {
+							errorMessages.push(`Duplicate candidate with ${dupReason} found in the same file for row ${index + 2}.`);
+							continue;
+						}
+					}
 
 					if (!isExistCandidate && !dup) {
 						allRows.push({ name, fatherName, collegeName, contactNumber, email })
@@ -5545,6 +5609,10 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const p = parseInt(req.query.page, 10);
 		const page = p || 1;
 		const status = req.query.status; 
+		const search = req.query.search;
+		const course = req.query.course;
+		const year = req.query.year;
+		const session = req.query.session;
 
 		const collegeId = mongoose.Types.ObjectId.isValid(college._id) 
 			? new mongoose.Types.ObjectId(college._id) 
@@ -5554,6 +5622,79 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const matchCondition = { college: collegeId };
 		if (status && (status === 'active' || status === 'inactive')) {
 			matchCondition.status = status;
+		}
+
+		// Add search functionality - search by name, fatherName, email, or contactNumber
+		if (search && search.trim()) {
+			const searchRegex = new RegExp(search.trim(), 'i');
+			matchCondition.$or = [
+				{ name: searchRegex },
+				{ fatherName: searchRegex },
+				{ email: searchRegex },
+				{ contactNumber: searchRegex }
+			];
+		}
+
+		// Add course filter
+		if (course) {
+			try {
+				const courseArray = JSON.parse(course);
+				if (Array.isArray(courseArray) && courseArray.length > 0) {
+					// Check if values are ObjectIds (course IDs) or strings (course names)
+					const courseIds = courseArray.filter(c => mongoose.Types.ObjectId.isValid(c));
+					const courseNames = courseArray.filter(c => !mongoose.Types.ObjectId.isValid(c));
+					
+					// If we have course IDs, fetch course names from database
+					if (courseIds.length > 0) {
+						const courses = await Courses.find({ 
+							_id: { $in: courseIds.map(id => new mongoose.Types.ObjectId(id)) }
+						}).select('name');
+						const namesFromIds = courses.map(c => c.name);
+						courseNames.push(...namesFromIds);
+					}
+					
+					// Filter by course names (since course is stored as string in UploadCandidates)
+					if (courseNames.length > 0) {
+						matchCondition.course = { $in: courseNames };
+					}
+				}
+			} catch (e) {
+				// If JSON parse fails, treat as single value
+				if (mongoose.Types.ObjectId.isValid(course)) {
+					// If it's an ObjectId, fetch course name
+					const courseDoc = await Courses.findById(course).select('name');
+					if (courseDoc) {
+						matchCondition.course = courseDoc.name;
+					}
+				} else {
+					// If it's already a string (course name), use as is
+					matchCondition.course = course;
+				}
+			}
+		}
+
+		// Add year filter
+		if (year) {
+			try {
+				const yearArray = JSON.parse(year);
+				if (Array.isArray(yearArray) && yearArray.length > 0) {
+					matchCondition.year = { $in: yearArray };
+				}
+			} catch (e) {
+				matchCondition.year = year;
+			}
+		}
+
+		// Add session filter
+		if (session) {
+			try {
+				const sessionArray = JSON.parse(session);
+				if (Array.isArray(sessionArray) && sessionArray.length > 0) {
+					matchCondition.session = { $in: sessionArray };
+				}
+			} catch (e) {
+				matchCondition.session = session;
+			}
 		}
 
 		let candidates = await UploadCandidates.aggregate([
@@ -6571,6 +6712,7 @@ router.delete('/center_delete/:id', async (req, res) => {
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	try {
+		console.log('[Lead Status Change] Step 1: Request received', { method: req.method, path: req.path });
 		const { id } = req.params;
 		const {
 			_leadStatus,
@@ -6578,13 +6720,18 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			remarks,
 			followup,  // combined date and time
 		} = req.body;
+		console.log("req", req.body)
+		console.log('[Lead Status Change] Step 2: Params & body', { appliedCourseId: id, _leadStatus, _leadSubStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
 		const userId = req.user._id;
 		const collegeId = req.user.college._id;
+		console.log('[Lead Status Change] Step 3: User context', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
 
 		// Find the AppliedCourse document by ID
 		const doc = await AppliedCourses.findById(id);
+		console.log('[Lead Status Change] Step 4: AppliedCourse lookup', { found: !!doc, id });
 		if (!doc) {
+			console.log('[Lead Status Change] Step 5: Exiting - AppliedCourse not found');
 			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
 		}
 
@@ -6612,9 +6759,13 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 			doc._leadSubStatus = _leadSubStatus;
 		}
-		let lastFollowup = await B2cFollowup.findOne({ appliedCourseId: doc._id, status: 'planned' });
+		// Get the most recent planned followup for this lead, if any
+		let lastFollowup = await B2cFollowup
+			.findOne({ appliedCourseId: doc._id, status: 'planned' })
+			.sort({ followupDate: -1, createdAt: -1 });
 		if (lastFollowup) {
-			lastFollowup.status = 'done'
+			lastFollowup.status = 'done';
+			await lastFollowup.save();
 		}
 
 		// If followup date and time is set or updated, log the change and update the followup
@@ -6626,9 +6777,11 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 				followupDate: new Date(followup),
 				remarks: remarks,
 				status: 'planned',
+				counsellorId: userId,
 				createdBy: userId,
 				collegeId: collegeId
 			});
+			console.log("newFollowup",newFollowup)
 			await newFollowup.save();
 		}
 
@@ -6656,28 +6809,30 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		doc.logs.push(newLogEntry);
-
+console.log('[Lead Status Change] Step 5: Log entry added', { logEntry: newLogEntry, id, _leadStatus, _leadSubStatus });
+console.log("newLogEntry", newLogEntry)
 		// Save the updated document
 		await doc.save();
-
+		console.log('[Lead Status Change] Step 5: Doc saved', { id, _leadStatus, _leadSubStatus });
 
 		const newStatusLogs = await statusLogHelper(id, {
 			_statusId: _leadStatus,
 			_subStatusId: _leadSubStatus,
 		});
 
-
-
+		console.log('[Lead Status Change] Step 6: Success - sending response');
 		return res.json({ success: true, data: doc });
 	} catch (error) {
-		console.error('Error updating status and followup:', error);
+		console.error('[Lead Status Change] Error:', error);
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
 
 router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	try {
+		console.log('[Lead Bulk Status Change] Step 1: Request received', { method: req.method, path: req.path });
 		const { selectedProfiles, _leadStatus, _leadSubStatus, remarks } = req.body;
+		console.log('[Lead Bulk Status Change] Step 2: Body', { selectedCount: selectedProfiles?.length, _leadStatus, _leadSubStatus, hasRemarks: !!remarks });
 		if (!selectedProfiles || !_leadStatus || !_leadSubStatus) {
 			let missingFields = [];
 
@@ -6685,12 +6840,14 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 			if (!_leadStatus) missingFields.push('_leadStatus');
 			if (!_leadSubStatus) missingFields.push('_leadSubStatus');
 
+			console.log('[Lead Bulk Status Change] Step 3: Validation failed', { missingFields });
 			return res.status(500).json({
 				success: false,
 				message: `Missing required fields: ${missingFields.join(', ')}`
 			});
 		}
 		const userId = req.user._id;
+		console.log('[Lead Bulk Status Change] Step 3: User', { userId: userId?.toString(), userName: req.user?.name });
 
 		// Fetch the new status document (including sub-statuses) only once
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
@@ -6760,10 +6917,11 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		// Wait for all updates to complete
 		await Promise.all(updatePromises);
 
+		console.log('[Lead Bulk Status Change] Step 4: Success', { updatedCount: selectedProfiles.length });
 		return res.json({ success: true, message: 'Status updated successfully' });
 
 	} catch (error) {
-		console.error('Error updating status and followup:', error);
+		console.error('[Lead Bulk Status Change] Error:', error);
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
@@ -6979,12 +7137,11 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		const { id } = req.params;
-		const b2cFollowup = await B2cFollowup.findOneAndUpdate({
-			_id: id,
-			status: 'pending'
-		},
-			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } }, { new: true }
-		).sort({ createdAt: -1 });
+		const b2cFollowup = await B2cFollowup.findOneAndUpdate(
+			{ _id: id, status: 'planned' },
+			{ $set: { status: 'done', updatedBy: user, statusUpdatedAt: new Date() } },
+			{ new: true }
+		);
 
 		// console.log("b2cFollowup", b2cFollowup)
 
@@ -7033,34 +7190,38 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		const user = req.user;
 
-		let { fromDate, toDate, projects, verticals, course, center, counselor } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor, allTime, filterBy } = req.query;
+		const useAllTime = allTime === 'true' || allTime === true;
+		const useActivityFilter = filterBy === 'activity';
 
+		// Parse dates (default today when filterBy=activity)
 		if (fromDate && fromDate !== 'null') {
 			fromDate = new Date(fromDate);
 			if (isNaN(fromDate.getTime())) {
-				console.log('Invalid fromDate format')
+				console.log('Invalid fromDate format');
 				return res.status(400).json({ error: "Invalid fromDate format" });
 			}
 		} else {
-			fromDate = new Date(new Date().setHours(0, 0, 0, 0));
+			fromDate = new Date();
+			fromDate.setUTCHours(0, 0, 0, 0);
 		}
 		if (toDate && toDate !== 'null') {
 			toDate = new Date(toDate);
 			if (isNaN(toDate.getTime())) {
-				console.log('Invalid toDate format')
+				console.log('Invalid toDate format');
 				return res.status(400).json({ error: "Invalid toDate format" });
 			}
+			toDate.setUTCHours(23, 59, 59, 999);
 		} else {
-			toDate = new Date(new Date().setHours(23, 59, 59, 999));
+			toDate = new Date();
+			toDate.setUTCHours(23, 59, 59, 999);
 		}
-
 
 		let projectsArray = [];
 		let verticalsArray = [];
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
-
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -7072,15 +7233,23 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-
-		let aggregate = []
-
-		let baseMatch = {}
-
+		let aggregate = [];
+		let baseMatch = {};
 		if (counselorArray.length > 0) {
 			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
 		} else {
 			baseMatch.createdBy = user._id;
+		}
+		if (useAllTime) {
+			// no date filter
+		} else if (useActivityFilter) {
+			// Today's activity: followups SET today (createdAt) OR status UPDATED today (done/missed - statusUpdatedAt)
+			baseMatch.$or = [
+				{ createdAt: { $gte: fromDate, $lte: toDate } },
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+			];
+		} else {
+			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
 		}
 
 		let group = [{
@@ -7113,12 +7282,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 
 		aggregate.push(
-			{
-				$match: {
-					followupDate: { $gte: fromDate, $lte: toDate },
-					...baseMatch
-				}
-			},
+			{ $match: baseMatch },
 			{
 				$lookup: {
 					from: 'appliedcourses',
@@ -7206,7 +7370,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			{
 				$lookup: {
 					from: 'users',
-					localField: 'appliedCourseId._counsellor',
+					localField: 'counsellorId',
 					foreignField: '_id',
 					as: 'counselorData'
 				}
@@ -7294,8 +7458,284 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 
 	}
-	catch (err) {
+		catch (err) {
 		console.error("Error fetching followup counts:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Internal server error",
+			error: err.message
+		});
+	}
+});
+
+router.get('/followupcounts-by-counselor', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const collegeId = user?.college?._id;
+
+		let { fromDate, toDate, projects, verticals, course, center, counselor, allTime, filterBy } = req.query;
+		const useAllTime = allTime === 'true' || allTime === true;
+		const useActivityFilter = filterBy === 'activity';
+
+		// Parse dates as local dates when the client sends YYYY-MM-DD (no time component).
+		// This prevents timezone shifting when filtering by calendar dates.
+		const parseLocalDate = (value) => {
+			if (!value) return null;
+			// Treat plain YYYY-MM-DD as local midnight
+			if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+				const [year, month, day] = value.split('-').map(Number);
+				return new Date(year, month - 1, day);
+			}
+			return new Date(value);
+		};
+
+		if (fromDate && fromDate !== 'null') {
+			fromDate = parseLocalDate(fromDate);
+			if (!fromDate || isNaN(fromDate.getTime())) {
+				return res.status(400).json({ success: false, message: "Invalid fromDate format" });
+			}
+		} else {
+			fromDate = new Date();
+		}
+		fromDate.setHours(0, 0, 0, 0);
+
+		if (toDate && toDate !== 'null') {
+			toDate = parseLocalDate(toDate);
+			if (!toDate || isNaN(toDate.getTime())) {
+				return res.status(400).json({ success: false, message: "Invalid toDate format" });
+			}
+		} else {
+			toDate = new Date();
+		}
+		toDate.setHours(23, 59, 59, 999);
+
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays (followupcounts-by-counselor):', parseError);
+		}
+
+		let baseMatch = {};
+
+		// Always restrict to this college, but by default include all counsellors
+		if (collegeId && mongoose.Types.ObjectId.isValid(collegeId)) {
+			baseMatch.collegeId = new mongoose.Types.ObjectId(collegeId);
+		}
+
+		// Counselor filter – when provided, limit to selected counsellors
+		if (counselorArray.length > 0) {
+			const ids = counselorArray.map(id => new mongoose.Types.ObjectId(id));
+		
+			baseMatch.$or = [
+				{ counsellorId: { $in: ids } },
+				{ counsellorId: { $exists: false }, createdBy: { $in: ids } },
+				{ counsellorId: null, createdBy: { $in: ids } }
+			];
+		}
+
+		// Date filter
+		if (useAllTime) {
+			// no date restriction
+		} else if (useActivityFilter) {
+			// Activity mode: created OR status updated in range
+			baseMatch.$or = [
+				{ createdAt: { $gte: fromDate, $lte: toDate } },
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+			];
+		} else {
+			// Default: followup date in range
+			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
+		}
+
+		const aggregate = [];
+
+		aggregate.push(
+			{ $match: baseMatch },
+			{
+				$addFields: {
+					effectiveCounsellorId: { $ifNull: ['$counsellorId', '$createdBy'] }
+				}
+			},
+			{
+				$lookup: {
+					from: 'appliedcourses',
+					localField: 'appliedCourseId',
+					foreignField: '_id',
+					as: 'appliedCourseId'
+				}
+			},
+			{
+				$unwind: {
+					path: '$appliedCourseId',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'courses',
+					localField: 'appliedCourseId._course',
+					foreignField: '_id',
+					as: 'courseData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$courseData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'verticals',
+					localField: 'courseData.vertical',
+					foreignField: '_id',
+					as: 'verticalData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$verticalData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'projects',
+					localField: 'courseData.project',
+					foreignField: '_id',
+					as: 'projectData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$projectData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'centers',
+					localField: 'appliedCourseId._center',
+					foreignField: '_id',
+					as: 'centerData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$centerData',
+					preserveNullAndEmptyArrays: true
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'effectiveCounsellorId',
+					foreignField: '_id',
+					as: 'counselorData'
+				}
+			},
+			{
+				$unwind: {
+					path: '$counselorData',
+					preserveNullAndEmptyArrays: true
+				}
+			}
+		);
+
+		// Apply multi-select filters (projects / verticals / course / center)
+		let additionalMatches = {};
+
+		if (projectsArray.length > 0) {
+			additionalMatches['courseData.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (verticalsArray.length > 0) {
+			additionalMatches['courseData.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (courseArray.length > 0) {
+			additionalMatches['courseData._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (centerArray.length > 0) {
+			additionalMatches['centerData._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (Object.keys(additionalMatches).length > 0) {
+			aggregate.push({ $match: additionalMatches });
+		}
+
+		// Group by counsellor + status
+		aggregate.push(
+			{
+				$group: {
+					_id: {
+						counselorId: '$effectiveCounsellorId',
+						counselorName: '$counselorData.name',
+						status: '$status'
+					},
+					count: { $sum: 1 }
+				}
+			},
+			{
+				$group: {
+					_id: {
+						counselorId: '$_id.counselorId',
+						counselorName: '$_id.counselorName'
+					},
+					done: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'done'] }, '$count', 0]
+						}
+					},
+					planned: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'planned'] }, '$count', 0]
+						}
+					},
+					missed: {
+						$sum: {
+							$cond: [{ $eq: ['$_id.status', 'missed'] }, '$count', 0]
+						}
+					}
+				}
+			},
+			{
+				$project: {
+					_id: 0,
+					counselorId: '$_id.counselorId',
+					counselorName: '$_id.counselorName',
+					done: 1,
+					planned: 1,
+					missed: 1,
+					total: { $add: ['$done', '$planned', '$missed'] }
+				}
+			},
+			{
+				$sort: {
+					counselorName: 1
+				}
+			}
+		);
+
+		const rows = await B2cFollowup.aggregate(aggregate);
+
+		return res.json({
+			success: true,
+			data: rows || []
+		});
+	} catch (err) {
+		console.error("Error fetching followup counts by counselor:", err);
 		return res.status(500).json({
 			success: false,
 			message: "Internal server error",
@@ -8024,6 +8464,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		if (leadStatus) {
 			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+		}
+
+		// Filter by KYC status when tab is "Pending for Documents" (kyc=false) or "Verified" (kyc=true)
+		if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
+			baseMatchStage.kyc = kyc === 'true' || kyc === true;
 		}
 
 		// Add base match stage
@@ -8917,7 +9362,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			}
 
 
-			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, remarks });
+			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, counsellorId: user._id, remarks });
 
 			if (!followup) {
 				return res.status(400).json({ status: false, message: "Followup not created" });
@@ -8933,6 +9378,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			}
 
+	
 
 			const newLogEntry = {
 				user: user._id,
@@ -8951,7 +9397,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			}
 
 
-
+		
 
 
 
@@ -8977,7 +9423,8 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				remarks: remarks,
 				status: 'planned',
 				createdBy: user._id,
-				collegeId: collegeId
+				collegeId: collegeId,
+				counsellorId: user._id
 			});
 			let actionParts = [];
 			actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
@@ -9524,35 +9971,35 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		});
 
 		// Check each mandatory document
-		for (const reqDoc of updatedRequiredDocs) {
-			if (reqDoc.mandatory) {
-				const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
-				// If mandatory doc is not uploaded or not verified, set flag to false
-				if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
-					allMandatoryDocsVerified = false;
-					break;
-				}
-			}
-		}
+		// for (const reqDoc of updatedRequiredDocs) {
+		// 	if (reqDoc.mandatory) {
+		// 		const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
+		// 		// If mandatory doc is not uploaded or not verified, set flag to false
+		// 		if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
+		// 			allMandatoryDocsVerified = false;
+		// 			break;
+		// 		}
+		// 	}
+		// }
 
 		// If all mandatory docs are verified, update KYC status to true
-		if (allMandatoryDocsVerified && !updatedProfile.kyc) {
-			updatedProfile.kyc = true;
-			await updatedProfile.save();
+		// if (allMandatoryDocsVerified && !updatedProfile.kyc) {
+		// 	updatedProfile.kyc = true;
+		// 	await updatedProfile.save();
 
 
-			const newStatusLogs = await statusLogHelper(id, {
-				kycApproved: true
-			});
+		// 	const newStatusLogs = await statusLogHelper(id, {
+		// 		kycApproved: true
+		// 	});
 
 
-		}
+		// }
 
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
-			kycUpdated: profile.kyc === true,
-			verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
+			// kycUpdated: profile.kyc === true,
+			// verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
 			requiredCount,
 			allMandatoryDocsVerified: allMandatoryDocsVerified
 		});
@@ -9562,6 +10009,59 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		return res.status(500).json({
 			success: false,
 			message: err.message || "Error verifying document",
+			error: err.message
+		});
+	}
+});
+
+router.post("/kycDone/:profileId", isCollege, async (req, res) => {
+	try {
+		const { profileId } = req.params;
+		const userId = req.user?._id;
+		if (!userId) {
+			return res.status(401).json({ success: false, message: "Unauthorized" });
+		}
+		const appliedCourse = await AppliedCourses.findById(profileId)
+			.populate("_course", "docsRequired");
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: "Applied course not found" });
+		}
+		const course = appliedCourse._course;
+		if (!course || !course.docsRequired || !Array.isArray(course.docsRequired)) {
+			return res.status(400).json({ success: false, message: "Course or docs configuration not found" });
+		}
+		const mandatoryDocs = course.docsRequired.filter(
+			(d) => d.mandatory === true && d.status !== false
+		);
+		const mandatoryDocIds = mandatoryDocs.map((d) => d._id.toString());
+		const uploadedDocs = appliedCourse.uploadedDocs || [];
+		for (const docId of mandatoryDocIds) {
+			const uploaded = uploadedDocs.find(
+				(u) => u.docsId && u.docsId.toString() === docId
+			);
+			if (!uploaded || uploaded.status !== "Verified") {
+				return res.status(400).json({
+					success: false,
+					message: "All mandatory documents must be verified before marking KYC done",
+					missingOrUnverifiedMandatory: true
+				});
+			}
+		}
+		appliedCourse.kyc = true;
+		appliedCourse.kycDoneAt = new Date();
+		appliedCourse.kycDoneBy = userId;
+		await appliedCourse.save();
+		return res.json({
+			success: true,
+			message: "KYC marked as done",
+			kycDoneAt: appliedCourse.kycDoneAt,
+			kycDoneBy: appliedCourse.kycDoneBy
+		});
+	} catch (err) {
+		console.error("Error marking KYC done:", err);
+		return res.status(500).json({
+			success: false,
+			message: err.message || "Error marking KYC done",
 			error: err.message
 		});
 	}
@@ -9720,6 +10220,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			baseMatchStage.isBatchFreeze = { $in: [true] };
 			baseMatchStage.dropout = { $in: [false] };
 		}
+		// Apply center filter early for better performance
+		if (centerArray.length > 0) {
+			baseMatchStage._center = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
 		aggregationPipeline.push({ $match: baseMatchStage });
 		aggregationPipeline.push(
 			{
@@ -9810,9 +10314,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		}
 		if (courseArray.length > 0) {
 			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (centerArray.length > 0) {
-			additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (name && name.trim()) {
 			const searchTerm = name.trim();
@@ -10291,9 +10792,12 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		};
 
 		if (teamMembers && teamMembers.length > 0) {
+			const teamMemberIds = teamMembers.map(member =>
+				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+			);
 			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMembers } },
-				{ counsellor: { $in: teamMembers } }
+				{ registeredBy: { $in: teamMemberIds } },
+				{ counsellor: { $in: teamMemberIds } }
 			];
 		}
 		// Add date filters
@@ -10330,6 +10834,10 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 				baseMatchStage.followupDate.$lte = toDate;
 			}
 		}
+		// Apply center filter early for better performance and accuracy
+		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
+			baseMatchStage._center = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
 		basePipeline.push({ $match: baseMatchStage });
 		basePipeline.push(
 			{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course', pipeline: [{ $lookup: { from: 'sectors', localField: 'sectors', foreignField: '_id', as: 'sectors' } }, { $lookup: { from: 'verticals', localField: 'vertical', foreignField: '_id', as: 'vertical' } }, { $lookup: { from: 'projects', localField: 'project', foreignField: '_id', as: 'project' } }] } },
@@ -10355,9 +10863,6 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		}
 		if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
 			additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
-			additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (appliedFilters.name && appliedFilters.name.trim()) {
 			const searchTerm = appliedFilters.name.trim();
@@ -13494,6 +13999,18 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 								0
 							]
 						}
+					},
+					totalKYC: { $sum: { $cond: ['$kycStage', 1, 0] } },
+					kycDone: { $sum: { $cond: ['$kyc', 1, 0] } },
+					pendingKYC: { $sum: { $cond: [{ $and: ['$kycStage', { $ne: ['$kyc', true] }] }, 1, 0] } },
+					rejectedDoc: {
+						$sum: {
+							$cond: [
+								{ $gt: [{ $size: { $ifNull: [{ $filter: { input: '$uploadedDocs', cond: { $eq: ['$$this.status', 'Rejected'] } } }, []] } }, 0] },
+								1,
+								0
+							]
+						}
 					}
 				}
 			}
@@ -13746,14 +14263,31 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 			}
 		]);
 
-		// Create lookup maps for total leads and untouch leads
+		// Create lookup maps by counselorName and by counselorId (for reliable KYC matching)
 		const totalLeadsMap = {};
 		const untouchLeadsMap = {};
+		const totalKYCMap = {};
+		const kycDoneMap = {};
+		const pendingKYCMap = {};
+		const rejectedDocMap = {};
+		const totalKYCMapById = {};
+		const kycDoneMapById = {};
+		const pendingKYCMapById = {};
 
 		appliedCoursesLeads.forEach(item => {
 			const counselorName = item._id.counselorName || 'Unknown';
+			const counselorIdStr = item._id.counselorId ? item._id.counselorId.toString() : '';
 			totalLeadsMap[counselorName] = item.totalLeads;
 			untouchLeadsMap[counselorName] = item.untouchLeads || 0;
+			totalKYCMap[counselorName] = item.totalKYC || 0;
+			kycDoneMap[counselorName] = item.kycDone || 0;
+			pendingKYCMap[counselorName] = item.pendingKYC || 0;
+			rejectedDocMap[counselorName] = item.rejectedDoc || 0;
+			if (counselorIdStr) {
+				totalKYCMapById[counselorIdStr] = item.totalKYC || 0;
+				kycDoneMapById[counselorIdStr] = item.kycDone || 0;
+				pendingKYCMapById[counselorIdStr] = item.pendingKYC || 0;
+			}
 		});
 
 		// Transform data to match frontend format - Counselor-wise with status and sub-status breakdowns
@@ -13761,21 +14295,30 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 
 		counselorMatrixData.forEach(counselor => {
 			const counselorName = counselor.counselorName || 'Unknown';
+			const counselorIdStr = counselor.counselorId ? counselor.counselorId.toString() : '';
 			const totalLeads = totalLeadsMap[counselorName] || 0;
 			const untouchLeads = untouchLeadsMap[counselorName] || 0;
+			// Prefer KYC from AppliedCourses by counselorId (reliable), then by name, then StatusLogs; ensure Total = Done + Pending when possible
+			const kycDone = kycDoneMapById[counselorIdStr] ?? kycDoneMap[counselorName] ?? counselor.totalKycApproved ?? 0;
+			const pendingKYC = pendingKYCMapById[counselorIdStr] ?? pendingKYCMap[counselorName] ?? 0;
+			let totalKYC = totalKYCMapById[counselorIdStr] ?? totalKYCMap[counselorName] ?? counselor.totalKycStage ?? 0;
+			if (totalKYC === 0 && (kycDone > 0 || pendingKYC > 0)) totalKYC = kycDone + pendingKYC;
 
-			// Initialize counselor data
+			// Initialize counselor data (KYC metrics from AppliedCourses - counsellor wise)
 			transformedData[counselorName] = {
-				Leads: totalLeads, // Use total leads from AppliedCourses as 1st column
-				Untouch: untouchLeads, // Add untouch leads count
-				KYCDone: counselor.totalKycApproved,
+				Leads: totalLeads,
+				Untouch: untouchLeads,
+				TotalKYC: totalKYC,
+				KYCDone: kycDone,
+				PendingKYC: pendingKYC,
+				RejectedDoc: rejectedDocMap[counselorName] ?? 0,
 				KYCStage: counselor.totalKycStage,
 				Admissions: counselor.totalAdmissions,
 				Dropouts: counselor.totalDropouts,
 				BatchAssigned: counselor.totalBatchAssigned,
 				BatchFreezed: counselor.totalBatchFreezed,
 				ZeroPeriod: counselor.totalZeroPeriodAssigned,
-				Paid: counselor.totalAdmissions, // Assuming admissions are paid
+				Paid: counselor.totalAdmissions,
 				Unpaid: totalLeads - counselor.totalAdmissions,
 				ConversionRate: totalLeads > 0 ? parseFloat(((counselor.totalAdmissions / totalLeads) * 100).toFixed(1)) : 0,
 				DropoutRate: totalLeads > 0 ? parseFloat(((counselor.totalDropouts / totalLeads) * 100).toFixed(1)) : 0
@@ -13786,7 +14329,6 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 				const statusTitle = statusData.statusTitle || 'Unknown';
 				const subStatusTitle = statusData.subStatusTitle || 'Unknown';
 
-				// Initialize status if not exists
 				if (!transformedData[counselorName][statusTitle]) {
 					transformedData[counselorName][statusTitle] = {
 						count: 0,
@@ -13794,15 +14336,38 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 					};
 				}
 
-				// Add to status count
 				transformedData[counselorName][statusTitle].count += statusData.count;
 
-				// Add to sub-status
 				if (!transformedData[counselorName][statusTitle].substatuses[subStatusTitle]) {
 					transformedData[counselorName][statusTitle].substatuses[subStatusTitle] = 0;
 				}
 				transformedData[counselorName][statusTitle].substatuses[subStatusTitle] += statusData.count;
 			});
+		});
+
+		// Include all counselors from AppliedCourses so KYC data is always counsellor-wise (even if no StatusLogs)
+		appliedCoursesLeads.forEach(item => {
+			const counselorName = item._id.counselorName || 'Unknown';
+			if (transformedData[counselorName]) return; // already added from StatusLogs
+			const totalLeads = totalLeadsMap[counselorName] || item.totalLeads || 0;
+			transformedData[counselorName] = {
+				Leads: totalLeads,
+				Untouch: untouchLeadsMap[counselorName] || 0,
+				TotalKYC: totalKYCMap[counselorName] || 0,
+				KYCDone: kycDoneMap[counselorName] || 0,
+				PendingKYC: pendingKYCMap[counselorName] || 0,
+				RejectedDoc: rejectedDocMap[counselorName] || 0,
+				KYCStage: 0,
+				Admissions: 0,
+				Dropouts: 0,
+				BatchAssigned: 0,
+				BatchFreezed: 0,
+				ZeroPeriod: 0,
+				Paid: 0,
+				Unpaid: totalLeads,
+				ConversionRate: 0,
+				DropoutRate: 0
+			};
 		});
 
 		return res.json({

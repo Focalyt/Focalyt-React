@@ -503,18 +503,51 @@ const AddLeads = () => {
       return alert("mobile number required");
     }
 
+    // Build data object, excluding selectedCenter if it's empty or course has no centers
+    const hasCenters = course.center && course.center.length > 0;
     const data = {
       ...formData,
       courseId,
       mobile: candidateNumber
     };
 
-    console.log("Final Form Data Object:", data);
+    // Remove selectedCenter if it's empty or if course doesn't have centers
+    if (!hasCenters || !data.selectedCenter || data.selectedCenter === "") {
+      delete data.selectedCenter;
+    }
 
     try {
+      // Build validation conditions
+      const validationErrors = [];
+      
+      // Check selectedCenter only if course has centers
+      if (hasCenters && (formData.selectedCenter === "" || !formData.selectedCenter)) {
+        validationErrors.push("Selected Center");
+      }
+      
+      if (formData.name === "") validationErrors.push("Name");
+      if (formData.email === "") validationErrors.push("Email");
+      if (formData.address === "") validationErrors.push("Address");
+      if (formData.sex === "") validationErrors.push("Gender");
+      if (formData.dob === "") validationErrors.push("Date of Birth");
+      if (formData.state === "") validationErrors.push("State");
+      if (formData.city === "") validationErrors.push("City");
+      if (formData.longitude === "") validationErrors.push("Longitude");
+      if (formData.latitude === "") validationErrors.push("Latitude");
+      if (formData.highestQualification === "") validationErrors.push("Highest Qualification");
+      if (!formData.courseId && !courseId) validationErrors.push("Course ID");
+      if (!formData.sourceType) validationErrors.push("Source Type");
+      
+      // Check source based on sourceType
+      if (formData.sourceType === "Third Party" && !formData.source) {
+        validationErrors.push("Third Party Source");
+      }
+      if (formData.sourceType === "Self/HO" && !formData.source) {
+        validationErrors.push("Self/HO Counselor");
+      }
 
-      if(formData.selectedCenter === "" || formData.name === "" || formData.email === "" || formData.address === "" || formData.sex === "" || formData.dob === "" || formData.state === "" || formData.city === "" || formData.longitude === "" || formData.latitude === "" || formData.highestQualification === "" || formData.courseId === "" ){
-        alert("Please fill all the fields");
+      if (validationErrors.length > 0) {
+        alert(`Please fill all the required fields: ${validationErrors.join(", ")}`);
         return;
       }
 

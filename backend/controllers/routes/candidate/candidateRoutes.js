@@ -1,4 +1,4 @@
-// const ObjectId = require("mongodb").ObjectId;
+
 const mongoose = require('mongoose');
 const bcrypt = require("bcryptjs");
 const express = require("express");
@@ -54,6 +54,7 @@ const {
   Company,
   VideoData,
   Referral,
+  ReferralShareOffer,
   Contact,
   LoanEnquiry,
   Review,
@@ -65,7 +66,9 @@ const {
   AssignmentSubmission,
   JobOffer,
   RewardStatus,
-  RewardClaim
+  RewardClaim,
+  Placement,
+  PlacementStatus
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -304,7 +307,8 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     const validation = { mobile: req.user.mobile };
    
-
+    // ✅ Accept refCode from request body or query (for old candidates)
+    const refCode = req.body?.refCode || req.query?.refCode;
 
     let selectedCenter = req.body.selectedCenter;
     if (!selectedCenter) {
@@ -341,6 +345,21 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     if (!candidate) {
       return res.status(404).json({ status: false, msg: "Candidate not found." });
+    }
+
+    // ✅ Handle refCode for old candidates (if referredBy not set)
+    let referrerId = candidate?.referredBy;
+    if (!referrerId && refCode && mongoose.Types.ObjectId.isValid(refCode)) {
+      const refCodeObjectId = new mongoose.Types.ObjectId(refCode);
+      if (refCodeObjectId.toString() === candidate._id.toString()) {
+        referrerId = null;
+      } else {
+        const referrerCandidate = await Candidate.findOne({ _id: refCodeObjectId, status: true, isDeleted: false }).lean();
+        if (referrerCandidate && referrerCandidate._id.toString() !== candidate._id.toString()) {
+          referrerId = refCodeObjectId;
+          await Candidate.findByIdAndUpdate(candidate._id, { referredBy: referrerId }, { new: true });
+        }
+      }
     }
 
     const alreadyApplied = await AppliedCourses.findOne({ _candidate: candidate._id, _course: courseId }).lean();
@@ -392,6 +411,53 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
 
     const appliedData = await new AppliedCourses(data).save();
+
+
+    // ✅ Use referrerId (from referredBy or refCode)
+    if (referrerId) {
+      const offer = await ReferralShareOffer.findOne({ offerType: "COURSE", isActive: true }).sort({ createdAt: -1 }).lean();
+      if (offer) {
+        const referrerReward = Number(offer.referrerAmount ?? offer.amount ?? 0);
+        const referredReward = Number(offer.referredAmount ?? 0);
+        const commentKey = `refApply:COURSE:${courseId}:${candidate._id}`;
+
+        if (Number.isFinite(referrerReward) && referrerReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: referrerId,
+            eventName: candidateCashbackEventName.referrer_course_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: referrerId,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referrer_course_apply,
+              amount: referrerReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+
+        if (Number.isFinite(referredReward) && referredReward > 0) {
+          const exists = await CandidateCashBack.findOne({
+            candidateId: candidate._id,
+            eventName: candidateCashbackEventName.referee_course_apply,
+            comment: commentKey,
+          }).lean();
+          if (!exists) {
+            await CandidateCashBack.create({
+              candidateId: candidate._id,
+              eventType: cashbackEventType.credit,
+              eventName: candidateCashbackEventName.referee_course_apply,
+              amount: referredReward,
+              isPending: true,
+              comment: commentKey,
+            });
+          }
+        }
+      }
+    }
 
 
     // Capitalize every word's first letter
@@ -509,11 +575,12 @@ router
       const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced, fatherName, motherName} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
-        let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
+        let referredBy = await CandidateProfile.findOne({ _id: formData.refCode })
         if (!referredBy) {
           req.flash("error", "Enter a valid referral code.");
           return res.send({ status: 'failure', error: "Enter a valid referral code." })
         }
+        console.log('[REGISTER] Valid referral code - referrer:', referredBy._id);
       }
       const dataCheck = await Candidate.findOne({ mobile: mobile });
       if (email && email.trim() !== '') {
@@ -1039,6 +1106,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   if (jobDetails.status == false) {
     return res.redirect("/candidate/searchJob");
   }
+  const referralOffer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).lean();
 
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
@@ -1103,6 +1171,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
     highestQualification,
     jobDetails,
     candidate,
+    referralOffer,
     isApplied,
     isRegisterInterview,
     canApply,
@@ -1887,36 +1956,83 @@ router.get("/learn", isCandidate, async (req, res) => {
     console.log("caught error ", err);
   }
 });
+
+router.get("/getCandidateId", isCandidate, async (req, res) => {
+  try {
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, error: "Invalid mobile number" });
+    }
+    
+    const candidate = await Candidate.findOne({ 
+      mobile: value.mobile,
+      status: true,
+      isDeleted: false
+    }).select('_id name mobile').lean();
+    
+    if (!candidate) {
+      return res.status(404).json({ status: false, error: "Candidate not found" });
+    }
+    
+    return res.json({ 
+      status: true, 
+      candidateId: candidate._id.toString(),
+      candidate: {
+        _id: candidate._id,
+        name: candidate.name,
+        mobile: candidate.mobile
+      }
+    });
+  } catch (err) {
+    console.error("Error getting candidate ID:", err);
+    return res.status(500).json({ status: false, error: "Internal server error" });
+  }
+});
+
 router
   .route("/myprofile")
   .get(isCandidate, async (req, res) => {
     try {
-
-      console.log(req.user)
-
       let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
         return res.send({ status: "failure", error: "Something went wrong!", error });
       }
-      const candidate = await Candidate.findOne({
-        mobile: value.mobile,
-      }).populate([
-        { path: "experiences.Company_State", select: ["name", "stateId"] },
-        {
-          path: "experiences.Company_City",
-          select: ["name", "stateId", "cityId"],
-        },
-        { path: "experiences.Industry_Name", select: ["name"] },
-        { path: "experiences.SubIndustry_Name", select: ["name"] },
-        { path: "state", select: ["name", "stateId"] },
-        { path: "locationPreferences.state", select: ["name", "stateId"] },
-        {
-          path: "locationPreferences.city",
-          select: ["name", "stateId", "cityId"],
-        },
-      ]);
+
+      let candidate;
+      try {
+        candidate = await Candidate.findOne({
+          mobile: value.mobile,
+        }).populate([
+          { path: "experiences.Company_State", select: ["name", "stateId"] },
+          {
+            path: "experiences.Company_City",
+            select: ["name", "stateId", "cityId"],
+          },
+          { path: "experiences.Industry_Name", select: ["name"] },
+          { path: "experiences.SubIndustry_Name", select: ["name"] },
+          { path: "state", select: ["name", "stateId"] },
+          { path: "locationPreferences.state", select: ["name", "stateId"] },
+          {
+            path: "locationPreferences.city",
+            select: ["name", "stateId", "cityId"],
+          },
+        ]);
+      } catch (populateError) {
+        // If populate fails, get candidate without problematic populates
+        candidate = await Candidate.findOne({
+          mobile: value.mobile,
+        }).populate([
+          { path: "state", select: ["name", "stateId"] },
+          { path: "locationPreferences.state", select: ["name", "stateId"] },
+          {
+            path: "locationPreferences.city",
+            select: ["name", "stateId", "cityId"],
+          },
+        ]);
+      }
       const isProfileCompleted = candidate.isProfileCompleted;
       const isVideoCompleted = candidate.profilevideo
       const cashback = await CashBackLogic.findOne({})
@@ -2282,7 +2398,6 @@ async function getUploadedURL() {
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   let jobId = req.params.jobId;
-  console.log('jobId', jobId)
   let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
@@ -2290,11 +2405,54 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     return res.send({ status: "failure", error: "Something went wrong!", error });
   }
   let candidateMobile = value.mobile;
+  
+  const refCode = req.body?.refCode || req.query?.refCode;
+  
   let vacancy = await Vacancy.findOne({ _id: jobId });
   if (!vacancy) {
     return res.send({ status: false, msg: "Vacancy not Found!" });
   }
   let candidate = await Candidate.findOne({ mobile: candidateMobile })
+  
+  if (!candidate) {
+    return res.send({ status: false, msg: "Candidate not found!" });
+  }
+
+  let referrerId = candidate?.referredBy;
+  console.log('[JOB_APPLY] Starting - refCode:', refCode, 'candidate.referredBy:', candidate?.referredBy, 'candidateId:', candidate._id);
+  
+  if (!referrerId && refCode && mongoose.Types.ObjectId.isValid(refCode)) {
+    console.log('[JOB_APPLY] Validating refCode:', refCode);
+    const refCodeObjectId = new mongoose.Types.ObjectId(refCode);
+    
+    if (refCodeObjectId.toString() === candidate._id.toString()) {
+      console.log('[JOB_APPLY] RefCode is same as current candidate - ignoring');
+      referrerId = null;
+    } else {
+      const referrerCandidate = await Candidate.findOne({ 
+        _id: refCodeObjectId
+      }).lean();
+      
+      console.log('[JOB_APPLY] Referrer lookup result:', {
+        found: !!referrerCandidate,
+        referrerId: referrerCandidate?._id,
+        status: referrerCandidate?.status,
+        isDeleted: referrerCandidate?.isDeleted
+      });
+      
+      // Accept referrer as long as they exist, even if disabled/deleted (for tracking purposes)
+      if (referrerCandidate && referrerCandidate._id.toString() !== candidate._id.toString()) {
+        referrerId = refCodeObjectId;
+        await Candidate.findByIdAndUpdate(candidate._id, { referredBy: referrerId }, { new: true });
+        console.log('[JOB_APPLY] Set referrerId to:', referrerId);
+      } else {
+        console.log('[JOB_APPLY] Referrer not found or is same candidate');
+      }
+    }
+  } else {
+    console.log('[JOB_APPLY] Skipping refCode validation - refCode valid:', mongoose.Types.ObjectId.isValid(refCode), 'has referredBy:', !!referrerId);
+  }
+  console.log('[JOB_APPLY] Final referrerId:', referrerId);
 
 
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
@@ -2335,6 +2493,62 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     // data["coinsDeducted"] = coinsDeducted
    
     const appliedData = await AppliedJobs.create(data);
+
+
+    if (referrerId) {
+      // try active offer first
+      let offer = await ReferralShareOffer.findOne({ offerType: "JOB", isActive: true }).sort({ createdAt: -1 }).lean();
+      if (!offer) {
+        // if none active, fall back to most recent job offer so rewards remain consistent
+        offer = await ReferralShareOffer.findOne({ offerType: "JOB" }).sort({ createdAt: -1 }).lean();
+        console.log('[REFERRAL] No active job offer, using last available offer:', offer?._id);
+      }
+      console.log('[REFERRAL] Job Apply - referrerId:', referrerId, 'offer:', offer);
+      
+      const referrerReward = offer ? Number(offer.referrerAmount ?? offer.amount ?? 0) : 0;
+      const referredReward = offer ? Number(offer.referredAmount ?? 0) : 0;
+      const commentKey = `refApply:JOB:${jobId}:${candidate._id}`;
+      console.log('[REFERRAL] Creating entries - referrerReward:', referrerReward, 'referredReward:', referredReward, 'commentKey:', commentKey);
+
+      // Always create referrer entry (track even when offer missing)
+      const referrerExists = await CandidateCashBack.findOne({
+        candidateId: referrerId,
+        eventName: candidateCashbackEventName.referrer_job_apply,
+        comment: commentKey,
+      }).lean();
+      if (!referrerExists) {
+        await CandidateCashBack.create({
+          candidateId: referrerId,
+          eventType: cashbackEventType.credit,
+          eventName: candidateCashbackEventName.referrer_job_apply,
+          amount: referrerReward,
+          isPending: referrerReward > 0 ? true : false,
+          comment: commentKey,
+        });
+        console.log('[REFERRAL] Created referrer entry for', referrerId);
+      }
+
+      // Always create referee entry (track even if no reward)
+      const refereeExists = await CandidateCashBack.findOne({
+        candidateId: candidate._id,
+        eventName: candidateCashbackEventName.referee_job_apply,
+        comment: commentKey,
+      }).lean();
+      if (!refereeExists) {
+        await CandidateCashBack.create({
+          candidateId: candidate._id,
+          eventType: cashbackEventType.credit,
+          eventName: candidateCashbackEventName.referee_job_apply,
+          amount: referredReward,
+          isPending: referredReward > 0 ? true : false,
+          comment: commentKey,
+        });
+        console.log('[REFERRAL] Created referee entry for', candidate._id);
+      }
+
+    } else {
+      console.log('[REFERRAL] No referrerId found for job application - candidate.referredBy:', candidate?.referredBy, 'refCode:', refCode);
+    }
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
 
@@ -3509,17 +3723,68 @@ router.get("/nearbyJobs", [isCandidate], async (req, res) => {
 });
 
 router.get(
+  "/nearby-jobs-form-options",
+  [isCandidate, authenti],
+  async (req, res) => {
+    try {
+      const [allQualification, allIndustry, allStates, skills] = await Promise.all([
+        Qualification.find({ status: true }).sort({ basic: -1 }).select("_id name").lean(),
+        Industry.find({ status: true }).select("_id name").lean(),
+        State.find({ countryId: "101", status: { $ne: false } }).select("_id name").lean(),
+        Skill.find({ status: true, type: "technical" }).select("_id name").lean(),
+      ]);
+      return res.json({
+        status: true,
+        allQualification: allQualification || [],
+        allIndustry: allIndustry || [],
+        allStates: allStates || [],
+        skills: skills || [],
+      });
+    } catch (err) {
+      console.error("nearby-jobs-form-options:", err.message);
+      return res.status(500).json({ status: false, error: err.message || "Something went wrong!" });
+    }
+  }
+);
+
+router.get(
   "/getNearbyJobsForMap",
   [isCandidate, authenti],
   async (req, res) => {
     const userMobile = req.user.mobile;
+    
+    console.log('\n' + '='.repeat(60));
+    // console.log('🗺️  ===== GET NEARBY JOBS API =====');
+    // console.log('User Mobile:', userMobile);
+    
     const candidate = await Candidate.findOne({ mobile: userMobile });
-    if (!candidate.latitude || !candidate.longitude) {
+    
+    // console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
+    // console.log('Candidate Found:', !!candidate);
+    
+    // Check personalInfo.currentAddress for location (not root level)
+    let latitude = candidate?.personalInfo?.currentAddress?.latitude;
+    let longitude = candidate?.personalInfo?.currentAddress?.longitude;
+    
+    // console.log('Location Source: personalInfo.currentAddress');
+    // console.log('  - latitude:', latitude, `(type: ${typeof latitude})`);
+    // console.log('  - longitude:', longitude, `(type: ${typeof longitude})`);
+    // console.log('  - coordinates:', candidate?.personalInfo?.currentAddress?.coordinates);
+    // console.log('  - city:', candidate?.personalInfo?.currentAddress?.city);
+    
+    if (!latitude || !longitude) {
+      console.error('❌ ERROR: No location found! Cannot proceed with geo-search.');
+      // console.log('Full currentAddress:', candidate?.personalInfo?.currentAddress);
+      // console.log('Full permanentAddress:', candidate?.personalInfo?.permanentAddress);
+      console.log('='.repeat(60) + '\n');
       req.flash("error", "Add Your Current Location!");
-      return res.send({ jobs: [], nearest: {}, status: false })
+      return res.send({ jobs: [], nearest: {}, status: false, message: "Location not found" })
     }
-    const lat = Number(candidate.latitude);
-    const long = Number(candidate.longitude);
+    
+    // console.log('✅ Location found! Proceeding with geo-search...');
+    const lat = Number(latitude);
+    const long = Number(longitude);
+    // console.log('Parsed Location:', { latitude: lat, longitude: long });
     let {
       qualification,
       experience,
@@ -3637,7 +3902,14 @@ router.get(
       }
     }
 
-    res.send({ jobs, nearest });
+    console.log('\n📊 ===== RESPONSE DATA =====');
+    console.log('Total Jobs Found:', jobs.length);
+    console.log('Nearest Job:', nearest?._id || 'No jobs, using user location');
+    console.log('Nearest Coordinates:', nearest?.location?.coordinates || [long, lat]);
+    console.log('Response Status:', 'true');
+    console.log('='.repeat(60) + '\n');
+
+    res.send({ jobs, nearest, status: true });
   }
 );
 
@@ -3819,7 +4091,7 @@ router.route('/kycDocument')
         req.flash("error", "Candidate doesn't exists!");
         return res.status(404).send({ status: false, message: "Candidate doesn't exists!" })
       }
-      let { aadharCard, aadharCardImage, panCard, panCardImage, upi } = req.body
+      let { aadharCard, aadharCardImage, panCard, panCardImage, upi, bankAccountNumber, bankIfscCode, bankDocumentImage } = req.body
       let add = {}
       if (aadharCard || aadharCard == '') {
         add['aadharCard'] = aadharCard
@@ -3832,6 +4104,15 @@ router.route('/kycDocument')
       }
       if (panCardImage || panCardImage == '') {
         add['panCardImage'] = panCardImage
+      }
+      if (bankAccountNumber || bankAccountNumber === '') {
+        add['bankAccountNumber'] = bankAccountNumber
+      }
+      if (bankIfscCode || bankIfscCode === '') {
+        add['bankIfscCode'] = bankIfscCode
+      }
+      if (bankDocumentImage || bankDocumentImage === '') {
+        add['bankDocumentImage'] = bankDocumentImage
       }
       if (upi) {
         let updateUpi = await Candidate.findOneAndUpdate({ _id: candidate._id }, { upi })
@@ -4524,7 +4805,10 @@ router.route('/reqDocs/:courseId')
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
-    console.log('user', user)
+    // console.log('\n' + '='.repeat(60));
+    // console.log('📥 ===== SAVE PROFILE REQUEST =====');
+    // console.log('User Mobile:', user.mobile);
+    // console.log('Request Body Keys:', Object.keys(req.body));
 
     const {
       name,
@@ -4537,10 +4821,35 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       experiences,
       qualifications,
       declaration,
-      isExperienced,showProfileForm
+      isExperienced,showProfileForm,
+      latitude,
+      longitude
     } = req.body;
 
-    console.log('experiences from frontend',experiences)
+    // console.log('\n📍 ===== LOCATION DATA RECEIVED =====');
+    // console.log('Root Level:');
+    // console.log('  - latitude:', latitude, `(type: ${typeof latitude})`);
+    // console.log('  - longitude:', longitude, `(type: ${typeof longitude})`);
+    
+    // if (personalInfo) {
+    //   console.log('\nPersonalInfo Location Data:');
+    //   console.log('  - currentAddress:', personalInfo.currentAddress ? {
+    //     latitude: personalInfo.currentAddress.latitude,
+    //     longitude: personalInfo.currentAddress.longitude,
+    //     coordinates: personalInfo.currentAddress.coordinates,
+    //     city: personalInfo.currentAddress.city,
+    //     state: personalInfo.currentAddress.state
+    //   } : 'NOT FOUND');
+      
+    //   console.log('  - permanentAddress:', personalInfo.permanentAddress ? {
+    //     latitude: personalInfo.permanentAddress.latitude,
+    //     longitude: personalInfo.permanentAddress.longitude,
+    //     coordinates: personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'NOT FOUND');
+    // }
+
+    // console.log('experiences from frontend',experiences)
 
     // Build dynamic update object
     const updatePayload = {
@@ -4571,7 +4880,32 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
       if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
       if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
-      if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
+      
+      // Ensure coordinates are populated from latitude/longitude for currentAddress
+      if (personalInfo.currentAddress) {
+        updatePayload.personalInfo.currentAddress = { ...personalInfo.currentAddress };
+        if (personalInfo.currentAddress.latitude && personalInfo.currentAddress.longitude) {
+          // Populate coordinates from latitude/longitude if missing or [0, 0]
+          if (!personalInfo.currentAddress.coordinates || 
+              (personalInfo.currentAddress.coordinates[0] === 0 && personalInfo.currentAddress.coordinates[1] === 0)) {
+            updatePayload.personalInfo.currentAddress.coordinates = [
+              Number(personalInfo.currentAddress.longitude),
+              Number(personalInfo.currentAddress.latitude)
+            ];
+            // console.log('✅ Updated currentAddress coordinates from latitude/longitude:', 
+            //   updatePayload.personalInfo.currentAddress.coordinates);
+          }
+        }
+      }
+
+      // Handle sameCurrentAddress flag - sync permanentAddress with currentAddress
+      if (personalInfo.permanentAddress?.sameCurrentAddress && personalInfo.currentAddress) {
+        updatePayload.personalInfo.permanentAddress = {
+          ...personalInfo.currentAddress,
+          sameCurrentAddress: true
+        };
+        // console.log('🔄 Synced permanentAddress with currentAddress (sameCurrentAddress=true)');
+      }
 
       if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
         updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
@@ -4650,8 +4984,8 @@ if (Array.isArray(experiences) && experiences.length > 0) {
           }
         }));
     }
-    console.log('updatePayload', updatePayload)
-    console.log('Incoming Data:', req.body);
+    // console.log('updatePayload', updatePayload)
+    // console.log('Incoming Data:', req.body);
   
     // Final DB Update
     const updatedProfile = await Candidate.findOneAndUpdate(
@@ -4660,8 +4994,29 @@ if (Array.isArray(experiences) && experiences.length > 0) {
       { new: true, runValidators: true }
     );
 
-    console.log('updatedProfile', updatedProfile)
-
+    // console.log('\n📊 ===== PROFILE UPDATE RESULT =====');
+    // console.log('updatedProfile Root Fields:');
+    // console.log('  - latitude:', updatedProfile?.latitude, `(type: ${typeof updatedProfile?.latitude})`);
+    // console.log('  - longitude:', updatedProfile?.longitude, `(type: ${typeof updatedProfile?.longitude})`);
+    
+    // if (updatedProfile?.personalInfo) {
+    //   console.log('\nUpdatedProfile PersonalInfo Location:');
+    //   console.log('  - currentAddress:', updatedProfile.personalInfo.currentAddress ? {
+    //     latitude: updatedProfile.personalInfo.currentAddress.latitude,
+    //     longitude: updatedProfile.personalInfo.currentAddress.longitude,
+    //     coordinates: updatedProfile.personalInfo.currentAddress.coordinates,
+    //     city: updatedProfile.personalInfo.currentAddress.city
+    //   } : 'EMPTY');
+      
+    //   console.log('  - permanentAddress:', updatedProfile.personalInfo.permanentAddress ? {
+    //     latitude: updatedProfile.personalInfo.permanentAddress.latitude,
+    //     longitude: updatedProfile.personalInfo.permanentAddress.longitude,
+    //     coordinates: updatedProfile.personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: updatedProfile.personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'EMPTY');
+    // }
+    
+    // console.log('='.repeat(60) + '\n');
 
     return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
   } catch (error) {
@@ -4674,7 +5029,7 @@ router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
   try {
     // Step 1: Find dynamic key (should be only 1 key in body)
 
-    console.log('updatefiles')
+    // console.log('updatefiles')
     const keys = Object.keys(req.body);
     if (keys.length !== 1) {
       return res.send({ status: false, message: 'Invalid request structure' });
@@ -4719,17 +5074,42 @@ console.log('updateQuery',updateQuery)
 router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
+    
+    // console.log('\n' + '='.repeat(60));
+    // console.log('👤 ===== GET PROFILE REQUEST =====');
+    // console.log('User Mobile:', user.mobile);
 
     const educations = await Qualification.find({ status: true });
-
-
-
     const candidate = await Candidate.findOne({ mobile: user.mobile });
 
     if (!candidate) {
+      console.error('❌ Candidate not found!');
+      console.log('='.repeat(60) + '\n');
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
+    // console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');
+    // console.log('Root Level:');
+    // console.log('  - latitude:', candidate?.latitude, `(type: ${typeof candidate?.latitude})`);
+    // console.log('  - longitude:', candidate?.longitude, `(type: ${typeof candidate?.longitude})`);
+    // console.log('  - location:', candidate?.location);
+    
+    // if (candidate?.personalInfo) {
+    //   // console.log('\nPersonalInfo Location Data:');
+    //   console.log('  - currentAddress:', candidate.personalInfo.currentAddress ? {
+    //     latitude: candidate.personalInfo.currentAddress.latitude,
+    //     longitude: candidate.personalInfo.currentAddress.longitude,
+    //     coordinates: candidate.personalInfo.currentAddress.coordinates
+    //   } : 'NOT SET');
+    //   console.log('  - permanentAddress:', candidate.personalInfo.permanentAddress ? {
+    //     latitude: candidate.personalInfo.permanentAddress.latitude,
+    //     longitude: candidate.personalInfo.permanentAddress.longitude,
+    //     coordinates: candidate.personalInfo.permanentAddress.coordinates,
+    //     sameCurrentAddress: candidate.personalInfo.permanentAddress.sameCurrentAddress
+    //   } : 'NOT SET');
+    // }
+    
+    // console.log('='.repeat(60) + '\n');
 
     res.status(200).json({
       status: true,
@@ -5263,6 +5643,7 @@ router.get("/job-offers", [isCandidate], async (req, res) => {
 
     const jobOffers = await JobOffer.find(jobOfferQuery)
       .populate([
+        { path: '_job', select: '_id title' },
         { path: '_qualification', select: 'name' },
         { path: '_industry', select: 'name' },
         { path: '_jobCategory', select: 'name' },
@@ -5353,6 +5734,31 @@ router.post("/job-offers/:jobOfferId/accept", [isCandidate], async (req, res) =>
       remarks: 'Candidate accepted the job offer'
     });
     await jobOffer.save();
+
+    // Mark placement as "placed" when candidate accepts the job offer
+    if (jobOffer.placement) {
+      const placement = await Placement.findById(jobOffer.placement);
+      if (placement) {
+        // Find "placed" status for the college
+        const placedStatus = await PlacementStatus.findOne({
+          $or: [
+            { college: placement.college, title: { $regex: /placed/i } },
+            { college: null, title: { $regex: /placed/i } }
+          ]
+        });
+
+        if (placedStatus) {
+          placement.status = placedStatus._id;
+          placement.logs.push({
+            user: candidate._id,
+            timestamp: new Date(),
+            action: 'Placed',
+            remarks: `Candidate accepted job offer: ${jobOffer.title || 'Job Offer'}`
+          });
+          await placement.save();
+        }
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -5481,17 +5887,23 @@ router.get('/rewardStatuses', [isCandidate], async (req, res) => {
     
     // Check which statuses have been claimed by this candidate
     const claims = await RewardClaim.find({ _candidate: candidate._id })
-      .select('_rewardStatus status')
+      .select('_rewardStatus status adminRemarks rejectedAt')
       .lean();
     
     const claimedStatusIds = new Set(claims.map(c => c._rewardStatus.toString()));
     
     // Add claim status to each reward status
-    const statusesWithClaimInfo = statuses.map(status => ({
-      ...status,
-      isClaimed: claimedStatusIds.has(status._id.toString()),
-      claimStatus: claims.find(c => c._rewardStatus.toString() === status._id.toString())?.status || null
-    }));
+    const statusesWithClaimInfo = statuses.map(status => {
+      const claim = claims.find(c => c._rewardStatus.toString() === status._id.toString());
+      return {
+        ...status,
+        isClaimed: claimedStatusIds.has(status._id.toString()),
+        claimStatus: claim?.status || null,
+        adminRemarks: claim?.adminRemarks || null,
+        rejectedAt: claim?.rejectedAt || null,
+        claimId: claim?._id || null
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -5534,7 +5946,7 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       });
     }
 
-    const { rewardStatusId, upiNumber, upiId, address, documents, feedback } = req.body;
+    const { rewardStatusId, upiNumber, upiId, address, email, documents, feedback } = req.body;
 
     if (!rewardStatusId) {
       return res.status(400).json({
@@ -5567,7 +5979,7 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       _rewardStatus: rewardStatusId
     });
 
-    if (existingClaim) {
+    if (existingClaim && existingClaim.status !== 'rejected') {
       return res.status(400).json({
         success: false,
         message: 'Reward already claimed',
@@ -5620,42 +6032,42 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
       }
     }
 
-    // Validate voucher type - may require UPI or address depending on voucher type
+    // Validate voucher type - require email for digital voucher delivery
     if (rewardStatus.rewardType === 'voucher') {
-      // Voucher can be digital (UPI) or physical (address)
-      // Both are optional but at least one should be provided
-      const hasUPI = (upiNumber && upiNumber.trim() !== '') || (upiId && upiId.trim() !== '');
-      const hasAddress = address && address.trim() !== '';
+      const hasEmail = email && email.trim() !== '';
       
-      if (!hasUPI && !hasAddress) {
+      if (!hasEmail) {
         return res.status(400).json({
           success: false,
-          message: 'For voucher reward, please provide either UPI details (for digital voucher) or address (for physical voucher)'
+          message: 'Email ID is required for voucher reward'
         });
       }
       
-      // Validate UPI format if provided
-      if (upiNumber && upiNumber.trim() !== '') {
-        const upiNumberRegex = /^[0-9]{10}$/;
-        if (!upiNumberRegex.test(upiNumber.trim())) {
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid UPI number format. Must be 10 digits'
-          });
-        }
-      }
-      if (upiId && upiId.trim() !== '') {
-        const upiIdRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
-        if (!upiIdRegex.test(upiId.trim())) {
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid UPI ID format. Example: name@paytm'
-          });
-        }
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format. Please provide a valid email address'
+        });
       }
     }
 
-    // For 'other' type, no specific validation - admin will review
+    // Validate 'other' reward - require address for fulfillment / review
+    if (rewardStatus.rewardType === 'other') {
+      if (!address || address.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Address is required for other reward'
+        });
+      }
+      if (address.trim().length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Address must be at least 10 characters long'
+        });
+      }
+    }
 
     // Validate required documents
     if (rewardStatus.requiredDocuments && rewardStatus.requiredDocuments.length > 0) {
@@ -5692,35 +6104,162 @@ router.post('/claimReward', [isCandidate], async (req, res) => {
 
     console.log('Processing reward claim with documents:', processedDocuments); // Debug log
 
-    // Create reward claim
-    const newClaim = new RewardClaim({
-      _candidate: candidate._id,
-      _rewardStatus: rewardStatusId,
-      rewardType: rewardStatus.rewardType,
-      // For money and voucher (if UPI provided), store UPI details
-      upiNumber: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
-        ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
-      upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
-        ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
-      // For gift, trophy, and voucher (if address provided), store address
-      address: (rewardStatus.rewardType === 'gift' || 
+    // If existing rejected claim exists, update it; otherwise create new
+    let savedClaim;
+    if (existingClaim && existingClaim.status === 'rejected') {
+      // Resubmit rejected claim - update with new data
+      existingClaim.status = 'pending';
+      existingClaim.rejectedAt = null;
+      existingClaim.adminRemarks = null;
+      existingClaim.claimedAt = new Date();
+      existingClaim.upiNumber = (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null;
+      existingClaim.upiId = (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+        ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null;
+      existingClaim.address = (rewardStatus.rewardType === 'gift' || 
                 rewardStatus.rewardType === 'trophy' || 
+                rewardStatus.rewardType === 'other' ||
                 (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
-        (address ? address.trim() : null) : null,
-      documents: processedDocuments,
-      feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
-      status: 'pending'
-    });
+        (address ? address.trim() : null) : null;
+      existingClaim.email = (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
+        (email.trim().toLowerCase()) : null;
+      existingClaim.documents = processedDocuments;
+      existingClaim.feedback = rewardStatus.requiresFeedback ? (feedback || null) : null;
+      
+      savedClaim = await existingClaim.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Reward claim resubmitted successfully',
+        data: savedClaim
+      });
+    } else {
+      // Create new reward claim
+      const newClaim = new RewardClaim({
+        _candidate: candidate._id,
+        _rewardStatus: rewardStatusId,
+        rewardType: rewardStatus.rewardType,
+        // For money and voucher (if UPI provided), store UPI details
+        upiNumber: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+          ((upiNumber && upiNumber.trim() !== '') ? upiNumber.trim() : null) : null,
+        upiId: (rewardStatus.rewardType === 'money' || rewardStatus.rewardType === 'voucher') ? 
+          ((upiId && upiId.trim() !== '') ? upiId.trim() : null) : null,
+        // For gift, trophy, voucher (if provided), and other, store address
+        address: (rewardStatus.rewardType === 'gift' || 
+                  rewardStatus.rewardType === 'trophy' || 
+                  rewardStatus.rewardType === 'other' ||
+                  (rewardStatus.rewardType === 'voucher' && address && address.trim() !== '')) ? 
+          (address ? address.trim() : null) : null,
+        // For voucher (if email provided), store email
+        email: (rewardStatus.rewardType === 'voucher' && email && email.trim() !== '') ? 
+          (email.trim().toLowerCase()) : null,
+        documents: processedDocuments,
+        feedback: rewardStatus.requiresFeedback ? (feedback || null) : null,
+        status: 'pending'
+      });
 
-    const savedClaim = await newClaim.save();
+      savedClaim = await newClaim.save();
 
-    return res.status(201).json({
-      success: true,
-      message: 'Reward claim submitted successfully',
-      data: savedClaim
-    });
+      return res.status(201).json({
+        success: true,
+        message: 'Reward claim submitted successfully',
+        data: savedClaim
+      });
+    }
   } catch (err) {
     console.error('Error claiming reward:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: err.message
+    });
+  }
+});
+
+// Get All Reward Claims for Candidate (Pending, Approved, Rejected)
+router.get('/allRewardClaims', [isCandidate], async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid candidate data'
+      });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true
+    });
+
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+
+    // Fetch all claims (pending, approved, rejected)
+    const claims = await RewardClaim.find({
+      _candidate: candidate._id
+    })
+      .populate('_rewardStatus', 'title description rewardType milestone requiredDocuments')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Format claims with delivery timeline information
+    const formattedClaims = claims.map(claim => {
+      let deliveryMessage = '';
+      let deliveryDays = 0;
+      
+      if (claim.status === 'approved') {
+        if (claim.rewardType === 'money') {
+          deliveryMessage = 'Reward will be transferred within 3 working days';
+          deliveryDays = 3;
+        } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') {
+          deliveryMessage = 'Will be delivered within 7 working days';
+          deliveryDays = 7;
+        } else {
+          deliveryMessage = 'Will be processed within 5 working days';
+          deliveryDays = 5;
+        }
+      }
+
+      return {
+        _id: claim._id,
+        rewardTitle: claim._rewardStatus?.title || 'N/A',
+        rewardDescription: claim._rewardStatus?.description || '',
+        rewardType: claim.rewardType,
+        milestone: claim._rewardStatus?.milestone || '',
+        status: claim.status,
+        approvedAt: claim.approvedAt,
+        rejectedAt: claim.rejectedAt,
+        disbursedAt: claim.disbursedAt,
+        adminRemarks: claim.adminRemarks,
+        deliveryMessage: deliveryMessage,
+        deliveryDays: deliveryDays,
+        claimedAt: claim.claimedAt,
+        createdAt: claim.createdAt,
+        achievementImage: claim.achievementImage || null,
+        documents: claim.documents || [],
+        upiNumber: claim.upiNumber,
+        upiId: claim.upiId,
+        address: claim.address,
+        email: claim.email,
+        feedback: claim.feedback
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reward claims fetched successfully',
+      data: formattedClaims
+    });
+  } catch (err) {
+    console.error('Error fetching reward claims:', err);
     return res.status(500).json({
       success: false,
       message: 'Server Error',
@@ -5797,14 +6336,96 @@ router.get('/approvedRewardClaims', [isCandidate], async (req, res) => {
         deliveryDays: deliveryDays,
         claimedAt: claim.claimedAt,
         createdAt: claim.createdAt,
-        achievementImage: claim.achievementImage || null
+        achievementImage: claim.achievementImage || null,
+        achievementType: 'reward_claim' 
       };
+    });
+
+    const referralEventNames = [
+      candidateCashbackEventName.referrer_job_apply,
+      candidateCashbackEventName.referee_job_apply,
+      candidateCashbackEventName.referrer_course_apply,
+      candidateCashbackEventName.referee_course_apply,
+    ];
+
+    const referralCashbacks = await CandidateCashBack.find({
+      candidateId: candidate._id,
+      eventName: { $in: referralEventNames }
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const referralAchievements = referralCashbacks.map(cashback => {
+      const isReferrer = cashback.eventName.includes('referrer_');
+      const isJob = cashback.eventName.includes('job_apply');
+      const isCourse = cashback.eventName.includes('course_apply');
+      
+      let itemId = null;
+      let itemType = '';
+      if (cashback.comment) {
+        const parts = cashback.comment.split(':');
+        if (parts.length >= 3) {
+          itemType = parts[1] || '';
+          itemId = parts[2] || null;
+        }
+      }
+
+      let rewardTitle = '';
+      let rewardDescription = '';
+      
+      if (isReferrer) {
+        if (isJob) {
+          rewardTitle = 'Job Referral Success';
+          rewardDescription = `You successfully referred someone for a job and earned ₹${cashback.amount}`;
+        } else if (isCourse) {
+          rewardTitle = 'Course Referral Success';
+          rewardDescription = `You successfully referred someone for a course and earned ₹${cashback.amount}`;
+        }
+      } else {
+        if (isJob) {
+          rewardTitle = 'Job Application Reward';
+          rewardDescription = `You applied for a job through referral and earned ₹${cashback.amount}`;
+        } else if (isCourse) {
+          rewardTitle = 'Course Application Reward';
+          rewardDescription = `You applied for a course through referral and earned ₹${cashback.amount}`;
+        }
+      }
+
+      return {
+        _id: cashback._id,
+        rewardTitle: rewardTitle,
+        rewardDescription: rewardDescription,
+        rewardType: 'money',
+        milestone: isReferrer ? 'Referral Achievement' : 'Application Reward',
+        status: cashback.isPending ? 'pending' : 'approved',
+        approvedAt: cashback.isPending ? null : cashback.updatedAt,
+        rejectedAt: null,
+        disbursedAt: null,
+        adminRemarks: null,
+        deliveryMessage: 'Reward will be transferred within 3 working days',
+        deliveryDays: 3,
+        claimedAt: null,
+        createdAt: cashback.createdAt,
+        achievementImage: null,
+        achievementType: 'referral', 
+        referralType: isReferrer ? 'referrer' : 'referee',
+        referralItemType: itemType.toLowerCase(), 
+        amount: cashback.amount,
+        isPending: cashback.isPending
+      };
+    });
+
+ 
+    const allAchievements = [...formattedClaims, ...referralAchievements].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA; 
     });
 
     return res.status(200).json({
       success: true,
       message: 'Approved reward claims fetched successfully',
-      data: formattedClaims
+      data: allAchievements
     });
   } catch (err) {
     console.error('Error fetching approved reward claims:', err);

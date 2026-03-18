@@ -375,27 +375,7 @@ const UploadCandidates = () => {
       });
       
       if (response.data && response.data.status) {
-        let candidates = response.data.candidates || [];
-        
-        // Apply client-side filtering if needed (for course filter)
-        if (filterData.course.values.length > 0) {
-          // Note: Backend should handle this, but adding client-side as fallback
-        }
-        
-        // Apply year filter
-        if (filterData.year.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.year.values.includes(c.year)
-          );
-        }
-        
-        // Apply session filter
-        if (filterData.session.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.session.values.includes(c.session)
-          );
-        }
-        
+        const candidates = response.data.candidates || [];
         setUploadedCandidates(candidates);
         setCandidatesTotalPages(response.data.totalPages || 1);
       } else {
@@ -419,8 +399,8 @@ const UploadCandidates = () => {
         status: 'active'
       };
 
-      if (searchTerm) {
-        params.search = searchTerm;
+      if (appliedSearchTerm) {
+        params.search = appliedSearchTerm;
       }
       if (filterData.course.values.length > 0) {
         params.course = JSON.stringify(filterData.course.values);
@@ -438,19 +418,7 @@ const UploadCandidates = () => {
       });
       
       if (response.data && response.data.status) {
-        let candidates = response.data.candidates || [];
-        
-        if (filterData.year.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.year.values.includes(c.year)
-          );
-        }
-        if (filterData.session.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.session.values.includes(c.session)
-          );
-        }
-        
+        const candidates = response.data.candidates || [];
         setActiveCandidates(candidates);
         setActiveTotalPages(response.data.totalPages || 1);
       } else {
@@ -474,8 +442,8 @@ const UploadCandidates = () => {
         status: 'inactive'
       };
 
-      if (searchTerm) {
-        params.search = searchTerm;
+      if (appliedSearchTerm) {
+        params.search = appliedSearchTerm;
       }
       if (filterData.course.values.length > 0) {
         params.course = JSON.stringify(filterData.course.values);
@@ -493,19 +461,7 @@ const UploadCandidates = () => {
       });
       
       if (response.data && response.data.status) {
-        let candidates = response.data.candidates || [];
-        
-        if (filterData.year.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.year.values.includes(c.year)
-          );
-        }
-        if (filterData.session.values.length > 0) {
-          candidates = candidates.filter(c => 
-            filterData.session.values.includes(c.session)
-          );
-        }
-        
+        const candidates = response.data.candidates || [];
         setInactiveCandidates(candidates);
         setInactiveTotalPages(response.data.totalPages || 1);
       } else {

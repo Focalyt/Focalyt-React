@@ -14,6 +14,7 @@ import HomePage from '../src/Pages/Front/HomePage/HomePage';
 // import About from './Pages/Front/About/About';
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
+import Result from "./Pages/Front/Result/Result";
 import Course from './Pages/Front/Courses/Course';
 import Jobs from './Pages/Front/Jobs/Jobs';
 import JobDetails from './Pages/Front/Jobs/JobDetails';
@@ -92,11 +93,15 @@ import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 import ClgCourse from './Pages/App/College/Settings/Course';
 import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
 import Status from './Pages/App/College/Status/status';
+import PreVerification from './Pages/App/College/PreVerification/PreVerification';
+import AICounsellor from './Pages/App/College/AICounsellor/AICounsellor';
 import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
 import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
+import Target from './Pages/App/College/Target/Target';
+
 
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
@@ -133,6 +138,7 @@ import ReEnquire from './Pages/App/College/Course/ReEnquire';
 import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
 import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
+import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -192,6 +198,7 @@ const Layout = () => {
         <Route exact path="/candidate-review" element={<CandidateReview />} />
         {/* <Route exact path="/about_us" element={<About />} /> */}
         <Route exact path="/labs" element={<Labs />} />
+        <Route exact path="/results" element={<Result />} />
         <Route exact path="/courses" element={<Course />} />
         <Route exact path="/joblisting" element={<Jobs />} />
         <Route exact path="/jobdetailsmore/:jobId" element={<JobDetails />} />
@@ -279,6 +286,8 @@ const Layout = () => {
           <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
           <Route path='statusdesign' element={<Status/>}/>
+          <Route path='preverification' element={<PreVerification />} />
+          <Route path='ai-counsellor' element={<AICounsellor />} />
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
           <Route path = 'myfollowupb2b' element={<MyFollowupB2B/>}/>
           <Route path='registrationcards' element={<RegistrationCards/>}/>
@@ -300,6 +309,8 @@ const Layout = () => {
           <Route path='trainerManagement' element={<TrainerManagement/>}/>
           <Route path='whatsappChat' element={<WhatsappChat/>}/>
           <Route path='whatsappWallet' element={<WhatsappWallet/>}/>
+          <Route path='emailTemplate' element={<EmailTemplate/>}/>
+          <Route path='target' element={<Target/>}/>
         </Route>
 
         {/* company  */}

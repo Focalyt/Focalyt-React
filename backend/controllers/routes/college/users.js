@@ -929,44 +929,86 @@ router.get('/b2b-users', isCollege, async (req, res) => {
   try {
 
     const user = req.user;
-    const aggrigation = [
-      {
-        $match: { "_concernPerson._id": new mongoose.Types.ObjectId(user._id) }
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "_concernPerson._id",
-          foreignField: "_id",
-          as: "user"
-        }
-      },
-      { $unwind: "$user" },
-      {
-        $match: {
-          "user.permissions.custom_permissions.can_view_leads_b2b": true
-        }
-      },
-      {
-        $project: {
-          _id: "$user._id",
-          name: "$user.name"
-        }
-      }
-    ];
+    console.log('👥 [BACKEND] /b2b-users - Request from user:', {
+      userId: user._id.toString(),
+      userName: user.name,
+      permissionType: user.permissions?.permission_type
+    });
+
+    // Find college where current user is concern person
+    const college = await College.findOne({ "_concernPerson._id": new mongoose.Types.ObjectId(user._id) });
     
-    const concernPersons = await College.aggregate(aggrigation);
-    // console.log('concernPersons', concernPersons)
+    if (!college) {
+      console.log('⚠️ [BACKEND] No college found for user');
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+
+    console.log('🏫 [BACKEND] College found:', {
+      collegeId: college._id.toString(),
+      concernPersonsCount: college._concernPerson?.length || 0
+    });
+
+    // Get all concern persons from college
+    const concernPersonIds = college._concernPerson?.map(cp => cp._id) || [];
+    console.log('👤 [BACKEND] Concern Person IDs:', concernPersonIds.map(id => id.toString()));
+
+    // Fetch all users who are concern persons
+    const allConcernPersons = await User.find({
+      _id: { $in: concernPersonIds }
+    }).select('_id name email permissions').lean();
+
+    console.log('📋 [BACKEND] All Concern Persons:', {
+      total: allConcernPersons.length,
+      users: allConcernPersons.map(u => ({
+        id: u._id.toString(),
+        name: u.name,
+        hasPermission: u.permissions?.custom_permissions?.can_view_leads_b2b || false,
+        permissionType: u.permissions?.permission_type,
+        isAdmin: u.permissions?.permission_type === 'Admin'
+      }))
+    });
+
+    // Filter: Users with can_view_leads_b2b permission OR Admin users
+    const finalUsers = allConcernPersons
+      .filter(u => {
+        const hasPermission = u.permissions?.custom_permissions?.can_view_leads_b2b || false;
+        const isAdmin = u.permissions?.permission_type === 'Admin';
+        return hasPermission || isAdmin;
+      })
+      .map(u => ({
+        _id: u._id,
+        name: u.name
+      }));
+
+    console.log('✅ [BACKEND] Filtered Users (can_view_leads_b2b OR Admin):', {
+      total: finalUsers.length,
+      users: finalUsers.map(u => ({
+        id: u._id.toString(),
+        name: u.name
+      }))
+    });
+
+    console.log('📊 [BACKEND] Final Users List:', {
+      total: finalUsers.length,
+      users: finalUsers.map(u => ({
+        id: u._id.toString(),
+        name: u.name
+      }))
+    });
+
     res.status(200).json({
       success: true,
-      data: concernPersons
+      data: finalUsers
     });
 
   }
 
   catch (err) {
 
-    console.log('error', err)
+    console.error('❌ [BACKEND] Error fetching b2b users:', err);
 
     res.status(500).json({
       success: false,

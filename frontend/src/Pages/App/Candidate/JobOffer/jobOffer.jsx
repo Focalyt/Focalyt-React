@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import moment from 'moment';
+import { useNavigate } from 'react-router-dom';
 
 function JobOffer() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
     const token = userData.token;
+    const navigate = useNavigate();
     
     const [jobOffers, setJobOffers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -93,6 +95,16 @@ function JobOffer() {
                 return;
             }
 
+            // Find the job offer to get the actual job ID
+            const jobOffer = jobOffers.find(job => job._id === jobId) || selectedJob;
+            const actualJobId = jobOffer?._job?._id || jobOffer?._job;
+
+            if (!actualJobId) {
+                alert('Job information not found. Cannot redirect to job page.');
+                setProcessingJobId(null);
+                return;
+            }
+
             const response = await axios.post(
                 `${backendUrl}/candidate/job-offers/${jobId}/accept`,
                 {},
@@ -102,21 +114,18 @@ function JobOffer() {
             );
 
             if (response.data && response.data.success) {
-                alert('Job offer accepted successfully!');
+                alert('Job offer accepted successfully! Redirecting to job application page...');
                 
-                // Refresh job offers list to get updated data from backend
-                await fetchJobOffers();
-                
-                // Update selected job if modal is open
-                if (selectedJob && selectedJob._id === jobId) {
-                    const updatedJob = response.data.data;
-                    setSelectedJob({ 
-                        ...updatedJob, 
-                        displayStatus: updatedJob.candidateResponse || updatedJob.status || 'active'
-                    });
+                // Close modal if open
+                if (showJobDetails) {
+                    handleCloseDetails();
                 }
+                
+                // Redirect to job application page with fromOffer flag
+                navigate(`/candidate/job/${actualJobId}?fromOffer=true`);
             } else {
                 alert(response.data?.message || 'Failed to accept job offer');
+                setProcessingJobId(null);
             }
         } catch (error) {
             console.error('Error accepting job offer:', error);
@@ -125,7 +134,6 @@ function JobOffer() {
             } else {
                 alert('Failed to accept job offer. Please try again.');
             }
-        } finally {
             setProcessingJobId(null);
         }
     };
@@ -157,7 +165,7 @@ function JobOffer() {
                 // Refresh job offers list to get updated data from backend
                 await fetchJobOffers();
                 
-                // Update selected job if modal is open
+                // Update selected job if modal is open (stay on same screen)
                 if (selectedJob && selectedJob._id === jobId) {
                     const updatedJob = response.data.data;
                     setSelectedJob({ 
@@ -166,8 +174,14 @@ function JobOffer() {
                     });
                 }
                 
-                // Close modal after rejection
-                handleCloseDetails();
+                // Update the job in the list
+                setJobOffers(prev => prev.map(job => 
+                    job._id === jobId 
+                        ? { ...job, candidateResponse: 'rejected', displayStatus: 'rejected' }
+                        : job
+                ));
+                
+                // DO NOT close modal - stay on same screen as requested
             } else {
                 alert(response.data?.message || 'Failed to reject job offer');
             }

@@ -288,6 +288,9 @@ function Center() {
                     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 
                                 0 2px 8px rgba(0, 0, 0, 0.04);
                     border: 1px solid #f1f5f9;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
                 }
 
                 .center-card:hover .center-card-inner {
@@ -299,15 +302,15 @@ function Center() {
 
                 .card-content {
                     position: relative;
-                    padding: 2rem;
-                    padding-bottom: 1.5rem;
+                    padding: 1.6rem 1.25rem;
+                    padding-bottom: 1rem;
                 }
 
                 .center-icon-wrapper {
                     position: relative;
                     width: 100px;
                     height: 100px;
-                    margin: 2rem auto 1.5rem;
+                    margin: 1.5rem auto 1rem;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -355,7 +358,7 @@ function Center() {
                     color: #1e293b;
                     font-size: 1.6rem;
                     font-weight: 800;
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 1.25rem;
                     line-height: 1.3;
                     min-height: 3rem;
                     display: flex;
@@ -498,19 +501,43 @@ function Center() {
                     line-height: 1.6;
                 }
 
-                /* Responsive */
-                @media (max-width: 768px) {
+ /* Responsive */
+                @media (max-width: 992px) {
                     .page-title {
-                        font-size: 1.75rem;
+                        font-size: 2rem;
                     }
 
                     .title-icon-wrapper {
-                        width: 50px;
-                        height: 50px;
+                        width: 52px;
+                        height: 52px;
                     }
 
                     .title-icon-wrapper i {
+                        font-size: 1.5rem;
+                    }
+
+                    .center-icon {
+                        width: 90px;
+                        height: 90px;
+                    }
+
+                    .center-name {
                         font-size: 1.4rem;
+                    }
+                }
+
+                @media (max-width: 768px) {
+                    .page-title {
+                        font-size: 1.6rem;
+                    }
+
+                    .title-icon-wrapper {
+                        width: 46px;
+                        height: 46px;
+                    }
+
+                    .title-icon-wrapper i {
+                        font-size: 1.35rem;
                     }
 
                     .header-stats {
@@ -520,6 +547,58 @@ function Center() {
 
                     .stat-badge {
                         flex: 1;
+                    }
+
+                    .card-content {
+                        padding: 1.25rem 1rem;
+                    }
+
+                    .center-icon {
+                        width: 80px;
+                        height: 80px;
+                    }
+
+                    .center-name {
+                        font-size: 1.25rem;
+                    }
+                }
+
+                @media (max-width: 576px) {
+                    .page-title {
+                        font-size: 1.4rem;
+                    }
+
+                    .title-icon-wrapper {
+                        width: 40px;
+                        height: 40px;
+                    }
+
+                    .title-icon-wrapper i {
+                        font-size: 1.1rem;
+                    }
+
+                    .center-icon-wrapper {
+                        margin: 1rem auto 0.75rem;
+                    }
+
+                    .center-icon {
+                        width: 70px;
+                        height: 70px;
+                        border-radius: 14px;
+                    }
+
+                    .center-name {
+                        font-size: 1.1rem;
+                        padding: 0 0.5rem;
+                    }
+
+                    .card-footer-action {
+                        padding: 1rem;
+                    }
+
+                    .empty-state {
+                        min-height: 300px;
+                        padding: 1rem;
                     }
                 }
             `}</style>

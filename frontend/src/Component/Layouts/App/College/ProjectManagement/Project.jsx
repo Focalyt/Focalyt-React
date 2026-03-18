@@ -517,25 +517,38 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   return (
     <div className="container py-4">
       {/* Back Button and Header */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className='d-md-block d-none'>
+      <div className="d-flex justify-content-between align-items-center mb-3 mobileHead">
+        <div className='d-md-block d-block'>
           <div className="d-flex align-items-center gap-3">
             <div className='d-flex align-items-center'>
-              <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer' }} className="me-2">
+              <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer',
+                                         whiteSpace:"nowrap",
+                                         marginBottom:"0px",
+                                         textOverflow:"ellipsis",
+                                         overflow:"hidden",
+                                         maxWidth:"150px",
+                                         fontSize:"clam(15px,2vw,1.1rem)" }} className="mb-0">
                 {selectedVertical?.name || 'Unknown'} Vertical
               </h4>
-              <span className="mx-2"> &gt; </span>
-              <h5 className="breadcrumb-item mb-0" style={{ whiteSpace: 'nowrap' }} aria-current="page">
-                Project
+              <span className="mx-2 mt-1 mb-2"> &gt; </span>
+              <h5 className="breadcrumb-item mb-0" style={{ cursor: 'pointer',
+                                         whiteSpace:"nowrap",
+                                         marginBottom:"0px",
+                                         textOverflow:"ellipsis",
+                                         overflow:"hidden",
+                                         maxWidth:"110px",
+                                         fontSize:"clam(15px,2vw,1.1rem)"
+                                          }} aria-current="page">Project
               </h5>
             </div>
           </div>
         </div>
-        <div className='d-flex'>
+        <div className='d-flex btnPosition'>
           {onBackToVerticals && (
             <button
               onClick={onBackToVerticals}
               className="btn btn-light"
+              style={{fontSize:"clamp(12px,1.8vw,15px)"}}
               title="Back to Verticals"
             >
               <i className="bi bi-arrow-left"></i>
@@ -543,22 +556,23 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
             </button>
           )}
 
-          <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          <button className="btn btn-outline-secondary me-2 border-0 visibility" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
           {((permissions?.custom_permissions?.can_add_project && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
 
-            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
+            <button className="btn btn-primary AddPRoject" style={{ whiteSpace: 'nowrap',fontSize:"clamp(12px,1.8vw,15px)" }} onClick={handleAdd}>Add Project</button>
           )}
         </div>
       </div>
 
-      <div className="d-flex justify-content-between mb-3">
-        <ul className="nav nav-pills">
+      <div className="d-flex justify-content-between mb-3 allCenter">
+        <ul className="nav nav-pills allCenterBtn">
           {['Active Projects', 'Inactive Projects', 'All Projects'].map(tab => (
-            <li className="nav-item" key={tab}>
+            <li className="nav-item me-1" key={tab}>
               <button
-                className={`nav-link ${activeProjectTab === tab ? 'active' : ''}`}
+              style={{fontSize:"clamp(12px,1.8vw,15px)"}}
+                className={`nav-link navBTn ${activeProjectTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveProjectTab(tab)}
               >
                 {tab}
@@ -568,7 +582,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
         </ul>
         <input
           type="text"
-          className="form-control w-25"
+          className="form-control w-25 searchBar"
           placeholder="Search projects..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -784,15 +798,91 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
         </div>
       )}
 
-      <style>
-        {`
-          @media(max-width:768px){
-            .verticals{
-              font-size:15px;
-            }
-          }
-        `}
-      </style>
+<style>
+{`
+/* ================= Base Styles ================= */
+
+.searchBar {
+  height: 30px;
+  width: 25%;
+}
+
+.centerBtnResponsive {
+  display: flex;
+}
+
+/* ================= 992px ================= */
+
+@media (max-width: 992px) {
+
+  .mobileHead {
+    display: block !important;
+  }
+
+  .btnPosition {
+    justify-content: space-between;
+  }
+
+  .subBtnRes {
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+}
+
+/* ================= 768px ================= */
+
+@media (max-width: 768px) {
+
+  .AddPRoject {
+    margin-left: 10px;
+  }
+
+  .verticals {
+    font-size: 15px;
+  }
+
+  .allCenter {
+    display: block !important;
+  }
+
+  .allCenterBtn {
+    margin-bottom: 10px !important;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+}
+
+/* ================= 525px ================= */
+
+@media (max-width: 525px) {
+  .searchBar {
+    width: 85px !important;
+  }
+}
+
+/* ================= 450px ================= */
+
+@media (max-width: 450px) {
+
+  .navBTn {
+    padding: 4px;
+    width: 80px;
+    border: 1px solid #d5d5d5;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: clamp(12px, 1.8vw, 15px);
+  }
+}
+`}
+</style>
     </div>
   );
 };

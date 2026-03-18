@@ -1184,6 +1184,7 @@ const Placements = () => {
 
   useEffect(() => {
     fetchLeads(null, 1);
+    fetchStatusCounts();
   }, []);
 
   const handleStatusCardClick = (statusId) => {
@@ -1252,7 +1253,7 @@ const Placements = () => {
 
       const params = {
         page: page,
-        // limit: 10,           
+        limit: 100,  // Increased limit to show more candidates per page
       };
 
       if (statusFilter) {
@@ -1279,6 +1280,7 @@ const Placements = () => {
 
       if (response.data.status) {
         const placements = response.data.data.placements || [];
+        console.log(`Fetched ${placements.length} placements (page ${page}, limit 100)`);
         setLeads(placements);
         const existingOffers = new Set();
         placements.forEach(placement => {
@@ -1297,6 +1299,7 @@ const Placements = () => {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
           setPageSize(response.data.data.pagination.totalPlacements || 0);
+          console.log(`Pagination: Page ${response.data.data.pagination.currentPage} of ${response.data.data.pagination.totalPages}, Total: ${response.data.data.pagination.totalPlacements}`);
         }
       } else {
         console.error('Failed to fetch placements:', response.data.message);
@@ -1319,7 +1322,24 @@ const Placements = () => {
       if (response.data.status) {
         const statusCountsData = response.data.data.statusCounts || [];
         setStatusCounts(statusCountsData);
-        setTotalLeads(response.data.data.totalLeads || 0);
+        
+        // Calculate total from backend response or sum of all status counts
+        let calculatedTotal = response.data.data.totalLeads || 0;
+        
+        // If backend total is 0 or seems incorrect, calculate from status counts
+        if (calculatedTotal === 0 && statusCountsData.length > 0) {
+          calculatedTotal = statusCountsData.reduce((sum, status) => sum + (status.count || 0), 0);
+        }
+        
+        // Use the higher value (backend total or calculated sum)
+        const finalTotal = Math.max(calculatedTotal, statusCountsData.reduce((sum, status) => sum + (status.count || 0), 0));
+        
+        console.log('Status counts:', statusCountsData);
+        console.log('Backend total:', response.data.data.totalLeads);
+        console.log('Calculated total from status counts:', calculatedTotal);
+        console.log('Final total:', finalTotal);
+        
+        setTotalLeads(finalTotal);
       } else {
         console.error('Failed to fetch status counts:', response.data.message);
       }
@@ -3263,7 +3283,7 @@ console.log("response.data",response.data)
                   border: 'none',
                   borderRadius: '24px',
                   fontWeight: '500',
-                  fontSize: '15px'
+                  fontSize: '12px'
                 }}
               >
                 {isSendingWhatsapp ? (
@@ -3403,7 +3423,7 @@ console.log("response.data",response.data)
         id="whatsappPanel"
         style={{
           width: '100%',
-          height: 'calc(100vh - 150px)',
+          height: 'calc(100vh - 25px)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -4139,7 +4159,7 @@ console.log("response.data",response.data)
                   </div>
 
                   {/* Search and Filter Section */}
-                  <div className="col-md-6 col-12">
+                  <div className="col-lg-6  col-mg-12 col-12">
                     <div className={`d-flex ${isMobile ? 'flex-column gap-2' : 'justify-content-end align-items-center gap-2'}`}>
                       {/* Quick Search */}
                       <div className={`d-flex align-items-center ${isMobile ? 'w-100' : 'gap-2'}`} style={isMobile ? { gap: '8px' } : {}}>

@@ -6,6 +6,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import useWebsocket from '../../../../utils/websocket';
 
@@ -703,7 +704,7 @@ const CRMDashboard = () => {
   const candidateRef = useRef();
   // Refs
   const addressInputRef = useRef(null);
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
   const { messages, updates } = useWebsocket(userData._id || userData._id);
@@ -749,7 +750,32 @@ const CRMDashboard = () => {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
+          try {
+            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+              headers: { 'x-auth': token }
+            });
+            if (centersRes.data.success && centersRes.data.data) {
+              const allCentersMapped = centersRes.data.data.map(c => ({ 
+                value: c._id, 
+                label: c.name 
+              }));
+              // console.log('🏢 ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
+              setCenterOptions(allCentersMapped);
+            } else {
+              // Fallback to centers from filters-data if list_all_centers fails
+              const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+              // console.log('🏢 CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
+              setCenterOptions(centersMapped);
+            }
+          } catch (centerErr) {
+            console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
+            // Fallback to centers from filters-data
+            const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+            setCenterOptions(centersMapped);
+          }
+          
           setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
@@ -785,6 +811,8 @@ const CRMDashboard = () => {
   };
 
 
+
+  const [isGoogleLoginLoading, setIsGoogleLoginLoading] = useState(false);
 
   // WhatsApp templates dropdown state
   const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
@@ -828,6 +856,66 @@ const CRMDashboard = () => {
   // const permissions = userData.permissions
 
   const [permissions, setPermissions] = useState();
+
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoginLoading(true);
+
+      const result = await getGoogleAuthCode({
+        scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
+        user: userData
+      });
+
+      const refreshToken = await getGoogleRefreshToken({
+        code: result,
+        user: userData
+      });
+
+      const user = {
+        ...userData,
+        googleAuthToken: refreshToken.data
+      };
+
+      sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+      sessionStorage.setItem('user', JSON.stringify(user));
+
+      setUserData(user);
+
+    } catch (error) {
+      console.error('Google login failed:', error);
+
+      if (error.message?.includes('Popup blocked')) {
+        alert('Please allow popups for this site and try again.');
+      } else if (error.message?.includes('closed by user')) {
+        alert('Login cancelled by user.');
+      } else {
+        alert('Login failed: ' + error.message);
+      }
+    } finally {
+      setIsGoogleLoginLoading(false);
+    }
+  };
+
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+
+      sessionStorage.removeItem('googleAuthToken');
+
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
+      alert('Disconnected from Google Calendar successfully.');
+    } catch (err) {
+      console.error('Error while disconnecting Google Calendar:', err);
+    }
+  };
 
   useEffect(() => {
     updatedPermission()
@@ -918,6 +1006,11 @@ const CRMDashboard = () => {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
+ 
+  const [leadIntelMap, setLeadIntelMap] = useState({});
+  const [loadingLeadIntel, setLoadingLeadIntel] = useState(false);
+  const [bulkSelectCount, setBulkSelectCount] = useState('50');
+
   // WhatsApp Panel states
   const [whatsappMessages, setWhatsappMessages] = useState([
   ]);
@@ -938,9 +1031,28 @@ const CRMDashboard = () => {
     remainingTimeMs: 0
   });
   const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
+  const [aiWhatsappSummary, setAiWhatsappSummary] = useState(null);
+  const [aiWhatsappLoading, setAiWhatsappLoading] = useState(false);
+  const [aiWhatsappError, setAiWhatsappError] = useState(null);
+  const [aiSuggestedReplyDraft, setAiSuggestedReplyDraft] = useState('');
+
+  // Unified AI Supervision view (one place for lead + WhatsApp insights)
+  const [showAiSupervision, setShowAiSupervision] = useState(false);
+  const [waSummaryByProfileId, setWaSummaryByProfileId] = useState({});
+  const [waSummaryLoadingByProfileId, setWaSummaryLoadingByProfileId] = useState({});
+  const [waSummaryErrorByProfileId, setWaSummaryErrorByProfileId] = useState({});
+  const [nextActionsByProfileId, setNextActionsByProfileId] = useState({});
+  const [nextActionsLoadingByProfileId, setNextActionsLoadingByProfileId] = useState({});
+  const [nextActionsErrorByProfileId, setNextActionsErrorByProfileId] = useState({});
+  const [aiSupervisionCount, setAiSupervisionCount] = useState('10');
+  const [leadSummaryByProfileId, setLeadSummaryByProfileId] = useState({});
+  const [leadSummaryLoadingByProfileId, setLeadSummaryLoadingByProfileId] = useState({});
+  const [leadSummaryErrorByProfileId, setLeadSummaryErrorByProfileId] = useState({});
+  const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
 
  
-  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [modalType, setModalType] = useState(null); 
+
   const [selectedSenderId, setSelectedSenderId] = useState('');
   const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
   const [responseRecipient, setResponseRecipient] = useState('sender');
@@ -1880,6 +1992,14 @@ const CRMDashboard = () => {
       values: []
     },
   });
+  
+  // Ref to store latest formData for use in async functions
+  const formDataRef = useRef(formData);
+  
+  // Update ref whenever formData changes
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
@@ -2478,6 +2598,49 @@ const CRMDashboard = () => {
     return isRequired ? 'border-danger' : '';
   };
 
+  const createGoogleCalendarEventForFollowup = async (followupDateTime) => {
+    try {
+      if (!userData.googleAuthToken?.accessToken) {
+        return;
+      }
+
+      const scheduledDateTime = new Date(followupDateTime);
+
+      const event = {
+        summary: `B2C Follow-up: ${selectedProfile?._candidate?.name || 'Unknown'}`,
+        description: `Follow-up with ${selectedProfile?._candidate?.name || 'Unknown'}\n\nMobile: ${selectedProfile?._candidate?.mobile || 'N/A'}\nEmail: ${selectedProfile?._candidate?.email || 'N/A'}\nCourse: ${selectedProfile?._course?.name || 'N/A'}\nCenter: ${selectedProfile?._center?.name || 'N/A'}\n\nRemarks: ${remarks || 'No remarks'}`,
+        start: {
+          dateTime: scheduledDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 },
+            { method: 'popup', minutes: 60 },
+          ],
+        },
+      };
+
+      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
+        user: userData,
+        event,
+      });
+
+      if (response.data.success) {
+        console.log('Followup added to Google Calendar');
+      } else {
+        console.error('Failed to add to Google Calendar:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error in createGoogleCalendarEventForFollowup:', error);
+    }
+  };
+
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
 
@@ -2509,12 +2672,26 @@ const CRMDashboard = () => {
         }
 
 
+       
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'bulk_status_change',
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
+
         // Prepare the request body
         const data = {
           selectedProfiles,
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
-          remarks: remarks || ''
+          remarks: (remarks || '').trim()
         };
 
         // Check if backend URL and token exist
@@ -2605,12 +2782,27 @@ const CRMDashboard = () => {
           }
         }
 
+        // Weak remark detection (optional improvement)
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'single_status_change',
+              candidate: selectedProfile?._candidate?.name,
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
+
         // Prepare the request body
         const data = {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
           followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
+          remarks: (remarks || '').trim()
         };
 
 
@@ -2637,10 +2829,14 @@ const CRMDashboard = () => {
             }
           }
         );
-
+console.log('API Response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
+
+          if (followupDateTime && userData.googleAuthToken?.accessToken) {
+            await createGoogleCalendarEventForFollowup(followupDateTime);
+          }
 
           // Reset form
           setSelectedStatus('');
@@ -2651,6 +2847,22 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
+
+          // Refetch full details for this lead and merge into list so NEXT ACTION DATE updates immediately
+          const updatedLeadId = selectedProfile._id;
+          try {
+            const detailRes = await axios.get(`${backendUrl}/college/appliedCandidatesDetails`, {
+              params: { leadId: updatedLeadId },
+              headers: { 'x-auth': token }
+            });
+            if (detailRes.data.success && detailRes.data.data) {
+              const fullDetail = detailRes.data.data;
+              setAllProfiles(prev => prev.map(p => p._id === updatedLeadId ? { ...p, ...fullDetail, followup: fullDetail.followup } : p));
+            }
+          } catch (err) {
+            console.error('Error refetching lead details after status update:', err);
+          }
+
           closePanel();
         } else {
           console.error('API returned error:', response.data);
@@ -2692,13 +2904,21 @@ const CRMDashboard = () => {
           }
         }
 
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
+        const hasExistingFollowup = selectedProfile?.followup?._id;
+        const payload = hasExistingFollowup
+          ? {
+            id: selectedProfile.followup._id,
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'update'
+          }
+          : {
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'new'
+          };
 
         // Check if backend URL and token exist
         if (!backendUrl) {
@@ -2711,20 +2931,9 @@ const CRMDashboard = () => {
           return;
         }
 
-        // Send PUT request to backend API
-        // const response = await axios.put(
-        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-        //   data,
-        //   {
-        //     headers: {
-        //       'x-auth': token,
-        //       'Content-Type': 'application/json'
-        //     }
-        //   }
-        // );
         const response = await axios.post(
           `${backendUrl}/college/b2c-set-followups`,
-          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
+          payload,
           {
             headers: {
               'x-auth': token,
@@ -2733,15 +2942,16 @@ const CRMDashboard = () => {
           }
         );
 
+        // Backend returns status: true (not success: true)
+        if (response.data.status === true || response.data.success === true) {
+          alert('Followup updated successfully!');
 
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-
+          if (userData.googleAuthToken?.accessToken && followupDateTime) {
+            await createGoogleCalendarEventForFollowup(followupDateTime);
+          }
         } else {
           console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
+          alert(response.data.message || 'Failed to update followup');
         }
 
       }
@@ -2863,12 +3073,28 @@ const CRMDashboard = () => {
   }, [currentPage]);
 
   // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts) => {
+  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null) => {
+    // Always calculate "All" count by summing all individual tab counts
+    // This ensures "All" tab count remains consistent regardless of which tab is active
+    const calculatedFilteredTotal = Object.keys(backendCounts || {})
+      .filter(key => key !== 'all' && key !== 'null')
+      .reduce((sum, key) => {
+        const statusData = backendCounts[key];
+        if (statusData && typeof statusData === 'object' && statusData.count) {
+          return sum + (statusData.count || 0);
+        } else if (typeof statusData === 'number') {
+          return sum + statusData;
+        }
+        return sum;
+      }, 0);
+    
+    // Use calculated sum, or fallback to backend's "all" value, or 0
+    const allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
-          return { ...filter, count: backendCounts.all || 0 };
+          return { ...filter, count: allCount };
         }
 
         const backendFilter = backendCounts[filter._id];
@@ -2889,7 +3115,6 @@ const CRMDashboard = () => {
     setIsLoadingProfiles(true);
     closePanel();
     setLeadDetailsVisible(null);
-    fetchRegistrationCrmFilterCounts();
 
     if (!token) {
       console.warn('No token found in session storage.');
@@ -2898,6 +3123,23 @@ const CRMDashboard = () => {
     }
 
     // Prepare query parameters
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
@@ -2909,8 +3151,8 @@ const CRMDashboard = () => {
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -2939,6 +3181,8 @@ const CRMDashboard = () => {
         // if (data.crmFilterCounts) {
         //   updateCrmFiltersFromBackend(data.crmFilterCounts);
         // }
+        await fetchRegistrationCrmFilterCounts(filters, page, null);
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2952,6 +3196,120 @@ const CRMDashboard = () => {
     }
   };
 
+  const buildLeadIntelPayload = useCallback((p) => ({
+    _id: p._id,
+    _candidate: p._candidate,
+    _course: p._course,
+    _leadStatus: p._leadStatus,
+    followupDate: p.followupDate,
+    followups: p.followups,
+    selectedSubstatus: p.selectedSubstatus,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  }), []);
+
+  const checkAndImproveRemarkIfWeak = useCallback(async ({ remarkText, context }) => {
+    const text = String(remarkText || '').trim();
+    if (!text || !token) return { finalRemark: text, changed: false };
+    try {
+      const res = await axios.post(
+        `${backendUrl}/api/ai/remark-quality`,
+        { remark: text, context: context || {} },
+        { headers: { 'x-auth': token } }
+      );
+      const data = res.data?.data;
+      if (res.data?.success && data?.isWeak && data?.improvedRemark) {
+        const ok = window.confirm(
+          `Remark looks too short/weak.\n\nSuggested improved remark:\n\n${data.improvedRemark}\n\nUse this improved remark?`
+        );
+        if (ok) return { finalRemark: data.improvedRemark, changed: true };
+      }
+      return { finalRemark: text, changed: false };
+    } catch (err) {
+      console.warn('Remark quality check failed:', err?.message || err);
+      return { finalRemark: text, changed: false };
+    }
+  }, [backendUrl, token]);
+
+  const chunkArray = useCallback((arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+    return chunks;
+  }, []);
+
+  const selectFirstNVisibleLeads = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(bulkSelectCount || '').trim(), 10) || 0));
+    setSelectedProfiles((allProfiles || []).slice(0, n).map(p => p._id));
+  }, [allProfiles, bulkSelectCount]);
+
+  const clearSelectedLeads = useCallback(() => {
+    setSelectedProfiles([]);
+  }, []);
+
+  // Fetch AI lead intelligence (score, intent, suggested action) in BULK (auto-batched by 5)
+  const fetchLeadIntelBulk = useCallback(async (profiles = []) => {
+    if (!profiles?.length || loadingLeadIntel || !token) return;
+    const batches = chunkArray(profiles, 5); // backend endpoint processes up to 5 per call
+    setLoadingLeadIntel(true);
+    try {
+      for (const batch of batches) {
+        const leadsToFetch = batch.map(buildLeadIntelPayload);
+        const res = await axios.post(
+          `${backendUrl}/api/ai/lead-intel/bulk`,
+          { leads: leadsToFetch },
+          { headers: { 'x-auth': token } }
+        );
+        if (res.data?.success && res.data?.data) {
+          setLeadIntelMap((prev) => ({ ...prev, ...res.data.data }));
+        }
+      }
+    } catch (err) {
+      console.error('Lead intel bulk fetch failed:', err);
+    } finally {
+      setLoadingLeadIntel(false);
+    }
+  }, [backendUrl, buildLeadIntelPayload, chunkArray, loadingLeadIntel, token]);
+
+  // Bulk input box UX: click/focus should trigger AI supervision for first N visible leads
+  const runAiSupervisionForFirstN = useCallback(async () => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(input1Value || '').trim(), 10) || 0));
+    if (n <= 0) return;
+    const selected = (allProfiles || []).slice(0, n);
+    setSelectedProfiles(selected.map(p => p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, input1Value]);
+
+  // Bulk: all leads visible in current list
+  const fetchLeadIntelAll = useCallback(async () => {
+    await fetchLeadIntelBulk(allProfiles || []);
+  }, [allProfiles, fetchLeadIntelBulk]);
+
+  // Bulk: only selected leads (checkbox selection)
+  const fetchLeadIntelSelected = useCallback(async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, selectedProfiles]);
+
+  // Single lead: fetch intel for one lead (uses same bulk API with 1 lead)
+  const fetchLeadIntelSingle = useCallback(async (profile) => {
+    if (!profile?._id) return;
+    await fetchLeadIntelBulk([profile]);
+  }, [fetchLeadIntelBulk]);
+
+  // Overdue: followupDate is in the past (start of today)
+  const overdueLeads = useMemo(() => {
+    if (!allProfiles?.length) return [];
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return allProfiles.filter((p) => {
+      const fd = p.followupDate ? new Date(p.followupDate) : null;
+      return fd && fd < todayStart;
+    });
+  }, [allProfiles]);
+
   const downloadLeads = async (filters = filterData, page = currentPage) => {
 
 
@@ -2959,6 +3317,23 @@ const CRMDashboard = () => {
       console.warn('No token found in session storage.');
       return;
     }
+
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -2973,8 +3348,8 @@ const CRMDashboard = () => {
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -3008,7 +3383,8 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     }
   };
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage) => {
+
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
@@ -3017,19 +3393,35 @@ const CRMDashboard = () => {
     }
 
     // Prepare query parameters
+
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      // leadStatus is intentionally excluded - we want counts for all statuses
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
       ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
@@ -3048,7 +3440,9 @@ const CRMDashboard = () => {
 
       if (response.data.success && response.data) {
         const data = response.data;
-        updateCrmFiltersFromBackend(data.crmFilterCount)
+        // Debug log to verify counts received
+       
+        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount)
 
       } else {
         console.error('Failed to fetch crm filter counts', response.data.message);
@@ -3245,9 +3639,9 @@ const CRMDashboard = () => {
     fetchProfileData(newFilterData, 1);
   };
 
-  // Auto-select profiles based on Input 1 value
+  // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
       return;
     }
 
@@ -3273,6 +3667,22 @@ const CRMDashboard = () => {
         if (!token) return;
 
         try {
+
+          const formatDateForAPI = (date, isEndDate = false) => {
+            if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+            const d = new Date(date);
+            if (isEndDate) {
+              d.setHours(23, 59, 59, 999);
+            } else {
+              d.setHours(0, 0, 0, 0);
+            }
+            return d.toISOString();
+          };
+
+          // Format only nextAction dates
+          const nextActionFromDateFormatted = filterData.nextActionFromDate ? formatDateForAPI(filterData.nextActionFromDate, false) : null;
+          const nextActionToDateFormatted = filterData.nextActionToDate ? formatDateForAPI(filterData.nextActionToDate, true) : null;
+
           const queryParams = new URLSearchParams({
             page: '1',
             limit: validNumValue.toString(),
@@ -3285,8 +3695,8 @@ const CRMDashboard = () => {
             ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
             ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
             ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
-            ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
-            ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
+            ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+            ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
             ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
             ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
@@ -3358,44 +3768,75 @@ const CRMDashboard = () => {
 
 
   const openEditPanel = async (profile = null, panel) => {
-    setSelectedProfile(null)
-    setShowPanel('')
-    setSelectedStatus(null)
-    setSelectedSubStatus(null)
-
+    setSelectedProfile(null);
+    setShowPanel('');
+    setSelectedStatus(null);
+    setSelectedSubStatus(null);
 
     if (profile) {
       setSelectedProfile(profile);
     }
 
     // Close all panels first
-
     setShowPopup(null);
     setSelectedConcernPerson(null);
-
 
     if (panel === 'StatusChange') {
       if (profile) {
         const newStatus = profile?._leadStatus?._id || '';
         setSelectedStatus(newStatus);
-
-        // if (newStatus) {
-        //   await fetchSubStatus(newStatus);
-        // }
-
         setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
-      setShowPanel('editPanel')
+      setShowPanel('editPanel');
 
-    }
-    else if (panel === 'SetFollowup') {
-      setShowPopup(null)
-      setShowPanel('followUp')
-    }
-    else if (panel === 'bulkstatuschange') {
-      setShowPopup(null)
-      setShowPanel('bulkstatuschange')
+    } else if (panel === 'SetFollowup') {
+      // For followup we need the latest followup document (if any)
+      if (profile && profile._id) {
+        try {
+          const response = await axios.get(
+            `${backendUrl}/college/appliedCandidatesDetails`,
+            {
+              params: { leadId: profile._id },
+              headers: { 'x-auth': token }
+            }
+          );
 
+          if (response.data.success && response.data.data) {
+            const fullProfile = response.data.data;
+            setSelectedProfile(fullProfile);
+
+            // Pre-fill from existing followup if present
+            if (fullProfile.followup?.followupDate) {
+              const existing = new Date(fullProfile.followup.followupDate);
+              if (!isNaN(existing.getTime())) {
+                setFollowupDate(existing);
+                const hours = String(existing.getHours()).padStart(2, '0');
+                const minutes = String(existing.getMinutes()).padStart(2, '0');
+                setFollowupTime(`${hours}:${minutes}`);
+              } else {
+                setFollowupDate('');
+                setFollowupTime('');
+              }
+              setRemarks(fullProfile.followup.remarks || '');
+            } else {
+              setFollowupDate('');
+              setFollowupTime('');
+              setRemarks('');
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching lead details for followup:', error);
+          // Fallback: keep basic profile; backend will handle first-time followup
+          setSelectedProfile(profile);
+        }
+      }
+
+      setShowPopup(null);
+      setShowPanel('followUp');
+
+    } else if (panel === 'bulkstatuschange') {
+      setShowPopup(null);
+      setShowPanel('bulkstatuschange');
     }
 
     if (!isMobile) {
@@ -3455,6 +3896,9 @@ const CRMDashboard = () => {
       } else {
         alert('Mobile number not found for this candidate');
       }
+    } else if (panel === 'email') {
+      setSelectedProfile(profile);
+      setShowPanel('Email');
     }
 
     if (!isMobile) {
@@ -3581,6 +4025,10 @@ const CRMDashboard = () => {
         })));
 
         setWhatsappMessages(formattedMessages);
+        // reset AI summary when chat changes
+        setAiWhatsappSummary(null);
+        setAiWhatsappError(null);
+        setAiSuggestedReplyDraft('');
       }
     } catch (error) {
       console.error('❌ Error fetching chat history:', error.response?.data || error.message);
@@ -3600,6 +4048,218 @@ const CRMDashboard = () => {
       setIsLoadingChatHistory(false);
     }
   };
+
+  const generateAiWhatsappSummary = async () => {
+    try {
+      if (!token) return;
+      if (!selectedProfile?._candidate?.mobile) return;
+      if (!Array.isArray(whatsappMessages) || whatsappMessages.length === 0) return;
+
+      setAiWhatsappLoading(true);
+      setAiWhatsappError(null);
+
+      const payloadMessages = whatsappMessages.map((m) => ({
+        timestamp: m.timestamp || m.sentAt || m.time || '',
+        sender: m.sender,
+        text: m.text,
+        direction: m.sender === 'agent' ? 'outgoing' : 'incoming',
+      }));
+
+      const leadContext = {
+        candidateName: selectedProfile?._candidate?.name,
+        mobile: selectedProfile?._candidate?.mobile,
+        leadStatus: selectedProfile?._leadStatus?.title,
+        substatus: selectedProfile?.selectedSubstatus?.title,
+        course: selectedProfile?._course?.name,
+      };
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        {
+          phone: selectedProfile._candidate.mobile,
+          leadContext,
+          messages: payloadMessages,
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (res.data?.success && res.data?.data) {
+        setAiWhatsappSummary(res.data.data);
+        setAiSuggestedReplyDraft(res.data.data.suggestedReply || '');
+      } else {
+        setAiWhatsappError(res.data?.message || 'Failed to generate AI summary');
+      }
+    } catch (err) {
+      console.error('AI whatsapp summary failed:', err);
+      setAiWhatsappError(err.response?.data?.message || err.message || 'Failed to generate AI summary');
+    } finally {
+      setAiWhatsappLoading(false);
+    }
+  };
+
+  const generateAiWhatsappSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      const mobile = profile?._candidate?.mobile;
+      if (!mobile) return;
+
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      // fetch chat history first
+      const chatRes = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${mobile}`,
+        { headers: { 'x-auth': token } }
+      );
+      const chatMessages = chatRes.data?.data || [];
+      if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: 'No WhatsApp messages found for this lead.' }));
+        return;
+      }
+
+      const leadContext = {
+        candidateName: profile?._candidate?.name,
+        mobile: profile?._candidate?.mobile,
+        leadStatus: profile?._leadStatus?.title,
+        substatus: profile?.selectedSubstatus?.title,
+        course: profile?._course?.name,
+      };
+
+      const aiRes = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        { phone: mobile, leadContext, messages: chatMessages },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (aiRes.data?.success && aiRes.data?.data) {
+        setWaSummaryByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data.data }));
+      } else {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI WhatsApp summary (profile) failed:', err);
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = {
+        _id: profile._id,
+        _candidate: profile._candidate,
+        _course: profile._course,
+        _leadStatus: profile._leadStatus,
+        selectedSubstatus: profile.selectedSubstatus,
+        followupDate: profile.followupDate,
+        followups: profile.followups,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      };
+      const notes = (profile.followups || [])
+        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
+        .filter(Boolean);
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/next-best-action`,
+        { leadProfile, notes },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && Array.isArray(res.data?.data?.actions)) {
+        setNextActionsByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data.actions }));
+      } else {
+        setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate actions' }));
+      }
+    } catch (err) {
+      console.error('AI next-best-action (profile) failed:', err);
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate actions' }));
+    } finally {
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (nextActionsByProfileId[p._id] || nextActionsLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateNextBestActionsForProfile(p);
+    }
+  };
+
+  const generateAiWhatsappSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      // skip if already generated
+      if (waSummaryByProfileId[p._id] || waSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateAiWhatsappSummaryForProfile(p);
+    }
+  };
+
+  const generateLeadSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = {
+        _id: profile._id,
+        _candidate: profile._candidate,
+        _course: profile._course,
+        _leadStatus: profile._leadStatus,
+        selectedSubstatus: profile.selectedSubstatus,
+        followupDate: profile.followupDate,
+        followups: profile.followups,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      };
+      const notes = (profile.followups || [])
+        .map((f) => (typeof f === 'object' && f.remarks ? f.remarks : null))
+        .filter(Boolean);
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/lead-summary`,
+        { leadId: profile._id, leadProfile, notes, messages: [] },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && res.data?.data) {
+        setLeadSummaryByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data }));
+      } else {
+        setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI lead-summary (profile) failed:', err);
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateLeadSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (leadSummaryByProfileId[p._id] || leadSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateLeadSummaryForProfile(p);
+    }
+  };
+
+  const selectFirstNForAiSupervision = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(aiSupervisionCount || '').trim(), 10) || 0));
+    const ids = (allProfiles || []).slice(0, n).map(p => p._id);
+    setSelectedProfiles(ids);
+    return (allProfiles || []).slice(0, n);
+  }, [aiSupervisionCount, allProfiles]);
 
   // Check WhatsApp 24-hour session window status
   const checkSessionWindow = async (phoneNumber) => {
@@ -5466,6 +6126,19 @@ const CRMDashboard = () => {
     setIsSendingBulkWhatsapp(true);
 
     try {
+      // Helper function to format date for API
+      // Only used for nextAction dates
+      const formatDateForAPI = (date, isEndDate = false) => {
+        if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+        const d = new Date(date);
+        if (isEndDate) {
+          d.setHours(23, 59, 59, 999);
+        } else {
+          d.setHours(0, 0, 0, 0);
+        }
+        return d.toISOString();
+      };
+
       // Fetch all profiles matching current filters (not just current page)
       const queryParams = new URLSearchParams({
         page: '1',
@@ -5850,7 +6523,7 @@ const CRMDashboard = () => {
       alert(resultMessage);
 
       if (failCount === 0 || successCount > 0) {
-        setShowWhatsappModal(false);
+        setModalType(null);
         setSelectedSenderId('');
         setSelectedWhatsappNumbers([]);
         setResponseRecipient('sender');
@@ -5911,12 +6584,14 @@ const CRMDashboard = () => {
       fetchWhatsappTemplates();
     }
   }, [showPanel]);
+useEffect(() => {
+  if (modalType === 'whatsapp') {
+    fetchWhatsappTemplates();
+  } else if (modalType === 'templateEdit') {
+    fetchWhatsappTemplates();
+  }
+}, [modalType]);
 
-  useEffect(() => {
-    if (showWhatsappModal) {
-      fetchWhatsappTemplates();
-    }
-  }, [showWhatsappModal]);
 
   // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
   useEffect(() => {
@@ -6014,7 +6689,39 @@ const CRMDashboard = () => {
 
             </h6>
           </div>
-          <div>
+          <div className="d-flex align-items-center gap-2">
+            {(showPanel === 'followUp' || showPanel === 'editPanel') && (
+              userData.googleAuthToken?.accessToken ? (
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleGoogleLogout}
+                  disabled={isGoogleLoginLoading}
+                >
+                  <i className="fas fa-calendar-times me-1"></i>
+                  Disconnect Google Calendar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoginLoading}
+                >
+                  {isGoogleLoginLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-calendar-plus me-1"></i>
+                      Connect Google Calendar
+                    </>
+                  )}
+                </button>
+              )
+            )}
             <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
@@ -6108,6 +6815,7 @@ const CRMDashboard = () => {
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
                       placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Date is mandatory" : "Select date"}
+                      style={{position: 'static'}}
                     />
                   </div>
                 </div>
@@ -6232,11 +6940,8 @@ const CRMDashboard = () => {
 
         <div className="card-body">
           <form>
-
-
             <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
+              {/* COUNSELOR SELECT DROPDOWN */}
               <div className="mb-1">
                 <label htmlFor="counselor" className="form-label small fw-medium text-dark">
                   Select Counselor<span className="text-danger">*</span>
@@ -6246,6 +6951,7 @@ const CRMDashboard = () => {
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
+                      value={selectedConcernPerson || ''}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -6274,12 +6980,11 @@ const CRMDashboard = () => {
                 CLOSE
               </button>
               <button
-                type="submit"
+                type="button"
                 className="btn text-white"
                 onClick={() => handleReferLead(showPanel === 'Reffer' ? 'RefferSingleLead' : 'RefferBulkLead')}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-
                 {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
@@ -8026,7 +8731,1232 @@ const CRMDashboard = () => {
     ) : null;
   };
   /************************************/
+  // Render Email Panel (Desktop Sidebar or Mobile Modal)
+  const renderEmailPanel = () => {
+    if (showPanel !== 'Email') return null;
+  
+    return (
+      <div className="col-11 transition-col" id="EmailPanel">
+        <div className="bg-white h-100 d-flex flex-column">
+  
+          {/* Header */}
+          <div className="border-bottom p-3 d-flex justify-content-between align-items-center">
+            <h5 className="mb-0 fw-bold">Send Email</h5>
+            <button
+              className="btn-close"
+               onClick={closePanel}
+                style={{ marginLeft: '8px' }}
+            />
+          </div>
+  
+          {/* Body */}
+          <div className="flex-grow-1 overflow-auto p-4">
+  
+            {/* Select Email */}
+            <div className="mb-4">
+              <h6 className="fw-bold mb-3">Select the Email to send</h6>
+              <div className="d-flex flex-column gap-2">
+                {['Primary Email', "Father's Email", "Mother's Email", 'Alternate Email'].map((emailType) => (
+                  <div key={emailType} className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={selectedWhatsappNumbers.includes(emailType)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedWhatsappNumbers([...selectedWhatsappNumbers, emailType]);
+                        } else {
+                          setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== emailType));
+                        }
+                      }}
+                    />
+                    <label className="form-check-label">
+                      {emailType}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+  
+            {/* Select Template */}
+            <div className="mb-4">
+              <label className="form-label fw-bold mb-2">
+                Select Email Template
+              </label>
+              <select
+                className="form-select"
+                value={selectedWhatsappTemplateModal}
+                onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+              >
+                <option value="">Select Template</option>
+                {whatsappTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+  
+          </div>
+  
+          {/* Footer */}
+          <div className="border-top p-3 d-flex justify-content-end gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowPanel(null)}
+            >
+              Close
+            </button>
+  
+            <button
+              className="btn btn-primary"
+              onClick={handleBulkWhatsappSend}
+              disabled={isSendingBulkWhatsapp}
+            >
+              {isSendingBulkWhatsapp ? 'Sending...' : 'Send Message'}
+            </button>
+          </div>
+  
+        </div>
+      </div>
+    );
+  };
+  
+  // const renderEmailPanel = () => {
+  //   const panelContent = (
+  //     <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+  //       {/* WhatsApp Header */}
+  //       <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
 
+  //         <div className="d-flex align-items-center mb-2">
+  //           <div
+  //             className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+  //             style={{
+  //               width: '48px',
+  //               height: '48px',
+  //               fontSize: '20px',
+  //               fontWeight: '600',
+  //               background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+  //               flexShrink: 0
+  //             }}
+  //           >
+  //             {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+  //           </div>
+  //           <div className="flex-grow-1">
+  //             <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+  //               {selectedProfile?._candidate?.name || 'N/A'}
+  //             </h6>
+  //             <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+  //               {selectedProfile?._candidate?.mobile || 'N/A'}
+  //             </p>
+  //           </div>
+  //           <button
+  //             className="btn-close"
+  //             onClick={closePanel}
+  //             style={{ marginLeft: '8px' }}
+  //           ></button>
+  //         </div>
+
+  //         {/* Session Status Badge - Below name */}
+  //         <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+  //           {sessionWindow.isOpen ? (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#D1F4E0',
+  //                 border: '1px solid #25D366',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <div
+  //                 className="rounded-circle me-1"
+  //                 style={{
+  //                   width: '6px',
+  //                   height: '6px',
+  //                   backgroundColor: '#25D366'
+  //                 }}
+  //               ></div>
+  //               <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+  //                 <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+  //                 {sessionCountdown} remaining
+  //               </span>
+  //             </div>
+  //           ) : (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#FFF3CD',
+  //                 border: '1px solid #FFA500',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+  //               <span className="fw-semibold" style={{ color: '#856404' }}>
+  //                 No Active Window
+  //               </span>
+  //             </div>
+  //           )}
+  //         </div>
+
+  //       </div>
+
+  //       {/* Messages Area */}
+  //       <div
+  //         className="flex-grow-1 overflow-auto p-3"
+  //         style={{
+  //           backgroundColor: '#ECE5DD',
+  //           backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+  //           maxHeight: '55vh',
+  //           minHeight: '300px'
+  //         }}
+  //       >
+  //         {/* Loading State */}
+  //         {isLoadingChatHistory && (
+  //           <div className="d-flex justify-content-center align-items-center h-100">
+  //             <div className="text-center">
+  //               <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+  //                 <span className="visually-hidden">Loading...</span>
+  //               </div>
+  //               <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Messages */}
+  //         {!isLoadingChatHistory && whatsappMessages.map(message => (
+  //           <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+  //             <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+  //               <div
+  //                 className={`${message.sender === 'agent'
+  //                   ? 'text-white'
+  //                   : 'bg-white text-dark'
+  //                   }`}
+  //                 style={{
+  //                   backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+  //                   color: message.sender === 'agent' ? '#000' : '#000',
+  //                   borderRadius: '8px',
+  //                   borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+  //                   borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+  //                   boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+  //                   padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+  //                   overflow: 'hidden'
+  //                 }}
+  //               >
+  //                 {/* Render template message with components */}
+  //                 {message.type === 'template' && message.templateData ? (
+  //                   <>
+  //                     {renderTemplateMessage(message.templateData, true)}
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 ) : (
+  //                   /* Regular text/media message */
+  //                   <>
+  //                     {/* Render media if present */}
+  //                     {message.mediaUrl && message.type === 'image' && (
+  //                       <img
+  //                         src={message.mediaUrl}
+  //                         alt="Shared image"
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Image]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       />
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'video' && (
+  //                       <video
+  //                         controls
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Video]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="video/mp4" />
+  //                         Your browser does not support the video tag.
+  //                       </video>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'audio' && (
+  //                       <audio
+  //                         controls
+  //                         style={{
+  //                           width: '100%',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="audio/mpeg" />
+  //                         Your browser does not support the audio tag.
+  //                       </audio>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'document' && (
+  //                       <a
+  //                         href={message.mediaUrl}
+  //                         target="_blank"
+  //                         rel="noopener noreferrer"
+  //                         className="d-flex align-items-center text-decoration-none"
+  //                         style={{
+  //                           padding: '8px',
+  //                           backgroundColor: 'rgba(0,0,0,0.05)',
+  //                           borderRadius: '4px',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+  //                         <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+  //                       </a>
+  //                     )}
+
+  //                     {/* Render text if it's not a default placeholder */}
+  //                     {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+  //                       <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+  //                         {message.text}
+  //                       </p>
+  //                     )}
+
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 )}
+  //               </div>
+  //               {message.sender === 'agent' && message.type === 'template' && (
+  //                 <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+  //                   <i className="fas fa-file-alt me-1"></i>Template Message
+  //                 </p>
+  //               )}
+  //             </div>
+  //           </div>
+  //         ))}
+
+  //         {/* Selected Template Preview in Chat */}
+  //         {selectedWhatsappTemplate && (
+  //           <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+  //             <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+  //               <div
+  //                 className="rounded-3 overflow-hidden"
+  //                 style={{
+  //                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                   boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+  //                   border: '2px solid rgba(255,255,255,0.3)',
+  //                   position: 'relative'
+  //                 }}
+  //               >
+  //                 {/* Decorative gradient overlay */}
+  //                 <div style={{
+  //                   position: 'absolute',
+  //                   top: 0,
+  //                   left: 0,
+  //                   right: 0,
+  //                   height: '100%',
+  //                   background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+  //                   pointerEvents: 'none'
+  //                 }}></div>
+
+  //                 {/* Header */}
+  //                 <div className="d-flex align-items-center justify-content-between p-3" style={{
+  //                   backgroundColor: 'rgba(255,255,255,0.15)',
+  //                   backdropFilter: 'blur(10px)',
+  //                   borderBottom: '1px solid rgba(255,255,255,0.2)'
+  //                 }}>
+  //                   <div className="d-flex align-items-center">
+  //                     <div
+  //                       className="rounded-circle d-flex align-items-center justify-content-center me-2"
+  //                       style={{
+  //                         width: '32px',
+  //                         height: '32px',
+  //                         backgroundColor: 'rgba(255,255,255,0.95)',
+  //                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+  //                       }}
+  //                     >
+  //                       <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+  //                     </div>
+  //                     <div>
+  //                       <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+  //                         WhatsApp Template
+  //                       </p>
+  //                       <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+  //                         {selectedWhatsappTemplate.name}
+  //                       </p>
+  //                     </div>
+  //                   </div>
+  //                   <button
+  //                     className="btn btn-sm p-0"
+  //                     onClick={() => setSelectedWhatsappTemplate(null)}
+  //                     style={{
+  //                       width: '28px',
+  //                       height: '28px',
+  //                       backgroundColor: 'rgba(255,255,255,0.2)',
+  //                       border: '1px solid rgba(255,255,255,0.4)',
+  //                       borderRadius: '50%',
+  //                       color: '#fff',
+  //                       fontSize: '12px',
+  //                       display: 'flex',
+  //                       alignItems: 'center',
+  //                       justifyContent: 'center',
+  //                       transition: 'all 0.2s ease'
+  //                     }}
+  //                     onMouseEnter={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+  //                       e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+  //                     }}
+  //                     onMouseLeave={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+  //                       e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+  //                     }}
+  //                     title="Remove Template"
+  //                   >
+  //                     <i className="fas fa-times"></i>
+  //                   </button>
+  //                 </div>
+
+  //                 {/* Content */}
+  //                 <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+  //                   {/* Category Badge */}
+  //                   <div className="mb-2">
+  //                     <span className="badge" style={{
+  //                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                       color: '#fff',
+  //                       fontSize: '10px',
+  //                       padding: '5px 12px',
+  //                       fontWeight: '600',
+  //                       borderRadius: '20px',
+  //                       letterSpacing: '0.3px'
+  //                     }}>
+  //                       <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+  //                       {selectedWhatsappTemplate.category}
+  //                     </span>
+  //                   </div>
+
+  //                   {/* Template Content */}
+  //                   <div
+  //                     className="rounded-3 p-3 mb-2"
+  //                     style={{
+  //                       backgroundColor: '#f8f9fa',
+  //                       border: '2px solid #e9ecef',
+  //                       borderLeft: '4px solid #667eea',
+  //                       position: 'relative'
+  //                     }}
+  //                   >
+  //                     {(() => {
+  //                       const components = selectedWhatsappTemplate.components || [];
+
+  //                       // Check if it's a carousel template
+  //                       const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+  //                       if (carouselComponent && carouselComponent.cards) {
+  //                         return (
+  //                           <div>
+  //                             {/* Carousel Body Text (if exists outside carousel) */}
+  //                             {(() => {
+  //                               const bodyComp = components.find(c => c.type === 'BODY');
+  //                               if (bodyComp && bodyComp.text) {
+  //                                 return (
+  //                                   <p className="mb-3" style={{
+  //                                     fontSize: '13px',
+  //                                     color: '#2c3e50',
+  //                                     fontWeight: '500'
+  //                                   }}>
+  //                                     {bodyComp.text}
+  //                                   </p>
+  //                                 );
+  //                               }
+  //                             })()}
+
+  //                             <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+  //                               <i className="fas fa-images me-1"></i>
+  //                               Carousel ({carouselComponent.cards.length} cards)
+  //                             </p>
+
+  //                             <div style={{
+  //                               display: 'flex',
+  //                               gap: '12px',
+  //                               overflowX: 'auto',
+  //                               paddingBottom: '10px',
+  //                               scrollbarWidth: 'thin'
+  //                             }}>
+  //                               {carouselComponent.cards.map((card, idx) => {
+  //                                 const cardHeader = card.components.find(c => c.type === 'HEADER');
+  //                                 const cardBody = card.components.find(c => c.type === 'BODY');
+  //                                 const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+  //                                 const imageUrl = cardHeader?.example?.header_handle?.[0];
+
+  //                                 return (
+  //                                   <div key={idx} style={{
+  //                                     minWidth: '200px',
+  //                                     maxWidth: '200px',
+  //                                     border: '2px solid #dee2e6',
+  //                                     borderRadius: '12px',
+  //                                     overflow: 'hidden',
+  //                                     backgroundColor: '#fff',
+  //                                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  //                                   }}>
+  //                                     {imageUrl && (
+  //                                       <>
+  //                                         <img
+  //                                           src={imageUrl}
+  //                                           alt={`Card ${idx + 1}`}
+  //                                           style={{
+  //                                             width: '100%',
+  //                                             height: '150px',
+  //                                             objectFit: 'cover'
+  //                                           }}
+  //                                           onError={(e) => {
+  //                                             e.target.style.display = 'none';
+  //                                             e.target.nextElementSibling.style.display = 'flex';
+  //                                           }}
+  //                                         />
+  //                                         <div style={{
+  //                                           display: 'none',
+  //                                           height: '150px',
+  //                                           alignItems: 'center',
+  //                                           justifyContent: 'center',
+  //                                           backgroundColor: '#e9ecef',
+  //                                           fontSize: '48px'
+  //                                         }}>
+  //                                           🖼️
+  //                                         </div>
+  //                                       </>
+  //                                     )}
+  //                                     <div style={{ padding: '12px' }}>
+  //                                       <p className="mb-2" style={{
+  //                                         fontSize: '12px',
+  //                                         lineHeight: '1.4',
+  //                                         color: '#2c3e50'
+  //                                       }}>
+  //                                         {(() => {
+  //                                           // Get candidate data for variable replacement
+  //                                           const candidate = selectedProfile?._candidate;
+  //                                           const registration = selectedProfile;
+
+  //                                           // Replace variables with actual candidate data
+  //                                           let text = cardBody?.text || '';
+
+  //                                           // Replace {{1}} with name
+  //                                           text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                           // Replace {{2}} with gender
+  //                                           text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                           // Replace {{3}} with mobile
+  //                                           text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                           // Replace {{4}} with email
+  //                                           text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                           // Replace {{5}} with course name
+  //                                           text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                           // Replace {{6}} with counselor name
+  //                                           text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                           // Replace {{7}} with job name
+  //                                           text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                           // Replace {{8}} with project name (college name)
+  //                                           text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+  //                                           // Replace {{9}} with batch name
+  //                                           text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                           // Replace {{10}} with lead owner name
+  //                                           text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+
+  //                                           return text;
+  //                                         })()}
+  //                                       </p>
+  //                                       {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+  //                                         <div style={{
+  //                                           borderTop: '1px solid #dee2e6',
+  //                                           paddingTop: '8px',
+  //                                           marginTop: '8px'
+  //                                         }}>
+  //                                           {cardButtons.buttons.map((btn, bidx) => (
+  //                                             <div
+  //                                               key={bidx}
+  //                                               style={{
+  //                                                 padding: '6px',
+  //                                                 marginBottom: '4px',
+  //                                                 textAlign: 'center',
+  //                                                 fontSize: '11px',
+  //                                                 color: '#007bff',
+  //                                                 fontWeight: '500'
+  //                                               }}
+  //                                             >
+  //                                               {btn.type === 'QUICK_REPLY' && '↩️ '}
+  //                                               {btn.text}
+  //                                             </div>
+  //                                           ))}
+  //                                         </div>
+  //                                       )}
+  //                                     </div>
+  //                                   </div>
+  //                                 );
+  //                               })}
+  //                             </div>
+  //                           </div>
+  //                         );
+  //                       }
+
+  //                       // Regular template with header (image/video), body, footer, buttons
+  //                       const headerComponent = components.find(c => c.type === 'HEADER');
+  //                       const bodyComponent = components.find(c => c.type === 'BODY');
+  //                       const footerComponent = components.find(c => c.type === 'FOOTER');
+  //                       const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+
+  //                       return (
+  //                         <div>
+  //                           {/* Header - Image or Video */}
+  //                           {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <img
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 alt="Template header"
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   objectFit: 'cover',
+  //                                   borderRadius: '12px 12px 0 0'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               />
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#e9ecef',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 🖼️
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <video
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 controls
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   borderRadius: '12px 12px 0 0',
+  //                                   backgroundColor: '#000'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               >
+  //                                 Your browser does not support the video tag.
+  //                               </video>
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#000',
+  //                                 color: '#fff',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 🎥
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'TEXT' && (
+  //                             <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+  //                               {headerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Body */}
+  //                           {bodyComponent && (
+  //                             <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+  //                               fontSize: '13px',
+  //                               color: '#2c3e50',
+  //                               lineHeight: '1.6',
+  //                               whiteSpace: 'pre-wrap'
+  //                             }}>
+  //                               {(() => {
+  //                                 // Get candidate data for variable replacement
+  //                                 const candidate = selectedProfile?._candidate;
+  //                                 const registration = selectedProfile;
+
+  //                                 // Get template variable mappings from selectedWhatsappTemplate
+  //                                 const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+  //                                 // Replace variables with actual candidate data using stored mappings
+  //                                 let text = bodyComponent.text || '';
+
+  //                                 if (variableMappings && variableMappings.length > 0) {
+  //                                   // Use stored variable mappings from database
+
+  //                                   variableMappings.forEach(mapping => {
+  //                                     const position = mapping.position;
+  //                                     const variableName = mapping.variableName;
+
+  //                                     // Get value based on actual variable name from mapping
+  //                                     let value = '';
+
+  //                                     switch (variableName) {
+  //                                       case 'name':
+  //                                         value = candidate?.name || registration?.name || 'User';
+  //                                         break;
+  //                                       case 'gender':
+  //                                         value = candidate?.gender || 'Male';
+  //                                         break;
+  //                                       case 'mobile':
+  //                                         value = candidate?.mobile || registration?.mobile || 'Mobile';
+  //                                         break;
+  //                                       case 'email':
+  //                                         value = candidate?.email || registration?.email || 'Email';
+  //                                         break;
+  //                                       case 'course_name':
+  //                                         value = selectedProfile?._course?.name || 'Course Name';
+  //                                         break;
+  //                                       case 'counselor_name':
+  //                                         value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+  //                                         break;
+  //                                       case 'job_name':
+  //                                         value = selectedProfile?._job?.title || 'Job Title';
+  //                                         break;
+  //                                       case 'project_name':
+  //                                         value = selectedProfile?._project?.name || 'Project Name';
+  //                                         break;
+  //                                       case 'batch_name':
+  //                                         value = selectedProfile?._batch?.name || 'Batch Not Assigned';
+  //                                         break;
+  //                                       case 'lead_owner_name':
+  //                                         value = selectedProfile?.registeredBy?.name || 'Self Registered';
+  //                                         break;
+  //                                       default:
+  //                                         // Try direct property access
+  //                                         value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+  //                                         break;
+  //                                     }
+
+  //                                     // Replace the numbered variable with actual value
+  //                                     text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+
+  //                                   });
+  //                                 } else {
+  //                                   text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                   text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                   text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                   text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                   text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                   // Replace {{6}} with counselor name
+  //                                   text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                   // Replace {{7}} with job name
+  //                                   text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                   // Replace {{8}} with project name (college name)
+  //                                   text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+
+  //                                   // Replace {{9}} with batch name
+  //                                   text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                   // Replace {{10}} with lead owner name
+  //                                   text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Self Registered');
+  //                                 }
+
+  //                                 return text;
+  //                               })()}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Footer */}
+  //                           {footerComponent && (
+  //                             <p className="mb-2" style={{
+  //                               fontSize: '11px',
+  //                               color: '#6b7280',
+  //                               fontStyle: 'italic'
+  //                             }}>
+  //                               {footerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Buttons */}
+  //                           {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+  //                             <div style={{
+  //                               marginTop: '12px',
+  //                               paddingTop: '12px',
+  //                               borderTop: '1px solid #dee2e6'
+  //                             }}>
+  //                               {buttonsComponent.buttons.map((button, idx) => (
+  //                                 <div
+  //                                   key={idx}
+  //                                   style={{
+  //                                     padding: '8px 12px',
+  //                                     marginBottom: '6px',
+  //                                     textAlign: 'center',
+  //                                     fontSize: '12px',
+  //                                     color: '#007bff',
+  //                                     border: '1px solid #007bff',
+  //                                     borderRadius: '6px',
+  //                                     backgroundColor: '#fff',
+  //                                     fontWeight: '500',
+  //                                     cursor: 'default'
+  //                                   }}
+  //                                 >
+  //                                   {button.type === 'QUICK_REPLY' && '↩️ '}
+  //                                   {button.type === 'URL' && '🔗 '}
+  //                                   {button.type === 'PHONE_NUMBER' && '📞 '}
+  //                                   {button.text}
+  //                                 </div>
+  //                               ))}
+  //                             </div>
+  //                           )}
+  //                         </div>
+  //                       );
+  //                     })()}
+  //                   </div>
+
+  //                   {/* Footer Info */}
+  //                   <div className="d-flex align-items-center justify-content-between">
+  //                     <div className="d-flex align-items-center">
+  //                       <div
+  //                         className="rounded-circle me-2"
+  //                         style={{
+  //                           width: '8px',
+  //                           height: '8px',
+  //                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  //                           boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+  //                           animation: 'pulse 2s ease-in-out infinite'
+  //                         }}
+  //                       ></div>
+  //                       <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+  //                         Ready to send
+  //                       </span>
+  //                     </div>
+  //                     <div className="d-flex align-items-center">
+  //                       <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+  //                       <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+  //                         Pre-approved
+  //                       </span>
+  //                     </div>
+  //                   </div>
+  //                 </div>
+  //               </div>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Scroll anchor */}
+  //         <div ref={whatsappMessagesEndRef} />
+  //       </div>
+
+  //       {/* Bottom Input Area */}
+  //       <div className="bg-white border-top p-3">
+  //         <div className="d-flex align-items-center gap-2">
+  //           {/* File Upload Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-file-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappFileMenu(!showWhatsappFileMenu);
+  //                 setShowWhatsappTemplateMenu(false);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Attach File"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: 'transparent',
+  //                 color: '#54656F',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //             </button>
+
+  //             {/* File Menu Dropdown */}
+  //             {showWhatsappFileMenu && (
+  //               <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+  //                 <div className="p-2">
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-document-input"
+  //                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-image-input"
+  //                     accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-video-input"
+  //                     accept="video/mp4,video/mkv,video/mov,video/avi"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-audio-input"
+  //                     accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+  //                     style={{ display: 'none' }}
+  //                   />
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-document-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+  //                     <span>Document</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-image-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+  //                     <span>Image</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-video-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+  //                     <span>Video</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start"
+  //                     onClick={() => document.getElementById('whatsapp-audio-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+  //                     <span>Audio</span>
+  //                   </button>
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
+  //           {/* <button
+  //             className="btn"
+  //             title="Attach File"
+  //             style={{
+  //               width: '42px',
+  //               height: '42px',
+  //               backgroundColor: 'transparent',
+  //               color: '#54656F',
+  //               border: 'none',
+  //               borderRadius: '8px',
+  //               padding: '0',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center'
+  //             }}
+  //           >
+  //             <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //           </button> */}
+
+  //           {/* Template Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-template-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Templates"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: '#0B66E4',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+  //             </button>
+
+  //             {/* Template Dropdown */}
+  //             {showWhatsappTemplateMenu && (
+  //               <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+  //                 <div className="p-3 border-bottom bg-light">
+  //                   <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+  //                   <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+  //                 </div>
+
+  //                 {whatsappTemplates.length === 0 ? (
+  //                   <div className="p-4 text-center">
+  //                     <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+  //                       <span className="visually-hidden">Loading...</span>
+  //                     </div>
+  //                     <p className="mb-0 small text-muted">Loading templates...</p>
+  //                   </div>
+  //                 ) : (
+  //                   whatsappTemplates.map(template => (
+  //                     <div
+  //                       key={template.id}
+  //                       className="p-3 border-bottom"
+  //                       style={{ cursor: 'pointer' }}
+  //                       onClick={() => handleWhatsappSelectTemplate(template)}
+  //                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+  //                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  //                     >
+  //                       <div className="d-flex justify-content-between align-items-center">
+  //                         <h6 className="mb-0 fw-semibold">{template.name}</h6>
+  //                         <div className="d-flex gap-1">
+  //                           <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+  //                           {template.language && (
+  //                             <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+  //                           )}
+  //                         </div>
+  //                       </div>
+  //                     </div>
+  //                   ))
+  //                 )}
+  //               </div>
+  //             )}
+  //           </div>
+
+  //           {/* Message Input or Template Send Button */}
+  //           {selectedWhatsappTemplate ? (
+  //             // Template Selected - Show Send Button
+  //             <button
+  //               className="btn flex-grow-1"
+  //               onClick={handleWhatsappSendTemplate}
+  //               disabled={isSendingWhatsapp}
+  //               style={{
+  //                 height: '42px',
+  //                 backgroundColor: '#25D366',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '24px',
+  //                 fontWeight: '500',
+  //                 fontSize: '15px'
+  //               }}
+  //             >
+  //               {isSendingWhatsapp ? (
+  //                 <>
+  //                   <span className="spinner-border spinner-border-sm me-2"></span>
+  //                   Sending...
+  //                 </>
+  //               ) : (
+  //                 <>
+  //                   <i className="fas fa-paper-plane me-2"></i>
+  //                   Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+  //                 </>
+  //               )}
+  //             </button>
+  //           ) : sessionWindow.isOpen ? (
+  //             // Active Session - Show Input
+  //             <>
+  //               <div className="position-relative flex-grow-1">
+  //                 <input
+  //                   type="text"
+  //                   className="form-control"
+  //                   value={whatsappNewMessage}
+  //                   onChange={(e) => setWhatsappNewMessage(e.target.value)}
+  //                   onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+  //                   placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
+  //                   style={{
+  //                     height: '42px',
+  //                     paddingRight: '50px',
+  //                     borderRadius: '24px',
+  //                     border: '1px solid #E9EDEF',
+  //                     fontSize: '15px',
+  //                     backgroundColor: '#F0F2F5'
+  //                   }}
+  //                 />
+  //                 <button
+  //                   className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+  //                   onClick={() => {
+  //                     setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+  //                     setShowWhatsappTemplateMenu(false);
+  //                   }}
+  //                   style={{
+  //                     height: '42px',
+  //                     width: '42px',
+  //                     border: 'none',
+  //                     background: 'transparent',
+  //                     color: '#54656F'
+  //                   }}
+  //                 >
+  //                   <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+  //                 </button>
+
+  //                 {/* Emoji Picker */}
+  //                 {showWhatsappEmojiPicker && (
+  //                   <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+  //                     <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
+  //                       {emojis.map((emoji, index) => (
+  //                         <button
+  //                           key={index}
+  //                           className="btn btn-light"
+  //                           onClick={() => handleWhatsappEmojiClick(emoji)}
+  //                           style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
+  //                         >
+  //                           {emoji}
+  //                         </button>
+  //                       ))}
+  //                     </div>
+  //                   </div>
+  //                 )}
+  //               </div>
+
+  //               {/* Send/Voice Button */}
+  //               {whatsappNewMessage.trim() ? (
+  //                 <button
+  //                   onClick={handleWhatsappSendMessage}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                 >
+  //                   <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+  //                 </button>
+  //               ) : (
+  //                 <button
+  //                   onClick={() => {
+  //                     setWhatsappMessages([...whatsappMessages, {
+  //                       id: whatsappMessages.length + 1,
+  //                       text: '🎤 Voice message',
+  //                       sender: 'agent',
+  //                       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //                       type: 'voice'
+  //                     }]);
+  //                   }}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                   title="Voice Message"
+  //                 >
+  //                   <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+  //                 </button>
+  //               )}
+  //             </>
+  //           ) : (
+  //             // No Session - Disabled Input with Tooltip
+  //             <div
+  //               className="position-relative flex-grow-1"
+  //               title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+  //             >
+  //               <input
+  //                 type="text"
+  //                 className="form-control"
+  //                 disabled
+  //                 placeholder="No active window - Use templates only"
+  //                 style={{
+  //                   height: '42px',
+  //                   borderRadius: '24px',
+  //                   border: '1px solid #E9EDEF',
+  //                   fontSize: '15px',
+  //                   backgroundColor: '#F5F5F5',
+  //                   color: '#8696A0',
+  //                   cursor: 'not-allowed'
+  //                 }}
+  //               />
+  //             </div>
+  //           )}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+
+  //   if (isMobile) {
+  //     return showPanel === 'Whatsapp' ? (
+  //       <div
+  //         className='modal show d-block'
+  //         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+  //         onClick={(e) => {
+  //           if (e.target === e.currentTarget) closePanel();
+  //         }}
+  //       >
+  //         <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+  //           <div className="modal-content" style={{ height: '80vh' }}>
+  //             {panelContent}
+  //           </div>
+  //         </div>
+  //       </div>
+  //     ) : null;
+  //   }
+
+  //   return showPanel === 'Email' ? (
+  //     <div className="col-11 transition-col" id="EmailPanel">
+  //       {panelContent}
+  //     </div>
+  //   ) : null;
+  // };
+  /************************************/
   //lead history
 
   const [leadHistory, setLeadHistory] = useState([]);
@@ -8633,7 +10563,7 @@ const CRMDashboard = () => {
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
-                          Clear All
+                          Clear
                         </button>
                         <button
                           className="btn-close"
@@ -8806,9 +10736,9 @@ const CRMDashboard = () => {
                           <i className="fas fa-calendar-plus me-1 text-success"></i>
                           Lead Creation Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6 firstDatepicker">
+                            <div className="col-12 col-sm-6 firstDatepicker fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -8820,7 +10750,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.createdToDate || new Date()}
                               />
                             </div>
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
@@ -8851,12 +10781,12 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton "
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -8868,9 +10798,10 @@ const CRMDashboard = () => {
                           <i className="fas fa-calendar-edit me-1 text-warning"></i>
                           Lead Modification Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
@@ -8882,7 +10813,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.modifiedToDate || new Date()}
                               />
                             </div>
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
@@ -8913,12 +10844,12 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -8930,9 +10861,9 @@ const CRMDashboard = () => {
                           <i className="fas fa-calendar-check me-1 text-info"></i>
                           Next Action Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-12 col-sm-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
@@ -8944,7 +10875,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-12 col-sm-6 translateX">
+                            <div className="col-12 col-sm-6 fixDate translateX">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -8974,12 +10905,12 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -9087,7 +11018,7 @@ const CRMDashboard = () => {
             <section className="list-view">
               <div className="row">
                 {/* Desktop Layout */}
-                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
+                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2 crm-sticky-action">
                  
                   {/* Left side - Buttons */}
                   <div style={{ display: "flex", gap: "8px" }}>
@@ -9154,6 +11085,9 @@ const CRMDashboard = () => {
                           gap: "4px"
                         }}
                         onClick={() => {
+                          setShowBulkInputs(true);
+                          setBulkMode('bulkrefer');
+                          setInput1Value('');
                           openPanel(null, 'RefferAllLeads');
                         }}
                       >
@@ -9182,6 +11116,25 @@ const CRMDashboard = () => {
                         Bulk Action
                       </button>
                     </>)}
+
+                  <button
+                    className="btn btn-sm btn-outline-dark"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => setShowAiSupervision(true)}
+                    title="Open unified AI Supervision view"
+                    disabled={allProfiles.length === 0}
+                  >
+                    <i className="fas fa-layer-group" style={{ fontSize: "10px" }}></i>
+                    AI Supervision
+                  </button>
+                  
                   </div>
 
                   {/* Right side - Input Fields */}
@@ -9201,6 +11154,16 @@ const CRMDashboard = () => {
                         type="text"
                         placeholder="Input 1"
                         value={input1Value}
+                        onFocus={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
+                        onClick={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
                         onKeyDown={(e) => {
                           // Allow numbers, backspace, delete, arrows, tab, enter
                           if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
@@ -9212,7 +11175,7 @@ const CRMDashboard = () => {
                             const numValue = parseInt(input1Value, 10);
                             const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                             if (numValue >= 1 && numValue <= maxValue) {
-                              setShowWhatsappModal(true);
+                              setModalType('whatsapp');
                             }
                           }
                         }}
@@ -9329,6 +11292,9 @@ const CRMDashboard = () => {
                               gap: "4px"
                             }}
                             onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
                               openPanel(null, 'RefferAllLeads');
                             }}
                           >
@@ -9366,6 +11332,18 @@ const CRMDashboard = () => {
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
 
+                        {/* Overdue follow-up alert */}
+                        {!isLoadingProfiles && overdueLeads.length > 0 && (
+                          <div className="col-12 mb-2">
+                            <div className="alert alert-warning d-flex align-items-center justify-content-between flex-wrap py-2 mb-0" role="alert">
+                              <span>
+                                <i className="fas fa-exclamation-triangle me-2"></i>
+                                <strong>{overdueLeads.length} lead{overdueLeads.length !== 1 ? 's' : ''}</strong> with overdue follow-up (next action date passed). Prioritize contact to reduce drop risk.
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Loading State */}
                         {isLoadingProfiles && (
                           <div className="col-12 text-center py-5">
@@ -9380,6 +11358,7 @@ const CRMDashboard = () => {
                         )}
 
                         {/* Profiles List */}
+                        <div className="crm-leads-scrolls col-12">
                         {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
@@ -9435,6 +11414,14 @@ const CRMDashboard = () => {
                                         >
                                           <i className="fab fa-whatsapp"></i>
                                         </a>
+                                        {/* <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openPanel(profile, 'email')}
+                                          style={{ fontSize: '20px' }}
+                                          title="Email"
+                                        >
+                                          <i className="fas fa-envelope"></i>
+                                        </a> */}
                                       </div>
                                     </div>
                                   </div>
@@ -9481,6 +11468,51 @@ const CRMDashboard = () => {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* Overdue badge: next action date passed */}
+                                  {/* {(profile.followupDate && new Date(profile.followupDate) < new Date(new Date().setHours(0, 0, 0, 0))) && (
+                                    <div className="col-12 col-md-auto mt-1 mt-md-0">
+                                      <span className="badge bg-danger" title="Next action date has passed">
+                                        <i className="fas fa-clock me-1"></i>Overdue follow-up
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="col-12 mt-1">
+                                    {leadIntelMap[profile._id] ? (
+                                      <div className="d-flex flex-wrap align-items-center gap-2 small">
+                                        <span className="badge bg-primary">AI Score: {leadIntelMap[profile._id].score}/100</span>
+                                        <span className="text-muted">Intent: {leadIntelMap[profile._id].intent}</span>
+                                        {leadIntelMap[profile._id].suggestedAction && (
+                                          <span className="text-dark" title="Suggested action">
+                                            <i className="fas fa-lightbulb text-warning me-1"></i>
+                                            {leadIntelMap[profile._id].suggestedAction}
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline-secondary"
+                                          style={{ padding: '2px 8px', fontSize: '11px' }}
+                                          onClick={() => fetchLeadIntelSingle(profile)}
+                                          disabled={loadingLeadIntel}
+                                          title="Refresh AI for this lead"
+                                        >
+                                          <i className="fas fa-robot me-1"></i>Refresh
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline-secondary"
+                                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        onClick={() => fetchLeadIntelSingle(profile)}
+                                        disabled={loadingLeadIntel}
+                                        title="Load AI for this lead"
+                                      >
+                                        <i className="fas fa-robot me-1"></i>AI for this lead
+                                      </button>
+                                    )}
+                                  </div> */}
 
                                   <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
@@ -9767,7 +11799,7 @@ const CRMDashboard = () => {
                                                 <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
-                                                <div className="info-label">NEXT ACTION DATE</div>
+                                                <div className="info-label">NEXT ACTION </div>
                                                 <div className="info-value">
                                                   {profile.followup?.followupDate ? (() => {
                                                     const dateObj = new Date(profile.followup?.followupDate);
@@ -11000,7 +13032,7 @@ const CRMDashboard = () => {
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
+                                      <CandidateProfile ref={candidateRef} leadData={selectedProfile} />
                                     </div>
                                     <div className="modal-footer">
                                       <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
@@ -11061,14 +13093,14 @@ const CRMDashboard = () => {
                               </div>
                             )}
 
-                            {showWhatsappModal && (
+                            {modalType === 'whatsapp' && (
                             <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                               <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
                                 <div className="modal-content">
                                   <div className="modal-header">
                                     <h1 className="modal-title fs-5">Whatsapp Chat</h1>
                                     <button type="button" className="btn-close" onClick={() => {
-                                      setShowWhatsappModal(false);
+                                      setModalType(null);
                                       setSelectedSenderId('');
                                       setSelectedWhatsappNumbers([]);
                                       setResponseRecipient('sender');
@@ -11182,7 +13214,116 @@ const CRMDashboard = () => {
                                   </div>
                                   <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => {
-                                      setShowWhatsappModal(false);
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}>Close</button>
+                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                                      {isSendingBulkWhatsapp ? (
+                                        <>
+                                          <span className="spinner-border spinner-border-sm me-2"></span>
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        'Send Message'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            )}
+                            {modalType === 'email' && (
+                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+                                <div className="modal-content">
+                                  <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Send Email</h1>
+                                    <button type="button" className="btn-close" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                      setShowBulkInputs(false);
+                                      setBulkMode(null);
+                                    }}></button>
+                                  </div>
+                                  <div className="modal-body" style={{ padding: '20px' }}>
+                                    
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select the Email to send</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        {['Primary Email', 'Father\'s Email', 'Mother\'s Email', 'Alternate Email'].map((numberType) => (
+                                          <div key={numberType} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`whatsappNumber-${numberType}`}
+                                              checked={selectedWhatsappNumbers.includes(numberType)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                                } else {
+                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                                                }
+                                              }}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                              {numberType}
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                     
+
+                                    {/* Select WhatsApp Template Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select Email Template</label>
+                                      <select
+                                        className="form-select border-0 shadow-sm"
+                                        id="whatsappTemplate"
+                                        value={selectedWhatsappTemplateModal}
+                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                                        disabled={whatsappTemplates.length === 0}
+                                        style={{
+                                          height: '48px',
+                                          padding: '12px 16px',
+                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <option value="">
+                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                                        </option>
+                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                                          <option key={template.id || index} value={template.id || template.name}>
+                                            {template.name || template.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {whatsappTemplates.length === 0 && (
+                                        <small className="text-muted d-block mt-1">
+                                          <i className="fas fa-spinner fa-spin me-1"></i>
+                                          Fetching templates...
+                                        </small>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => {
+                                      setModalType(null);
                                       setSelectedSenderId('');
                                       setSelectedWhatsappNumbers([]);
                                       setResponseRecipient('sender');
@@ -11223,6 +13364,7 @@ const CRMDashboard = () => {
 
 
                         ))}
+                        </div>
 
 
 
@@ -11309,6 +13451,7 @@ const CRMDashboard = () => {
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
+              {renderEmailPanel()}
               {renderLeadHistoryPanel()}
               {renderAllLeadPanel()}
               {renderChangeCenterPanel()}
@@ -11319,13 +13462,517 @@ const CRMDashboard = () => {
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
         {isMobile && renderRefferPanel()}
-        {isMobile && renderWhatsAppPanel()}
+        {isMobile && renderEmailPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
         {isMobile && renderChangeCenterPanel()}
         {renderActionsModal()}
       </div>
       <UploadModal />
+
+      {/* Unified AI Supervision Modal */}
+      {showAiSupervision && (
+        <div
+          className="modal show fade d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAiSupervision(false);
+          }}
+        >
+          <div className="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">AI Supervision (Leads + WhatsApp)</h5>
+                <button type="button" className="btn-close" onClick={() => setShowAiSupervision(false)}></button>
+              </div>
+              <div className="modal-body">
+                {/* Top info + segmented controls */}
+                <div className="mb-3">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                    <div className="small text-muted">
+                      Visible leads: <strong>{allProfiles?.length || 0}</strong> · Selected:{' '}
+                      <strong>{selectedProfiles?.length || 0}</strong>
+                    </div>
+                    <div className="badge bg-light text-dark border small">
+                      AI Tools · Bulk Actions · WhatsApp
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-column flex-lg-row gap-2">
+                    {/* AI tools / first N */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                          <span className="small fw-semibold text-muted text-uppercase">AI tools · First N leads</span>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="small text-muted">First N</span>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              value={aiSupervisionCount}
+                              onChange={(e) =>
+                                setAiSupervisionCount((e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4))
+                              }
+                              style={{ width: 72 }}
+                              placeholder="10"
+                              title="Run AI for first N visible leads"
+                            />
+                          </div>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              await fetchLeadIntelBulk(leads);
+                            }}
+                          >
+                            <i className="fas fa-robot me-1"></i> AI score
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateLeadSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-dark"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateNextBestActionsForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateAiWhatsappSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bulk for all / selected */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="small fw-semibold text-muted text-uppercase mb-2">Bulk for all / selected</div>
+                        <div className="btn-group w-100 mb-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={fetchLeadIntelAll}
+                          >
+                            <i className="fas fa-layer-group me-1"></i> AI (all)
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !selectedProfiles?.length}
+                            onClick={fetchLeadIntelSelected}
+                          >
+                            <i className="fas fa-check-square me-1"></i> AI (selected)
+                          </button>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateLeadSummaryForSelected}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateNextBestActionsForSelected}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateAiWhatsappSummaryForSelected}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main layout: leads table + AI insights panel */}
+                <div className="row g-3">
+                  <div className="col-12 col-lg-7">
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Lead</th>
+                        <th>Status</th>
+                        <th>AI Score</th>
+                        <th>Intent</th>
+                        <th>Next step</th>
+                        <th style={{ width: 140 }}>Quick actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(allProfiles || []).map((p) => {
+                        const intel = leadIntelMap[p._id];
+                        const leadSummary = leadSummaryByProfileId[p._id];
+                        const leadSummaryLoading = !!leadSummaryLoadingByProfileId[p._id];
+                        const leadSummaryErr = leadSummaryErrorByProfileId[p._id];
+                        const wa = waSummaryByProfileId[p._id];
+                        const waLoading = !!waSummaryLoadingByProfileId[p._id];
+                        const waErr = waSummaryErrorByProfileId[p._id];
+                        const actions = nextActionsByProfileId[p._id];
+                        const actionsLoading = !!nextActionsLoadingByProfileId[p._id];
+                        const actionsErr = nextActionsErrorByProfileId[p._id];
+                        const nextAction = p.followupDate ? new Date(p.followupDate).toLocaleDateString() : '—';
+                        const overdue = p.followupDate && new Date(p.followupDate) < new Date(new Date().setHours(0, 0, 0, 0));
+                        return (
+                          <tr
+                            key={p._id}
+                            style={{ cursor: 'pointer' }}
+                            className={aiSupervisionActiveLeadId === p._id ? 'table-primary' : ''}
+                            onClick={() => setAiSupervisionActiveLeadId(p._id)}
+                          >
+                            <td>
+                              <div className="fw-semibold">{p._candidate?.name || '—'}</div>
+                              <div className="small text-muted">{p._candidate?.mobile || '—'}</div>
+                            </td>
+                            <td className="small">
+                              <div>
+                                <span
+                                  className={`badge rounded-pill ${
+                                    (p._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {p._leadStatus?.title || '—'}
+                                </span>
+                              </div>
+                              {p.selectedSubstatus?.title && (
+                                <div className="small text-muted mt-1">{p.selectedSubstatus.title}</div>
+                              )}
+                            </td>
+                            <td className="small">
+                              {intel ? (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    intel.score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : intel.score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                >
+                                  {intel.score}/100
+                                </span>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="small">{intel?.intent || '—'}</td>
+                            <td className="small">
+                              {overdue && <span className="badge bg-danger me-1">Overdue</span>}
+                              <span className="text-muted">{nextAction}</span>
+                            </td>
+                            <td>
+                              <div className="d-flex flex-wrap gap-1">
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Call"
+                                  type="button"
+                                  onClick={() => {
+                                    const phone = p._candidate?.mobile;
+                                    if (phone) window.open(`tel:${phone}`, '_self');
+                                  }}
+                                >
+                                  <i className="fas fa-phone"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Open WhatsApp chat"
+                                  type="button"
+                                  // onClick={() => {
+                                  //   setSelectedProfile(p);
+                                  //   openWhatsappPanel();
+                                  //   setShowAiSupervision(false);
+                                  // }}
+                                >
+                                  <i className="fab fa-whatsapp text-success"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Email (from candidate record)"
+                                  type="button"
+                                  onClick={() => {
+                                    const email = p._candidate?.email;
+                                    if (email) window.open(`mailto:${email}`);
+                                  }}
+                                >
+                                  <i className="fas fa-envelope"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Run AI for this lead"
+                                  type="button"
+                                  onClick={() => fetchLeadIntelSingle(p)}
+                                  disabled={loadingLeadIntel}
+                                >
+                                  <i className="fas fa-robot"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-lg-5">
+                    {(() => {
+                      const activeId = aiSupervisionActiveLeadId || allProfiles?.[0]?._id;
+                      const active = (allProfiles || []).find(p => p._id === activeId) || null;
+                      if (!active) return (
+                        <div className="text-muted">Select a lead to view details.</div>
+                      );
+
+                      const summary = leadSummaryByProfileId[active._id];
+                      const summaryLoading = !!leadSummaryLoadingByProfileId[active._id];
+                      const summaryErr = leadSummaryErrorByProfileId[active._id];
+
+                      const actions = nextActionsByProfileId[active._id] || [];
+                      const actionsLoading = !!nextActionsLoadingByProfileId[active._id];
+                      const actionsErr = nextActionsErrorByProfileId[active._id];
+
+                      const wa = waSummaryByProfileId[active._id];
+                      const waLoading = !!waSummaryLoadingByProfileId[active._id];
+                      const waErr = waSummaryErrorByProfileId[active._id];
+
+                      return (
+                        <div className="position-sticky" style={{ top: 0 }}>
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-user me-2 text-secondary"></i>
+                                <strong>{active._candidate?.name || 'Lead'}</strong>
+                              </div>
+                              <div className="small text-muted">{active._candidate?.mobile || ''}</div>
+                            </div>
+                            <div className="card-body py-2 px-3 small text-muted d-flex justify-content-between align-items-center">
+                              <div>
+                                <span
+                                  className={`badge rounded-pill me-2 ${
+                                    (active._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {active._leadStatus?.title || '—'}
+                                </span>
+                                {active.selectedSubstatus?.title && (
+                                  <span className="text-muted">{active.selectedSubstatus.title}</span>
+                                )}
+                              </div>
+                              {leadIntelMap[active._id]?.score != null && (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    leadIntelMap[active._id].score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : leadIntelMap[active._id].score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                  title="AI score"
+                                >
+                                  AI {leadIntelMap[active._id].score}/100
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Candidate Summary (AI) - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-robot text-primary me-2"></i>
+                                <strong>Candidate Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => generateLeadSummaryForProfile(active)}
+                                disabled={summaryLoading}
+                                title="Generate summary"
+                              >
+                                {summaryLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {summaryLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {summaryLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating summary…
+                                </div>
+                              )}
+                              {!summaryLoading && summaryErr && (
+                                <div className="text-danger small">{summaryErr}</div>
+                              )}
+                              {!summaryLoading && summary && (
+                                <div className="small">
+                                  <p className="mb-2">{summary.summary}</p>
+                                  {summary.goal && <p className="mb-1"><strong>Goal:</strong> {summary.goal}</p>}
+                                  {summary.interestArea && <p className="mb-1"><strong>Interest:</strong> {summary.interestArea}</p>}
+                                  {summary.budgetRange && <p className="mb-1"><strong>Budget:</strong> {summary.budgetRange}</p>}
+                                  {summary.urgency && <p className="mb-1"><strong>Urgency:</strong> {summary.urgency}</p>}
+                                  {Array.isArray(summary.concerns) && summary.concerns.length > 0 && (
+                                    <p className="mb-0"><strong>Concerns:</strong> {summary.concerns.join('; ')}</p>
+                                  )}
+                                </div>
+                              )}
+                              {!summaryLoading && !summary && !summaryErr && (
+                                <span className="text-muted small">Summary not available.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recommended actions - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-lightbulb text-warning me-2"></i>
+                                <strong>Recommended actions</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-dark"
+                                onClick={() => generateNextBestActionsForProfile(active)}
+                                disabled={actionsLoading}
+                                title="Generate actions"
+                              >
+                                {actionsLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-bolt me-1" />}
+                                {actionsLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {actionsLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating actions…
+                                </div>
+                              )}
+                              {!actionsLoading && actionsErr && (
+                                <div className="text-danger small">{actionsErr}</div>
+                              )}
+                              {!actionsLoading && Array.isArray(actions) && actions.length > 0 && (
+                                <ul className="mb-0 ps-3 small">
+                                  {actions.map((action, i) => (
+                                    <li key={i}>{action}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {!actionsLoading && (!actions || actions.length === 0) && !actionsErr && (
+                                <span className="text-muted small">No suggestions right now.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* WhatsApp AI summary card */}
+                          <div className="card border-0 shadow-sm">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fab fa-whatsapp text-success me-2"></i>
+                                <strong>WhatsApp Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => generateAiWhatsappSummaryForProfile(active)}
+                                disabled={waLoading}
+                                title="Generate WhatsApp summary"
+                              >
+                                {waLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {waLoading ? 'Generating…' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3 small">
+                              {waLoading && <div className="text-muted d-flex align-items-center"><span className="spinner-border spinner-border-sm me-2" />Generating…</div>}
+                              {!waLoading && waErr && <div className="text-danger">{waErr}</div>}
+                              {!waLoading && wa && (
+                                <>
+                                  <div className="text-muted" style={{ whiteSpace: 'pre-line' }}>{wa.summary}</div>
+                                  {Array.isArray(wa.objections) && wa.objections.length > 0 && (
+                                    <div className="mt-2"><strong>Objections:</strong> {wa.objections.join(', ')}</div>
+                                  )}
+                                  {wa.suggestedReply && (
+                                    <div className="mt-2">
+                                      <strong>Suggested reply:</strong>
+                                      <div className="d-flex gap-2 align-items-start mt-1">
+                                        <textarea className="form-control form-control-sm" rows={2} value={wa.suggestedReply} readOnly />
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-primary"
+                                          onClick={() => {
+                                            try { navigator.clipboard.writeText(wa.suggestedReply); } catch (_) {}
+                                          }}
+                                          title="Copy reply"
+                                        >
+                                          <i className="fas fa-copy"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {!waLoading && !wa && !waErr && <span className="text-muted">No summary yet.</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAiSupervision(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
@@ -14625,7 +17272,7 @@ margin-left:15px;
       </style>
       <style>
         {`
-          
+      
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
   position: relative;
@@ -14699,7 +17346,7 @@ margin-left:15px;
   overflow: hidden;
   animation: slideDown 0.2s ease;
 }
-
+    
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -14752,7 +17399,6 @@ margin-left:15px;
   padding: 0.5rem;
   border-bottom: 1px solid #e9ecef;
 }
-
 .options-list-new {
   max-height: 180px;
   overflow-y: auto;
@@ -14857,7 +17503,6 @@ margin-left:15px;
   font-size: 0.75rem;
   padding: 0.25em 0.4em;
 }
-
 /* Animation for dropdown open/close */
 .multi-select-options-new {
   transform-origin: top;
@@ -14903,18 +17548,15 @@ margin-left:15px;
     height: min-content !important;
     transform: translateX(0px)!important;
 }
-.translateX .react-calendar {
-  height: min-content !important;
-    transform: translateX(-110px) !important;
-    width: 250px !important;
-}
-
+// .translateX .react-calendar {
+//   height: min-content !important;
+//     transform: translateX(-110px) !important;
+//     width: 250px !important;
+// }
 .react-calendar{
     height: min-content !important;
     width: 250px !important;
 }
-
-  /* Mobile Date Picker - Override in media query below */
 @media (max-width: 768px) {
   .multi-select-options-new {
     max-height: 250px;
@@ -14946,39 +17588,35 @@ margin-left:15px;
                     display: none;
                   }
               }
-              .nav-tabs-main > li > button{
-              padding: 15px 9px;
-              }
+  //             .nav-tabs-main > li > button{
+  //             padding: 15px 9px;
+  //             }
   
-  /* Mobile Date Picker Fixes - Prevent Overlap */
   .firstDatepicker .react-calendar,
   .translateX .react-calendar,
-  .react-calendar {
-    width: calc(100vw - 40px) !important;
-    max-width: 300px !important;
-    position: fixed !important;
-    z-index: 9999 !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-  }
+  // .react-calendar {
+  //   // width: calc(100vw - 40px) !important;
+  //   max-width: 300px !important;
+  //   // position: fixed !important;
+  //   z-index: 9999 !important;
+  //   left: 50% !important;
+  //   right: 50% !important;
+  //   transform: translateX(-50%) translateY(-50%) !important;
+  //   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  // }
   
-  /* Ensure date filter cards stack properly on mobile */
   .row.g-4 > .col-12.col-md-4 {
     margin-bottom: 1.5rem !important;
   }
   
-  /* Status filter spacing on mobile */
   .row.g-4 > .col-12.col-md-6 {
     margin-bottom: 1rem !important;
   }
   
-  /* Date picker input spacing */
   .card.bg-light .row.g-2 > .col-12 {
     margin-bottom: 0.75rem;
   }
   
-  /* Modal Body Mobile Spacing */
   .modal-body.p-4 {
     padding: 1rem !important;
   }
@@ -14993,10 +17631,12 @@ margin-left:15px;
     padding-right: 0.5rem !important;
   }
 }
-        `}
+  `}
       </style>
-      <style>
-        {`.bg-gradient-primary {
+<style>
+  {
+    `
+     .bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -15021,6 +17661,22 @@ margin-left:15px;
               margin-right: 0.25rem;
           }
 
+          .crm-sticky-actions {
+              position: sticky;
+              top: 0;
+              z-index: 8;
+              background: #fff;
+              padding-top: 6px;
+              padding-bottom: 6px;
+              border-bottom: 1px solid #eee;
+          }
+
+          .crm-leads-scroll {
+              max-height: calc(100vh - 260px);
+              overflow-y: auto;
+              padding-right: 4px;
+          }
+
           .card {
               transition: box-shadow 0.15s ease-in-out;
           }
@@ -15037,7 +17693,7 @@ margin-left:15px;
               width: 40px;
               height: 40px;
           }
-
+    
           .circular-progress-container svg {
               transform: rotate(-90deg);
           }
@@ -15167,8 +17823,7 @@ margin-left:15px;
               padding: 0;
               position: relative;
           }
-
-          .scrollable-container {
+ .scrollable-container {
               display: none;
           }
 
@@ -15236,7 +17891,6 @@ margin-left:15px;
               position: relative;
               justify-content: space-between;
           }
-
           .whatsapp-chat .topbar-container .left-topbar {
               display: flex;
               align-items: center;
@@ -15445,8 +18099,7 @@ margin-left:15px;
               margin-right: 15px;
               margin-left: 10px;
           }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
+        .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
               margin-right: 10px;
           }
 
@@ -15567,7 +18220,6 @@ margin-left:15px;
               flex-wrap: wrap;
               gap: 15px;
           }
-
           .resume-contact-item {
               display: flex;
               align-items: center;
@@ -15750,10 +18402,7 @@ margin-left:15px;
               color: #007bff;
               font-weight: bold;
           }
-
-
-
-          /* WhatsApp Panel Mobile Styles */
+           /* WhatsApp Panel Mobile Styles */
           .whatsapp-chat {
               height: 100%;
               display: flex;
@@ -15966,9 +18615,7 @@ margin-left:15px;
               padding: 8px;
           }
 
-          /* Responsive adjustments */
-
-
+          /* Responsive adjustments */ 
           /* Add this to your existing style tag or CSS file */
           .react-date-picker__wrapper {
               border: 1px solid #ced4da !important;
@@ -15999,13 +18646,9 @@ margin-left:15px;
           .react-date-picker__wrapper {
               background: white !important;
           }
-
-
           .no-scroll {
               overflow: hidden;
           }
-
-
           .doc-iframe {
               transform-origin: top left;
               transition: transform 0.3s ease;
@@ -16033,8 +18676,7 @@ margin-left:15px;
               background-color: #4a6fdc;
               color: white;
           }
-
-          .panel-header h2 {
+     .panel-header h2 {
               color: white;
               font-size: 1.5rem;
               margin: 0;
@@ -16074,8 +18716,7 @@ margin-left:15px;
 
           .candidate-details {
               flex-grow: 1;
-          }
-
+          }   
           .candidate-details h3 {
               margin: 0 0 5px 0;
               font-size: 22px;
@@ -16114,7 +18755,6 @@ margin-left:15px;
               font-size: 20px;
               font-weight: bold;
           }
-
           .document-list {
               overflow-x: auto;
               margin: 0 20px 20px 20px;
@@ -16160,8 +18800,7 @@ margin-left:15px;
               background-color: #fff3cd;
               color: #856404;
           }
-
-          .status-approved {
+        .status-approved {
               background-color: #d4edda;
               color: #155724;
           }
@@ -16184,7 +18823,7 @@ margin-left:15px;
               color: var(--primary-color);
           }
 
-          .view-btn:hover {
+      .view-btn:hover {
               background-color: rgba(74, 111, 220, 0.1);
           }
 
@@ -16217,7 +18856,7 @@ margin-left:15px;
           .reject-btn:hover {
               background-color: #f5c6cb;
           }
-
+        
           .document-modal-overlay {
               position: fixed;
               top: 0;
@@ -16255,8 +18894,7 @@ margin-left:15px;
                   transform: scale(1) translateY(0);
               }
           }
-
-          .document-modal-content .modal-header {
+.document-modal-content .modal-header {
               padding: 1.5rem 2rem;
               border-bottom: 1px solid #e9ecef;
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -16304,8 +18942,7 @@ margin-left:15px;
               flex: 2;
               min-width: 400px;
           }
-
-          .document-preview-container {
+         .document-preview-container {
               background: #f8f9fa;
               border-radius: 8px;
               height: 500px;
@@ -16337,7 +18974,6 @@ margin-left:15px;
               border-radius: 25px;
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
           }
-
           .control-btn {
               background: #007bff;
               color: white;
@@ -16410,8 +19046,7 @@ margin-left:15px;
               color: #6c757d;
               line-height: 1.5;
           }
-
-          .action-buttons {
+        .action-buttons {
               margin-top: 1.5rem;
               display: flex;
               gap: 10px;
@@ -16426,8 +19061,7 @@ margin-left:15px;
               gap: 8px;
               transition: all 0.2s;
           }
-
-          .rejection-form {
+         .rejection-form {
               background: #fff3cd;
               border: 1px solid #ffeaa7;
               border-radius: 8px;
@@ -16448,7 +19082,6 @@ margin-left:15px;
               border-radius: 4px;
               resize: vertical;
           }
-
           /* .document-history {
     overflow-y: auto;
 } */
@@ -17268,12 +19901,10 @@ margin-left:15px;
 
           /* Responsive Design */
 
-          .react-date-picker__calendar.react-date-picker__calendar--open {
-              inset: 0 !important;
-              width: 300px !important;
-          }
-
-          
+          // .react-date-picker__calendar.react-date-picker__calendar--open {
+          //     inset: 0 !important;
+          //     width: 300px !important;
+          // }
           .site-header--sticky--register:not(.mobile-sticky-enable) {
     /* position: absolute !important; */
     top: 97px;
@@ -17282,8 +19913,7 @@ margin-left:15px;
     .breadcrumb-item a, .card-body a {
     color: #fc2b5a;
 }
-
-          @media (max-width: 1200px) {
+    @media (max-width: 1200px) {
               .document-history .history-preview iframe.pdf-thumbnail {
                   height: auto !important;
                   max-height: 600px;
@@ -17556,7 +20186,7 @@ margin-left:15px;
               }
           }
 
-          @media (max-width: 576px) {
+ @media (max-width: 576px) {
 
 
               // .btn-group {
@@ -17583,10 +20213,10 @@ margin-left:15px;
                   min-height: 200px;
               }
           }
-        `}
-      </style>
-
-      <style>
+    `
+  }
+</style>      
+<style>
         {`
           input[type="text"], 
 input[type="email"], 
@@ -19105,9 +21735,44 @@ max-width: 600px;
   .pac-container {
     z-index: 10000 !important;
   }
+  .react-date-picker__calendar--open{
+  position: sticky!important
+  }
         `}
       </style>
 
+      <style>
+{`
+  .fixDate {
+    box-sizing: border-box;
+    font-size: 13px;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  @media (max-width: 767px) {
+    .CButton {
+      font-size: 13px;
+      padding: 2px;
+      white-space:nowrap;
+    }
+  }
+
+
+  .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+        
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+}
+`}
+</style>
     </div>
   );
 };

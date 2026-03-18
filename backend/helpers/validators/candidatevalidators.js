@@ -16,7 +16,7 @@ module.exports = {
                     type: Joi.string().valid('Point').required(), // ✅ add kar diya
                     coordinates: Joi.array().items(Joi.number()).length(2).required(), // ✅ add kar diya
                     state: Joi.string().required(),
-                    city: Joi.string().required(),
+                    city: Joi.string().required().allow(''),
                     latitude: Joi.number().required(),
                     longitude: Joi.number().required(),
                     refCode: Joi.string().optional(),
@@ -27,7 +27,7 @@ module.exports = {
                     type: Joi.string().valid('Point').required(), // ✅ add kar diya
                     coordinates: Joi.array().items(Joi.number()).length(2).required(), // ✅ add kar diya
                     state: Joi.string().required(),
-                    city: Joi.string().required(),
+                    city: Joi.string().required().allow(''),
                     latitude: Joi.number().required(),
                     longitude: Joi.number().required(),
                     refCode: Joi.string().optional(),

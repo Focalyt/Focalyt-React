@@ -1746,11 +1746,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     <div className="container py-4">
       <div className="row">
         <div className={mainContentClass}>
-          <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-3 allCenter">
             <div>
               <div className="d-flex align-items-center gap-3">
 
-                <ol className="breadcrumb border-0 mb-0 small">
+                <ol className="breadcrumb border-0 mb-0 ">
                   {onBackToVerticals && selectedVertical && (
                     <li className="breadcrumb-item">
                       <button
@@ -1834,13 +1834,13 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
             </ul>
 
             {/* Sub Tabs and Search */}
-            <div className='d-flex justify-content-between mb-3'>
-              <ul className="nav nav-pills">
+            <div className='d-flex justify-content-between mb-3 allCenter'>
+              <ul className="nav nav-pills allCenterBtn mb-3">
                 {mainTab === 'Batches'
                   ? ['Active Batches', 'Inactive Batches', 'All Batches'].map(tab => (
                     <li className="nav-item" key={tab}>
                       <button
-                        className={`nav-link ${batchSubTab === tab ? 'active' : ''}`}
+                        className={`nav-link navBTn ${batchSubTab === tab ? 'active' : ''}`}
                         onClick={() => setBatchSubTab(tab)}
                       >
                         {tab}
@@ -7185,7 +7185,59 @@ height:100%;
     `
             }
           </style>
+          <style>
+{`
 
+    .CardDetailBtn .nav-link {
+  margin: 0px 4px 10px;
+  border-bottom: 1px solid #d0cece;
+  border-radius: 8px;
+  white-space: nowrap;
+  background-color: transparent;
+  color: black;
+  transition: all 0.3s ease;
+}
+
+.CardDetailBtn .nav-link.active {
+  background-color: #fc2b5a;
+  color: white;
+  border-bottom: none;
+}
+
+/* ================= 992px ================= */
+@media (max-width: 992px) {
+  .allCenter {
+    display: block !important;
+  }
+}
+
+/* ================= 768px ================= */
+@media (max-width: 768px) {
+
+  .allCenterBtn {
+    margin-bottom: 10px !important;
+  }
+
+  .navBTn {
+    padding: 4px;
+    width: clamp(85px, 25vw, 136px);
+    font-size: 14px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+    .iconPosition{
+    margin-bottom:15px !important;
+    }
+    .CardBtn{
+    overflow: hidden !important;
+    display: flex !important;
+    overflow-x: auto !important;
+    }
+   
+}
+`}
+</style>
         </div>
         {!isMobile && (
           <div className="col-4" >

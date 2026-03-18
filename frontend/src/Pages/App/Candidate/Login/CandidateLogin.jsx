@@ -63,16 +63,30 @@ const CandidateLogin = () => {
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
 
+    // ✅ Save refCode to localStorage when component mounts (for job/course apply later)
+    useEffect(() => {
+        if (refCode) {
+            localStorage.setItem('refCode', refCode);
+            console.log('RefCode saved from login URL:', refCode);
+        }
+    }, [refCode]);
+
     // Redirect if user is already logged in
     useEffect(() => {
         if (user) {
             if (returnUrl) {
-                window.location.href = returnUrl;
+                // ✅ Preserve refCode in returnUrl if present in login URL
+                let finalReturnUrl = returnUrl;
+                if (refCode && !returnUrl.includes('refCode=')) {
+                    const separator = returnUrl.includes('?') ? '&' : '?';
+                    finalReturnUrl = `${returnUrl}${separator}refCode=${refCode}`;
+                }
+                window.location.href = finalReturnUrl;
             } else {
                 window.location.href = '/candidate/searchjob';
             }
         }
-    }, [user, returnUrl]);
+    }, [user, returnUrl, refCode]);
 
     //     useEffect(() => {
     //     // Add external CSS and script dynamically
@@ -388,7 +402,13 @@ const CandidateLogin = () => {
 
 
                             if (returnUrl) {
-                                window.location.href = returnUrl;
+                                // ✅ Preserve refCode in returnUrl if present in login URL
+                                let finalReturnUrl = returnUrl;
+                                if (refCode && !returnUrl.includes('refCode=')) {
+                                    const separator = returnUrl.includes('?') ? '&' : '?';
+                                    finalReturnUrl = `${returnUrl}${separator}refCode=${refCode}`;
+                                }
+                                window.location.href = finalReturnUrl;
                             } else {
                                 window.location.href = '/candidate/searchjob';
                             }
@@ -452,8 +472,13 @@ const CandidateLogin = () => {
 
 
                             if (returnUrl) {
-
-                                window.location.href = returnUrl
+                                // ✅ Preserve refCode in returnUrl if present in login URL
+                                let finalReturnUrl = returnUrl;
+                                if (refCode && !returnUrl.includes('refCode=')) {
+                                    const separator = returnUrl.includes('?') ? '&' : '?';
+                                    finalReturnUrl = `${returnUrl}${separator}refCode=${refCode}`;
+                                }
+                                window.location.href = finalReturnUrl;
                             }
                             else {
                                 window.location.href = '/candidate/searchjob';

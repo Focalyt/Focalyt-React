@@ -631,22 +631,22 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       )}
 
       {/* ======== ADD THIS: Back Button and Header ======== */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className='d-md-block d-none'>
+      <div className="d-flex justify-content-between align-items-center mb-3 d-flex justify-content-between align-items-center mb-3 allCenter">
+        <div className='mb-2'>
           <div className="d-flex align-items-center gap-3">
 
-            <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+            <div className='d-flex align-items-center w-100'>
+              <h5 style={{ cursor: 'pointer', whiteSpace:"nowrap", textOverflow:"ellipsis", overflow:"hidden", maxWidth:"110px", fontSize:"clam(15px,2vw,1rem)" }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer', whiteSpace:"nowrap", textOverflow:"ellipsis", overflow:"hidden", maxWidth:"110px", fontSize:"clam(15px,2vw,1rem)" }}  title={selectedProject.name} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer', fontSize: '0.9rem' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer', whiteSpace:"nowrap", textOverflow:"ellipsis", overflow:"hidden", maxWidth:"110px", fontSize:"clam(15px,2vw,1rem)" }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 className="breadcrumb-item mb-0" aria-current="page" style={{ fontSize: '0.9rem' }}>
+              <h5 className="breadcrumb-item mb-0" aria-current="page" style={{cursor: 'pointer', whiteSpace:"nowrap", textOverflow:"ellipsis", overflow:"hidden", maxWidth:"110px", fontSize:"clam(15px,2vw,1rem)" }}>
                 All Courses
               </h5>
             </div>
@@ -658,31 +658,33 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           {onBackToCenters && (
             <button
               onClick={onBackToCenters}
-              className="btn btn-light"
+              className="btn btn-light BAckBtn"
               title="Back to Verticals"
+              style={{fontSize:"clamp(12px,1.8vw,15px)"}}
             >
-              <i className="bi bi-arrow-left"></i>
+              <i className="bi bi-arrow-left me-2"></i>
               <span>Back</span>
             </button>
           )}
 
-          <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          <button className="btn btn-outline-secondary me-2 border-0 bg-transparent visibility" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          {((permissions?.custom_permissions?.can_add_course && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+          {/* {((permissions?.custom_permissions?.can_add_course && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
 
             <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
-          )}
+          )} */}
         </div>
       </div>
 
 
-      <div className="d-flex justify-content-between mb-3">
-        <ul className="nav nav-pills">
+      <div className="d-flex justify-content-between mb-3 allCenter">
+        <ul className="d-flex nav nav-pills mb-2 allCenterBtn">
           {['Active Courses', 'Inactive Courses', 'All Courses'].map(tab => (
             <li className="nav-item" key={tab}>
-              <button
-                className={`nav-link ${activeCourseTab === tab ? 'active' : ''}`}
+              <button 
+              style={{fontSize:"clamp(12px,1.8vw,15px)"}}
+                className={`nav-link navBTn ${activeCourseTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveCourseTab(tab)}
               >
                 {tab}
@@ -692,7 +694,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         </ul>
         <input
           type="text"
-          className="form-control w-25"
+          className="form-control w-25 searchBar"
           placeholder="Search courses..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -1184,6 +1186,72 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         }
         `}
       </style>
+      <style>
+{`
+
+@media (max-width:768px){
+.navBTn{
+padding: 4px;
+    /* border-radius: 5px !important; */
+    text-overflow: ellipsis;
+    width: 80px;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 14px;
+        // border: 1px solid #d5d5d5;
+        }   
+      }
+.centerBtnResponsive{
+      display: flex;
+    } 
+   .searchBar {
+    height: 30px !important;
+    width: 25% !important;
+  }
+
+  @media (max-width: 525px) {
+    .searchBar {
+      width: 85px !important;
+    }
+  //     .BAckBtn{
+  // margin-left:75% !important;
+  // white-space:nowrap;
+  // }
+  }                 
+  @media (max-width: 992px) {
+  .allCenter{
+               display:block !important;
+               }
+  .centerBtnResponsive{
+                    display: flex;
+                }
+                .subBtnRes{
+                white-space: nowrap;
+                padding: 0.25rem 0.5rem;
+                font-size: 12px;
+               
+
+                }
+                .visibility {
+      display: none !important;
+    }
+  // .BAckBtn{
+  // margin-left:84%;
+  // white-space:nowrap;
+  // }
+  }
+
+  @media (max-width: 768px) {
+    .visibility {
+      display: none !important;
+    }
+      
+                .allCenterBtn{
+                margin-bottom:10px !important;
+                }
+  }
+`}
+</style>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import { Helmet } from 'react-helmet-async';
 import FrontLayout from '../../../Component/Layouts/Front';
 
 function CourseDetails() {
@@ -11,12 +12,13 @@ function CourseDetails() {
     const [error, setError] = useState(null);
     const coursePhotos = course?.photos || []; // Ensure it's an array
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
     useEffect(() => {
         const fetchCourseDetails = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get(`http://localhost:8080/coursedetails/${courseId}`);
+                const response = await axios.get(`${backendUrl}/coursedetails/${courseId}`);
                 setCourse(response.data.course);
             } catch (err) {
                 setError("Failed to load course details");
@@ -38,7 +40,7 @@ function CourseDetails() {
         fetchCourseDetails();
        
         
-    }, [courseId]);
+    }, [courseId, backendUrl]);
 
     // Important Terms ko split karne ke liye alag useEffect
   useEffect(() => {
@@ -61,12 +63,49 @@ function CourseDetails() {
 
 
 
-    if (loading) return <div>Loading course details...</div>;
-    if (error) return <div>Error: {error}</div>;
-    if (!course) return <div>Course not found</div>;
+    if (loading) return <FrontLayout><div className="text-center py-5">Loading course details...</div></FrontLayout>;
+    if (error) return <FrontLayout><div className="text-center py-5 text-danger">Error: {error}</div></FrontLayout>;
+    if (!course) return <FrontLayout><div className="text-center py-5">Course not found</div></FrontLayout>;
+
+    // Share card meta: thumbnail (OG image), title, description
+    const courseTitle = course.name || 'Course';
+    const rawDesc = course.shareDescription || course.description || '';
+    const courseDescription = rawDesc
+        ? (rawDesc.length > 200 ? rawDesc.substring(0, 200).replace(/\n/g, ' ').trim() + '...' : rawDesc.replace(/\n/g, ' ').trim())
+        : `${courseTitle}. ${course.duration ? `Duration: ${course.duration}.` : ''} ${course.trainingMode ? course.trainingMode : ''} | Focalyt`;
+    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/coursedetails/${courseId}`;
+    let shareImage = '';
+    if (course.thumbnail) {
+        shareImage = course.thumbnail.startsWith('http') ? course.thumbnail : `${bucketUrl}/${course.thumbnail.replace(/^\//, '')}`;
+    } else if (course.photos && course.photos[0]) {
+        const p = course.photos[0];
+        shareImage = p.startsWith('http') ? p : `${bucketUrl}/${p.replace(/^\//, '')}`;
+    } else {
+        shareImage = typeof window !== 'undefined' ? `${window.location.origin}/Assets/public_assets/images/newjoblisting/course_img.svg` : '';
+    }
 
     return (
         <>
+            <Helmet>
+                <title>{courseTitle} | Focalyt</title>
+                <meta name="title" content={courseTitle} />
+                <meta name="description" content={courseDescription} />
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content={shareUrl} />
+                <meta property="og:title" content={courseTitle} />
+                <meta property="og:description" content={courseDescription} />
+                <meta property="og:image" content={shareImage} />
+                <meta property="og:image:secure_url" content={shareImage} />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
+                <meta property="og:site_name" content="Focalyt" />
+                <meta property="og:locale" content="en_US" />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:url" content={shareUrl} />
+                <meta name="twitter:title" content={courseTitle} />
+                <meta name="twitter:description" content={courseDescription} />
+                <meta name="twitter:image" content={shareImage} />
+            </Helmet>
 <FrontLayout>
             <section className="section-padding-120 mt-5">
                 <div className="container">
@@ -866,6 +905,14 @@ a.pointer.img-fluid {
     .feature-widget-7__title {
         font-size: 22px;
     }
+}
+    .bg_hexa{background-image: url(Assets/public/public_assets/images/pattern-bg.jpg);
+    background-position: center;
+    transform-origin: 0 0;
+    background-size: initial;
+    background-repeat: repeat;
+    position: relative !important;
+    box-shadow: inset 0 0 0 1000px rgba(18, 18, 18, 0.92);
 }
 `
 

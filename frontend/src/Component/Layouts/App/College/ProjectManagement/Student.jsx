@@ -4467,7 +4467,7 @@ const Student = ({
 
                       <ol className="breadcrumb border-0 mb-0 small">
                         {onBackToCenters && selectedCenter && (
-                          <li className="breadcrumb-item">
+                          <li className="breadcrumb-item p-0">
                             <button
                               className="btn btn-link p-0 text-decoration-none"
                               onClick={onBackToCenters}
@@ -4477,7 +4477,7 @@ const Student = ({
                           </li>
                         )}
                         {onBackToCourses && selectedCourse && (
-                          <li className="breadcrumb-item">
+                          <li className="breadcrumb-item p-0">
                             <button
                               className="btn btn-link p-0 text-decoration-none"
                               onClick={onBackToCourses}
@@ -4487,7 +4487,7 @@ const Student = ({
                           </li>
                         )}
                         {onBackToBatches && selectedBatch && (
-                          <li className="breadcrumb-item">
+                          <li className="breadcrumb-item p-0">
                             <button
                               className="btn btn-link p-0 text-decoration-none"
                               onClick={onBackToBatches}
@@ -4497,7 +4497,7 @@ const Student = ({
                           </li>
                         )}
                         <li
-                          className="breadcrumb-item active"
+                          className="breadcrumb-item active p-0"
                           aria-current="page"
                         >
                           Students{" "}
@@ -4995,7 +4995,7 @@ const Student = ({
                       className={`btn btn-sm ${showAttendanceMode
                         ? "btn-success"
                         : "btn-outline-success"
-                        } me-2`}
+                        } me-1`}
                     >
                       <i className="fas fa-check-circle me-1"></i>
                       {showAttendanceMode
@@ -5013,7 +5013,7 @@ const Student = ({
                           className={`btn btn-sm ${showBulkControls
                             ? "btn-primary"
                             : "btn-outline-primary"
-                            } me-2`}
+                            } me-1 fitbox`}
                         >
                           <i className="fas fa-users me-1"></i>
                           {showBulkControls ? "Exit Bulk Controls" : "Show Bulk Controls"}
@@ -9792,6 +9792,7 @@ background: #fd2b5a;
         scrollbar-width: thin;
         scrollbar-color: #007bff #f1f1f1;
         padding-bottom: 8px;
+        margin-bottom: 10px;
     }
     
     .filterTab::-webkit-scrollbar {
@@ -12561,6 +12562,24 @@ html body .content .content-wrapper {
 }
 
     `
+        }
+      </style>
+      <style>
+        {
+          `
+          .fitbox{
+                  padding: 4px 8px !important;
+                  overflow:hidden;
+          }
+          @media(max-width: 425px){
+          .fitbox{
+              white-space: nowrap;
+    overflow: hidden;
+    max-width: 106px;
+    padding: 4px 8px !important;
+          }
+          }
+          `
         }
       </style>
     </div>

@@ -175,28 +175,33 @@ function Course() {
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
-  const handleShare = async (courseId, courseName, courseThumbnail) => {
-    const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
+  const handleShare = async (course, courseId, courseName, courseThumbnail) => {
+    // Use course detail page URL so WhatsApp/Facebook/Twitter show card with thumbnail, title, description
+    const courseUrl = `${window.location.origin}/coursedetails/${courseId}`;
+    const detailText = course
+      ? [course.duration && `Duration: ${course.duration}`, course.trainingMode && course.trainingMode, course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'].filter(Boolean).join(' • ')
+      : '';
+    const shareText = detailText ? `${courseName} — ${detailText}` : `Check out this course: ${courseName}`;
     if (navigator.share) {
       try {
         await navigator.share({
           title: courseName,
-          text: `Check out this course: ${courseName}`,
+          text: shareText,
           url: courseUrl,
         });
         console.log("Shared successfully!");
       } catch (error) {
         console.error("Error sharing:", error);
-        fallbackCopyText(courseName, courseUrl);
+        fallbackCopyText(shareText, courseUrl);
       }
     } else {
-      fallbackCopyText(courseName, courseUrl);
+      fallbackCopyText(shareText, courseUrl);
     }
   }
 
-  function fallbackCopyText(courseName, courseUrl) {
-    const shareText = `Check out this course: ${courseName} - ${courseUrl}`;
-    navigator.clipboard.writeText(shareText).then(() => {
+  function fallbackCopyText(shareText, courseUrl) {
+    const fullText = `${shareText}\n${courseUrl}`;
+    navigator.clipboard.writeText(fullText).then(() => {
       alert("Course link copied! You can paste it anywhere.");
     }).catch(err => {
       console.error("Clipboard copy failed:", err);
@@ -584,7 +589,7 @@ function Course() {
                                       
                                       <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 ms-2 text-center">
                                         <button
-                                          onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
+                                          onClick={() => handleShare(course, course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
                                           {/* <Share2 size={16} className="mr-1" /> */}
                                           Share
                                         </button>

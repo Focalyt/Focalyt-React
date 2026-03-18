@@ -91,11 +91,13 @@ module.exports.StatusLogs = require("./statusLogs");
 module.exports.B2cFollowup = require("./b2cFollowup");
 module.exports.DripMarketingRule = require("./dripMarkettingRule");
 module.exports.ReEnquire = require("./reEnquire");
+module.exports.PreVerification = require("./preVerification");
 // module.exports.Manager = required("");
 module.exports.Traine = require("./trainer")
 
 module.exports.WhatsAppTemplate = require("./wATemplate");
 module.exports.WhatsAppMessage = require("./whatsappMessage");
+module.exports.ChatHistory = require("./chatHistory");
 
 
 module.exports.TrainerTimeTable = require("./trainerTimeTable");
@@ -114,9 +116,15 @@ module.exports.Placement = require("./Placement");
 module.exports.JobOffer = require("./jobOffer");
 module.exports.UploadCandidates = require("./uploadCandidates");
 module.exports.RewardClaim = require("./RewardClaim");
+<<<<<<< HEAD
 
 // Live Class Models
 module.exports.LiveClass = require("./liveClass");
 module.exports.ClassAttendance = require("./classAttendance");
 module.exports.ClassRecording = require("./classRecording");
 module.exports.ClassChatMessage = require("./classChatMessage");
+=======
+module.exports.ReferralShareOffer = require("./referralShareOffer");
+module.exports.BotTraining = require("./botTraining");
+module.exports.BotTrainingRule = require("./botTrainingRule");
+>>>>>>> c582cfa409b087ea8145b21447965322670fe93e

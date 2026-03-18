@@ -1,9 +1,145 @@
 <% include ../partials/header %>
+
+<style>
+  /* Reward Claims UI polish (scoped via .rcm-*) */
+  .rcm-wrap { --rcm-border:#e5e7eb; --rcm-muted:#6b7280; --rcm-bg:#f8fafc; --rcm-text:#0f172a; }
+  .rcm-wrap .card { border: 1px solid var(--rcm-border); border-radius: 14px; box-shadow: 0 10px 22px rgba(15,23,42,.06); }
+  .rcm-wrap .rcm-header-title { letter-spacing: .2px; }
+
+  /* Stats */
+  .rcm-stats { margin: 6px 0 18px; }
+  .rcm-stat-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 18px 38px rgba(15,23,42,.10);
+    transform: translateY(0);
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  }
+  .rcm-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 22px 46px rgba(15,23,42,.14);
+    filter: saturate(1.05);
+  }
+  .rcm-stat-card::after {
+    content:"";
+    position:absolute;
+    inset:-48px -48px auto auto;
+    width:190px;
+    height:190px;
+    background:rgba(255,255,255,.16);
+    transform: rotate(25deg);
+    border-radius: 28px;
+  }
+  .rcm-stat-card::before {
+    content:"";
+    position:absolute;
+    left:-60px;
+    bottom:-80px;
+    width:200px;
+    height:200px;
+    background:rgba(255,255,255,.10);
+    border-radius: 999px;
+    filter: blur(1px);
+  }
+  .rcm-stat-body {
+    padding: 18px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height: 98px;
+  }
+  .rcm-stat-label { font-size: 12px; font-weight: 800; opacity: .92; margin: 0; letter-spacing: .04em; text-transform: uppercase; }
+  .rcm-stat-value { font-size: 34px; font-weight: 900; margin: 2px 0 0; line-height: 1; letter-spacing: -.02em; }
+  .rcm-stat-sub { font-size: 12px; opacity: .9; margin-top: 8px; display:flex; align-items:center; gap: 6px; }
+  .rcm-stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(255,255,255,.22);
+    border: 1px solid rgba(255,255,255,.22);
+    backdrop-filter: blur(6px);
+  }
+  .rcm-stat-icon i { font-size: 18px; color: #fff; }
+
+  .rcm-filters { background: var(--rcm-bg); border: 1px solid var(--rcm-border); border-radius: 14px; padding: 14px; }
+  .rcm-filters label { font-size: 12px; font-weight: 700; color: var(--rcm-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .rcm-filters .form-control { border-radius: 12px; border: 1px solid #dbe2ea; box-shadow: none; height: 40px; }
+  .rcm-filters .btn { border-radius: 12px; height: 40px; padding: 0 14px; font-weight: 700; display:inline-flex; align-items:center; justify-content:center; line-height: 1; }
+  .rcm-actions { display:flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .rcm-actions .btn { border-radius: 10px; font-weight: 700; display:inline-flex; align-items:center; justify-content:center; line-height: 1; }
+  .rcm-actions .rcm-subtle { display:inline-flex; align-items:center; height: 32px; padding: 0 6px; }
+
+  /* Searchable candidate dropdown */
+  .rcm-search-wrap { position: relative; }
+  .rcm-search-input { padding-right: 38px; }
+  .rcm-search-icon { position:absolute; right: 12px; top: 50%; transform: translateY(-50%); color:#94a3b8; pointer-events:none; }
+  .rcm-dropdown {
+    display:none;
+    position:absolute;
+    top: calc(100% + 6px);
+    left:0; right:0;
+    background:#fff;
+    border: 1px solid var(--rcm-border);
+    border-radius: 12px;
+    box-shadow: 0 18px 38px rgba(15,23,42,.12);
+    max-height: 260px;
+    overflow:auto;
+    z-index: 2000;
+  }
+  .rcm-option {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .rcm-option:last-child { border-bottom: none; }
+  .rcm-option:hover { background:#f8fafc; }
+  .rcm-option strong { display:block; font-size: 13px; color: #0f172a; }
+  .rcm-option small { display:block; font-size: 12px; color: #64748b; }
+
+  .rcm-table { border: 1px solid var(--rcm-border); border-radius: 14px; overflow: hidden; }
+  .rcm-table thead th { background: #f1f5f9; color: #334155; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--rcm-border) !important; white-space: nowrap; }
+  .rcm-table td { vertical-align: top; padding-top: 14px !important; padding-bottom: 14px !important; }
+  .rcm-table tbody tr:hover { background: #fbfdff; }
+  .rcm-subtle { color: var(--rcm-muted); font-size: 12px; }
+  .rcm-pill { border-radius: 999px; padding: 6px 10px; font-weight: 800; font-size: 11px; }
+  .rcm-pill--money { background:#dcfce7; color:#166534; }
+  .rcm-pill--gift { background:#dbeafe; color:#1e40af; }
+  .rcm-pill--trophy { background:#fef9c3; color:#854d0e; }
+  .rcm-pill--voucher { background:#ede9fe; color:#5b21b6; }
+  .rcm-pill--other { background:#ffe4e6; color:#9f1239; }
+  .rcm-status { border-radius: 999px; padding: 6px 10px; font-weight: 800; font-size: 11px; text-transform: capitalize; }
+  .rcm-status--pending { background:#fff7ed; color:#9a3412; }
+  .rcm-status--approved { background:#dcfce7; color:#166534; }
+  .rcm-status--rejected { background:#fee2e2; color:#991b1b; }
+
+  .rcm-doc-link { display:inline-flex; align-items:center; gap: 8px; padding: 8px 10px; border: 1px solid var(--rcm-border); border-radius: 12px; background:#fff; color:#0f172a; text-decoration:none; font-weight:700; font-size: 12px; }
+  .rcm-doc-link:hover { background:#f8fafc; text-decoration:none; }
+
+  .rcm-empty { padding: 28px; text-align:center; color: var(--rcm-muted); }
+  .rcm-empty h5 { color: var(--rcm-text); margin-bottom: 6px; }
+
+  /* Column sizing (avoid badge wrap / broken layout) */
+  .rcm-table th:nth-child(3), .rcm-table td:nth-child(3) { min-width: 110px; width: 110px; }
+  .rcm-table td:nth-child(3) { white-space: nowrap; }
+  .rcm-table th:nth-child(8), .rcm-table td:nth-child(8) { min-width: 240px; }
+
+  @media (max-width: 575px) {
+    .rcm-stat-body { min-height: 78px; }
+    .rcm-stat-value { font-size: 28px; }
+    .rcm-stat-body { padding: 16px 16px; }
+  }
+</style>
+
 <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
   <div class="content-header-left col-md-12 col-12 mb-2">
     <div class="row breadcrumbs-top">
       <div class="col-9">
-        <h3 class="content-header-title float-left mb-0">Reward Claims Management</h3>
+        <h3 class="content-header-title float-left mb-0 rcm-header-title">Reward Claims</h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
@@ -19,39 +155,55 @@
 
   <section class="list-view">
     <div class="row">
-      <div class="col-12 rounded equal-height-2 coloumn-2">
+      <div class="col-12 rounded equal-height-2 coloumn-2 rcm-wrap">
         <div class="card">
           <!-- Statistics Cards -->
-          <div class="row mb-3 mt-2">
+          <div class="row rcm-stats">
             <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
-              <div class="card bg-primary text-white">
-                <div class="card-body">
-                  <h5 class="card-title">Total Claims</h5>
-                  <h2><%= stats.total || 0 %></h2>
+              <div class="rcm-stat-card" style="background: linear-gradient(135deg,#ff2d55,#ff5b7b); color:#fff;">
+                <div class="rcm-stat-body">
+                  <div>
+                    <p class="rcm-stat-label">Total Claims</p>
+                    <p class="rcm-stat-value"><%= stats.total || 0 %></p>
+                    <div class="rcm-stat-sub"><i class="feather icon-activity"></i> Overall requests</div>
+                  </div>
+                  <div class="rcm-stat-icon"><i class="feather icon-layers"></i></div>
                 </div>
               </div>
             </div>
             <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
-              <div class="card bg-warning text-white">
-                <div class="card-body">
-                  <h5 class="card-title">Pending</h5>
-                  <h2><%= stats.pending || 0 %></h2>
+              <div class="rcm-stat-card" style="background: linear-gradient(135deg,#f59e0b,#fb7185); color:#fff;">
+                <div class="rcm-stat-body">
+                  <div>
+                    <p class="rcm-stat-label">Pending</p>
+                    <p class="rcm-stat-value"><%= stats.pending || 0 %></p>
+                    <div class="rcm-stat-sub"><i class="feather icon-clock"></i> Needs review</div>
+                  </div>
+                  <div class="rcm-stat-icon"><i class="feather icon-clock"></i></div>
                 </div>
               </div>
             </div>
             <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
-              <div class="card bg-success text-white">
-                <div class="card-body">
-                  <h5 class="card-title">Approved</h5>
-                  <h2><%= stats.approved || 0 %></h2>
+              <div class="rcm-stat-card" style="background: linear-gradient(135deg,#22c55e,#10b981); color:#fff;">
+                <div class="rcm-stat-body">
+                  <div>
+                    <p class="rcm-stat-label">Approved</p>
+                    <p class="rcm-stat-value"><%= stats.approved || 0 %></p>
+                    <div class="rcm-stat-sub"><i class="feather icon-check-circle"></i> Ready to disburse</div>
+                  </div>
+                  <div class="rcm-stat-icon"><i class="feather icon-check-circle"></i></div>
                 </div>
               </div>
             </div>
             <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12">
-              <div class="card bg-danger text-white">
-                <div class="card-body">
-                  <h5 class="card-title">Rejected</h5>
-                  <h2><%= stats.rejected || 0 %></h2>
+              <div class="rcm-stat-card" style="background: linear-gradient(135deg,#ef4444,#f97316); color:#fff;">
+                <div class="rcm-stat-body">
+                  <div>
+                    <p class="rcm-stat-label">Rejected</p>
+                    <p class="rcm-stat-value"><%= stats.rejected || 0 %></p>
+                    <div class="rcm-stat-sub"><i class="feather icon-x-circle"></i> Not eligible</div>
+                  </div>
+                  <div class="rcm-stat-icon"><i class="feather icon-x-circle"></i></div>
                 </div>
               </div>
             </div>
@@ -62,7 +214,7 @@
             <div class="row mb-2">
               <div class="col-xl-12 col-lg-12">
                 <form method="GET" id="filterForm">
-                  <div class="row">
+                  <div class="row rcm-filters">
                     <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
                       <label>Status</label>
                       <select class="form-control text-capitalize" name="status" id="status">
@@ -85,20 +237,51 @@
                     </div>
                     <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1">
                       <label>Candidate</label>
-                      <select class="form-control" name="candidateId" id="candidateId">
-                        <option value="">All Candidates</option>
-                        <% if (candidates && candidates.length > 0) { %>
-                          <% candidates.forEach((candidate) => { %>
-                            <option value="<%= candidate._id %>" <%= filters.candidateId === candidate._id.toString() ? 'selected' : '' %>>
-                              <%= candidate.name %> (<%= candidate.mobile %>)
-                            </option>
-                          <% }); %>
-                        <% } %>
-                      </select>
+                      <div class="rcm-search-wrap">
+                        <input
+                          type="text"
+                          class="form-control rcm-search-input"
+                          id="candidateSearchInput"
+                          placeholder="Type name / mobile to search..."
+                          autocomplete="off"
+                          oninput="filterCandidateOptions()"
+                          onfocus="showCandidateDropdown()"
+                          onblur="hideCandidateDropdown()"
+                          value="<%= (filters.candidateId && candidates && candidates.length) ? ((candidates.find(c => c._id.toString() === filters.candidateId.toString())?.name || '') + ' (' + (candidates.find(c => c._id.toString() === filters.candidateId.toString())?.mobile || '') + ')') : '' %>"
+                        />
+                        <span class="rcm-search-icon"><i class="feather icon-search"></i></span>
+                        <input type="hidden" name="candidateId" id="candidateId" value="<%= filters.candidateId || '' %>" />
+                        <div id="candidateDropdown" class="rcm-dropdown">
+                          <div class="rcm-option" data-id="" data-name="all candidates" onclick="selectCandidate('', '')">
+                            <strong>All Candidates</strong>
+                            <small>Show all</small>
+                          </div>
+                          <% if (candidates && candidates.length > 0) { %>
+                            <% candidates.forEach((candidate) => { %>
+                              <div
+                                class="rcm-option"
+                                data-id="<%= candidate._id %>"
+                                data-name="<%= ((candidate.name || '') + ' ' + (candidate.mobile || '')).toLowerCase() %>"
+                                data-display="<%= String(candidate.name || '').replace(/"/g, '&quot;') %> (<%= String(candidate.mobile || '').replace(/"/g, '&quot;') %>)"
+                                onclick="selectCandidateFromElement(this)"
+                              >
+                                <strong><%= candidate.name %></strong>
+                                <small><%= candidate.mobile %></small>
+                              </div>
+                            <% }); %>
+                          <% } %>
+                        </div>
+                      </div>
                     </div>
-                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1" style="margin-top: 2.5rem !important;">
-                      <button class="btn btn-success waves-effect waves-light text-white" type="submit">Filter</button>
-                      <a class="btn btn-danger waves-effect waves-light text-white ml-1" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims">Reset</a>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 col-12 mt-1 d-flex align-items-end justify-content-end">
+                      <div class="rcm-actions">
+                        <button class="btn btn-success waves-effect waves-light text-white" type="submit">
+                          <i class="feather icon-filter mr-50"></i> Filter
+                        </button>
+                        <a class="btn btn-outline-danger waves-effect waves-light" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims">
+                          <i class="feather icon-refresh-ccw mr-50"></i> Reset
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </form>
@@ -106,8 +289,8 @@
             </div>
 
             <!-- Claims Table -->
-            <div class="table-responsive">
-              <table class="table table-hover-animation mb-0 table-hover">
+            <div class="table-responsive rcm-table">
+              <table class="table mb-0">
                 <thead>
                   <tr>
                     <th>Candidate</th>
@@ -131,11 +314,11 @@
                         <td>
                           <strong><%= claim.rewardTitle %></strong>
                           <% if (claim.rewardDescription) { %>
-                            <br><small class="text-muted"><%= claim.rewardDescription.substring(0, 50) %>...</small>
+                            <br><small class="rcm-subtle"><%= claim.rewardDescription.length > 50 ? claim.rewardDescription.substring(0, 50) + '...' : claim.rewardDescription %></small>
                           <% } %>
                         </td>
                         <td class="text-capitalize">
-                          <span class="badge badge-<%= claim.rewardType === 'money' ? 'success' : claim.rewardType === 'gift' ? 'info' : claim.rewardType === 'trophy' ? 'warning' : 'secondary' %>">
+                          <span class="rcm-pill rcm-pill--<%= claim.rewardType %>">
                             <%= claim.rewardType %>
                           </span>
                         </td>
@@ -147,7 +330,12 @@
                             <% if (claim.upiId) { %>
                               <strong>UPI ID:</strong> <%= claim.upiId %><br>
                             <% } %>
+                          <% } else if (claim.rewardType === 'voucher') { %>
+                            <strong>Email:</strong> <%= claim.email || 'N/A' %>
                           <% } else if (claim.rewardType === 'gift' || claim.rewardType === 'trophy') { %>
+                            <strong>Address:</strong><br>
+                            <small><%= claim.address ? (claim.address.length > 50 ? claim.address.substring(0, 50) + '...' : claim.address) : 'N/A' %></small>
+                          <% } else if (claim.rewardType === 'other') { %>
                             <strong>Address:</strong><br>
                             <small><%= claim.address ? (claim.address.length > 50 ? claim.address.substring(0, 50) + '...' : claim.address) : 'N/A' %></small>
                           <% } %>
@@ -159,53 +347,69 @@
                         <td>
                           <% if (claim.documents && claim.documents.length > 0) { %>
                             <% claim.documents.forEach((doc) => { %>
-                              <a href="<%= process.env.MIPIE_BUCKET_URL %>/<%= doc.documentKey %>" target="_blank" class="btn btn-sm btn-info mb-1">
-                                View <%= doc.documentName %>
-                              </a><br>
+                              <a href="<%= process.env.MIPIE_BUCKET_URL %>/<%= doc.documentKey %>" target="_blank" class="rcm-doc-link mb-1">
+                                <i class="feather icon-file-text"></i> <span><%= doc.documentName %></span>
+                              </a>
+                              <br>
                             <% }); %>
                           <% } else { %>
-                            <span class="text-muted">No documents</span>
+                            <span class="rcm-subtle">No documents</span>
                           <% } %>
                         </td>
                         <td><%= claim.claimedAtFormatted %></td>
                         <td>
-                          <span class="badge badge-<%= claim.status === 'approved' ? 'success' : claim.status === 'rejected' ? 'danger' : 'warning' %> text-capitalize">
+                          <span class="rcm-status rcm-status--<%= claim.status %>">
                             <%= claim.status %>
                           </span>
                           <% if (claim.status === 'approved' && claim.approvedAtFormatted) { %>
-                            <br><small>Approved: <%= claim.approvedAtFormatted %></small>
+                            <br><small class="rcm-subtle">Approved: <%= claim.approvedAtFormatted %></small>
                           <% } %>
                           <% if (claim.status === 'rejected' && claim.rejectedAtFormatted) { %>
-                            <br><small>Rejected: <%= claim.rejectedAtFormatted %></small>
+                            <br><small class="rcm-subtle">Rejected: <%= claim.rejectedAtFormatted %></small>
                           <% } %>
                           <% if (claim.disbursedAtFormatted) { %>
-                            <br><small class="text-success">Disbursed: <%= claim.disbursedAtFormatted %></small>
+                            <br><small class="rcm-subtle" style="color:#166534;">Disbursed: <%= claim.disbursedAtFormatted %></small>
                           <% } %>
                         </td>
                         <td>
                           <% if (claim.status === 'pending') { %>
-                            <button class="btn btn-success btn-sm text-white" onclick="approveClaim('<%= claim._id %>')">
-                              Approve
-                            </button>
-                            <button class="btn btn-danger btn-sm text-white" onclick="rejectClaim('<%= claim._id %>')">
-                              Reject
-                            </button>
+                            <div class="rcm-actions">
+                              <button class="btn btn-success btn-sm text-white" onclick="approveClaim('<%= claim._id %>')">
+                                <i class="feather icon-check mr-50"></i> Approve
+                              </button>
+                              <button class="btn btn-danger btn-sm text-white" onclick="rejectClaim('<%= claim._id %>')">
+                                <i class="feather icon-x mr-50"></i> Reject
+                              </button>
+                              <button class="btn btn-info btn-sm text-white" onclick="viewClaimDetails('<%= claim._id %>')">
+                                <i class="feather icon-eye mr-50"></i> Details
+                              </button>
+                            </div>
                           <% } else if (claim.status === 'approved' && !claim.disbursedAt) { %>
-                            <button class="btn btn-primary btn-sm text-white" onclick="disburseClaim('<%= claim._id %>')">
-                              Mark Disbursed
-                            </button>
+                            <div class="rcm-actions">
+                              <button class="btn btn-primary btn-sm text-white" onclick="disburseClaim('<%= claim._id %>')">
+                                <i class="feather icon-send mr-50"></i> Mark Disbursed
+                              </button>
+                              <button class="btn btn-info btn-sm text-white" onclick="viewClaimDetails('<%= claim._id %>')">
+                                <i class="feather icon-eye mr-50"></i> Details
+                              </button>
+                            </div>
                           <% } else { %>
-                            <span class="text-muted">No action</span>
+                            <div class="rcm-actions">
+                              <span class="rcm-subtle">No action</span>
+                              <button class="btn btn-info btn-sm text-white" onclick="viewClaimDetails('<%= claim._id %>')">
+                                <i class="feather icon-eye mr-50"></i> Details
+                              </button>
+                            </div>
                           <% } %>
-                          <button class="btn btn-info btn-sm text-white mt-1" onclick="viewClaimDetails('<%= claim._id %>')">
-                            View Details
-                          </button>
                         </td>
                       </tr>
                     <% }); %>
                   <% } else { %>
                     <tr>
-                      <td colspan="8" class="text-center">No claims found</td>
+                      <td colspan="8" class="rcm-empty">
+                        <h5>No claims found</h5>
+                        <div class="rcm-subtle">Try adjusting filters or reset to see all claims.</div>
+                      </td>
                     </tr>
                   <% } %>
                 </tbody>
@@ -290,6 +494,65 @@
 
 <script>
 let currentClaimId = null;
+
+// Candidate searchable dropdown
+function showCandidateDropdown() {
+  const dropdown = document.getElementById('candidateDropdown');
+  if (!dropdown) return;
+  dropdown.style.display = 'block';
+  filterCandidateOptions();
+}
+
+function hideCandidateDropdown() {
+  setTimeout(() => {
+    const dropdown = document.getElementById('candidateDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  }, 180);
+}
+
+function filterCandidateOptions() {
+  const input = document.getElementById('candidateSearchInput');
+  const dropdown = document.getElementById('candidateDropdown');
+  if (!input || !dropdown) return;
+
+  const term = (input.value || '').toLowerCase().trim();
+  const options = dropdown.querySelectorAll('.rcm-option');
+  let hasAny = false;
+
+  options.forEach(opt => {
+    const name = opt.getAttribute('data-name') || '';
+    const isAll = (opt.getAttribute('data-id') || '') === '';
+    if (isAll) {
+      opt.style.display = 'block';
+      hasAny = true;
+      return;
+    }
+    if (!term || name.includes(term)) {
+      opt.style.display = 'block';
+      hasAny = true;
+    } else {
+      opt.style.display = 'none';
+    }
+  });
+
+  dropdown.style.display = hasAny ? 'block' : 'none';
+}
+
+function selectCandidate(id, displayText) {
+  const input = document.getElementById('candidateSearchInput');
+  const hidden = document.getElementById('candidateId');
+  const dropdown = document.getElementById('candidateDropdown');
+  if (input) input.value = displayText || '';
+  if (hidden) hidden.value = id || '';
+  if (dropdown) dropdown.style.display = 'none';
+}
+
+function selectCandidateFromElement(el) {
+  if (!el) return;
+  const id = el.getAttribute('data-id') || '';
+  const displayText = el.getAttribute('data-display') || '';
+  selectCandidate(id, displayText);
+}
 
 function approveClaim(claimId) {
   currentClaimId = claimId;

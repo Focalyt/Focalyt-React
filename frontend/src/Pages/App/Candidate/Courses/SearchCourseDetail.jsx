@@ -893,7 +893,7 @@ const CourseDetails = () => {
                   {/* Mobile Apply Button */}
                   {!isApplied ? (
                     <a
-                      className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center"
+                      className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center RegButton"
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -924,7 +924,7 @@ const CourseDetails = () => {
                         cursor: 'not-allowed',
                         textDecoration: 'none',
                       }}
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none RegButton"
                     >
                       <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
                     </a>
@@ -6968,12 +6968,35 @@ display: none;
 max-width: 100%;
 }
 }
-
-
         `
       }
     </style>
 
+    <style>
+  {
+`
+@media (max-width: 768px) {
+.apply-thisjob{
+        margin-top: 5px;
+        float:right;
+        width:51% !important;
+        white-space: nowrap;
+}
+.apply-thisjob i {
+    font-size: 21px !important;
+    margin-right: 5px !important;
+    line-height: 11px !important;
+    position: relative !important;
+    top: 4px !important;
+}
+    .RegButton{
+        width: auto !important;  
+
+    }
+}
+`
+  }
+</style>
     </>
   );
 };

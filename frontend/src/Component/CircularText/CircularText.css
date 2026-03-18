@@ -1,0 +1,51 @@
+.circular-text {
+  margin: 0 auto;
+  border-radius: 50%;
+  width: 70px;
+  height: 70px;
+  position: relative;
+  font-weight: 900;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  transform-origin: 50% 50%;
+  animation: spin var(--spin-duration, 23s) linear infinite;
+  display: block;
+}
+
+.circular-text:hover {
+  animation-duration: calc(var(--spin-duration, 23s) / 4);
+}
+
+.circular-text span.circular-letter {
+  position: absolute;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .circular-text {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .circular-text span.circular-letter {
+    font-size: 9px;
+  }
+}
+

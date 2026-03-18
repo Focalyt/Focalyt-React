@@ -388,7 +388,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const token = userData.token;
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [showPanel, setShowPanel] = useState('')
-
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchModal, setShowBranchModal] = useState(false);
   const candidateRef = useRef();
 
   const fetchProfile = (id) => {
@@ -497,6 +499,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [uploadedByUser, setUploadedByUser] = useState(null);
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
+  const [kycMarkingProfileId, setKycMarkingProfileId] = useState(null);
 
   //course history
   const [courseHistory, setCourseHistory] = useState([]);
@@ -638,6 +641,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
   const [visitDates, setVisitDates] = useState([]);
 
+  const [preVerificationQuestions, setPreVerificationQuestions] = useState([]);
+  const [isLoadingPreVerificationQuestions, setIsLoadingPreVerificationQuestions] = useState(false);
   // Question rejection reason modal state
   const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
   const [questionRejectionReason, setQuestionRejectionReason] = useState('');
@@ -648,6 +653,32 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     showSetPreVerification(true);
     // Fetch existing question answers if any
     await fetchQuestionAnswers(profile._id);
+  };
+
+  const fetchPreVerificationQuestions = async () => {
+    try {
+      setIsLoadingPreVerificationQuestions(true);
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerification/questions`,
+        {
+          headers: { "x-auth": token },
+        }
+      );
+
+      if (response.data.status && Array.isArray(response.data.data)) {
+        setPreVerificationQuestions(response.data.data);
+      } else {
+        setPreVerificationQuestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching pre‑verification questions:", error);
+      setPreVerificationQuestions([]);
+    } finally {
+      setIsLoadingPreVerificationQuestions(false);
+    }
   };
 
   // Handle question rejection with reason
@@ -780,28 +811,17 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
         setQuestionAnswers(existingData);
 
-        // Populate form with existing data
         const formData = {};
-        const questions = [
-          "Is the Candidate Aware of the Course Duration and Placement Benefits?",
-          "Is the Candidate Aware of the Course and practicle Module ?",
-          "Currently Work Status / Not Working Status / Not Working Status",
-          "Is Candidate Interested Placement by us?",
-          "If we offered a job outside Odisha, would you be interested in the placement?",
-          "Parent Confirmation",
-          "Is Candidate Interested for Course Completion?",
-          "Recommendation from Placement",
-          "Confirm DOB",
-          "Are you Going to Attend Center for Physical Counselling"
-        ];
-
-        existingData.forEach((qa, index) => {
-          if (qa.question === questions[index]) {
-            formData[`q${index + 1}`] = qa.answer;
-            // If there's a rejection reason, also load it
-            // if (qa.rejectionReason) {
-            //   formData[`q${index + 1}_reason`] = qa.rejectionReason;
-            // }
+        const sortedQuestions = (preVerificationQuestions || [])
+          .filter((q) => q.isActive !== false)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        sortedQuestions.forEach((q, index) => {
+          const match = existingData.find((qa) => qa.question === q.questionText);
+          if (match) {
+            formData[`q${index + 1}`] = match.answer;
+            if (match.rejectionReason) {
+              formData[`q${index + 1}_reason`] = match.rejectionReason;
+            }
           }
         });
 
@@ -825,16 +845,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  useEffect(() => {
+    fetchPreVerificationQuestions();
+  }, []);
+
   const QuestionAnswer = async () => {
     try {
       setIsSubmittingAnswers(true);
-
-      // -----------------
-      // Validation for visit date
-      if (questionFormData.q10 && !selectedDate) {
-        alert('Please select a date');
-        return;
-      }
 
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
@@ -843,20 +860,34 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         return;
       }
 
-      // 1️⃣ Prepare data for first API
+      if (!preVerificationQuestions.length) {
+        alert("Pre‑verification questions are not loaded. Please try again.");
+        return;
+      }
+
+      const sortedQuestions = preVerificationQuestions
+        .filter((q) => q.isActive !== false)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const isVisitTypeQuestion = (q) => {
+        if (q.type === 'visit') return true;
+        const opts = Array.isArray(q.options) ? q.options : [];
+        return opts.length >= 2 &&
+          opts.some((o) => /visit/i.test(String(o))) &&
+          opts.some((o) => /joining/i.test(String(o))) &&
+          opts.some((o) => /both/i.test(String(o)));
+      };
+      const visitQuestionIndex = sortedQuestions.findIndex(isVisitTypeQuestion);
+
+      // Validation for visit date when user has answered the visit-type question
+      const visitAnswerKey = visitQuestionIndex >= 0 ? `q${visitQuestionIndex + 1}` : null;
+      if (visitAnswerKey && questionFormData[visitAnswerKey] && !selectedDate) {
+        alert('Please select a date');
+        setIsSubmittingAnswers(false);
+        return;
+      }
+
       const responses = [];
-      const questions = [
-        "Is the Candidate Aware of the Course Duration and Placement Benefits?",
-        "Is the Candidate Aware of the Course and practicle Module ?",
-        "Currently Work Status / Not Working Status",
-        "Is Candidate Interested Placement by us?",
-        "If we offered a job outside Odisha, would you be interested in the placement?",
-        "Parent Confirmation",
-        "Is Candidate Interested for Course Completion?",
-        "Recommendation from Placement",
-        "Confirm DOB",
-        "Are you Going to Attend Center for Physical Counselling"
-      ];
+      const questions = sortedQuestions.map((q) => q.questionText);
 
       const existingAnswersMap = {};
       questionAnswers.forEach(qa => {
@@ -864,14 +895,15 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       });
 
       questions.forEach((question, index) => {
-        const newAnswer = questionFormData[`q${index + 1}`];
+        const fieldKey = `q${index + 1}`;
+        const newAnswer = questionFormData[fieldKey];
         const existingAnswer = existingAnswersMap[question];
         const answer = newAnswer || existingAnswer;
 
         if (answer) {
           const responseObj = { question, answer };
           if (answer === 'Rejected') {
-            const rejectionReason = questionFormData[`q${index + 1}_reason`];
+            const rejectionReason = questionFormData[`${fieldKey}_reason`];
             if (rejectionReason) responseObj.rejectionReason = rejectionReason;
           }
           responses.push(responseObj);
@@ -905,18 +937,19 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       }
 
 
-      const formData = {
-        appliedCourseId: selectedProfile._id,
-        visitDate: selectedDate,
-        visitType: questionFormData.q10
-      };
-
-      // Call second API
-      const visitResponse = await axios.post(
-        `${backendUrl}/college/candidate/visit-calendar`,
-        formData,
-        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
-      );
+      const visitType = visitAnswerKey ? questionFormData[visitAnswerKey] : null;
+      if (visitAnswerKey && visitType && selectedDate) {
+        const formData = {
+          appliedCourseId: selectedProfile._id,
+          visitDate: selectedDate,
+          visitType: visitType
+        };
+        await axios.post(
+          `${backendUrl}/college/candidate/visit-calendar`,
+          formData,
+          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+        );
+      }
 
       // 4️⃣ Handle responses
       alert("Pre-verification & visit scheduled successfully!");
@@ -1357,11 +1390,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
       if (response.data.success) {
         // If KYC was updated, show a success message
-        if (response.data.kycUpdated) {
-          alert('All documents verified! KYC status has been updated.');
-        } else {
-          alert(`Document ${status.toLowerCase()} successfully!`);
-        }
+          // if (response.data.kycUpdated) {
+          //   alert('All documents verified! KYC status has been updated.');
+          // } else {
+          // }
+        alert(`Document ${status.toLowerCase()} successfully!`);
+
 
         // Refresh the profile data
         await fetchProfileData();
@@ -1372,6 +1406,36 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     } catch (error) {
       console.error('Error updating document status:', error);
       alert('Failed to update document status');
+    }
+  };
+
+  const handleMarkKycDone = async (profile) => {
+    if (!profile || !profile._id) return;
+    if (profile.kyc === true) {
+      alert('KYC is already marked as done for this candidate.');
+      return;
+    }
+    if (!window.confirm('Mark KYC as done for this candidate? All mandatory documents must be verified.')) {
+      return;
+    }
+    setKycMarkingProfileId(profile._id);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/kycDone/${profile._id}`,
+        {},
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.success) {
+        alert('KYC marked as done successfully.');
+        await fetchProfileData();
+      } else {
+        alert(response.data.message || 'Failed to mark KYC done');
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Failed to mark KYC done';
+      alert(msg);
+    } finally {
+      setKycMarkingProfileId(null);
     }
   };
 
@@ -1436,32 +1500,31 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
 
   const handleCrmFilterClick = (filter, index) => {
+    // 0: Pending for Documents, 1: Pending for Verification, 2: Reject Documents, 3: Verified, 4: All
     if (index === 0) {
-      setFilterData({
-        ...filterData,
-        kyc: false,
-      })
+      setFilterData(prev => ({ ...prev, kyc: false }));
       setActiveCrmFilter(index);
       return;
     }
     if (index === 1) {
-      // Filter profiles where kyc is true
-      setFilterData({
-        ...filterData,
-        kyc: true,
-      })
-      setActiveCrmFilter(index);
-      return;
-    } else if (index === 2) {
-      setFilterData({
-        ...filterData,
-        kyc: 'all',
-      })
+      setFilterData(prev => ({ ...prev, kyc: false })); // Pending for Verification = not yet verified
       setActiveCrmFilter(index);
       return;
     }
+    if (index === 2) {
+      setFilterData(prev => ({ ...prev, kyc: 'all' }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    if (index === 3) {
+      // Verified tab - only kyc done
+      setFilterData(prev => ({ ...prev, kyc: true }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    // index === 4: All
+    setFilterData(prev => ({ ...prev, kyc: 'all' }));
     setActiveCrmFilter(index);
-
   };
 
   // Filter state from Registration component
@@ -2003,7 +2066,75 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
 
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
 
 
   useEffect(() => {
@@ -2026,7 +2157,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         page: page.toString(),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.kyc && { kyc: filters.kyc }),
+        ...(filters.kyc !== undefined && filters.kyc !== 'all' && { kyc: String(filters.kyc) }),
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
@@ -3198,7 +3329,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         {ekycFilters.map((filter, index) => (
                           <div key={filter._id} className="position-relative flex-shrink-0 me-2">
                             <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative penddingBtn`}
                               onClick={() => handleCrmFilterClick(filter, index)}
                               style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
                             >
@@ -3468,7 +3599,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <button
-                          className="btn btn-sm btn-outline-danger"
+                          className="btn btn-sm btn-outline-danger CButton"
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
@@ -3632,12 +3763,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3694,12 +3825,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3755,12 +3886,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3896,7 +4027,26 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                               <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '0.35rem' }}>
                                                 <i className="fas fa-phone"></i>
                                               </button>
-                                              <img
+
+                                              <button
+                                                className='btn btn-outline-primary btn-sm border-0'
+                                                title='Mark KYC Done'
+                                                style={{
+                                                  fontSize: '20px',
+                                                  marginBottom: '0.35rem',
+                                                  backgroundColor: profile.kyc === true ? '#90EE90' : '#fc2b5a',
+                                                  color: profile.kyc === true ? '#1a5f1a' : 'white'
+                                                }}
+                                                disabled={profile.kyc === true || kycMarkingProfileId === profile._id}
+                                                onClick={() => handleMarkKycDone(profile)}
+                                              >
+                                                {kycMarkingProfileId === profile._id ? (
+                                                  <><i className="fas fa-spinner fa-spin me-1"></i> Marking...</>
+                                                ) : (
+                                                  <><i className="fas fa-check"></i> Mark KYC Done</>
+                                                )}
+                                              </button>
+                                              {/* <img
                                                 src="/Assets/public_assets/images/kyc_done.png"
                                                 alt="ekyc done"
                                                 className='ekycimg'
@@ -3907,7 +4057,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 alt="ekyc pending"
                                                 className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
-                                              />
+                                              /> */}
                                             </div>
 
                                             {profile.batch && (
@@ -3917,226 +4067,250 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                               </div>
                                             )}
-                                             <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                          <div className="btn-group">
-                                            <div style={{ position: "relative", display: "inline-block" }}>
-                                              <button
-                                                className="btn btn-sm btn-outline-secondary border-0"
-                                                onClick={() => togglePopup(profileIndex)}
-                                                aria-label="Options"
-                                              >
-                                                <i className="fas fa-ellipsis-v"></i>
-                                              </button>
-
-                                              {/* Mobile Bottom Sheet Modal */}
-                                              {showPopup === profileIndex && (
-                                                <>
-                                                  {/* Backdrop */}
-                                                  <div
-                                                    onClick={() => setShowPopup(null)}
-                                                    style={{
-                                                      position: "fixed",
-                                                      top: 0,
-                                                      left: 0,
-                                                      width: "100vw",
-                                                      height: "100vh",
-                                                      backgroundColor: "rgba(0, 0, 0, 0.5)",
-                                                      zIndex: 9998,
-                                                      animation: "fadeIn 0.3s ease"
-                                                    }}
-                                                  ></div>
-
-                                                  {/* Bottom Sheet */}
-                                                  <div
-                                                    style={{
-                                                      position: "fixed",
-                                                      bottom: 0,
-                                                      left: 0,
-                                                      right: 0,
-                                                      backgroundColor: "white",
-                                                      borderRadius: "20px 20px 0 0",
-                                                      boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
-                                                      zIndex: 9999,
-                                                      animation: "slideUpMobile 0.3s ease",
-                                                      maxHeight: "80vh",
-                                                      overflowY: "auto",
-                                                      padding: "20px 0"
-                                                    }}
+                                            <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                              <div className="btn-group">
+                                                <div style={{ position: "relative", display: "inline-block" }}>
+                                                  <button
+                                                    className="btn btn-sm btn-outline-secondary border-0"
+                                                    onClick={() => togglePopup(profileIndex)}
+                                                    aria-label="Options"
                                                   >
-                                                    {/* Handle Bar */}
-                                                    <div style={{
-                                                      width: "40px",
-                                                      height: "4px",
-                                                      backgroundColor: "#ddd",
-                                                      borderRadius: "2px",
-                                                      margin: "0 auto 20px",
-                                                    }}></div>
+                                                    <i className="fas fa-ellipsis-v"></i>
+                                                  </button>
 
-                                                    {/* Menu Items */}
-                                                    <div
-                                                      style={{
-                                                        padding: "0 20px"
-                                                      }}
-                                                    >
-                                                      {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
-                                                        <button
-                                                          className="dropdown-item"
-                                                          style={{
-                                                            width: "100%",
-                                                            padding: "16px 0",
-                                                            border: "none",
-                                                            background: "none",
-                                                            textAlign: "left",
-                                                            cursor: "pointer",
-                                                            fontSize: "15px",
-                                                            fontWeight: "500",
-                                                            borderBottom: "1px solid #f0f0f0",
-                                                            color: "#333"
-                                                          }}
-                                                          onClick={() => {
-                                                            setShowPopup(null);
-                                                            handleMoveToAdmission(profile);
-                                                          }}
-                                                        >
-                                                          Move to Admission
-                                                        </button>
-                                                      )}
-
-                                                      {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                                        <>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              handleMarkDropout(profile);
-                                                            }}
-                                                          >
-                                                            Mark Dropout
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              openPanel('SetFollowup', profile);
-                                                            }}
-                                                          >
-                                                            Set Followup
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              handleFetchCandidate(profile);
-                                                            }}
-                                                          >
-                                                            Edit Profile
-                                                          </button>
-                                                          <button
-                                                            className="dropdown-item"
-                                                            style={{
-                                                              width: "100%",
-                                                              padding: "16px 0",
-                                                              border: "none",
-                                                              background: "none",
-                                                              textAlign: "left",
-                                                              cursor: "pointer",
-                                                              fontSize: "15px",
-                                                              fontWeight: "500",
-                                                              borderBottom: "1px solid #f0f0f0",
-                                                              color: "#333"
-                                                            }}
-                                                            onClick={() => {
-                                                              setShowPopup(null);
-                                                              openPreVerificationModal(profile);
-                                                            }}
-                                                          >
-                                                            Add Pre Verification
-                                                          </button>
-
-                                                        </>
-                                                      )}
-                                                      <button
-                                                        className="dropdown-item"
+                                                  {/* Mobile Bottom Sheet Modal */}
+                                                  {showPopup === profileIndex && (
+                                                    <>
+                                                      {/* Backdrop */}
+                                                      <div
+                                                        onClick={() => setShowPopup(null)}
                                                         style={{
-                                                          width: "100%",
-                                                          padding: "16px 0",
-                                                          border: "none",
-                                                          background: "none",
-                                                          textAlign: "left",
-                                                          cursor: "pointer",
-                                                          fontSize: "15px",
-                                                          fontWeight: "500",
-                                                          color: "#333"
+                                                          position: "fixed",
+                                                          top: 0,
+                                                          left: 0,
+                                                          width: "100vw",
+                                                          height: "100vh",
+                                                          backgroundColor: "rgba(0, 0, 0, 0.5)",
+                                                          zIndex: 9998,
+                                                          animation: "fadeIn 0.3s ease"
                                                         }}
-                                                        onClick={() => {
-                                                          setShowPopup(null);
-                                                          openPanel('leadHistory', profile);
+                                                      ></div>
+
+                                                      {/* Bottom Sheet */}
+                                                      <div
+                                                        style={{
+                                                          position: "fixed",
+                                                          bottom: 0,
+                                                          left: 0,
+                                                          right: 0,
+                                                          backgroundColor: "white",
+                                                          borderRadius: "20px 20px 0 0",
+                                                          boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
+                                                          zIndex: 9999,
+                                                          animation: "slideUpMobile 0.3s ease",
+                                                          maxHeight: "80vh",
+                                                          overflowY: "auto",
+                                                          padding: "20px 0"
                                                         }}
                                                       >
-                                                        History List
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </>
-                                              )}
+                                                        {/* Handle Bar */}
+                                                        <div style={{
+                                                          width: "40px",
+                                                          height: "4px",
+                                                          backgroundColor: "#ddd",
+                                                          borderRadius: "2px",
+                                                          margin: "0 auto 20px",
+                                                        }}></div>
+
+                                                        {/* Menu Items */}
+                                                        <div
+                                                          style={{
+                                                            padding: "0 20px"
+                                                          }}
+                                                        >
+                                                          {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                                            <button
+                                                              className="dropdown-item"
+                                                              style={{
+                                                                width: "100%",
+                                                                padding: "16px 0",
+                                                                border: "none",
+                                                                background: "none",
+                                                                textAlign: "left",
+                                                                cursor: "pointer",
+                                                                fontSize: "15px",
+                                                                fontWeight: "500",
+                                                                borderBottom: "1px solid #f0f0f0",
+                                                                color: "#333"
+                                                              }}
+                                                              onClick={() => {
+                                                                setShowPopup(null);
+                                                                handleMoveToAdmission(profile);
+                                                              }}
+                                                            >
+                                                              Move to Admission
+                                                            </button>
+                                                          )}
+
+                                                          {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                                            <>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleMarkDropout(profile);
+                                                                }}
+                                                              >
+                                                                Mark Dropout
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPanel('SetFollowup', profile);
+                                                                }}
+                                                              >
+                                                                Set Followup
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleFetchCandidate(profile);
+                                                                }}
+                                                              >
+                                                                Edit Profile
+                                                              </button>
+                                                              {/* Change Branch */}
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setSelectedProfile(profile);
+                                                                  getBranches(profile);
+                                                                  setShowBranchModal(true);
+                                                                  setShowPopup(null);
+                                                                }}
+                                                              >
+                                                                <span className="fw-medium">Change Branch</span>
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPreVerificationModal(profile);
+                                                                }}
+                                                              >
+                                                                Add Pre Verification
+                                                              </button>
+
+                                                            </>
+                                                          )}
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              openPanel('leadHistory', profile);
+                                                            }}
+                                                          >
+                                                            History List
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                </div>
+
+                                                <button
+                                                  className="btn btn-sm btn-outline-secondary border-0"
+                                                  onClick={() => {
+                                                    setLeadDetailsVisible(profileIndex)
+                                                    setSelectedProfile(profile)
+                                                  }}
+                                                >
+                                                  {leadDetailsVisible === profileIndex ? (
+                                                    <i className="fas fa-chevron-up"></i>
+                                                  ) : (
+                                                    <i className="fas fa-chevron-down"></i>
+                                                  )}
+                                                </button>
+                                              </div>
                                             </div>
 
-                                            <button
-                                              className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => {
-                                                setLeadDetailsVisible(profileIndex)
-                                                setSelectedProfile(profile)
-                                              }}
-                                            >
-                                              {leadDetailsVisible === profileIndex ? (
-                                                <i className="fas fa-chevron-up"></i>
-                                              ) : (
-                                                <i className="fas fa-chevron-down"></i>
-                                              )}
-                                            </button>
-                                          </div>
-                                        </div>
-                                            
                                           </div>
                                         </div>
 
-                                       
+
 
                                         <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                           <div className="btn-group">
@@ -4260,6 +4434,27 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       }}
                                                     >
                                                       Edit Profile
+                                                    </button>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      onClick={() => {
+                                                        setSelectedProfile(profile);
+                                                        getBranches(profile);
+                                                        setShowBranchModal(true);
+                                                        setShowPopup(null);
+                                                      }}
+                                                    >
+                                                      Change Branch
                                                     </button>
                                                     <button
                                                       className="dropdown-item"
@@ -5366,19 +5561,29 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                                           <div className="mt-1 text-muted">{item.rejectionReason}</div>
                                                                         </div>
                                                                       )}
-                                                                      {item.question === "Are you Going to Attend Center for Physical Counselling" && visitDates && visitDates.length > 0 && (
+                                                                      {(item.answer === 'Visit' || item.answer === 'Joining' || item.answer === 'Both') && (item.visitDate || (visitDates && visitDates.length > 0)) && (
                                                                         <div className="mt-2 p-2 bg-light border rounded">
                                                                           <small className="text-primary fw-bold">Visit Date:</small>
                                                                           <div className="mt-1">
-                                                                            {visitDates.map((visit, visitIndex) => (
-                                                                              <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                            {item.visitDate ? (
+                                                                              <div className="d-flex align-items-center gap-2">
                                                                                 <i className="fas fa-calendar-alt text-primary"></i>
-                                                                                <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
-                                                                                <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
-                                                                                  {visit.visitType}
+                                                                                <span>{new Date(item.visitDate).toLocaleDateString()}</span>
+                                                                                <span className={`badge bg-${item.answer === 'Visit' ? 'primary' : item.answer === 'Joining' ? 'success' : 'info'}`}>
+                                                                                  {item.answer}
                                                                                 </span>
                                                                               </div>
-                                                                            ))}
+                                                                            ) : (
+                                                                              visitDates.map((visit, visitIndex) => (
+                                                                                <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                                  <i className="fas fa-calendar-alt text-primary"></i>
+                                                                                  <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
+                                                                                  <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
+                                                                                    {visit.visitType}
+                                                                                  </span>
+                                                                                </div>
+                                                                              ))
+                                                                            )}
                                                                           </div>
                                                                         </div>
                                                                       )}
@@ -5547,257 +5752,106 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td className="s-no">1</td>
-                        <td className="question">Is the Candidate Aware of the Course Duration and Placement Benefits?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q1_select"
-                                className="form-select"
-                                value={questionFormData.q1}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q1: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">2</td>
-                        <td className="question">Is the Candidate Aware of the Course and practicle Module ?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q2_select"
-                                className="form-select"
-                                value={questionFormData.q2}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q2: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">3</td>
-                        <td className="question">Currently Work Status / Not Working Status</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q3_select"
-                                className="form-select"
-                                value={questionFormData.q3}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q3: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Working">Working</option>
-                                <option value="Not Working">Not Working</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">4</td>
-                        <td className="question">Is Candidate Interested Placement by us?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q4_select"
-                                className="form-select"
-                                value={questionFormData.q4}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q4: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-
-                      <tr>
-                        <td className="s-no">5</td>
-                        <td className="question">If we offered a job outside Odisha, would you be interested in the placement?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q5_select"
-                                className="form-select"
-                                value={questionFormData.q5}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q5: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">6</td>
-                        <td className="question">Parent Confirmation</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q6_select"
-                                className="form-select"
-                                value={questionFormData.q6}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q6: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">7</td>
-                        <td className="question">Is Candidate Interested for Course Completion?</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q7_select"
-                                className="form-select"
-                                value={questionFormData.q7}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">8</td>
-                        <td className="question">Recommendation from Placement</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q8_select"
-                                className="form-select"
-                                value={questionFormData.q8}
-                                // onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                                onChange={(e) => {
-                                  if (e.target.value === 'Rejected') {
-                                    handleQuestionRejection(7, 'Recommendation from Placement');
-                                  } else {
-                                    setQuestionFormData({ ...questionFormData, q8: e.target.value });
-                                  }
-                                }}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Selected">Selected</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                              {questionFormData.q8 === "Rejected" && questionFormData.q8_reason && (
-                                <div className="mt-2 p-2 bg-light border rounded">
-                                  <small className="text-danger fw-bold">Rejection Reason:</small>
-                                  <div className="mt-1 text-muted">{questionFormData.q8_reason}</div>
+                      {isLoadingPreVerificationQuestions ? (
+                        <tr>
+                          <td colSpan={3} className="text-center py-3 text-muted">
+                            Loading questions...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const sortedQuestions = (preVerificationQuestions || [])
+                          .filter((q) => q.isActive !== false)
+                          .sort((a, b) => (a.order || 0) - (b.order || 0));
+                        if (sortedQuestions.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={3} className="text-center py-3 text-muted">
+                                No pre-verification questions configured. Add questions in Pre Verification settings.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return sortedQuestions.map((q, index) => {
+                          const fieldKey = `q${index + 1}`;
+                          const options = Array.isArray(q.options) ? q.options : [];
+                          const hasRejected = options.some((opt) => String(opt).toLowerCase() === 'rejected');
+                          const isVisitType = q.type === 'visit' || (
+                            options.length >= 2 &&
+                            options.some((o) => /visit/i.test(String(o))) &&
+                            options.some((o) => /joining/i.test(String(o))) &&
+                            options.some((o) => /both/i.test(String(o)))
+                          );
+                          return (
+                            <tr key={q._id || index}>
+                              <td className="s-no">{index + 1}</td>
+                              <td className="question">{q.questionText}</td>
+                              <td>
+                                <div className="checkbox-group">
+                                  <div className="select-option">
+                                    <select
+                                      name={`${fieldKey}_select`}
+                                      className="form-select"
+                                      value={questionFormData[fieldKey] ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (hasRejected && val === 'Rejected') {
+                                          handleQuestionRejection(index + 1, q.questionText);
+                                        } else {
+                                          setQuestionFormData((prev) => ({ ...prev, [fieldKey]: val }));
+                                        }
+                                      }}
+                                    >
+                                      <option value="">Select Option</option>
+                                      {options.map((opt, i) => (
+                                        <option key={i} value={String(opt).trim()}>
+                                          {String(opt).trim()}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {isVisitType && questionFormData[fieldKey] && (
+                                      <div className="date-field mt-2">
+                                        <label className="form-label">Select Date:</label>
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          value={selectedDate}
+                                          onChange={(e) => setSelectedDate(e.target.value)}
+                                          required
+                                        />
+                                      </div>
+                                    )}
+                                    {hasRejected && questionFormData[fieldKey] === 'Rejected' && questionFormData[`${fieldKey}_reason`] && (
+                                      <div className="mt-2 p-2 bg-light border rounded">
+                                        <small className="text-danger fw-bold">Rejection Reason:</small>
+                                        <div className="mt-1 text-muted">{questionFormData[`${fieldKey}_reason`]}</div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">9</td>
-                        <td className="question">Confirm DOB</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q9_select"
-                                className="form-select"
-                                value={questionFormData.q9}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q9: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">10</td>
-                        <td className="question">Are you Going to Attend Center for Physical Counselling</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q10_select"
-                                className="form-select"
-                                value={questionFormData.q10}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q10: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Visit">Visit</option>
-                                <option value="Joining">Joining</option>
-                                <option value="Both">Both</option>
-                              </select>
-                            </div>
-                            {questionFormData.q10 && (
-                              <div className="date-field mt-2">
-                                <label className="form-label">Select Date:</label>
-                                <input
-                                  type="date"
-                                  className="form-control"
-                                  value={selectedDate}
-                                  onChange={(e) => setSelectedDate(e.target.value)}
-                                  required
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
-                    <button
-                      onClick={QuestionAnswer}
-                      className="btn btn-primary"
-                      disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
-                    >
-                      {isSubmittingAnswers ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit'
-                      )}
-                    </button>
                   </table>
+                <div className="modal-footer border-0 pt-2">
+                  <button
+                    type="button"
+                    onClick={QuestionAnswer}
+                    className="btn btn-primary"
+                    disabled={isLoadingQuestionAnswers || isSubmittingAnswers || isLoadingPreVerificationQuestions}
+                  >
+                    {isSubmittingAnswers ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
                 </div>
               </div>
 
@@ -5843,6 +5897,55 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           </div>
         </div>
       )}
+        {showBranchModal && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                                  <div className="modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Select Branch</h1>
+                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="course"
+                                          value={selectedBranch}
+                                          onChange={(e) => setSelectedBranch(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+
+                                          }}
+
+                                        >
+                                          <option value="">Select Branch</option>
+                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                            <option key={branch._id || index} value={branch._id}>
+                                              {branch.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {
+                                        setShowBranchModal(false);
+                                        setSelectedBranch('');
+                                      }}>Close</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(selectedProfile, selectedBranch)}>Save Branch</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
       <style>
         {`
@@ -11047,6 +11150,42 @@ max-width: 600px;
         .verification-table tbody tr:nth-child(5) { animation-delay: 0.3s; }
         .verification-table tbody tr:nth-child(6) { animation-delay: 0.35s; }
         .verification-table tbody tr:nth-child(7) { animation-delay: 0.4s; }
+          `
+        }
+      </style>
+      <style>
+        {
+          `
+          @media (min-width:768px){
+          .penddingBtn{
+                  font-size: 10px !important;
+                  max-width: min-content;
+          }
+                  html body .content .content-wrapper {
+    margin-top: 3rem;
+    padding: 1.8rem 2.2rem 0;
+}
+                  
+          }
+          @media (max-width: 768px){
+          .CButton{ font-size:12px; padding:2px; 
+          white-space: nowrap;}
+          html body .content .content-wrapper {
+    margin-top: 2rem;
+    padding: 1.8rem 1.2rem 0;
+}
+          }
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+         .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+}
           `
         }
       </style>
