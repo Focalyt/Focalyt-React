@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import axios from 'axios';
@@ -440,6 +440,200 @@ const LeadAnalyticsDashboard = () => {
     const [aiDailySummary, setAiDailySummary] = useState(null);
     const [aiDailySummaryLoading, setAiDailySummaryLoading] = useState(false);
     const [aiDailySummaryError, setAiDailySummaryError] = useState(null);
+    const [aiAdmissionSummary, setAiAdmissionSummary] = useState(null);
+    const [aiAdmissionSummaryLoading, setAiAdmissionSummaryLoading] = useState(false);
+    const [aiAdmissionSummaryError, setAiAdmissionSummaryError] = useState(null);
+    const [aiKycSummary, setAiKycSummary] = useState(null);
+    const [aiKycSummaryLoading, setAiKycSummaryLoading] = useState(false);
+    const [aiKycSummaryError, setAiKycSummaryError] = useState(null);
+    const [aiLeadIntel, setAiLeadIntel] = useState([]);
+    const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
+    const [aiLeadIntelError, setAiLeadIntelError] = useState(null);
+    const [selectedAiLeadId, setSelectedAiLeadId] = useState('');
+    const [aiLeadSearchTerm, setAiLeadSearchTerm] = useState('');
+    const [aiLeadDetail, setAiLeadDetail] = useState(null);
+    const [aiLeadActions, setAiLeadActions] = useState([]);
+    const [aiLeadDetailLoading, setAiLeadDetailLoading] = useState(false);
+    const [aiLeadDetailError, setAiLeadDetailError] = useState(null);
+    const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
+    const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
+    const [pendingAiLeadDetailId, setPendingAiLeadDetailId] = useState(null);
+    const aiDetailSectionRef = useRef(null);
+
+    const getLeadDisplayName = (lead) => {
+        const fullName = [lead?.firstName, lead?.middleName, lead?.lastName].filter(Boolean).join(' ').trim();
+        return fullName
+            || lead?.name
+            || lead?.candidateName
+            || lead?._candidate?.name
+            || lead?._candidate?.fullName
+            || lead?._candidate?.personalInfo?.fullName
+            || 'Unnamed Lead';
+    };
+
+    const getLeadCenterName = (lead) => lead?._center?.name || lead?.centerName || 'Unknown Center';
+
+    const getLeadCounselorName = (lead) => {
+        const latestAssignment = Array.isArray(lead?.leadAssignment) && lead.leadAssignment.length > 0
+            ? lead.leadAssignment[lead.leadAssignment.length - 1]
+            : null;
+
+        return latestAssignment?.counsellorName || latestAssignment?.name || 'Unassigned';
+    };
+
+    const getLeadBatchName = (lead) => (
+        lead?._batch?.name
+        || lead?.batchName
+        || lead?._course?.batchName
+        || ''
+    );
+
+    const getLeadContactNumbers = (lead) => (
+        [
+            lead?.mobile,
+            lead?.phone,
+            lead?.whatsappNumber,
+            lead?._candidate?.mobile,
+            lead?._candidate?.phone,
+            lead?._candidate?.whatsappNumber,
+            lead?._candidate?.personalInfo?.mobile,
+            lead?._candidate?.personalInfo?.phone,
+        ].filter(Boolean)
+    );
+
+    const getLeadDocumentSnapshot = (lead) => {
+        const documents = Array.isArray(lead?.uploadedDocs) ? lead.uploadedDocs : [];
+
+        const normalizedDocuments = documents.map((doc) => {
+            const latestUpload = Array.isArray(doc?.uploads) && doc.uploads.length > 0
+                ? doc.uploads[doc.uploads.length - 1]
+                : null;
+
+            const rawStatus = latestUpload?.status || doc?.status || '';
+            const hasUpload = Boolean(
+                latestUpload?.fileUrl
+                || doc?.fileUrl
+                || (Array.isArray(doc?.uploads) && doc.uploads.length > 0)
+            );
+
+            let status = rawStatus;
+            if (!status) {
+                status = hasUpload ? 'Uploaded' : 'Not Uploaded';
+            }
+
+            return {
+                name: doc?.Name || doc?.name || 'Unknown Document',
+                hasUpload,
+                status,
+            };
+        });
+
+        const pendingDocs = normalizedDocuments.filter((doc) =>
+            ['Not Uploaded', 'No Uploads', 'Pending', 'Uploaded'].includes(doc.status) && !['Verified', 'Rejected'].includes(doc.status)
+        ).length;
+        const rejectedDocs = normalizedDocuments.filter((doc) => doc.status === 'Rejected').length;
+        const verifiedDocs = normalizedDocuments.filter((doc) => doc.status === 'Verified').length;
+        const pendingVerificationDocs = normalizedDocuments.filter((doc) => doc.status === 'Pending').length;
+        const hasAnyUploads = normalizedDocuments.some((doc) => doc.hasUpload);
+
+        const category = rejectedDocs > 0
+            ? 'Rejected'
+            : pendingVerificationDocs > 0
+                ? 'Pending Verification'
+                : !lead?.kyc && (pendingDocs > 0 || !hasAnyUploads)
+                    ? 'Pending KYC'
+                    : lead?.kyc
+                        ? 'Verified'
+                        : 'Review';
+
+        return {
+            documents: normalizedDocuments,
+            pendingDocs,
+            rejectedDocs,
+            verifiedDocs,
+            pendingVerificationDocs,
+            hasAnyUploads,
+            category,
+        };
+    };
+
+    const getLeadPrioritySeed = (lead) => {
+        let score = 0;
+
+        if (lead?.dropout) score += 30;
+        if (lead?.courseStatus === 0) score += 25;
+        if (lead?.followupDate && new Date(lead.followupDate) < new Date()) score += 20;
+        if (lead?.kycStage && !lead?.kyc) score += 15;
+        if (lead?.registrationFee !== 'Paid') score += 10;
+        if (lead?.admissionDone) score -= 20;
+
+        return score;
+    };
+
+    const getLeadNotes = (lead) => {
+        const remarkNotes = Array.isArray(lead?.remarks)
+            ? lead.remarks.map((item) => item?.remark || item?.text || item?.comment).filter(Boolean)
+            : [];
+        const followupNotes = Array.isArray(lead?.followups)
+            ? lead.followups.map((item) => item?.remark || item?.note || item?.comment).filter(Boolean)
+            : [];
+
+        return [...remarkNotes, ...followupNotes].slice(-10);
+    };
+
+    const buildAiLeadProfile = useCallback((lead) => {
+        const documentSnapshot = getLeadDocumentSnapshot(lead);
+        const followupDate = lead?.followupDate || null;
+        const isOverdue = followupDate ? new Date(followupDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
+        return {
+            _id: lead?._id,
+            _candidate: lead?._candidate,
+            _course: lead?._course,
+            _center: lead?._center,
+            _leadStatus: lead?._leadStatus,
+            leadAssignment: lead?.leadAssignment,
+            followupDate,
+            followups: lead?.followups || [],
+            remarks: lead?.remarks || [],
+            createdAt: lead?.createdAt || null,
+            updatedAt: lead?.updatedAt || null,
+            admissionDate: lead?.admissionDate || null,
+            registrationFee: lead?.registrationFee || 'Unknown',
+            dropout: !!lead?.dropout,
+            kyc: !!lead?.kyc,
+            kycStage: !!lead?.kycStage,
+            admissionDone: !!lead?.admissionDone,
+            studentName: getLeadDisplayName(lead),
+            centerName: getLeadCenterName(lead),
+            counselorName: getLeadCounselorName(lead),
+            courseName: lead?._course?.name || lead?.courseName || lead?.course || 'Not specified',
+            batchName: getLeadBatchName(lead) || 'Unassigned',
+            latestLeadStatus: lead?._leadStatus?.title || lead?.leadStatus || 'Unknown',
+            notes: getLeadNotes(lead),
+            riskContext: {
+                isOverdueFollowup: isOverdue,
+                hasNoUploads: !documentSnapshot.hasAnyUploads,
+                pendingDocs: documentSnapshot.pendingDocs,
+                rejectedDocs: documentSnapshot.rejectedDocs,
+                verifiedDocs: documentSnapshot.verifiedDocs,
+                pendingVerificationDocs: documentSnapshot.pendingVerificationDocs,
+                kycBucket: documentSnapshot.category,
+            },
+        };
+    }, []);
+
+    const openLeadInAiDetail = (leadId) => {
+        if (!leadId) return;
+        setSelectedAiLeadId(leadId);
+        setAiLeadDetail(null);
+        setAiLeadActions([]);
+        setAiLeadDetailError(null);
+        setPendingAiLeadDetailId(leadId);
+        window.requestAnimationFrame(() => {
+            aiDetailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    };
     // Initialize with today's date
     const getInitialDates = () => {
         const today = new Date();
@@ -791,6 +985,426 @@ const LeadAnalyticsDashboard = () => {
         };
     }, [filteredData]);
 
+    const aiScopedLeads = useMemo(() => (
+        selectedCenter === 'all'
+            ? filteredData
+            : filteredData.filter(lead => lead?._center?.name === selectedCenter)
+    ), [filteredData, selectedCenter]);
+
+    const aiLeadCandidates = useMemo(() => (
+        [...aiScopedLeads]
+            .filter(Boolean)
+            .sort((a, b) => getLeadPrioritySeed(b) - getLeadPrioritySeed(a))
+            .slice(0, 5)
+            .map((lead) => {
+                const aiProfile = buildAiLeadProfile(lead);
+                return {
+                    _id: aiProfile._id,
+                    name: aiProfile.studentName,
+                    center: aiProfile.centerName,
+                    counselor: aiProfile.counselorName,
+                    course: aiProfile.courseName,
+                    status: aiProfile.latestLeadStatus,
+                    substatuses: Array.isArray(lead?._leadStatus?.substatuses)
+                        ? lead._leadStatus.substatuses.map((item) => item?.title).filter(Boolean)
+                        : [],
+                    remarks: aiProfile.notes.slice(-5),
+                    admissionDone: aiProfile.admissionDone,
+                    dropout: aiProfile.dropout,
+                    kycDone: aiProfile.kyc,
+                    kycStage: aiProfile.kycStage,
+                    registrationFee: aiProfile.registrationFee,
+                    followupDate: aiProfile.followupDate,
+                    createdAt: aiProfile.createdAt,
+                    batchName: aiProfile.batchName,
+                    riskContext: aiProfile.riskContext,
+                };
+            })
+    ), [aiScopedLeads, buildAiLeadProfile]);
+
+    const aiLeadPrioritySnapshot = useMemo(() => ({
+        high: aiLeadIntel.filter((lead) => lead.priority === 'High').length,
+        medium: aiLeadIntel.filter((lead) => lead.priority === 'Medium').length,
+        low: aiLeadIntel.filter((lead) => lead.priority === 'Low').length,
+    }), [aiLeadIntel]);
+
+    const kycSupervisorData = useMemo(() => {
+        const stats = {
+            totalLeads: aiScopedLeads.length,
+            kycPending: 0,
+            kycDone: 0,
+            leadsWithPendingDocuments: 0,
+            leadsWithRejectedDocuments: 0,
+            leadsWithoutAnyUploads: 0,
+            leadsPendingVerification: 0,
+        };
+
+        const leadRiskList = aiScopedLeads.map((lead) => {
+            const documentSnapshot = getLeadDocumentSnapshot(lead);
+            const pendingDocs = documentSnapshot.pendingDocs;
+            const rejectedDocs = documentSnapshot.rejectedDocs;
+            const verifiedDocs = documentSnapshot.verifiedDocs;
+            const hasAnyUploads = documentSnapshot.hasAnyUploads;
+            const pendingVerification = documentSnapshot.pendingVerificationDocs > 0;
+
+            if (lead?.kyc) stats.kycDone += 1;
+            if (!lead?.kyc && documentSnapshot.category === 'Pending KYC') stats.kycPending += 1;
+            if (pendingDocs > 0 && !lead?.kyc) stats.leadsWithPendingDocuments += 1;
+            if (rejectedDocs > 0) stats.leadsWithRejectedDocuments += 1;
+            if (!hasAnyUploads) stats.leadsWithoutAnyUploads += 1;
+            if (pendingVerification) stats.leadsPendingVerification += 1;
+
+            const riskScore =
+                (rejectedDocs * 30) +
+                (pendingDocs * 10) +
+                (pendingVerification ? 20 : 0) +
+                (!hasAnyUploads ? 20 : 0) +
+                (lead?.kycStage && !lead?.kyc ? 15 : 0) -
+                (lead?.kyc ? 25 : 0) -
+                (verifiedDocs * 5);
+
+            return {
+                _id: lead?._id,
+                name: getLeadDisplayName(lead),
+                center: getLeadCenterName(lead),
+                course: lead?._course?.name || lead?.courseName || 'Not specified',
+                pendingDocs,
+                rejectedDocs,
+                verifiedDocs,
+                hasAnyUploads,
+                pendingVerification,
+                category: documentSnapshot.category,
+                riskScore,
+            };
+        });
+
+        return {
+            stats,
+            kycRows: leadRiskList
+                .map((lead) => ({
+                    _id: lead._id,
+                    studentName: lead.name,
+                    courseName: lead.course,
+                    centerName: lead.center,
+                    pendingDocs: lead.pendingDocs,
+                    rejectedDocs: lead.rejectedDocs,
+                    verifiedDocs: lead.verifiedDocs,
+                    uploadStatus: lead.hasAnyUploads ? 'Uploaded' : 'No Upload',
+                    verificationStatus: lead.pendingVerification ? 'Pending Verification' : 'Not Pending',
+                    kycCategory: lead.category,
+                }))
+                .sort((a, b) => (
+                    (b.pendingDocs + b.rejectedDocs) - (a.pendingDocs + a.rejectedDocs)
+                )),
+            topRiskLeads: leadRiskList
+                .filter((lead) => lead.riskScore > 0)
+                .sort((a, b) => b.riskScore - a.riskScore)
+                .slice(0, 5),
+        };
+    }, [aiScopedLeads]);
+
+    const admissionSupervisorData = useMemo(() => {
+        const admittedLeads = aiScopedLeads.filter((lead) => lead?.admissionDone || lead?.admissionDate);
+        const stats = {
+            totalAdmitted: admittedLeads.length,
+            paidAdmissions: 0,
+            unpaidAdmissions: 0,
+            dropouts: 0,
+            noBatchAssigned: 0,
+            noBranchAssigned: 0,
+            missingAdmissionDate: 0,
+        };
+        const courseMap = {};
+
+        const riskLeads = admittedLeads.map((lead) => {
+            const batchName = getLeadBatchName(lead);
+            const hasBatch = !!batchName;
+            const hasBranch = !!(lead?._center?._id || lead?._center?.name || lead?.centerName);
+            const isPaid = lead?.registrationFee === 'Paid';
+            const isDropout = !!lead?.dropout;
+            const hasAdmissionDate = !!lead?.admissionDate;
+            const courseName = lead?._course?.name || lead?.courseName || 'Not specified';
+
+            if (isPaid) stats.paidAdmissions += 1;
+            if (!isPaid) stats.unpaidAdmissions += 1;
+            if (isDropout) stats.dropouts += 1;
+            if (!hasBatch) stats.noBatchAssigned += 1;
+            if (!hasBranch) stats.noBranchAssigned += 1;
+            if (!hasAdmissionDate) stats.missingAdmissionDate += 1;
+
+            if (!courseMap[courseName]) {
+                courseMap[courseName] = {
+                    courseName,
+                    totalAdmitted: 0,
+                    paidAdmissions: 0,
+                    unpaidAdmissions: 0,
+                    dropouts: 0,
+                    noBatchAssigned: 0,
+                    noBranchAssigned: 0,
+                };
+            }
+
+            courseMap[courseName].totalAdmitted += 1;
+            if (isPaid) courseMap[courseName].paidAdmissions += 1;
+            if (!isPaid) courseMap[courseName].unpaidAdmissions += 1;
+            if (isDropout) courseMap[courseName].dropouts += 1;
+            if (!hasBatch) courseMap[courseName].noBatchAssigned += 1;
+            if (!hasBranch) courseMap[courseName].noBranchAssigned += 1;
+
+            const riskScore =
+                (isDropout ? 40 : 0) +
+                (!isPaid ? 20 : 0) +
+                (!hasBatch ? 20 : 0) +
+                (!hasBranch ? 15 : 0) +
+                (!hasAdmissionDate ? 10 : 0);
+
+            return {
+                _id: lead?._id,
+                name: getLeadDisplayName(lead),
+                course: courseName,
+                center: getLeadCenterName(lead),
+                batchName: batchName || 'Unassigned',
+                isPaid,
+                isDropout,
+                hasAdmissionDate,
+                riskScore,
+            };
+        });
+
+        return {
+            stats,
+            courseBreakdown: Object.values(courseMap)
+                .sort((a, b) => b.totalAdmitted - a.totalAdmitted || a.courseName.localeCompare(b.courseName)),
+            admissionRows: admittedLeads
+                .map((lead) => ({
+                    _id: lead?._id,
+                    studentName: getLeadDisplayName(lead),
+                    courseName: lead?._course?.name || lead?.courseName || 'Not specified',
+                    centerName: getLeadCenterName(lead),
+                    counselorName: getLeadCounselorName(lead),
+                    batchName: getLeadBatchName(lead) || 'Unassigned',
+                    admissionDate: lead?.admissionDate || null,
+                    feeStatus: lead?.registrationFee || 'Unknown',
+                    dropout: !!lead?.dropout,
+                }))
+                .sort((a, b) => {
+                    const dateA = a.admissionDate ? new Date(a.admissionDate).getTime() : 0;
+                    const dateB = b.admissionDate ? new Date(b.admissionDate).getTime() : 0;
+                    return dateB - dateA;
+                }),
+            topRiskLeads: riskLeads
+                .filter((lead) => lead.riskScore > 0)
+                .sort((a, b) => b.riskScore - a.riskScore)
+                .slice(0, 5),
+        };
+    }, [aiScopedLeads]);
+
+    const aiSupervisionQueue = useMemo(() => {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const queue = aiScopedLeads.flatMap((lead) => {
+            const documentSnapshot = getLeadDocumentSnapshot(lead);
+            const leadName = getLeadDisplayName(lead);
+            const courseName = lead?._course?.name || lead?.courseName || 'Not specified';
+            const centerName = getLeadCenterName(lead);
+            const counselorName = getLeadCounselorName(lead);
+            const batchName = getLeadBatchName(lead) || 'Unassigned';
+            const contactNumbers = getLeadContactNumbers(lead);
+            const followupDate = lead?.followupDate || null;
+            const isOverdue = followupDate ? new Date(followupDate) < todayStart : false;
+            const rows = [];
+
+            const pushItem = (type, severity, label, reason, action, extra = {}) => {
+                rows.push({
+                    _id: `${lead?._id}-${type}`,
+                    leadId: lead?._id,
+                    type,
+                    severity,
+                    label,
+                    reason,
+                    action,
+                    studentName: leadName,
+                    courseName,
+                    centerName,
+                    counselorName,
+                    contactNumbers,
+                    followupDate,
+                    admissionDate: lead?.admissionDate || null,
+                    feeStatus: lead?.registrationFee || 'Unknown',
+                    batchName,
+                    kycBucket: documentSnapshot.category,
+                    sourceStatus: lead?._leadStatus?.title || lead?.leadStatus || 'Unknown',
+                    ...extra,
+                });
+            };
+
+            if (documentSnapshot.rejectedDocs > 0) {
+                pushItem(
+                    'kycRejected',
+                    'High',
+                    'KYC Rejected',
+                    `${documentSnapshot.rejectedDocs} rejected document(s) need fresh upload or correction.`,
+                    'Call the student, explain the rejection reason, and ask for corrected documents today.',
+                    { pendingDocs: documentSnapshot.pendingDocs, rejectedDocs: documentSnapshot.rejectedDocs }
+                );
+            }
+
+            if (documentSnapshot.pendingVerificationDocs > 0) {
+                pushItem(
+                    'kycPendingVerification',
+                    'Medium',
+                    'Pending Verification',
+                    `${documentSnapshot.pendingVerificationDocs} document(s) are uploaded but waiting for review.`,
+                    'Prioritize document verification so the student can move to the next stage.',
+                    { pendingDocs: documentSnapshot.pendingDocs, rejectedDocs: documentSnapshot.rejectedDocs }
+                );
+            }
+
+            if (!lead?.kyc && !documentSnapshot.hasAnyUploads) {
+                pushItem(
+                    'kycNoUpload',
+                    'Medium',
+                    'No KYC Upload',
+                    'No document upload found for this lead.',
+                    'Send a document checklist and take follow-up on upload completion.'
+                );
+            }
+
+            if ((lead?.admissionDone || lead?.admissionDate) && lead?.registrationFee !== 'Paid') {
+                pushItem(
+                    'admissionUnpaid',
+                    'High',
+                    'Admission Unpaid',
+                    'Admission is marked, but the registration fee is still not paid.',
+                    'Take fee follow-up and confirm payment proof before batch movement.'
+                );
+            }
+
+            if ((lead?.admissionDone || lead?.admissionDate) && !getLeadBatchName(lead)) {
+                pushItem(
+                    'admissionNoBatch',
+                    'Medium',
+                    'Batch Not Assigned',
+                    'Student admission exists, but no batch is assigned.',
+                    'Assign batch quickly to avoid post-admission drop-off.'
+                );
+            }
+
+            if (lead?.dropout) {
+                pushItem(
+                    'dropoutRisk',
+                    'High',
+                    'Dropout',
+                    'Student is already marked as dropout.',
+                    'Review the dropout reason and identify if recovery or closure is needed.'
+                );
+            }
+
+            if (isOverdue) {
+                pushItem(
+                    'overdueFollowup',
+                    'Medium',
+                    'Overdue Follow-up',
+                    'Follow-up date has already passed.',
+                    'Counselor should reconnect with the student and update the next action date.'
+                );
+            }
+
+            return rows;
+        });
+
+        return queue.sort((a, b) => {
+            const severityOrder = { High: 3, Medium: 2, Low: 1 };
+            const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+            if (severityDiff !== 0) return severityDiff;
+
+            const followupA = a.followupDate ? new Date(a.followupDate).getTime() : 0;
+            const followupB = b.followupDate ? new Date(b.followupDate).getTime() : 0;
+            return followupA - followupB;
+        });
+    }, [aiScopedLeads]);
+
+    const aiQueueCounts = useMemo(() => ({
+        all: aiSupervisionQueue.length,
+        kycRejected: aiSupervisionQueue.filter((item) => item.type === 'kycRejected').length,
+        kycPendingVerification: aiSupervisionQueue.filter((item) => item.type === 'kycPendingVerification').length,
+        kycNoUpload: aiSupervisionQueue.filter((item) => item.type === 'kycNoUpload').length,
+        admissionUnpaid: aiSupervisionQueue.filter((item) => item.type === 'admissionUnpaid').length,
+        admissionNoBatch: aiSupervisionQueue.filter((item) => item.type === 'admissionNoBatch').length,
+        dropoutRisk: aiSupervisionQueue.filter((item) => item.type === 'dropoutRisk').length,
+        overdueFollowup: aiSupervisionQueue.filter((item) => item.type === 'overdueFollowup').length,
+    }), [aiSupervisionQueue]);
+
+    const filteredAiSupervisionQueue = useMemo(() => {
+        const query = aiSupervisionSearchTerm.trim().toLowerCase();
+        const normalizedQueryDigits = query.replace(/\D/g, '');
+
+        return aiSupervisionQueue.filter((item) => {
+            const matchesFilter = aiSupervisionQueueFilter === 'all' || item.type === aiSupervisionQueueFilter;
+            if (!matchesFilter) return false;
+
+            if (!query) return true;
+
+            const haystack = [
+                item.studentName,
+                item.courseName,
+                item.centerName,
+                item.counselorName,
+                item.label,
+                item.reason,
+                item.action,
+                item.sourceStatus,
+                ...(Array.isArray(item.contactNumbers) ? item.contactNumbers : []),
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            const matchesText = haystack.includes(query);
+            if (matchesText) return true;
+
+            if (!normalizedQueryDigits) return false;
+
+            const contactDigits = (Array.isArray(item.contactNumbers) ? item.contactNumbers : [])
+                .map((value) => String(value).replace(/\D/g, ''))
+                .filter(Boolean);
+
+            return contactDigits.some((digits) => digits.includes(normalizedQueryDigits));
+        });
+    }, [aiSupervisionQueue, aiSupervisionQueueFilter, aiSupervisionSearchTerm]);
+
+    const selectedAiLead = useMemo(() => (
+        filteredData.find((lead) => lead?._id === selectedAiLeadId) || null
+    ), [filteredData, selectedAiLeadId]);
+
+    const aiFilteredLeadOptions = useMemo(() => {
+        const query = aiLeadSearchTerm.trim().toLowerCase();
+
+        const matches = !query
+            ? aiScopedLeads
+            : aiScopedLeads.filter((lead) => {
+                const haystack = [
+                    getLeadDisplayName(lead),
+                    getLeadCenterName(lead),
+                    getLeadCounselorName(lead),
+                    lead?._course?.name,
+                    lead?.courseName,
+                    lead?._leadStatus?.title,
+                    lead?.mobile,
+                    lead?.phone,
+                    lead?.email
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+
+                return haystack.includes(query);
+            });
+
+        return matches.slice(0, 100).map((lead) => ({
+            value: lead._id,
+            label: `${getLeadDisplayName(lead)} | ${getLeadCenterName(lead)} | ${lead?._course?.name || lead?.courseName || 'No Course'}`
+        }));
+    }, [aiScopedLeads, aiLeadSearchTerm]);
+
     const generateDailyAiSummary = async () => {
         try {
             if (!token || !backendUrl) return;
@@ -823,6 +1437,236 @@ const LeadAnalyticsDashboard = () => {
             setAiDailySummaryLoading(false);
         }
     };
+
+    const generatePriorityLeadInsights = async () => {
+        try {
+            if (!token || !backendUrl) return;
+            if (aiLeadCandidates.length === 0) {
+                setAiLeadIntel([]);
+                setAiLeadIntelError('No registration leads found for the current filters.');
+                return;
+            }
+
+            setAiLeadIntelLoading(true);
+            setAiLeadIntelError(null);
+
+            const res = await axios.post(
+                `${backendUrl}/api/ai/lead-intel/bulk`,
+                { leads: aiLeadCandidates },
+                { headers: { 'x-auth': token } }
+            );
+
+            if (res.data?.success && res.data?.data) {
+                const rankedLeads = aiLeadCandidates
+                    .map((lead) => ({
+                        ...lead,
+                        ...(res.data.data[lead._id] || {}),
+                    }))
+                    .filter((lead) => lead.summary || lead.suggestedAction || typeof lead.score === 'number')
+                    .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+                setAiLeadIntel(rankedLeads);
+            } else {
+                setAiLeadIntel([]);
+                setAiLeadIntelError(res.data?.message || 'Failed to generate AI lead insights');
+            }
+        } catch (err) {
+            setAiLeadIntel([]);
+            setAiLeadIntelError(err.response?.data?.message || err.message || 'Failed to generate AI lead insights');
+        } finally {
+            setAiLeadIntelLoading(false);
+        }
+    };
+
+    const generateDetailedAiLeadProfile = useCallback(async (leadOverride = null) => {
+        try {
+            const targetLead = leadOverride || selectedAiLead;
+            if (!token || !backendUrl || !targetLead) return;
+
+            setAiLeadDetailLoading(true);
+            setAiLeadDetailError(null);
+
+            const leadProfile = buildAiLeadProfile(targetLead);
+            const notes = leadProfile.notes;
+
+            const [summaryRes, actionsRes] = await Promise.all([
+                axios.post(
+                    `${backendUrl}/api/ai/lead-summary`,
+                    {
+                        leadId: targetLead._id,
+                        leadProfile,
+                        notes,
+                        messages: []
+                    },
+                    { headers: { 'x-auth': token } }
+                ),
+                axios.post(
+                    `${backendUrl}/api/ai/next-best-action`,
+                    {
+                        leadProfile,
+                        notes
+                    },
+                    { headers: { 'x-auth': token } }
+                )
+            ]);
+
+            if (summaryRes.data?.success) {
+                setAiLeadDetail(summaryRes.data.data || null);
+            } else {
+                setAiLeadDetail(null);
+            }
+
+            if (actionsRes.data?.success) {
+                setAiLeadActions(actionsRes.data.data?.actions || []);
+            } else {
+                setAiLeadActions([]);
+            }
+        } catch (err) {
+            setAiLeadDetail(null);
+            setAiLeadActions([]);
+            setAiLeadDetailError(err.response?.data?.message || err.message || 'Failed to generate detailed AI lead profile');
+        } finally {
+            setAiLeadDetailLoading(false);
+        }
+    }, [backendUrl, buildAiLeadProfile, selectedAiLead, token]);
+
+    useEffect(() => {
+        if (!pendingAiLeadDetailId || selectedAiLead?._id !== pendingAiLeadDetailId) return;
+
+        generateDetailedAiLeadProfile(selectedAiLead);
+        setPendingAiLeadDetailId(null);
+    }, [generateDetailedAiLeadProfile, pendingAiLeadDetailId, selectedAiLead]);
+
+    const generateKycAiSupervision = async () => {
+        try {
+            if (!token || !backendUrl) return;
+
+            setAiKycSummaryLoading(true);
+            setAiKycSummaryError(null);
+
+            const dateLabel = useCustomDate && startDate && endDate
+                ? `${new Date(startDate).toLocaleDateString('en-IN')} - ${new Date(endDate).toLocaleDateString('en-IN')}`
+                : (selectedPeriod || 'today');
+
+            const highlights = [
+                `Center filter: ${selectedCenter}`,
+                `KYC pending leads: ${kycSupervisorData.stats.kycPending}`,
+                `KYC done leads: ${kycSupervisorData.stats.kycDone}`,
+                `Pending document leads: ${kycSupervisorData.stats.leadsWithPendingDocuments}`,
+                `Rejected document leads: ${kycSupervisorData.stats.leadsWithRejectedDocuments}`,
+                `No upload leads: ${kycSupervisorData.stats.leadsWithoutAnyUploads}`,
+                `Pending verification leads: ${kycSupervisorData.stats.leadsPendingVerification}`,
+                `KYC action queue: ${aiQueueCounts.kycRejected + aiQueueCounts.kycPendingVerification + aiQueueCounts.kycNoUpload}`,
+                ...kycSupervisorData.topRiskLeads.map((lead, index) =>
+                    `Risk lead ${index + 1}: ${lead.name} | ${lead.center} | pending docs=${lead.pendingDocs} | rejected docs=${lead.rejectedDocs}`
+                ),
+                ...filteredAiSupervisionQueue
+                    .filter((item) => item.type.startsWith('kyc'))
+                    .slice(0, 5)
+                    .map((item, index) => `KYC queue ${index + 1}: ${item.studentName} | ${item.courseName} | ${item.label} | ${item.reason}`)
+            ];
+
+            const res = await axios.post(
+                `${backendUrl}/api/ai/dashboard-daily-summary`,
+                {
+                    date: dateLabel,
+                    stats: {
+                        ...kycSupervisorData.stats,
+                        admissions: dashboardAiStats.admissions,
+                        overdueFollowups: dashboardAiStats.overdueFollowups,
+                    },
+                    highlights
+                },
+                { headers: { 'x-auth': token } }
+            );
+
+            if (res.data?.success && res.data?.data) {
+                setAiKycSummary(res.data.data);
+            } else {
+                setAiKycSummary(null);
+                setAiKycSummaryError(res.data?.message || 'Failed to generate AI KYC supervision');
+            }
+        } catch (err) {
+            setAiKycSummary(null);
+            setAiKycSummaryError(err.response?.data?.message || err.message || 'Failed to generate AI KYC supervision');
+        } finally {
+            setAiKycSummaryLoading(false);
+        }
+    };
+
+    const generateAdmissionAiSupervision = async () => {
+        try {
+            if (!token || !backendUrl) return;
+
+            setAiAdmissionSummaryLoading(true);
+            setAiAdmissionSummaryError(null);
+
+            const dateLabel = useCustomDate && startDate && endDate
+                ? `${new Date(startDate).toLocaleDateString('en-IN')} - ${new Date(endDate).toLocaleDateString('en-IN')}`
+                : (selectedPeriod || 'today');
+
+            const highlights = [
+                `Center filter: ${selectedCenter}`,
+                `Total admitted: ${admissionSupervisorData.stats.totalAdmitted}`,
+                `Paid admissions: ${admissionSupervisorData.stats.paidAdmissions}`,
+                `Unpaid admissions: ${admissionSupervisorData.stats.unpaidAdmissions}`,
+                `Dropouts: ${admissionSupervisorData.stats.dropouts}`,
+                `No batch assigned: ${admissionSupervisorData.stats.noBatchAssigned}`,
+                `No branch assigned: ${admissionSupervisorData.stats.noBranchAssigned}`,
+                `Missing admission date: ${admissionSupervisorData.stats.missingAdmissionDate}`,
+                `Admission action queue: ${aiQueueCounts.admissionUnpaid + aiQueueCounts.admissionNoBatch + aiQueueCounts.dropoutRisk}`,
+                ...admissionSupervisorData.courseBreakdown.map((course, index) =>
+                    `Course ${index + 1}: ${course.courseName} | admissions=${course.totalAdmitted} | paid=${course.paidAdmissions} | unpaid=${course.unpaidAdmissions} | dropouts=${course.dropouts} | no batch=${course.noBatchAssigned}`
+                ),
+                ...admissionSupervisorData.topRiskLeads.map((lead, index) =>
+                    `Admission risk ${index + 1}: ${lead.name} | ${lead.center} | batch=${lead.batchName} | paid=${lead.isPaid ? 'yes' : 'no'} | dropout=${lead.isDropout ? 'yes' : 'no'}`
+                ),
+                ...filteredAiSupervisionQueue
+                    .filter((item) => ['admissionUnpaid', 'admissionNoBatch', 'dropoutRisk'].includes(item.type))
+                    .slice(0, 5)
+                    .map((item, index) => `Admission queue ${index + 1}: ${item.studentName} | ${item.courseName} | ${item.label} | ${item.reason}`)
+            ];
+
+            const res = await axios.post(
+                `${backendUrl}/api/ai/dashboard-daily-summary`,
+                {
+                    date: dateLabel,
+                    stats: {
+                        totalLeads: admissionSupervisorData.stats.totalAdmitted,
+                        kycPending: admissionSupervisorData.stats.unpaidAdmissions,
+                        kycDone: admissionSupervisorData.stats.paidAdmissions,
+                        admissions: admissionSupervisorData.stats.totalAdmitted,
+                        overdueFollowups: admissionSupervisorData.stats.noBatchAssigned + admissionSupervisorData.stats.noBranchAssigned,
+                    },
+                    highlights
+                },
+                { headers: { 'x-auth': token } }
+            );
+
+            if (res.data?.success && res.data?.data) {
+                setAiAdmissionSummary(res.data.data);
+            } else {
+                setAiAdmissionSummary(null);
+                setAiAdmissionSummaryError(res.data?.message || 'Failed to generate AI admission supervision');
+            }
+        } catch (err) {
+            setAiAdmissionSummary(null);
+            setAiAdmissionSummaryError(err.response?.data?.message || err.message || 'Failed to generate AI admission supervision');
+        } finally {
+            setAiAdmissionSummaryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!selectedAiLeadId && aiScopedLeads.length > 0) {
+            setSelectedAiLeadId(aiScopedLeads[0]._id);
+        }
+        if (selectedAiLeadId && !aiScopedLeads.some((lead) => lead?._id === selectedAiLeadId)) {
+            setSelectedAiLeadId(aiScopedLeads[0]?._id || '');
+            setAiLeadDetail(null);
+            setAiLeadActions([]);
+        }
+    }, [aiScopedLeads, selectedAiLeadId]);
 
     // Get daily admissions data
     const getDailyAdmissions = () => {
@@ -1900,8 +2744,833 @@ const LeadAnalyticsDashboard = () => {
                         </div>
                     </div>
 
+                    <div className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <CheckCircle className="text-success" size={18} />
+                                <strong>AI Admission Supervision</strong>
+                            </div>
+                            <button
+                                className="btn btn-sm btn-outline-success"
+                                onClick={generateAdmissionAiSupervision}
+                                disabled={aiAdmissionSummaryLoading}
+                            >
+                                {aiAdmissionSummaryLoading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                        Supervising...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-user-graduate me-2"></i>
+                                        Run Admission AI
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            <div className="row g-3 mb-3">
+                                <div className="col-12 col-md-3">
+                                    <div className="border rounded-3 p-3 bg-light h-100">
+                                        <div className="text-muted small mb-1">Total Admitted</div>
+                                        <div className="h4 mb-0 text-success">{admissionSupervisorData.stats.totalAdmitted}</div>
+                                    </div>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('admissionUnpaid')}
+                                    >
+                                        <div className="text-muted small mb-1">Unpaid Admissions</div>
+                                        <div className="h4 mb-0 text-warning">{admissionSupervisorData.stats.unpaidAdmissions}</div>
+                                    </button>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('admissionNoBatch')}
+                                    >
+                                        <div className="text-muted small mb-1">No Batch Assigned</div>
+                                        <div className="h4 mb-0 text-primary">{admissionSupervisorData.stats.noBatchAssigned}</div>
+                                    </button>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('dropoutRisk')}
+                                    >
+                                        <div className="text-muted small mb-1">Dropouts</div>
+                                        <div className="h4 mb-0 text-danger">{admissionSupervisorData.stats.dropouts}</div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border rounded-3 p-3 bg-light mb-3">
+                                <div className="fw-semibold mb-2">Course-wise Admission Breakdown</div>
+                                {admissionSupervisorData.courseBreakdown.length > 0 ? (
+                                    <div className="table-responsive">
+                                        <table className="table table-sm align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Course</th>
+                                                    <th className="text-center">Admissions</th>
+                                                    <th className="text-center">Paid</th>
+                                                    <th className="text-center">Unpaid</th>
+                                                    <th className="text-center">Dropouts</th>
+                                                    <th className="text-center">No Batch</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {admissionSupervisorData.courseBreakdown.map((course) => (
+                                                    <tr key={course.courseName}>
+                                                        <td className="fw-medium">{course.courseName}</td>
+                                                        <td className="text-center">{course.totalAdmitted}</td>
+                                                        <td className="text-center text-success">{course.paidAdmissions}</td>
+                                                        <td className="text-center text-warning">{course.unpaidAdmissions}</td>
+                                                        <td className="text-center text-danger">{course.dropouts}</td>
+                                                        <td className="text-center text-primary">{course.noBatchAssigned}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-muted small">No course-wise admissions found for the current filters.</div>
+                                )}
+                            </div>
+
+                            <div className="border rounded-3 p-3 bg-light mb-3">
+                                <div className="fw-semibold mb-2">Admission Student Table</div>
+                                {admissionSupervisorData.admissionRows.length > 0 ? (
+                                    <div className="table-responsive">
+                                        <table className="table table-sm align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Student Name</th>
+                                                    <th>Course Name</th>
+                                                    <th>Center</th>
+                                                    <th>Counselor</th>
+                                                    <th>Admission Date</th>
+                                                    <th>Fee Status</th>
+                                                    <th>Batch</th>
+                                                    <th>Status</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {admissionSupervisorData.admissionRows.map((row) => (
+                                                    <tr key={row._id}>
+                                                        <td className="fw-medium">{row.studentName}</td>
+                                                        <td>{row.courseName}</td>
+                                                        <td>{row.centerName}</td>
+                                                        <td>{row.counselorName}</td>
+                                                        <td>{row.admissionDate ? new Date(row.admissionDate).toLocaleDateString('en-IN') : 'N/A'}</td>
+                                                        <td>
+                                                            <span className={row.feeStatus === 'Paid' ? 'text-success fw-medium' : 'text-warning fw-medium'}>
+                                                                {row.feeStatus}
+                                                            </span>
+                                                        </td>
+                                                        <td>{row.batchName}</td>
+                                                        <td>
+                                                            <span className={row.dropout ? 'text-danger fw-medium' : 'text-success fw-medium'}>
+                                                                {row.dropout ? 'Dropout' : 'Active'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-info"
+                                                                onClick={() => openLeadInAiDetail(row._id)}
+                                                            >
+                                                                Open AI Detail
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-muted small">No admission student data found for the current filters.</div>
+                                )}
+                            </div>
+
+                            {aiAdmissionSummaryError && (
+                                <div className="alert alert-danger py-2 mb-3">{aiAdmissionSummaryError}</div>
+                            )}
+
+                            <div className="row g-3">
+                                <div className="col-12 col-lg-5">
+                                    <div className="border rounded-3 p-3 h-100 bg-light">
+                                        <div className="fw-semibold mb-2">Top Admission Risk Leads</div>
+                                        {admissionSupervisorData.topRiskLeads.length > 0 ? (
+                                            <div className="d-flex flex-column gap-2">
+                                                {admissionSupervisorData.topRiskLeads.map((lead) => (
+                                                    <div key={lead._id} className="border rounded-3 bg-white p-2">
+                                                        <div className="fw-semibold small">{lead.name}</div>
+                                                        <div className="text-muted small">{lead.center} | {lead.course}</div>
+                                                        <div className="small mt-1">
+                                                            Batch: {lead.batchName} | Fee: {lead.isPaid ? 'Paid' : 'Unpaid'} | {lead.isDropout ? 'Dropout' : 'Active'}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-link px-0 mt-1"
+                                                            onClick={() => openLeadInAiDetail(lead._id)}
+                                                        >
+                                                            Open full AI detail
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-muted small">No major post-admission risks detected in the current filters.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="col-12 col-lg-7">
+                                    {aiAdmissionSummary ? (
+                                        <div className="border rounded-3 p-3 h-100">
+                                            <div className="fw-semibold mb-2">{aiAdmissionSummary.title || 'Admission Supervision Summary'}</div>
+                                            <div className="small text-muted" style={{ whiteSpace: 'pre-line' }}>
+                                                {aiAdmissionSummary.summary}
+                                            </div>
+                                            {Array.isArray(aiAdmissionSummary.risks) && aiAdmissionSummary.risks.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Risks</div>
+                                                    <ul className="small mb-0 ps-3">
+                                                        {aiAdmissionSummary.risks.map((risk, index) => (
+                                                            <li key={index}>{risk}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {Array.isArray(aiAdmissionSummary.suggestedFocus) && aiAdmissionSummary.suggestedFocus.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Admission Actions</div>
+                                                    <ul className="small mb-0 ps-3">
+                                                        {aiAdmissionSummary.suggestedFocus.map((focus, index) => (
+                                                            <li key={index}>{focus}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="border rounded-3 p-4 h-100 d-flex align-items-center justify-content-center text-muted small bg-light">
+                                            Click <strong className="ms-1 me-1">Run Admission AI</strong> to supervise admission-post data like fee status, batch allocation, branch assignment, and dropouts from the dashboard.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <FileCheck className="text-warning" size={18} />
+                                <strong>AI KYC Supervision</strong>
+                            </div>
+                            <button
+                                className="btn btn-sm btn-outline-warning"
+                                onClick={generateKycAiSupervision}
+                                disabled={aiKycSummaryLoading}
+                            >
+                                {aiKycSummaryLoading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                        Supervising...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-user-shield me-2"></i>
+                                        Run KYC Supervision
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            <div className="row g-3 mb-3">
+                                <div className="col-12 col-md-3">
+                                    <div className="border rounded-3 p-3 bg-light h-100">
+                                        <div className="text-muted small mb-1">Pending KYC</div>
+                                        <div className="h4 mb-0 text-warning">{kycSupervisorData.stats.kycPending}</div>
+                                    </div>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('kycRejected')}
+                                    >
+                                        <div className="text-muted small mb-1">Rejected Docs</div>
+                                        <div className="h4 mb-0 text-danger">{kycSupervisorData.stats.leadsWithRejectedDocuments}</div>
+                                    </button>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('kycNoUpload')}
+                                    >
+                                        <div className="text-muted small mb-1">No Uploads</div>
+                                        <div className="h4 mb-0 text-secondary">{kycSupervisorData.stats.leadsWithoutAnyUploads}</div>
+                                    </button>
+                                </div>
+                                <div className="col-12 col-md-3">
+                                    <button
+                                        type="button"
+                                        className="border rounded-3 p-3 bg-light h-100 w-100 text-start"
+                                        style={{ border: '1px solid #dee2e6' }}
+                                        onClick={() => setAiSupervisionQueueFilter('kycPendingVerification')}
+                                    >
+                                        <div className="text-muted small mb-1">Pending Verification</div>
+                                        <div className="h4 mb-0 text-primary">{kycSupervisorData.stats.leadsPendingVerification}</div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border rounded-3 p-3 bg-light mb-3">
+                                <div className="fw-semibold mb-2">KYC Student Table</div>
+                                {kycSupervisorData.kycRows.length > 0 ? (
+                                    <div
+                                        className="table-responsive"
+                                        style={{ maxHeight: '560px', overflowY: 'auto' }}
+                                    >
+                                        <table className="table table-sm align-middle mb-0">
+                                            <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+                                                <tr>
+                                                    <th>Student Name</th>
+                                                    <th>Course Name</th>
+                                                    <th>Center</th>
+                                                    <th>KYC Bucket</th>
+                                                    <th className="text-center">Pending Docs</th>
+                                                    <th className="text-center">Rejected Docs</th>
+                                                    <th className="text-center">Verified Docs</th>
+                                                    <th>Upload Status</th>
+                                                    <th>Verification Status</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {kycSupervisorData.kycRows.map((row) => (
+                                                    <tr key={row._id}>
+                                                        <td className="fw-medium">{row.studentName}</td>
+                                                        <td>{row.courseName}</td>
+                                                        <td>{row.centerName}</td>
+                                                        <td>
+                                                            <span className={
+                                                                row.kycCategory === 'Rejected'
+                                                                    ? 'text-danger fw-medium'
+                                                                    : row.kycCategory === 'Pending Verification'
+                                                                        ? 'text-primary fw-medium'
+                                                                        : row.kycCategory === 'Pending KYC'
+                                                                            ? 'text-warning fw-medium'
+                                                                            : 'text-success fw-medium'
+                                                            }>
+                                                                {row.kycCategory}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-center text-warning fw-medium">{row.pendingDocs}</td>
+                                                        <td className="text-center text-danger fw-medium">{row.rejectedDocs}</td>
+                                                        <td className="text-center text-success fw-medium">{row.verifiedDocs}</td>
+                                                        <td>
+                                                            <span className={row.uploadStatus === 'No Upload' ? 'text-danger fw-medium' : 'text-success fw-medium'}>
+                                                                {row.uploadStatus}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className={row.verificationStatus === 'Pending Verification' ? 'text-warning fw-medium' : 'text-muted fw-medium'}>
+                                                                {row.verificationStatus}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-info"
+                                                                onClick={() => openLeadInAiDetail(row._id)}
+                                                            >
+                                                                Open AI Detail
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-muted small">No KYC student data found for the current filters.</div>
+                                )}
+                            </div>
+
+                            {aiKycSummaryError && (
+                                <div className="alert alert-danger py-2 mb-3">{aiKycSummaryError}</div>
+                            )}
+
+                            <div className="row g-3">
+                                <div className="col-12 col-lg-5">
+                                    <div className="border rounded-3 p-3 h-100 bg-light">
+                                        <div className="fw-semibold mb-2">Top KYC Risk Leads</div>
+                                        {kycSupervisorData.topRiskLeads.length > 0 ? (
+                                            <div className="d-flex flex-column gap-2">
+                                                {kycSupervisorData.topRiskLeads.map((lead) => (
+                                                    <div key={lead._id} className="border rounded-3 bg-white p-2">
+                                                        <div className="fw-semibold small">{lead.name}</div>
+                                                        <div className="text-muted small">{lead.center} | {lead.course}</div>
+                                                        <div className="small mt-1">
+                                                            Pending: {lead.pendingDocs} | Rejected: {lead.rejectedDocs} | Verified: {lead.verifiedDocs}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-link px-0 mt-1"
+                                                            onClick={() => openLeadInAiDetail(lead._id)}
+                                                        >
+                                                            Open full AI detail
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-muted small">No major KYC-risk leads detected in the current filters.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="col-12 col-lg-7">
+                                    {aiKycSummary ? (
+                                        <div className="border rounded-3 p-3 h-100">
+                                            <div className="fw-semibold mb-2">{aiKycSummary.title || 'KYC Supervision Summary'}</div>
+                                            <div className="small text-muted" style={{ whiteSpace: 'pre-line' }}>
+                                                {aiKycSummary.summary}
+                                            </div>
+                                            {Array.isArray(aiKycSummary.risks) && aiKycSummary.risks.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Risks</div>
+                                                    <ul className="small mb-0 ps-3">
+                                                        {aiKycSummary.risks.map((risk, index) => (
+                                                            <li key={index}>{risk}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {Array.isArray(aiKycSummary.suggestedFocus) && aiKycSummary.suggestedFocus.length > 0 && (
+                                                <div className="mt-3">
+                                                    <div className="fw-semibold mb-1">Supervisor Actions</div>
+                                                    <ul className="small mb-0 ps-3">
+                                                        {aiKycSummary.suggestedFocus.map((focus, index) => (
+                                                            <li key={index}>{focus}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="border rounded-3 p-4 h-100 d-flex align-items-center justify-content-center text-muted small bg-light">
+                                            Click <strong className="ms-1 me-1">Run KYC Supervision</strong> to get AI supervision based on KYC management data, document status, and risky leads.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <AlertTriangle className="text-danger" size={18} />
+                                <strong>AI Supervision Action Queue</strong>
+                            </div>
+                            <div className="d-flex flex-wrap gap-2 align-items-center">
+                                <input
+                                    type="text"
+                                    className="form-control form-control-sm"
+                                    style={{ minWidth: '260px' }}
+                                    placeholder="Search student, course, reason, phone..."
+                                    value={aiSupervisionSearchTerm}
+                                    onChange={(e) => setAiSupervisionSearchTerm(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-secondary"
+                                    onClick={() => {
+                                        setAiSupervisionQueueFilter('all');
+                                        setAiSupervisionSearchTerm('');
+                                    }}
+                                >
+                                    Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                        <div className="card-body">
+                            <div className="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'all' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('all')}>
+                                    All ({aiQueueCounts.all})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycRejected' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('kycRejected')}>
+                                    Rejected ({aiQueueCounts.kycRejected})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycPendingVerification' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setAiSupervisionQueueFilter('kycPendingVerification')}>
+                                    Pending Verification ({aiQueueCounts.kycPendingVerification})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycNoUpload' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setAiSupervisionQueueFilter('kycNoUpload')}>
+                                    No Upload ({aiQueueCounts.kycNoUpload})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionUnpaid' ? 'btn-warning text-dark' : 'btn-outline-warning'}`} onClick={() => setAiSupervisionQueueFilter('admissionUnpaid')}>
+                                    Unpaid ({aiQueueCounts.admissionUnpaid})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionNoBatch' ? 'btn-info text-dark' : 'btn-outline-info'}`} onClick={() => setAiSupervisionQueueFilter('admissionNoBatch')}>
+                                    No Batch ({aiQueueCounts.admissionNoBatch})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'dropoutRisk' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('dropoutRisk')}>
+                                    Dropouts ({aiQueueCounts.dropoutRisk})
+                                </button>
+                                <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'overdueFollowup' ? 'btn-outline-dark active' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('overdueFollowup')}>
+                                    Overdue ({aiQueueCounts.overdueFollowup})
+                                </button>
+                            </div>
+
+                            <div className="small text-muted mb-3">
+                                Showing {filteredAiSupervisionQueue.length} action item(s)
+                                {aiSupervisionSearchTerm ? ` for "${aiSupervisionSearchTerm}"` : ''}.
+                            </div>
+
+                            {filteredAiSupervisionQueue.length > 0 ? (
+                                <div
+                                    className="table-responsive"
+                                    style={{ maxHeight: '560px', overflowY: 'auto' }}
+                                >
+                                    <table className="table table-sm align-middle mb-0">
+                                        <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+                                            <tr>
+                                                <th>Severity</th>
+                                                <th>Student</th>
+                                                <th>Course</th>
+                                                <th>Center</th>
+                                                <th>Issue</th>
+                                                <th>Reason</th>
+                                                <th>Recommended Action</th>
+                                                <th>Open</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredAiSupervisionQueue.map((item) => (
+                                                <tr key={item._id}>
+                                                    <td>
+                                                        <span className={`badge ${item.severity === 'High' ? 'bg-danger' : item.severity === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                                                            {item.severity}
+                                                        </span>
+                                                    </td>
+                                                    <td className="fw-medium">{item.studentName}</td>
+                                                    <td>{item.courseName}</td>
+                                                    <td>{item.centerName}</td>
+                                                    <td>{item.label}</td>
+                                                    <td className="small text-muted">{item.reason}</td>
+                                                    <td className="small">{item.action}</td>
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-outline-info"
+                                                            onClick={() => openLeadInAiDetail(item.leadId)}
+                                                        >
+                                                            AI Detail
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="border rounded-3 p-4 text-muted small bg-light">
+                                    No supervision action item found for the current queue filter.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <Target className="text-success" size={18} />
+                                <strong>AI Priority Leads</strong>
+                            </div>
+                            <button
+                                className="btn btn-sm btn-outline-success"
+                                onClick={generatePriorityLeadInsights}
+                                disabled={aiLeadIntelLoading}
+                            >
+                                {aiLeadIntelLoading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                        Scoring...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-brain me-2"></i>
+                                        Analyze Top Leads
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        <div className="card-body">
+                            <div className="row g-3 mb-3">
+                                <div className="col-12 col-md-4">
+                                    <div className="border rounded p-3 bg-light h-100">
+                                        <div className="text-muted small mb-1">High Priority</div>
+                                        <div className="h4 mb-0 text-danger">{aiLeadPrioritySnapshot.high}</div>
+                                    </div>
+                                </div>
+                                <div className="col-12 col-md-4">
+                                    <div className="border rounded p-3 bg-light h-100">
+                                        <div className="text-muted small mb-1">Medium Priority</div>
+                                        <div className="h4 mb-0 text-warning">{aiLeadPrioritySnapshot.medium}</div>
+                                    </div>
+                                </div>
+                                <div className="col-12 col-md-4">
+                                    <div className="border rounded p-3 bg-light h-100">
+                                        <div className="text-muted small mb-1">Low Priority</div>
+                                        <div className="h4 mb-0 text-success">{aiLeadPrioritySnapshot.low}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {aiLeadIntelError && (
+                                <div className="alert alert-danger py-2 mb-3">{aiLeadIntelError}</div>
+                            )}
+
+                            {aiLeadIntel.length > 0 ? (
+                                <div className="row g-3">
+                                    {aiLeadIntel.map((lead) => (
+                                        <div className="col-12 col-xl-6" key={lead._id}>
+                                            <div className="border rounded-3 p-3 h-100 bg-white">
+                                                <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                                    <div>
+                                                        <div className="fw-semibold">{lead.name}</div>
+                                                        <div className="text-muted small">
+                                                            {lead.course} • {lead.center} • {lead.counselor}
+                                                        </div>
+                                                    </div>
+                                                    <span className={`badge ${lead.priority === 'High' ? 'bg-danger' : lead.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                                                        {lead.priority || 'Unscored'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="d-flex flex-wrap gap-2 small mb-2">
+                                                    <span className="badge bg-light text-dark border">Score: {lead.score ?? '-'}</span>
+                                                    <span className="badge bg-light text-dark border">Intent: {lead.intent || '-'}</span>
+                                                    <span className="badge bg-light text-dark border">Status: {lead.status || '-'}</span>
+                                                    {lead.followupDate && (
+                                                        <span className="badge bg-light text-dark border">
+                                                            Follow-up: {new Date(lead.followupDate).toLocaleDateString('en-IN')}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="small text-muted mb-2" style={{ minHeight: '42px' }}>
+                                                    {lead.summary || 'AI summary not available for this lead yet.'}
+                                                </div>
+
+                                                <div className="border-top pt-2">
+                                                    <div className="small fw-semibold mb-1">Suggested action</div>
+                                                    <div className="small">{lead.suggestedAction || 'No action suggested.'}</div>
+                                                </div>
+                                                <div className="mt-3">
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline-info"
+                                                        onClick={() => openLeadInAiDetail(lead._id)}
+                                                    >
+                                                        Open full AI detail
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-muted small">
+                                    Click <strong>Analyze Top Leads</strong> to score the most important registration leads and get action suggestions from Anthropic.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div ref={aiDetailSectionRef} className="card shadow-sm border-0 mb-4">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                                <Users className="text-info" size={18} />
+                                <strong>AI Registration Full Detail</strong>
+                            </div>
+                            <div className="d-flex gap-2 flex-wrap align-items-center">
+                                <input
+                                    type="text"
+                                    className="form-control form-control-sm"
+                                    style={{ minWidth: '240px' }}
+                                    placeholder="Search by student, center, course, phone..."
+                                    value={aiLeadSearchTerm}
+                                    onChange={(e) => setAiLeadSearchTerm(e.target.value)}
+                                />
+                                <select
+                                    className="form-select form-select-sm"
+                                    style={{ minWidth: '320px' }}
+                                    value={selectedAiLeadId}
+                                    onChange={(e) => {
+                                        setSelectedAiLeadId(e.target.value);
+                                        setAiLeadDetail(null);
+                                        setAiLeadActions([]);
+                                        setAiLeadDetailError(null);
+                                    }}
+                                >
+                                    <option value="">Select registration lead</option>
+                                    {aiFilteredLeadOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    className="btn btn-sm btn-outline-info"
+                                    onClick={generateDetailedAiLeadProfile}
+                                    disabled={!selectedAiLeadId || aiLeadDetailLoading}
+                                >
+                                    {aiLeadDetailLoading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-magnifying-glass-chart me-2"></i>
+                                            Generate Full AI Detail
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="card-body">
+                            {aiLeadDetailError && (
+                                <div className="alert alert-danger py-2 mb-3">{aiLeadDetailError}</div>
+                            )}
+
+                            <div className="small text-muted mb-3">
+                                Showing {aiFilteredLeadOptions.length} searchable registrations
+                                {aiLeadSearchTerm ? ` for "${aiLeadSearchTerm}"` : ''}.
+                            </div>
+
+                            {selectedAiLead ? (
+                                <div className="row g-3">
+                                    <div className="col-12 col-lg-4">
+                                        <div className="border rounded-3 p-3 h-100 bg-light">
+                                            <div className="fw-semibold mb-2">{getLeadDisplayName(selectedAiLead)}</div>
+                                            <div className="small text-muted mb-2">{getLeadCenterName(selectedAiLead)} | {getLeadCounselorName(selectedAiLead)}</div>
+                                            <div className="small mb-1"><strong>Course:</strong> {selectedAiLead?._course?.name || selectedAiLead?.courseName || 'Not specified'}</div>
+                                            <div className="small mb-1"><strong>Status:</strong> {selectedAiLead?._leadStatus?.title || selectedAiLead?.leadStatus || 'Unknown'}</div>
+                                            <div className="small mb-1"><strong>KYC:</strong> {selectedAiLead?.kyc ? 'Done' : selectedAiLead?.kycStage ? 'In Progress' : 'Not Started'}</div>
+                                            <div className="small mb-1"><strong>KYC Bucket:</strong> {getLeadDocumentSnapshot(selectedAiLead).category}</div>
+                                            <div className="small mb-1"><strong>Admission:</strong> {selectedAiLead?.admissionDone ? 'Done' : 'Pending'}</div>
+                                            <div className="small mb-1"><strong>Registration Fee:</strong> {selectedAiLead?.registrationFee || 'Unknown'}</div>
+                                            <div className="small mb-1"><strong>Batch:</strong> {getLeadBatchName(selectedAiLead) || 'Unassigned'}</div>
+                                            <div className="small mb-1"><strong>Follow-up Date:</strong> {selectedAiLead?.followupDate ? new Date(selectedAiLead.followupDate).toLocaleDateString('en-IN') : 'N/A'}</div>
+                                            <div className="small mb-0"><strong>Recent Notes:</strong> {getLeadNotes(selectedAiLead).length}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-12 col-lg-8">
+                                        {aiLeadDetail ? (
+                                            <div className="row g-3">
+                                                <div className="col-12">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">AI Summary</div>
+                                                        <div className="small text-muted" style={{ whiteSpace: 'pre-line' }}>
+                                                            {aiLeadDetail.summary || 'No summary generated.'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Student Goal</div>
+                                                        <div className="small">{aiLeadDetail.goal || 'Not identified'}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Interest Area</div>
+                                                        <div className="small">{aiLeadDetail.interestArea || 'Not identified'}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Budget Range</div>
+                                                        <div className="small">{aiLeadDetail.budgetRange || 'Not specified'}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Urgency</div>
+                                                        <div className="small">{aiLeadDetail.urgency || 'Not clear yet'}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Concerns</div>
+                                                        {Array.isArray(aiLeadDetail.concerns) && aiLeadDetail.concerns.length > 0 ? (
+                                                            <ul className="small mb-0 ps-3">
+                                                                {aiLeadDetail.concerns.map((item, index) => (
+                                                                    <li key={index}>{item}</li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <div className="small text-muted">No clear concerns detected.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="col-12 col-md-6">
+                                                    <div className="border rounded-3 p-3 h-100">
+                                                        <div className="fw-semibold mb-2">Next Best Actions</div>
+                                                        {aiLeadActions.length > 0 ? (
+                                                            <ul className="small mb-0 ps-3">
+                                                                {aiLeadActions.map((action, index) => (
+                                                                    <li key={index}>{action}</li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <div className="small text-muted">Generate AI detail to get recommended actions.</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="border rounded-3 p-4 h-100 d-flex align-items-center justify-content-center text-muted small bg-light">
+                                                Select a registration lead and click <strong className="ms-1 me-1">Generate Full AI Detail</strong> to analyze the full record from registration data.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-muted small">
+                                    No registration data is available for the current filters.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Key Metrics Cards */}
-                    <div className="row g-3 mb-4">
+                    {/* <div className="row g-3 mb-4">
                         <div className="col-12 mb-2">
                             <p className="text-muted small mb-0">
                                 <strong>Data Period:</strong> {
@@ -2021,10 +3690,10 @@ const LeadAnalyticsDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Main Analytics Matrix */}
-                    <div className="card shadow-sm mb-4">
+                    {/* <div className="card shadow-sm mb-4">
                         <div className="card-body">
                             <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                                 <UserCheck className="text-primary" size={20} />
@@ -2132,11 +3801,10 @@ const LeadAnalyticsDashboard = () => {
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Charts Row */}
-                    <div className="row g-4 mb-4">
-                        {/* Conversion vs Dropout Chart */}
+                    {/* <div className="row g-4 mb-4">
                         <div className="col-lg-6">
                             <div className="card shadow-sm h-100">
                                 <div className="card-body">
@@ -2159,7 +3827,6 @@ const LeadAnalyticsDashboard = () => {
                             </div>
                         </div>
 
-                        {/* Status Distribution */}
                         <div className="col-lg-6">
                             <div className="card shadow-sm h-100">
                                 <div className="card-body">
@@ -2189,10 +3856,10 @@ const LeadAnalyticsDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Course-wise Document Status Table */}
-                    <div className="card shadow-sm mb-4">
+                    {/* <div className="card shadow-sm mb-4">
                         <div className="card-body">
                             <h2 className="h5 fw-semibold mb-4">Course-wise Document Status</h2>
                             <div className="table-responsive">
@@ -2218,10 +3885,10 @@ const LeadAnalyticsDashboard = () => {
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Course-wise Pending Documents Table */}
-                    <div className="card shadow-sm mb-4">
+                    {/* <div className="card shadow-sm mb-4">
                         <div className="card-body">
                             <h2 className="h5 fw-semibold mb-4">Course-wise Pending Documents</h2>
                             <div className="table-responsive">
@@ -2247,10 +3914,10 @@ const LeadAnalyticsDashboard = () => {
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Center-wise Analytics */}
-                    <div className="card shadow-sm mb-4">
+                    {/* <div className="card shadow-sm mb-4">
                         <div className="card-body">
                             <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                                 <Building className="text-purple" size={20} />
@@ -2279,7 +3946,6 @@ const LeadAnalyticsDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Center-wise Bar Chart */}
                                             <div className="row g-3 mb-3">
                                                 <div className="col-12">
                                                     <ResponsiveContainer width="100%" height={180}>
@@ -2300,7 +3966,6 @@ const LeadAnalyticsDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Center-wise Pie Chart for Status Distribution */}
                                             <div className="row g-3 mb-3">
                                                 <div className="col-12">
                                                     <ResponsiveContainer width="100%" height={180}>
@@ -2343,11 +4008,10 @@ const LeadAnalyticsDashboard = () => {
                                 ))}
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Daily Admissions Analytics */}
-                    <div className="row g-4 mb-4">
-                        {/* Daily Admissions Table */}
+                    {/* <div className="row g-4 mb-4">
                         <div className="col-lg-6">
                             <div className="card shadow-sm h-100">
                                 <div className="card-body">
@@ -2425,7 +4089,6 @@ const LeadAnalyticsDashboard = () => {
                             </div>
                         </div>
 
-                        {/* Daily Admissions Chart */}
                         <div className="col-lg-6">
                             <div className="card shadow-sm h-100">
                                 <div className="card-body">
@@ -2487,10 +4150,10 @@ const LeadAnalyticsDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Followup Analytics */}
-                    <div className="card shadow-sm">
+                    {/* <div className="card shadow-sm">
                         <div className="card-body">
                             <h2 className="h4 fw-semibold mb-4 d-flex align-items-center gap-2">
                                 <Clock className="text-warning" size={20} />
@@ -2515,15 +4178,15 @@ const LeadAnalyticsDashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* ====== NEW: Course-Counsellor Status Table ====== */}
-                    <div className="card shadow-sm mb-4">
+                    {/* <div className="card shadow-sm mb-4">
                         <div className="card-body">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
 
-                                {/* Date Filter Controls */}
+                                
                                 <div className="d-flex gap-2 align-items-center">
                                     <button
                                         className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
@@ -2595,7 +4258,6 @@ const LeadAnalyticsDashboard = () => {
                                                             const renderCenter = !centerRendered;
                                                             const tr = (
                                                                 <tr key={`${courseName}-${centerName}-${row.counsellorId || row.counsellorName}`}>
-                                                                    {/* Project column left blank for now, can be filled if available in row */}
                                                                     {renderCourse && (
                                                                         <td rowSpan={courseRowSpan}>{row.projectName || ''}</td>
                                                                     )}
@@ -2639,7 +4301,7 @@ const LeadAnalyticsDashboard = () => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </div> */}
                 </>
             )}
 

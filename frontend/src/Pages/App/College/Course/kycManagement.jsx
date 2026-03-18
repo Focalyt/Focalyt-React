@@ -4292,18 +4292,15 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 </div>
 
                                                 <button
-                                                  className="btn btn-sm btn-outline-secondary border-0"
-                                                  onClick={() => {
-                                                    setLeadDetailsVisible(profileIndex)
-                                                    setSelectedProfile(profile)
-                                                  }}
-                                                >
-                                                  {leadDetailsVisible === profileIndex ? (
-                                                    <i className="fas fa-chevron-up"></i>
-                                                  ) : (
-                                                    <i className="fas fa-chevron-down"></i>
-                                                  )}
-                                                </button>
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => toggleLeadDetails(profileIndex)}
+                                      >
+                                        {leadDetailsVisible === profileIndex ? (
+                                          <i className="fas fa-chevron-up"></i>
+                                        ) : (
+                                          <i className="fas fa-chevron-down"></i>
+                                        )}
+                                      </button>
                                               </div>
                                             </div>
 

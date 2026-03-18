@@ -50,7 +50,7 @@
   "date_range_to": "{{from}} to {{to}}",
   "custom": "Custom",
   "dashboard": "Dashboard",
-  "dashboard_subtitle": "Dashboard Subtitle",
+  "dashboard_subtitle": "Real-time analytics based on Applied Courses data",
   "dashboard_tab_ai": "Dashboard Tab Ai",
   "dashboard_tab_counsellor": "Dashboard Tab Counsellor",
   "dashboard_tab_overview": "Dashboard Tab Overview",

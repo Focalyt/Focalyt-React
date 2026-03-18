@@ -9967,10 +9967,8 @@ const WhatsappChat = () => {
                                           readOnly
                                         />
                                       </div>
-                                    </div>
-                                  </div>
 
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+ <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
                                       {/* Three-dot button for mobile - Opens Modal */}
                                       <button
@@ -9984,7 +9982,7 @@ const WhatsappChat = () => {
                                       {/* Expand/Collapse button */}
                                       <button
                                         className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(profileIndex)}
+                                        onClick={() => toggleLeadDetails(profileIndex)}
                                       >
                                         {leadDetailsVisible === profileIndex ? (
                                           <i className="fas fa-chevron-up"></i>
@@ -9994,6 +9992,11 @@ const WhatsappChat = () => {
                                       </button>
                                     </div>
                                   </div>
+
+                                    </div>
+                                  </div>
+
+                                 
 
                                   <div className="col-md-1 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
