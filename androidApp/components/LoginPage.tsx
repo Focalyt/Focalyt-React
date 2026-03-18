@@ -269,16 +269,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         const userData = data.data?.user || data.user;
         
         if (userData) {
-          console.log('👤 Real user data from server:', {
-            name: userData.name,
-            executiveId: userData._id || userData.executiveId,
-            email: userData.email,
-            phone: userData.mobile || userData.phone,
-            status: userData.status,
-            role: userData.role
-          });
-          
-          // Create enhanced user data with location tracking fields
           const enhancedUserData = {
             ...userData,
             executiveId: userData._id || userData.executiveId || 'EMP001',
@@ -292,25 +282,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             createdAt: userData.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          
-          console.log('🎯 Enhanced user data for storage:', {
-            name: enhancedUserData.name,
-            executiveId: enhancedUserData.executiveId,
-            email: enhancedUserData.email,
-            phone: enhancedUserData.phone,
-            status: enhancedUserData.status,
-            locationTracking: 'initialized',
-            totalTrackingPoints: enhancedUserData.totalTrackingPoints
-          });
-          
           await AsyncStorage.setItem('userData', JSON.stringify(enhancedUserData));
-          console.log('✅ Real user data saved to AsyncStorage');
-        } else {
-          console.log('⚠️ No user data in server response');
-          console.log('🔍 Available data keys:', Object.keys(data));
-          if (data.data) {
-            console.log('🔍 Data.data keys:', Object.keys(data.data));
+          if (data.data?.token || data.token) {
+            await AsyncStorage.setItem('authToken', data.data?.token || data.token);
           }
+          console.log('✅ Real user data saved to AsyncStorage');
         }
         
         setIsLoading(false);

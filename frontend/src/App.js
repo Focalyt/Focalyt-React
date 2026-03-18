@@ -150,6 +150,7 @@ import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
 import Assignment from './Pages/App/Trainer/Assignment/Assignment';
 import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
+import StartLiveClass from './Pages/App/Trainer/LiveClass/StartLiveClass';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -342,6 +343,8 @@ const Layout = () => {
         <Route path='center' element={<Center/>}/>
         <Route path='assignment' element={<Assignment/>}/>
         <Route path='createassignment' element={<CreateAssignment/>}/>
+        <Route path='live-class' element={<StartLiveClass/>}/>
+        <Route path='live-class/room' element={<StartLiveClass/>}/>
         </Route>
 
 
