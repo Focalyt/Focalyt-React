@@ -8,6 +8,7 @@ const {
   AppliedCourses,
   Status,
   User,
+  B2cFollowup,
 } = require("../controllers/models");
 
 const helpers = require("../helpers");
@@ -15,6 +16,9 @@ const sendMails = helpers.sendMails || helpers.sendMail;
 const {
   getManagerWiseAiReports,
   buildAiSupervisionEmailSection,
+  getManagerWiseCounselorAiReports,
+  buildCounselorAiEmailSection,
+  getFallbackManagerRecipients,
 } = require("../helpers/aiSupervisionReport");
 
 if (!sendMails) {
@@ -139,6 +143,48 @@ async function buildCounselorMatrixForToday() {
     pendingKYCMap[counselorId] = (pendingKYCMap[counselorId] || 0) + (item.pendingKYC || 0);
   });
 
+  const followupActivity = await B2cFollowup.find({
+    $or: [
+      { createdAt: { $gte: todayStartTime, $lte: todayEndTime } },
+      { statusUpdatedAt: { $gte: todayStartTime, $lte: todayEndTime } },
+    ],
+    counsellorId: { $exists: true, $ne: null },
+  })
+    .select("counsellorId status remarks followupDate createdAt statusUpdatedAt")
+    .lean();
+
+  const followupStatsMap = {};
+  const ensureFollowupStats = (counselorId) => {
+    if (!followupStatsMap[counselorId]) {
+      followupStatsMap[counselorId] = {
+        followupsSet: 0,
+        followupsDone: 0,
+        followupsMissed: 0,
+        followupsPlanned: 0,
+        recentRemarks: [],
+      };
+    }
+
+    return followupStatsMap[counselorId];
+  };
+
+  followupActivity.forEach((item) => {
+    const counselorId = item?.counsellorId ? String(item.counsellorId) : null;
+    if (!counselorId) return;
+
+    const stats = ensureFollowupStats(counselorId);
+    stats.followupsSet += 1;
+
+    const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+    if (normalizedStatus === "done") stats.followupsDone += 1;
+    else if (normalizedStatus === "missed") stats.followupsMissed += 1;
+    else stats.followupsPlanned += 1;
+
+    if (item?.remarks && stats.recentRemarks.length < 3) {
+      stats.recentRemarks.push(item.remarks);
+    }
+  });
+
   // StatusLogs-based aggregation for admissions/dropouts etc.
   const counselorMatrixData = await StatusLogs.aggregate([
     {
@@ -243,8 +289,29 @@ async function buildCounselorMatrixForToday() {
     const counselorId = counselor.counselorId ? String(counselor.counselorId) : null;
     const counselorName = counselor.counselorName || "Unknown";
     const totalLeads = totalLeadsMap[counselorId] || counselor.totalLeads || 0;
+    const followupStats = followupStatsMap[counselorId] || {
+      followupsSet: 0,
+      followupsDone: 0,
+      followupsMissed: 0,
+      followupsPlanned: 0,
+      recentRemarks: [],
+    };
   
     if (!counselorId) return;
+
+    const performanceMeta = getCounselorPerformanceMeta({
+      totalLeads,
+      totalAdmissions: counselor.totalAdmissions || 0,
+      totalDropouts: counselor.totalDropouts || 0,
+      totalKYC: totalKYCMap[counselorId] || 0,
+      kycDone: kycDoneMap[counselorId] || 0,
+      pendingKYC: pendingKYCMap[counselorId] || 0,
+      unpaid: totalLeads - (counselor.totalAdmissions || 0),
+      untouch: untouchLeadsMap[counselorId] || 0,
+      followupsDone: followupStats.followupsDone,
+      followupsMissed: followupStats.followupsMissed,
+      followupsPlanned: followupStats.followupsPlanned,
+    });
   
     transformedData[counselorId] = {
       counselorId,
@@ -262,8 +329,17 @@ PendingKYC: pendingKYCMap[counselorId] || 0,
       Dropouts: counselor.totalDropouts || 0,
       Paid: counselor.totalAdmissions || 0,
       Unpaid: totalLeads - (counselor.totalAdmissions || 0),
+      FollowupsSet: followupStats.followupsSet,
+      FollowupsDone: followupStats.followupsDone,
+      FollowupsMissed: followupStats.followupsMissed,
+      FollowupsPlanned: followupStats.followupsPlanned,
+      LatestRemarks: followupStats.recentRemarks,
       ConversionRate: Number(counselor.conversionRate || 0).toFixed(1),
       DropoutRate: Number(counselor.dropoutRate || 0).toFixed(1),
+      PerformanceScore: performanceMeta.score,
+      PerformanceTier: performanceMeta.tier,
+      PerformanceInsight: performanceMeta.insight,
+      ImprovementPlan: performanceMeta.recommendation,
     };
   });
 
@@ -276,21 +352,50 @@ PendingKYC: pendingKYCMap[counselorId] || 0,
   
     // const totalLeads = totalLeadsMap[counselorName] || item.totalLeads || 0;
     const totalLeads = totalLeadsMap[counselorId] || item.totalLeads || 0;
+    const followupStats = followupStatsMap[counselorId] || {
+      followupsSet: 0,
+      followupsDone: 0,
+      followupsMissed: 0,
+      followupsPlanned: 0,
+      recentRemarks: [],
+    };
+    const performanceMeta = getCounselorPerformanceMeta({
+      totalLeads,
+      totalAdmissions: 0,
+      totalDropouts: 0,
+      totalKYC: totalKYCMap[counselorId] || 0,
+      kycDone: kycDoneMap[counselorId] || 0,
+      pendingKYC: pendingKYCMap[counselorId] || 0,
+      unpaid: totalLeads,
+      untouch: untouchLeadsMap[counselorId] || 0,
+      followupsDone: followupStats.followupsDone,
+      followupsMissed: followupStats.followupsMissed,
+      followupsPlanned: followupStats.followupsPlanned,
+    });
   
     transformedData[counselorId] = {
       counselorId,
       counselorName,
       Leads: totalLeads,
-      Untouch: untouchLeadsMap[counselorName] || 0,
-      TotalKYC: totalKYCMap[counselorName] || 0,
-      KYCDone: kycDoneMap[counselorName] || 0,
-      PendingKYC: pendingKYCMap[counselorName] || 0,
+      Untouch: untouchLeadsMap[counselorId] || 0,
+      TotalKYC: totalKYCMap[counselorId] || 0,
+      KYCDone: kycDoneMap[counselorId] || 0,
+      PendingKYC: pendingKYCMap[counselorId] || 0,
       Admissions: 0,
       Dropouts: 0,
       Paid: 0,
       Unpaid: totalLeads,
+      FollowupsSet: followupStats.followupsSet,
+      FollowupsDone: followupStats.followupsDone,
+      FollowupsMissed: followupStats.followupsMissed,
+      FollowupsPlanned: followupStats.followupsPlanned,
+      LatestRemarks: followupStats.recentRemarks,
       ConversionRate: 0,
       DropoutRate: 0,
+      PerformanceScore: performanceMeta.score,
+      PerformanceTier: performanceMeta.tier,
+      PerformanceInsight: performanceMeta.insight,
+      ImprovementPlan: performanceMeta.recommendation,
     };
   });
 
@@ -317,9 +422,105 @@ PendingKYC: pendingKYCMap[counselorId] || 0,
             (sum, id) => sum + Number(transformedData[id].ConversionRate || 0),
             0
           ) / counselorIds.length,
+    averagePerformanceScore:
+      counselorIds.length === 0
+        ? 0
+        : counselorIds.reduce(
+            (sum, id) => sum + Number(transformedData[id].PerformanceScore || 0),
+            0
+          ) / counselorIds.length,
   };
 
   return { data: transformedData, summary };
+}
+
+function getCounselorPerformanceMeta({
+  totalLeads = 0,
+  totalAdmissions = 0,
+  totalDropouts = 0,
+  totalKYC = 0,
+  kycDone = 0,
+  pendingKYC = 0,
+  unpaid = 0,
+  untouch = 0,
+  followupsDone = 0,
+  followupsMissed = 0,
+  followupsPlanned = 0,
+}) {
+  const conversionRate = totalLeads > 0 ? (totalAdmissions / totalLeads) * 100 : 0;
+  const kycCompletionRate = totalKYC > 0 ? (kycDone / totalKYC) * 100 : 0;
+  const totalFollowupActivity = followupsDone + followupsMissed + followupsPlanned;
+  const followupSuccessRate =
+    totalFollowupActivity > 0 ? (followupsDone / totalFollowupActivity) * 100 : 0;
+  const untouchRate = totalLeads > 0 ? (untouch / totalLeads) * 100 : 0;
+  const unpaidRate = totalLeads > 0 ? (unpaid / totalLeads) * 100 : 0;
+  const dropoutRate = totalLeads > 0 ? (totalDropouts / totalLeads) * 100 : 0;
+
+  let score =
+    20 +
+    conversionRate * 0.35 +
+    kycCompletionRate * 0.2 +
+    followupSuccessRate * 0.2 -
+    untouchRate * 0.15 -
+    unpaidRate * 0.12 -
+    dropoutRate * 0.18 -
+    pendingKYC * 2 -
+    followupsMissed * 3;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let tier = "Needs Attention";
+  let insight = "Performance needs structured follow-up discipline and stronger closure efforts.";
+  let recommendation = "Increase same-day outreach, update remarks clearly, and close pending leads with defined next actions.";
+
+  if (score >= 80) {
+    tier = "Top Performer";
+    insight = "Strong lead handling, conversion movement, and consistent follow-up quality.";
+    recommendation = "Maintain the current cadence, mentor the team on follow-up discipline, and focus on high-value closures.";
+  } else if (score >= 55) {
+    tier = "Intermediate Performer";
+    insight = "Good movement is visible, but there is room to improve follow-up quality and lead closure.";
+    recommendation = "Tighten follow-up completion, reduce unpaid leads, and add clearer remarks after each interaction.";
+  }
+
+  if (followupsMissed > followupsDone && score < 80) {
+    recommendation = "Missed follow-ups are hurting performance. Prioritize planned calls, log clear remarks, and re-book overdue leads quickly.";
+  } else if (pendingKYC > kycDone && score < 80) {
+    recommendation = "A large KYC backlog is slowing movement. Push document collection and resolve verification blockers faster.";
+  } else if (unpaid > totalAdmissions && totalLeads > 0 && score < 80) {
+    recommendation = "Fee conversion is weak. Focus on payment closure, objection handling, and stronger next-step communication.";
+  }
+
+  return {
+    score,
+    tier,
+    insight,
+    recommendation,
+  };
+}
+
+function getTierBadgeStyles(tier) {
+  if (tier === "Top Performer") {
+    return {
+      background: "#dcfce7",
+      color: "#166534",
+      border: "#86efac",
+    };
+  }
+
+  if (tier === "Intermediate Performer") {
+    return {
+      background: "#fef3c7",
+      color: "#92400e",
+      border: "#fcd34d",
+    };
+  }
+
+  return {
+    background: "#fee2e2",
+    color: "#991b1b",
+    border: "#fca5a5",
+  };
 }
 
 function buildHtmlReport({ data, summary, managerName, extraSectionsHtml = "" }) {
@@ -541,66 +742,92 @@ async function getManagerWiseReports(counselorDataMap) {
   }).filter(m => m.counselors.length > 0);
 }
 async function sendDailyCounselorPerformanceEmail() {
-  if (!sendMails) return;
-
+   console.log("🚀 Email scheduler started");
+  // if (!sendMails) return;
+if (!sendMails) {
+    console.log("❌ sendMails not found");
+    return;
+  }
   try {
-    const { data } = await buildCounselorMatrixForToday();
+    const counselorAiReports = await getManagerWiseCounselorAiReports();
     const aiManagerWiseReports = await getManagerWiseAiReports();
+    const fallbackManagers = await getFallbackManagerRecipients();
+
+    const counselorAiReportMap = {};
+    counselorAiReports.forEach((report) => {
+      counselorAiReportMap[String(report.managerId)] = report;
+    });
+
     const aiManagerReportMap = {};
     aiManagerWiseReports.forEach((report) => {
       aiManagerReportMap[String(report.managerId)] = report;
     });
 
-    // console.log("==== transformed counselor data keys ====");
-    // console.log(Object.keys(data || {}));
-
-    // console.log("==== transformed counselor data ====");
-    // console.log(JSON.stringify(data, null, 2));
-
-    const managerWiseReports = await getManagerWiseReports(data);
-    const managerReportMap = {};
-    managerWiseReports.forEach((report) => {
-      managerReportMap[String(report.managerId)] = report;
+    const fallbackManagerMap = {};
+    fallbackManagers.forEach((manager) => {
+      fallbackManagerMap[String(manager.managerId)] = manager;
     });
 
-    // console.log("==== managerWiseReports ====");
-    // console.log(JSON.stringify(managerWiseReports, null, 2));
-
     const allManagerIds = [...new Set([
-      ...Object.keys(managerReportMap),
+      ...Object.keys(counselorAiReportMap),
       ...Object.keys(aiManagerReportMap),
+      ...Object.keys(fallbackManagerMap),
     ])];
-
+// console.log("allManagerIds" , allManagerIds)
     if (!allManagerIds.length) {
-      // console.warn("[CounselorPerformanceEmailScheduler] No manager-wise reports found.");
       return;
     }
 
-    const subject = `Daily Counsellor Performance + AI Supervision – ${moment().format("DD MMM YYYY")}`;
+    const subject = `Daily Counsellor Performance + AI Supervision - ${moment().format("DD MMM YYYY")}`;
 
     for (const managerId of allManagerIds) {
-      const managerReport = managerReportMap[String(managerId)] || null;
+      const counselorAiReport = counselorAiReportMap[String(managerId)] || null;
       const aiReport = aiManagerReportMap[String(managerId)] || null;
-      const rows = managerReport?.counselors || [];
-      const managerName = managerReport?.managerName || aiReport?.managerName || "Manager";
-      const managerEmail = managerReport?.managerEmail || aiReport?.managerEmail;
-
+      const fallbackManager = fallbackManagerMap[String(managerId)] || null;
+      const managerName =
+        counselorAiReport?.managerName ||
+        aiReport?.managerName ||
+        fallbackManager?.managerName ||
+        "Manager";
+      const managerEmail =
+        counselorAiReport?.managerEmail ||
+        aiReport?.managerEmail ||
+        fallbackManager?.managerEmail;
+// console.log("managerEmail", managerEmail)
       if (!managerEmail) {
         continue;
       }
 
-      const summary = {
-        totalCounselors: rows.length,
-        totalLeads: rows.reduce((sum, r) => sum + (r.Leads || 0), 0),
-        totalAdmissions: rows.reduce((sum, r) => sum + (r.Admissions || 0), 0),
-        totalDropouts: rows.reduce((sum, r) => sum + (r.Dropouts || 0), 0),
-        averageConversionRate:
-          rows.length === 0
-            ? 0
-            : rows.reduce((sum, r) => sum + Number(r.ConversionRate || 0), 0) / rows.length,
-      };
+      const counselorAiHtml = buildCounselorAiEmailSection({
+        summary: counselorAiReport?.summary || {
+          totalCounselors: 0,
+          totalLeads: 0,
+          highPriorityLeads: 0,
+          intermediatePriorityLeads: 0,
+          lowPriorityLeads: 0,
+          totalDailyFollowupsDone: 0,
+          followupEnoughLeads: 0,
+          followupModerateLeads: 0,
+          followupNotEnoughLeads: 0,
+          admissions: 0,
+          overdueLeads: 0,
+          topLeads: [],
+          lowFollowupLeads: [],
+          topCounselor: null,
+        },
+        narrative: counselorAiReport?.narrative || {
+          headline: "AI counsellor performance brief",
+          overview: "No counsellor AI narrative is available for today.",
+          topCounsellorSummary: "No top counsellor insight is available.",
+          observations: [],
+          managerActions: [],
+        },
+        counselors: counselorAiReport?.counselors || [],
+        leadInsights: counselorAiReport?.leadInsights || [],
+        managerName,
+      });
 
-      const extraSectionsHtml = buildAiSupervisionEmailSection({
+      const aiSupervisionHtml = buildAiSupervisionEmailSection({
         summary: aiReport?.summary || {
           totalLeads: 0,
           totalActionItems: 0,
@@ -616,24 +843,29 @@ async function sendDailyCounselorPerformanceEmail() {
         items: aiReport?.items || [],
         managerName,
       });
-
-      const html = buildHtmlReport({
-        data: rows,
-        summary,
-        managerName,
-        extraSectionsHtml,
-      });
+// console.log("aiSupervisionHtml", aiSupervisionHtml)
+      const html = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Daily Counsellor AI Report - ${moment().format("DD MMM YYYY")}</title>
+          </head>
+          <body style="font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;background:#f3f4f6;padding:16px;">
+            <div style="max-width:980px;margin:0 auto;background:#ffffff;border-radius:8px;padding:16px 20px;border:1px solid #e5e7eb;">
+              ${counselorAiHtml}
+              ${aiSupervisionHtml || ""}
+            </div>
+          </body>
+        </html>
+      `;
 
       try {
         await sendMails(subject, html, managerEmail, {
           from: "Focalyt Portal <focalytportal@gmail.com>",
           cc: "parveen.bansal@focalyt.com",
-          // cc:"akash.gaurav@focalyt.com"
+          // cc: "akash.gaurav@focalyt.com",
         });
-
-        
       } catch (err) {
-       
       }
     }
   } catch (err) {
