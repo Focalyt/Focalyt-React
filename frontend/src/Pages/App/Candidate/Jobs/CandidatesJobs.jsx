@@ -1853,9 +1853,9 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
     padding: 0.75rem;
   }
 
-  .forsmallscrn {
-    display: block !important;
-  }
+  // .forsmallscrn {
+  //   display: block !important;
+  // }
 
   .forlrgscreen {
     display: none;
@@ -3008,9 +3008,9 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
     padding: 0.75rem;
   }
 
-  .forsmallscrn {
-    display: block !important;
-  }
+  // .forsmallscrn {
+  //   display: block !important;
+  // }
 
   .forlrgscreen {
     display: none;
