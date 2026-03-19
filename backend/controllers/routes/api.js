@@ -4,7 +4,7 @@ const { google } = require('googleapis')
 const multer  = require('multer')
 var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
-const { User } = require("../models");
+const { User, TrainerTimeTable } = require("../models");
 const {
 	commonFunc,
 	educationlist,
@@ -173,6 +173,40 @@ commonRoutes.post("/gettrainergoogleauth", async (req, res) => {
     res.status(500).json({
       error: 'Failed to exchange authorization code',
       message: error.message
+    });
+  }
+});
+
+commonRoutes.get("/live-class/:id", async (req, res) => {
+  try {
+    const liveClass = await TrainerTimeTable.findOne({
+      _id: req.params.id,
+      isDeleted: { $ne: true }
+    }).select(
+      "title subject date startTime endTime trainerId courseId courseName batchId batchName roomName liveClassPlatform googleMeetLink joinPath status"
+    ).populate("trainerId", "name");
+
+    if (!liveClass) {
+      return res.status(404).json({
+        status: false,
+        message: "Live class not found"
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        ...liveClass.toObject(),
+        trainerName: liveClass?.trainerId?.name || "",
+        joinPath: liveClass.joinPath || `/live-class/${liveClass._id}`
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching live class details:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Error fetching live class details",
+      error: error.message
     });
   }
 });

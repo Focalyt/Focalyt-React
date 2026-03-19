@@ -209,9 +209,17 @@ const trainerTimeTableSchema = new Schema({
         type: String,
         trim: true
     },
+    roomName: {
+        type: String,
+        trim: true
+    },
+    joinPath: {
+        type: String,
+        trim: true
+    },
     liveClassPlatform: {
         type: String,
-        enum: ['none', 'google_meet'],
+        enum: ['none', 'google_meet', 'jitsi'],
         default: 'none'
     }
     

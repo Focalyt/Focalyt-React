@@ -9,7 +9,7 @@ const getDefaultLiveClassForm = () => ({
     startTime: '',
     endTime: '',
     description: '',
-    createGoogleMeet: true
+    createGoogleMeet: false
 });
 
 function TimeTable() {
@@ -297,6 +297,11 @@ function TimeTable() {
         }));
     };
 
+    const buildPortalLiveClassUrl = (session) => {
+        const joinPath = session?.joinPath || `/live-class/${session?._id}`;
+        return `${window.location.origin}${joinPath}`;
+    };
+
     const resetLiveClassForm = () => {
         setLiveClassForm(getDefaultLiveClassForm());
     };
@@ -321,17 +326,29 @@ function TimeTable() {
     };
 
     const handleShareLiveClassOnWhatsapp = (session) => {
-        if (!session?.googleMeetLink) {
-            alert('Google Meet link is not available for this live class.');
+        const joinUrl = session?.googleMeetLink || buildPortalLiveClassUrl(session);
+        if (!joinUrl) {
+            alert('Live class link is not available for this session.');
             return;
         }
 
         const queryParams = new URLSearchParams({
             source: 'trainer-live-class',
-            draft: buildLiveClassWhatsappMessage(session)
+            draft: `${buildLiveClassWhatsappMessage(session)}\nPortal class link: ${joinUrl}`
         });
 
         window.location.assign(`/institute/whatsappChat?${queryParams.toString()}`);
+    };
+
+    const handleCopyLiveClassLink = async (session) => {
+        try {
+            const link = session?.googleMeetLink || buildPortalLiveClassUrl(session);
+            await navigator.clipboard.writeText(link);
+            alert('Live class link copied successfully.');
+        } catch (error) {
+            console.error('Failed to copy live class link:', error);
+            alert('Unable to copy live class link.');
+        }
     };
 
     const handleCreateLiveClass = async (e) => {
@@ -344,6 +361,11 @@ function TimeTable() {
 
         if (liveClassForm.createGoogleMeet && !userData.googleAuthToken?.accessToken) {
             alert('Please connect Google Calendar before creating a Google Meet class.');
+            return;
+        }
+
+        if (liveClassForm.startTime >= liveClassForm.endTime) {
+            alert('End time must be later than start time.');
             return;
         }
 
@@ -367,7 +389,8 @@ function TimeTable() {
                 description: liveClassForm.description,
                 color: '#198754',
                 scheduleType: 'single',
-                createGoogleMeet: liveClassForm.createGoogleMeet
+                createGoogleMeet: liveClassForm.createGoogleMeet,
+                liveClassPlatform: liveClassForm.createGoogleMeet ? 'google_meet' : 'jitsi'
             };
 
             const response = await axios.post(`${backendUrl}/college/scheduledTimeTable`, payload, {
@@ -898,10 +921,10 @@ function TimeTable() {
                         <div>
                             <h3 className="live-class-title">
                                 <i className="fas fa-video me-2"></i>
-                                Live Classes With Google Meet
+                                Live Classes In LMS
                             </h3>
                             <p className="live-class-subtitle">
-                                Create trainer live sessions and automatically generate a Google Meet link.
+                                Create trainer live sessions and let students join directly inside the LMS.
                             </p>
                         </div>
                         <div className="live-class-actions">
@@ -982,14 +1005,14 @@ function TimeTable() {
                                 />
                             </div>
                             <div className="form-group checkbox-group">
-                                <label>Create Meeting</label>
+                                <label>Optional Meet Backup</label>
                                 <label className="live-class-checkbox">
                                     <input
                                         type="checkbox"
                                         checked={liveClassForm.createGoogleMeet}
                                         onChange={(e) => handleLiveClassInputChange('createGoogleMeet', e.target.checked)}
                                     />
-                                    <span>Create Google Meet link for this live class</span>
+                                    <span>Also create Google Meet link for this live class</span>
                                 </label>
                             </div>
                         </div>
@@ -1007,7 +1030,13 @@ function TimeTable() {
 
                         {liveClassForm.createGoogleMeet && !userData.googleAuthToken?.accessToken && (
                             <div className="live-class-note warning">
-                                Connect Google Calendar first to generate Google Meet links for trainer live classes.
+                                Connect Google Calendar only if you want a Google Meet backup. LMS live class will still work without it.
+                            </div>
+                        )}
+
+                        {!liveClassForm.createGoogleMeet && (
+                            <div className="live-class-note">
+                                Jitsi room will be created for this session and students will join inside your LMS portal.
                             </div>
                         )}
 
@@ -1041,6 +1070,7 @@ function TimeTable() {
                                             <th>Platform</th>
                                             <th>Join</th>
                                             <th>Share</th>
+                                            <th>Copy Link</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1051,7 +1081,12 @@ function TimeTable() {
                                                 <td>{new Date(session.date).toLocaleDateString('en-IN')}</td>
                                                 <td>{session.startTime} - {session.endTime}</td>
                                                 <td>
-                                                    {session.googleMeetLink ? (
+                                                    {session.liveClassPlatform === 'jitsi' ? (
+                                                        <div>
+                                                            <div className="platform-tag google-meet">Jitsi LMS</div>
+                                                            <small className="text-muted d-block mt-1">{session.roomName}</small>
+                                                        </div>
+                                                    ) : session.googleMeetLink ? (
                                                         <div>
                                                             <div className="platform-tag google-meet">Google Meet</div>
                                                             {session.googleMeetCode && (
@@ -1063,7 +1098,14 @@ function TimeTable() {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {session.googleMeetLink ? (
+                                                    {session.liveClassPlatform === 'jitsi' ? (
+                                                        <a
+                                                            href={session.joinPath || `/live-class/${session._id}`}
+                                                            className="btn btn-primary btn-sm"
+                                                        >
+                                                            Join In LMS
+                                                        </a>
+                                                    ) : session.googleMeetLink ? (
                                                         <a
                                                             href={session.googleMeetLink}
                                                             target="_blank"
@@ -1077,13 +1119,26 @@ function TimeTable() {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {session.googleMeetLink ? (
+                                                    {session.liveClassPlatform === 'jitsi' || session.googleMeetLink ? (
                                                         <button
                                                             type="button"
                                                             className="btn btn-success btn-sm"
                                                             onClick={() => handleShareLiveClassOnWhatsapp(session)}
                                                         >
                                                             Share on WhatsApp
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-muted">No link</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {session.liveClassPlatform === 'jitsi' || session.googleMeetLink ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline-primary btn-sm"
+                                                            onClick={() => handleCopyLiveClassLink(session)}
+                                                        >
+                                                            Copy Link
                                                         </button>
                                                     ) : (
                                                         <span className="text-muted">No link</span>

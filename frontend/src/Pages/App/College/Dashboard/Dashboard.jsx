@@ -770,7 +770,7 @@ const LeadAnalyticsDashboard = () => {
       setFilterData(newFilterData);
 
 
-      fetchProfileData(newFilterData);
+      fetchProfileData(newFilterData, formData);
 
     } catch (error) {
       console.error('Filter change error:', error);
@@ -872,7 +872,7 @@ const LeadAnalyticsDashboard = () => {
   }, [filterData, startDate, endDate])
 
 
-  const fetchStats = async (filters = filterData) => {
+  const fetchStats = async (filters = filterData, criteria = formData) => {
     try {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
@@ -892,14 +892,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
       // Use the new dashboard API with date filtering
       const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
         headers: {
@@ -924,7 +924,7 @@ const LeadAnalyticsDashboard = () => {
     fetchSourceLeads();
   }, [filterData, startDate, endDate])
 
-  const fetchSourceLeads = async (filters = filterData) => {
+  const fetchSourceLeads = async (filters = filterData, criteria = formData) => {
     try {
       setIsLoading(true);
 
@@ -942,14 +942,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
 
       const response = await axios.get(`${backendUrl}/college/digitalLead/sourceLeadsData?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -1022,7 +1022,7 @@ const LeadAnalyticsDashboard = () => {
     fetchFollowupCountsByCounselor();
   }, [token, startDate, endDate, formData, filterData]);
 
-  const fetchProfileData = async (filters = filterData) => {
+  const fetchProfileData = async (filters = filterData, criteria = formData) => {
     try {
       setIsLoading(true);
 
@@ -1046,14 +1046,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
       // Use the new dashboard API with date filtering
       const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
         headers: {
@@ -2312,8 +2312,8 @@ const LeadAnalyticsDashboard = () => {
   const [b2cHoveredCol, setB2cHoveredCol] = useState(null);
   const [b2cSheetHoveredCol, setB2cSheetHoveredCol] = useState(null);
 
-  // Dummy UI (B2C Funnel) — will be wired to APIs later
-  const b2cFunnelDashboardRows = useMemo(() => ([
+
+  const legacyB2cFunnelDashboardRows = useMemo(() => ([
     { group: 'College Data', month: 'January', totalCandidate: 32, selectedDocs: 28, hot: 6, warm: 1, notConnected: 1, notEligible: 0, notInterested: 7, docsPending: 0, dropOut: 0, batchDetails: 'Batch-1', atCenter: 25 },
     { group: 'College Data', month: 'February', totalCandidate: 8, selectedDocs: 8, hot: 11, warm: 3, notConnected: 3, notEligible: 0, notInterested: 6, docsPending: 0, dropOut: 0, batchDetails: 'Batch-2', atCenter: 0 },
     { group: 'College Data', month: 'March', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-3', atCenter: 0 },
@@ -2331,13 +2331,202 @@ const LeadAnalyticsDashboard = () => {
     { group: 'Digital', month: 'July', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: '', atCenter: 0 },
   ]), []);
 
-  const b2cFunnelSheetRows = useMemo(() => ([
+  const legacyB2cFunnelSheetRows = useMemo(() => ([
     { id: 1, leadOwner: 'Amit', leadSource: 'College Data', batchDetails: 'Batch-1', studentName: 'Riya Sharma', contactNo: '98XXXXXX12', status: 'DOCUMENTS', feedbackCall: 'Call Tomorrow', newRemarks: 'Interested, docs pending', documents: 'Aadhar, 10th Marksheet' },
     { id: 2, leadOwner: 'Neha', leadSource: 'Digital', batchDetails: 'Batch-1', studentName: 'Mohit Verma', contactNo: '99XXXXXX34', status: 'HOT', feedbackCall: 'Connected', newRemarks: 'Ready for KYC', documents: 'Aadhar' },
     { id: 3, leadOwner: 'Sahil', leadSource: 'College Data', batchDetails: 'Batch-2', studentName: 'Pooja Singh', contactNo: '97XXXXXX56', status: 'WARM', feedbackCall: 'Follow-up', newRemarks: 'Needs counseling', documents: '-' },
     { id: 4, leadOwner: 'Amit', leadSource: 'Digital', batchDetails: 'Batch-2', studentName: 'Arjun Patel', contactNo: '96XXXXXX78', status: 'NOT INTERESTED', feedbackCall: 'Closed', newRemarks: 'Not interested now', documents: '-' },
     { id: 5, leadOwner: 'Neha', leadSource: 'College Data', batchDetails: 'Batch-1', studentName: 'Kunal Jain', contactNo: '95XXXXXX90', status: 'DOCUMENTS', feedbackCall: 'WhatsApp', newRemarks: 'Waiting for docs', documents: 'Aadhar, Photo' },
   ]), []);
+
+  void legacyB2cFunnelDashboardRows;
+  void legacyB2cFunnelSheetRows;
+
+  const b2cStatusColumns = useMemo(
+    () => allStatuses.filter(status => status && status !== 'Untouch Leads'),
+    [allStatuses]
+  );
+
+  const getB2cLeadSource = (lead) => {
+    const rawSource =
+      lead?._candidate?.sourceInfo?.sourceName ||
+      lead?._candidate?.sourceInfo?.source ||
+      lead?._candidate?.sourceInfo?.sourceType ||
+      lead?.leadSource ||
+      lead?.source ||
+      lead?.lead_type ||
+      lead?.registrationType ||
+      lead?.registeredBy?.source ||
+      lead?.registeredBy?.name ||
+      lead?.registeredBy?.type ||
+      '';
+
+    if (!rawSource) return 'Unknown';
+
+    const normalizedSource = String(rawSource).trim().toLowerCase();
+    if (normalizedSource.includes('digital')) return 'Digital';
+    if (normalizedSource.includes('college')) return 'College Data';
+    if (normalizedSource.includes('portal')) return 'Portal';
+    return String(rawSource).trim();
+  };
+
+  const getB2cCenterName = (lead) => {
+    return lead?._center?.name || lead?.centerName || 'Unknown';
+  };
+
+  const getB2cProjectName = (lead) => {
+    const project = lead?._course?.project;
+
+    if (Array.isArray(project)) {
+      return project.map((item) => item?.name).filter(Boolean).join(', ') || 'Unknown Project';
+    }
+
+    return project?.name || lead?.projectName || 'Unknown Project';
+  };
+
+  const getB2cMonthLabel = (lead) => {
+    const sourceDate = lead?.createdAt || lead?.updatedAt || lead?.admissionDate || lead?.date;
+    const parsedDate = sourceDate ? new Date(sourceDate) : null;
+
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) return 'Unknown';
+
+    return parsedDate.toLocaleString('en-US', { month: 'long' });
+  };
+
+  const getLatestCounsellorName = (lead) => {
+    if (Array.isArray(lead?.leadAssignment) && lead.leadAssignment.length > 0) {
+      return lead.leadAssignment[lead.leadAssignment.length - 1]?.counsellorName || 'Unknown';
+    }
+
+    return lead?.counsellorName || lead?.counselorName || 'Unknown';
+  };
+
+  const getB2cDocumentsText = (lead) => {
+    if (!Array.isArray(lead?.uploadedDocs) || lead.uploadedDocs.length === 0) {
+      return '-';
+    }
+
+    const pendingDocs = lead.uploadedDocs
+      .filter(doc => doc && doc.status !== 'Verified')
+      .map(doc => doc.Name || doc.name)
+      .filter(Boolean);
+
+    if (pendingDocs.length > 0) {
+      return pendingDocs.join(', ');
+    }
+
+    const allDocs = lead.uploadedDocs
+      .map(doc => doc?.Name || doc?.name)
+      .filter(Boolean);
+
+    return allDocs.length > 0 ? allDocs.join(', ') : '-';
+  };
+
+  const b2cFunnelDashboardRows = useMemo(() => {
+    const groupedRows = {};
+
+    filteredData.forEach((lead) => {
+      const group = getB2cCenterName(lead) !== 'Unknown'
+        ? getB2cCenterName(lead)
+        : getB2cLeadSource(lead);
+      const month = getB2cMonthLabel(lead);
+      const status = (lead?._leadStatus?.title || '').trim();
+      const groupKey = `${group}__${month}`;
+
+      if (!groupedRows[groupKey]) {
+        groupedRows[groupKey] = {
+          group,
+          month,
+          totalCandidate: 0,
+          atCenter: 0,
+        };
+
+        b2cStatusColumns.forEach((statusLabel) => {
+          groupedRows[groupKey][statusLabel] = 0;
+        });
+      }
+
+      groupedRows[groupKey].totalCandidate += 1;
+
+      if (status && b2cStatusColumns.includes(status)) {
+        groupedRows[groupKey][status] += 1;
+      }
+
+      if (lead?.inZeroPeriod || lead?.batchAssigned) {
+        groupedRows[groupKey].atCenter += 1;
+      }
+    });
+
+    const monthOrder = {
+      January: 1,
+      February: 2,
+      March: 3,
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+      Unknown: 99,
+    };
+
+    return Object.values(groupedRows).sort((a, b) => {
+      if (a.group !== b.group) {
+        return a.group.localeCompare(b.group);
+      }
+
+      return (monthOrder[a.month] || 99) - (monthOrder[b.month] || 99);
+    });
+  }, [filteredData, b2cStatusColumns]);
+
+  const b2cDashboardTitle = useMemo(() => {
+    const projectNames = Array.from(
+      new Set(
+        filteredData
+          .map((lead) => getB2cProjectName(lead))
+          .filter((name) => name && name !== 'Unknown Project')
+      )
+    );
+
+    const centerNames = Array.from(
+      new Set(
+        filteredData
+          .map((lead) => getB2cCenterName(lead))
+          .filter((name) => name && name !== 'Unknown')
+      )
+    );
+
+    const projectLabel = projectNames.length > 0 ? projectNames.join(', ') : 'Project';
+    const centerLabel = centerNames.length > 0 ? centerNames.join(', ') : 'Center';
+
+    return `DASHBOARD ${projectLabel} (${centerLabel})`;
+  }, [filteredData]);
+
+  const b2cFunnelSheetRows = useMemo(() => (
+    filteredData.map((lead, index) => ({
+      id: index + 1,
+      leadOwner: getLatestCounsellorName(lead),
+      center: getB2cCenterName(lead),
+      leadSource: getB2cLeadSource(lead),
+      studentName:
+        lead?._candidate?.name ||
+        lead?.candidateName ||
+        lead?.name ||
+        'Unknown',
+      contactNo:
+        lead?._candidate?.mobile ||
+        lead?.candidateMobile ||
+        lead?.mobile ||
+        '-',
+      status: (lead?._leadStatus?.title || 'Unknown').trim() || 'Unknown',
+      feedbackCall: lead?.nextAction?.title || lead?.nextActionDate || '-',
+      newRemarks: lead?.remarks || lead?.remark || lead?.comment || '-',
+      documents: getB2cDocumentsText(lead),
+    }))
+  ), [filteredData]);
 
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -2797,7 +2986,7 @@ const LeadAnalyticsDashboard = () => {
             </div>
           </div>
 
-          {/* B2C Funnel (Dummy screen) */}
+          {/* B2C Funnel  */}
           {/* <div className="card shadow-sm mb-4">
             <div className="card-body">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -2805,27 +2994,15 @@ const LeadAnalyticsDashboard = () => {
                   <Target className="text-primary" size={20} />
                   B2C Funnel 
                 </h2>
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
-                        </span>
-                      )}
-                    </button>
+                    
               </div>
 
               <div className="table-responsive mb-4 b2c-table-wrap">
                 <table className="table table-bordered align-middle mb-0 b2c-dashboard-table" style={{ minWidth: 'max-content' }}>
                   <thead>
                     <tr>
-                      <th colSpan={13} className="text-center fw-bold b2c-sticky-title" style={{ background: '#ffeb3b' }}>
-                        DASHBOARD PLTP OSDA (Nobel College)
+                      <th colSpan={b2cStatusColumns.length + 3} className="text-center fw-bold b2c-sticky-title" style={{ background: '#ffeb3b' }}>
+                        {b2cDashboardTitle}
                       </th>
                     </tr>
                     <tr className="table-light">
@@ -2836,7 +3013,7 @@ const LeadAnalyticsDashboard = () => {
                         className={b2cHoveredCol === 'group' ? 'b2c-col-hover' : ''}
                         style={{ minWidth: 140 }}
                       >
-                        College Data
+                        Center
                       </th>
                       <th
                         data-col="month"
@@ -2848,16 +3025,8 @@ const LeadAnalyticsDashboard = () => {
                         Months
                       </th>
                       {[
-                        { key: 'totalCandidate', label: 'Total Candidate college data' },
-                        { key: 'selectedDocs', label: 'Selected Documents' },
-                        { key: 'hot', label: 'Hot' },
-                        { key: 'warm', label: 'Warm' },
-                        { key: 'notConnected', label: 'Not Connected' },
-                        { key: 'notEligible', label: 'Not Eligible' },
-                        { key: 'notInterested', label: 'Not Interested' },
-                        { key: 'docsPending', label: 'Documents Pending' },
-                        { key: 'dropOut', label: 'Drop Out' },
-                        { key: 'batchDetails', label: 'Batch Details' },
+                        { key: 'totalCandidate', label: 'Total Candidate' },
+                        ...b2cStatusColumns.map((status) => ({ key: status, label: status })),
                         { key: 'atCenter', label: 'At Center' },
                       ].map(({ key, label }) => (
                         <th
@@ -2903,15 +3072,17 @@ const LeadAnalyticsDashboard = () => {
                             {row.month}
                           </td>
                           <td data-col="totalCandidate" className={`text-center ${b2cHoveredCol === 'totalCandidate' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('totalCandidate')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.totalCandidate}</td>
-                          <td data-col="selectedDocs" className={`text-center ${b2cHoveredCol === 'selectedDocs' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('selectedDocs')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.selectedDocs}</td>
-                          <td data-col="hot" className={`text-center ${b2cHoveredCol === 'hot' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('hot')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.hot}</td>
-                          <td data-col="warm" className={`text-center ${b2cHoveredCol === 'warm' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('warm')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.warm}</td>
-                          <td data-col="notConnected" className={`text-center ${b2cHoveredCol === 'notConnected' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('notConnected')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.notConnected}</td>
-                          <td data-col="notEligible" className={`text-center ${b2cHoveredCol === 'notEligible' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('notEligible')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.notEligible}</td>
-                          <td data-col="notInterested" className={`text-center ${b2cHoveredCol === 'notInterested' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('notInterested')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.notInterested}</td>
-                          <td data-col="docsPending" className={`text-center ${b2cHoveredCol === 'docsPending' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('docsPending')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.docsPending}</td>
-                          <td data-col="dropOut" className={`text-center ${b2cHoveredCol === 'dropOut' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('dropOut')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.dropOut}</td>
-                          <td data-col="batchDetails" className={`text-center ${b2cHoveredCol === 'batchDetails' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('batchDetails')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.batchDetails}</td>
+                          {b2cStatusColumns.map((status) => (
+                            <td
+                              key={status}
+                              data-col={status}
+                              className={`text-center ${b2cHoveredCol === status ? 'b2c-col-hover' : ''}`}
+                              onMouseEnter={() => setB2cHoveredCol(status)}
+                              onMouseLeave={() => setB2cHoveredCol(null)}
+                            >
+                              {row[status] || 0}
+                            </td>
+                          ))}
                           <td data-col="atCenter" className={`text-center ${b2cHoveredCol === 'atCenter' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('atCenter')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.atCenter}</td>
                         </tr>
                       );
@@ -2924,18 +3095,17 @@ const LeadAnalyticsDashboard = () => {
                 <table className="table table-hover align-middle mb-0 b2c-sheet-table" style={{ minWidth: 'max-content' }}>
                   <thead className="table-light">
                     <tr>
-                      {[
-                        { key: 'id', label: 'Sr. No.', className: 'text-center', style: { minWidth: 70 } },
-                        { key: 'leadOwner', label: 'Lead Owner', style: { minWidth: 140 } },
-                        { key: 'leadSource', label: 'Lead Source', style: { minWidth: 140 } },
-                        { key: 'batchDetails', label: 'Batch Details', style: { minWidth: 120 } },
-                        { key: 'studentName', label: 'Student Name', style: { minWidth: 180 } },
-                        { key: 'contactNo', label: 'Contact No', style: { minWidth: 130 } },
-                        { key: 'status', label: 'Status', style: { minWidth: 140 } },
-                        { key: 'feedbackCall', label: 'Feed Back Call', style: { minWidth: 140 } },
-                        { key: 'newRemarks', label: 'New Remarks', style: { minWidth: 200 } },
-                        { key: 'documents', label: 'Documents', style: { minWidth: 220 } },
-                      ].map((h) => (
+                        {[
+                          { key: 'id', label: 'Sr. No.', className: 'text-center', style: { minWidth: 70 } },
+                          { key: 'leadOwner', label: 'Lead Owner', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'center', label: 'Center', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'leadSource', label: 'Lead Source', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'studentName', label: 'Student Name', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'contactNo', label: 'Contact No', style: { minWidth: 140, maxWidth: 140, width: 140 } },
+                          { key: 'status', label: 'Status', style: { minWidth: 150, maxWidth: 150, width: 150 } },
+                          { key: 'newRemarks', label: 'New Remarks', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'documents', label: 'Documents', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                        ].map((h) => (
                         <th
                           key={h.key}
                           data-col={h.key}
@@ -2954,10 +3124,10 @@ const LeadAnalyticsDashboard = () => {
                       <tr key={r.id}>
                         <td data-col="id" className={`text-center fw-semibold ${b2cSheetHoveredCol === 'id' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('id')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.id}</td>
                         <td data-col="leadOwner" className={b2cSheetHoveredCol === 'leadOwner' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('leadOwner')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.leadOwner}</td>
-                        <td data-col="leadSource" className={b2cSheetHoveredCol === 'leadSource' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('leadSource')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.leadSource}</td>
-                        <td data-col="batchDetails" className={b2cSheetHoveredCol === 'batchDetails' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('batchDetails')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.batchDetails}</td>
-                        <td data-col="studentName" className={`fw-medium ${b2cSheetHoveredCol === 'studentName' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('studentName')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.studentName}</td>
-                        <td data-col="contactNo" className={b2cSheetHoveredCol === 'contactNo' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('contactNo')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.contactNo}</td>
+                        <td data-col="center" className={b2cSheetHoveredCol === 'center' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('center')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.center}><div className="b2c-cell-text">{r.center}</div></td>
+                        <td data-col="leadSource" className={b2cSheetHoveredCol === 'leadSource' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('leadSource')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.leadSource}><div className="b2c-cell-text">{r.leadSource}</div></td>
+                        <td data-col="studentName" className={`fw-medium ${b2cSheetHoveredCol === 'studentName' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('studentName')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.studentName}><div className="b2c-cell-text">{r.studentName}</div></td>
+                        <td data-col="contactNo" className={b2cSheetHoveredCol === 'contactNo' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('contactNo')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.contactNo}><div className="b2c-nowrap-text">{r.contactNo}</div></td>
                         <td data-col="status" className={b2cSheetHoveredCol === 'status' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('status')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>
                           <span className={`badge ${r.status === 'HOT' ? 'bg-danger' :
                             r.status === 'WARM' ? 'bg-warning text-dark' :
@@ -2968,9 +3138,8 @@ const LeadAnalyticsDashboard = () => {
                             {r.status}
                           </span>
                         </td>
-                        <td data-col="feedbackCall" className={b2cSheetHoveredCol === 'feedbackCall' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('feedbackCall')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.feedbackCall}</td>
-                        <td data-col="newRemarks" className={b2cSheetHoveredCol === 'newRemarks' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('newRemarks')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.newRemarks}</td>
-                        <td data-col="documents" className={`text-muted ${b2cSheetHoveredCol === 'documents' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('documents')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.documents}</td>
+                        <td data-col="newRemarks" className={b2cSheetHoveredCol === 'newRemarks' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('newRemarks')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.newRemarks}><div className="b2c-cell-text">{r.newRemarks}</div></td>
+                        <td data-col="documents" className={`text-muted ${b2cSheetHoveredCol === 'documents' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('documents')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.documents}><div className="b2c-cell-text">{r.documents}</div></td>
                       </tr>
                     ))}
                   </tbody>
@@ -4160,6 +4329,39 @@ const LeadAnalyticsDashboard = () => {
           box-shadow: 0 1px 0 rgba(0,0,0,0.06);
         }
 
+        .b2c-sheet-table {
+          table-layout: fixed;
+        }
+
+        .b2c-sheet-table thead th {
+          white-space: nowrap;
+          text-align: center;
+          overflow: visible;
+        }
+
+        .b2c-sheet-table td {
+          height: 79px;
+          max-height: 79px;
+          vertical-align: middle;
+          white-space: nowrap;
+          text-align: center;
+        }
+
+        .b2c-cell-text {
+          min-width: 169px;
+          max-width: 170px;
+          width: 170px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
+        }
+
+        .b2c-nowrap-text {
+          white-space: nowrap;
+          display: block;
+        }
+
         /* First title row in dashboard table sits above header row */
         .b2c-dashboard-table thead .b2c-sticky-title {
           top: 0;
@@ -4685,7 +4887,9 @@ const LeadAnalyticsDashboard = () => {
                     <button
                       className="btn btn-primary"
                       onClick={() => {
-                        fetchProfileData(filterData);
+                        fetchProfileData(filterData, formData);
+                        fetchStats(filterData, formData);
+                        fetchSourceLeads(filterData, formData);
                         setIsFilterCollapsed(true);
                       }}
                     >
@@ -4700,225 +4904,7 @@ const LeadAnalyticsDashboard = () => {
         </div>
       )}
 
-      {isFunnelDashboard && !isFilterCollapsed &&(
-
-<div
-className="modal show fade d-block"
-style={{
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  zIndex: 1050
-}}
-onClick={(e) => {
-  if (e.target === e.currentTarget) setIsFilterCollapsed(true);
-}}
->
-<div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
-  <div className="modal-content">
-    {/* Modal Header - Fixed at top */}
-    <div className="modal-header bg-white border-bottom">
-      <div className="d-flex justify-content-between align-items-center w-100">
-        <div className="d-flex align-items-center">
-          <i className="fas fa-filter text-primary me-2"></i>
-          <h5 className="fw-bold mb-0 text-dark">{t('advanced_filters')}</h5>
-          {totalSelected > 0 && (
-            <span className="badge bg-primary ms-2">
-              {t('active_count', { count: totalSelected })}
-            </span>
-          )}
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <button
-            className="btn btn-sm btn-outline-danger"
-            onClick={clearAllFilters}
-          >
-            <i className="fas fa-times-circle me-1"></i>
-            {t('clear_all')}
-          </button>
-          <button
-            className="btn-close"
-            onClick={() => setIsFilterCollapsed(true)}
-            aria-label="Close"
-          ></button>
-        </div>
-      </div>
-    </div>
-
-    {/* Modal Body - Scrollable content */}
-    <div className="modal-body p-4">
-      <div className="row g-4">
-        {/* Course Type Filter */}
-        <div className="col-md-3">
-          <label className="form-label small fw-bold text-dark CourseType">
-            <i className="fas fa-graduation-cap me-1 text-success"></i>
-            {t('course_type')}
-          </label>
-          <div className="position-relative">
-            <select
-              className="form-select"
-              name="courseType"
-              value={filterData.courseType}
-              onChange={handleFilterChange}
-            >
-              <option value="">{t('all_types')}</option>
-              <option value="Free">🆓 {t('free')}</option>
-              <option value="Paid">💰 {t('paid')}</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Project Filter */}
-        <div className="col-md-3">
-          <MultiSelectCheckbox
-            title={t('projects')}
-            options={projectOptions}
-            selectedValues={formData?.projects?.values}
-            onChange={(values) => handleCriteriaChange('projects', values)}
-            icon="fas fa-sitemap"
-            isOpen={dropdownStates.projects}
-            onToggle={() => toggleDropdown('projects')}
-            t={t}
-          />
-        </div>
-
-        {/* Verticals Filter */}
-        <div className="col-md-3">
-          <MultiSelectCheckbox
-            title={t('verticals')}
-            options={verticalOptions}
-            selectedValues={formData?.verticals?.values || []}
-            icon="fas fa-sitemap"
-            isOpen={dropdownStates.verticals}
-            onToggle={() => toggleDropdown('verticals')}
-            onChange={(values) => handleCriteriaChange('verticals', values)}
-            t={t}
-          />
-        </div>
-
-        {/* Course Filter */}
-        <div className="col-md-3">
-          <MultiSelectCheckbox
-            title={t('course_type')}
-            options={courseOptions}
-            selectedValues={formData?.course?.values || []}
-            onChange={(values) => handleCriteriaChange('course', values)}
-            icon="fas fa-graduation-cap"
-            isOpen={dropdownStates.course}
-            onToggle={() => toggleDropdown('course')}
-            t={t}
-          />
-        </div>
-
-        {/* Center Filter */}
-        <div className="col-md-3">
-          <MultiSelectCheckbox
-            title={t('centers')}
-            options={centerOptions}
-            selectedValues={formData?.center?.values || []}
-            onChange={(values) => handleCriteriaChange('center', values)}
-            icon="fas fa-building"
-            isOpen={dropdownStates.center}
-            onToggle={() => toggleDropdown('center')}
-            t={t}
-          />
-        </div>
-
-        {/* Counselor Filter */}
-        <div className="col-md-3">
-          <MultiSelectCheckbox
-            title={t('counselors')}
-            options={counselorOptions}
-            selectedValues={formData?.counselor?.values || []}
-            onChange={(values) => handleCriteriaChange('counselor', values)}
-            icon="fas fa-user-tie"
-            isOpen={dropdownStates.counselor}
-            onToggle={() => toggleDropdown('counselor')}
-            t={t}
-          />
-        </div>
-      </div>
-
-   
-
-
-      {/* Results Summary */}
-      <div className="row mt-4">
-        <div className="col-12">
-          <div className="alert alert-info">
-            <div className="d-flex align-items-center">
-              <i className="fas fa-info-circle me-2"></i>
-              <div>
-
-                {/* Active filter indicators */}
-                <div className="mt-2">
-                  {(filterData.createdFromDate || filterData.createdToDate) && (
-                    <span className="badge bg-success me-2">
-                      <i className="fas fa-calendar-plus me-1"></i>
-                      Created Date Filter Active
-                    </span>
-                  )}
-
-                  {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                    <span className="badge bg-warning me-2">
-                      <i className="fas fa-calendar-edit me-1"></i>
-                      Modified Date Filter Active
-                    </span>
-                  )}
-
-                  {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                    <span className="badge bg-info me-2">
-                      <i className="fas fa-calendar-check me-1"></i>
-                      Next Action Date Filter Active
-                    </span>
-                  )}
-
-                  {totalSelected > 0 && (
-                    <span className="badge bg-primary me-2">
-                      <i className="fas fa-filter me-1"></i>
-                      {totalSelected} Multi-Select Filters Active
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Modal Footer - Fixed at bottom */}
-    <div className="modal-footer bg-light border-top">
-      <div className="d-flex justify-content-between align-items-center w-100">
-        <div className="text-muted small">
-          <i className="fas fa-filter me-1"></i>
-          {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
-        </div>
-        <div className="d-flex gap-2">
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => setIsFilterCollapsed(true)}
-          >
-            <i className="fas fa-eye-slash me-1"></i>
-            Hide Filters
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              fetchProfileData(filterData);
-              setIsFilterCollapsed(true);
-            }}
-          >
-            <i className="fas fa-search me-1"></i>
-            Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
-      )
-        
-      }
+      
 
       <style>
         {

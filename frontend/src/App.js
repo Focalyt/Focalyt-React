@@ -151,6 +151,7 @@ import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourse
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
 import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
 import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
+import LiveClassRoom from './Pages/App/Trainer/LiveClassRoom/LiveClassRoom';
 import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
@@ -214,6 +215,7 @@ const Layout = () => {
         <Route path="/userAgreement" element={<UserAgreement/>}/>
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
+        <Route path="/live-class/:id" element={<LiveClassRoom />} />
         <Route path="/candidate" element={<CandidateLayout />}>
 
           <Route path="dashboard" element={<CandidateDashboard />} />

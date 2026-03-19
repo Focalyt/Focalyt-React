@@ -15132,7 +15132,8 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			isRecurring,
 			recurringType,
 			recurringEndDate,
-			createGoogleMeet = false
+			createGoogleMeet = false,
+			liveClassPlatform = 'jitsi'
 		} = req.body;
 
 		const trainerId = req.user._id;
@@ -15174,6 +15175,14 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			});
 		}
 
+		const normalizedPlatform = createGoogleMeet ? 'google_meet' : (liveClassPlatform || 'jitsi');
+		const safeTitle = String(title || 'live-class')
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/(^-|-$)/g, '')
+			.slice(0, 40) || 'live-class';
+		const roomName = `focalyt-${safeTitle}-${Date.now()}`;
+
 		const trainerTimeTable = new TrainerTimeTable({
 			trainerId,
 			collegeId,
@@ -15192,7 +15201,9 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 			isRecurring: isRecurring || false,
 			recurringType: isRecurring ? recurringType : null,
 			recurringEndDate: isRecurring ? recurringEndDate : null,
-			createdBy: trainerId
+			createdBy: trainerId,
+			roomName,
+			liveClassPlatform: normalizedPlatform,
 		});
 
 		if (scheduleType === 'weekly') {
@@ -15274,6 +15285,9 @@ router.post('/scheduledTimeTable', isTrainer, async (req, res) => {
 		}
 
 		await trainerTimeTable.save();
+		trainerTimeTable.joinPath = `/live-class/${trainerTimeTable._id}`;
+
+		await trainerTimeTable.save();
 
 		return res.status(200).json({
 			status: true,
@@ -15306,10 +15320,15 @@ router.get('/trainerTimeTable', isTrainer, async (req, res) => {
 			trainerId: trainerId,
 		}).populate('trainerId', 'name')
 
+		const data = scheduledTimeTable.map((item) => ({
+			...item.toObject(),
+			joinPath: item.joinPath || `/live-class/${item._id}`,
+		}));
+
 		return res.status(200).json({
 			status: true,
 			message: 'Timetable fetched successfully',
-			data: scheduledTimeTable,
+			data,
 		});
 	} catch (error) {
 		console.error('Error fetching trainer timetable:', error);
@@ -15759,6 +15778,45 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 		return res.status(500).json({
 			status: false,
 			message: 'Error adding daily diary',
+			error: error.message
+		});
+	}
+})
+
+router.post('/trainerTimeTable/:id/end-class', isTrainer, async (req, res) => {
+	try {
+		const liveClass = await TrainerTimeTable.findOne({
+			_id: req.params.id,
+			trainerId: req.user._id,
+			isDeleted: { $ne: true }
+		});
+
+		if (!liveClass) {
+			return res.status(404).json({
+				status: false,
+				message: 'Live class not found'
+			});
+		}
+
+		liveClass.status = 'completed';
+		liveClass.completedAt = new Date();
+		liveClass.lastModifiedBy = req.user._id;
+		await liveClass.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Live class ended successfully',
+			data: {
+				_id: liveClass._id,
+				status: liveClass.status,
+				completedAt: liveClass.completedAt
+			}
+		});
+	} catch (error) {
+		console.error('Error ending live class:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Error ending live class',
 			error: error.message
 		});
 	}
