@@ -12,6 +12,42 @@ const UploadCandidates = require('../../models/uploadCandidates');
 const CandidateProfile = require('../../models/candidateProfile');
 const { Vacancy, Company, City, State, Qualification, Industry, Skill, JobCategory, JobOffer, College } = require('../../models');
 
+const getUntouchDefaults = async (collegeId) => {
+  const collegeObjectId = new mongoose.Types.ObjectId(collegeId);
+  const untouchTitleRegex = /^untouch leads?$/i;
+
+  let untouchStatus = await PlacementStatus.findOne({
+    college: collegeObjectId,
+    title: untouchTitleRegex
+  }).lean();
+
+  if (!untouchStatus) {
+    untouchStatus = await PlacementStatus.findOne({
+      college: null,
+      title: untouchTitleRegex
+    }).lean();
+  }
+
+  if (!untouchStatus) {
+    untouchStatus = await PlacementStatus.findOne({
+      $or: [{ college: collegeObjectId }, { college: null }]
+    }).sort({ index: 1 }).lean();
+  }
+
+  let untouchSubstatus = null;
+  if (untouchStatus?.substatuses?.length) {
+    untouchSubstatus =
+      untouchStatus.substatuses.find(
+        (sub) => sub?.title && /^untouch leads?$/i.test(sub.title)
+      ) || untouchStatus.substatuses[0];
+  }
+
+  return {
+    statusId: untouchStatus?._id || null,
+    subStatusId: untouchSubstatus?._id || null
+  };
+};
+
 router.get('/', isCollege, async (req, res) => {
   try {
     // Include both college-specific statuses and global statuses (college: null)
@@ -849,15 +885,9 @@ router.get('/candidates', isCollege, async (req, res) => {
       });
     }
 
-    const countPipeline = [...aggregationPipeline, { $count: 'total' }];
-    const countResult = await AppliedCourses.aggregate(countPipeline);
-    const totalPlacements = countResult[0]?.total || 0;
-    const totalPages = Math.ceil(totalPlacements / parseInt(limit));
 
     aggregationPipeline.push(
-      { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: parseInt(limit) }
+      { $sort: { createdAt: -1 } }
     );
 
     const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
@@ -976,13 +1006,10 @@ router.get('/candidates', isCollege, async (req, res) => {
           college: new mongoose.Types.ObjectId(college._id)
         }).lean();
 
+        const untouchDefaults = await getUntouchDefaults(college._id);
+
         // ✅ If Placement record doesn't exist, create one
         if (!placementRecord) {
-          // Get default placement status (first status for the college)
-          const defaultStatus = await PlacementStatus.findOne({ 
-            college: new mongoose.Types.ObjectId(college._id) 
-          }).sort({ index: 1 }).lean();
-
           // Try to find candidate profile if user is linked
           let candidateProfile = null;
           if (uploadCandidate.user) {
@@ -998,7 +1025,8 @@ router.get('/candidates', isCollege, async (req, res) => {
             location: 'Not Set',
             college: new mongoose.Types.ObjectId(college._id),
             uploadCandidate: uploadCandidate._id,
-            status: defaultStatus ? defaultStatus._id : null,
+            status: untouchDefaults.statusId,
+            subStatus: untouchDefaults.subStatusId,
             addedBy: req.user._id,
             logs: [{
               user: req.user._id,
@@ -1010,6 +1038,20 @@ router.get('/candidates', isCollege, async (req, res) => {
 
           placementRecord = await newPlacement.save();
           placementRecord = placementRecord.toObject();
+        } else if (!placementRecord.status) {
+          if (untouchDefaults.statusId) {
+            await Placement.updateOne(
+              { _id: placementRecord._id },
+              {
+                $set: {
+                  status: untouchDefaults.statusId,
+                  subStatus: untouchDefaults.subStatusId || null
+                }
+              }
+            );
+            placementRecord.status = untouchDefaults.statusId;
+            placementRecord.subStatus = untouchDefaults.subStatusId || null;
+          }
         }
 
         // Try to find candidate profile if user is linked
@@ -1240,67 +1282,15 @@ router.get('/candidates', isCollege, async (req, res) => {
     });
     
     // Debug logging (can be removed in production)
-    if (statusFilter) {
-      console.log(`Status filter applied: ${statusFilter}`);
-      console.log(`UploadCandidates found: ${activeUploadCandidates.length}`);
-      console.log(`UploadCandidates placements created: ${uploadCandidatesPlacements.length}`);
-      console.log(`Total placements: ${allPlacements.length}`);
-    }
+    // if (statusFilter) {
+    //   console.log(`Status filter applied: ${statusFilter}`);
+    //   console.log(`UploadCandidates found: ${activeUploadCandidates.length}`);
+    //   console.log(`UploadCandidates placements created: ${uploadCandidatesPlacements.length}`);
+    //   console.log(`Total placements: ${allPlacements.length}`);
+    // }
 
-    // Calculate total count including upload candidates with placements
-    // Only count if UploadCandidate still exists (not deleted)
-    let totalUploadCandidates = 0;
-    const placementsWithUploadCandidates = await Placement.aggregate([
-      {
-        $match: {
-          college: new mongoose.Types.ObjectId(college._id),
-          uploadCandidate: { $exists: true, $ne: null }
-        }
-      },
-      {
-        $lookup: {
-          from: 'uploadcandidates',
-          localField: 'uploadCandidate',
-          foreignField: '_id',
-          as: 'uploadCandidateData'
-        }
-      },
-      {
-        $match: {
-          'uploadCandidateData.0': { $exists: true } // Only if UploadCandidate still exists
-        }
-      },
-      {
-        $project: {
-          uploadCandidate: 1
-        }
-      }
-    ]);
-    
-    const uploadCandidateIds = placementsWithUploadCandidates
-      .map(p => p.uploadCandidate)
-      .filter(Boolean);
-    
-    if (uploadCandidateIds.length > 0) {
-      const uploadCandidatesQuery = {
-        college: new mongoose.Types.ObjectId(college._id),
-        _id: { $in: uploadCandidateIds }
-      };
-      
-      if (search) {
-        const searchRegex = new RegExp(search, 'i');
-        uploadCandidatesQuery.$or = [
-          { name: searchRegex },
-          { email: searchRegex },
-          { contactNumber: searchRegex }
-        ];
-      }
-      
-      totalUploadCandidates = await UploadCandidates.countDocuments(uploadCandidatesQuery);
-    }
-
-    const totalAllPlacements = totalPlacements + totalUploadCandidates;
-    const totalPagesAll = Math.ceil(totalAllPlacements / parseInt(limit));
+    const totalAllPlacements = allPlacements.length;
+    const totalPagesAll = Math.max(1, Math.ceil(totalAllPlacements / parseInt(limit)));
 
     // Apply pagination to merged results
     const paginatedPlacements = allPlacements.slice(skip, skip + parseInt(limit));
@@ -1401,7 +1391,7 @@ router.post('/add-candidate', isCollege, async (req, res) => {
 
 router.put('/update-status/:id', isCollege, async (req, res) => {
   try {
-    console.log('[Placement Update Status] Step 1: Request received', { method: req.method, path: req.path, id: req.params.id });
+    // console.log('[Placement Update Status] Step 1: Request received', { method: req.method, path: req.path, id: req.params.id });
     const { id } = req.params;
     const {
       status,
@@ -1415,18 +1405,18 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
       location,
       appliedCourseId: appliedCourseid
     } = req.body;
-    console.log('[Placement Update Status] Step 2: Body', { status, subStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
+    // console.log('[Placement Update Status] Step 2: Body', { status, subStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
     const userId = req.user._id;
     const collegeId = req.user.college._id;
-    console.log('[Placement Update Status] Step 3: User', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
+    // console.log('[Placement Update Status] Step 3: User', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
 
     let placement = null;
     let appliedCourse = null;
     let appliedCourseId = appliedCourseid;
 
     placement = await Placement.findById(id);
-    console.log('[Placement Update Status] Step 4: Placement lookup by id', { found: !!placement, id });
+    // console.log('[Placement Update Status] Step 4: Placement lookup by id', { found: !!placement, id });
     
     if (placement) {
       appliedCourseId = placement.appliedCourse;
@@ -1477,6 +1467,7 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
       // ✅ Check if this is for an UploadCandidate
       const uploadCandidate = await UploadCandidates.findById(id);
       if (uploadCandidate) {
+        const untouchDefaults = await getUntouchDefaults(collegeId);
         // Create Placement record for UploadCandidate
         const placementCompanyName = companyName ? String(companyName).trim() : 'Not Set';
         const placementEmployerName = employerName ? String(employerName).trim() : '';
@@ -1499,6 +1490,8 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
           location: location || 'Not Set',
           college: collegeId,
           uploadCandidate: id,
+          status: untouchDefaults.statusId,
+          subStatus: untouchDefaults.subStatusId,
           addedBy: userId,
           logs: [{
             user: userId,
@@ -1621,7 +1614,7 @@ router.put('/update-status/:id', isCollege, async (req, res) => {
 
     const updatedPlacement = await placement.save();
 
-    console.log('[Placement Update Status] Step 6: Success - sending response', { placementId: updatedPlacement?._id?.toString(), status, subStatus: subStatus || '(none)' });
+    // console.log('[Placement Update Status] Step 6: Success - sending response', { placementId: updatedPlacement?._id?.toString(), status, subStatus: subStatus || '(none)' });
     return res.status(200).json({
       success: true,
       message: 'Placement status updated successfully',

@@ -1296,8 +1296,21 @@ const LeadAnalyticsDashboard = () => {
     appliedCoursesData[0]._leadStatus.substatuses = [{ title: 'Test Substatus' }];
   }
 
-  // Data is now filtered by backend, so we use it directly
-  const filteredData = appliedCoursesData;
+  const filteredData = useMemo(() => {
+    if (!Array.isArray(appliedCoursesData)) return [];
+
+    let nextData = appliedCoursesData.filter(Boolean);
+
+    if (formData?.center?.values?.length > 0) {
+      const selectedCenterIds = new Set(formData.center.values.map(String));
+      nextData = nextData.filter((lead) => {
+        const centerId = lead?._center?._id;
+        return centerId && selectedCenterIds.has(String(centerId));
+      });
+    }
+
+    return nextData;
+  }, [appliedCoursesData, formData]);
 
   // Get daily admissions data
   const getDailyAdmissions = () => {
@@ -2987,7 +3000,7 @@ const LeadAnalyticsDashboard = () => {
           </div>
 
           {/* B2C Funnel  */}
-          {/* <div className="card shadow-sm mb-4">
+           <div className="card shadow-sm mb-4">
             <div className="card-body">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <h2 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
@@ -3146,7 +3159,7 @@ const LeadAnalyticsDashboard = () => {
                 </table>
               </div>
             </div>
-          </div> */}
+          </div> 
 
           {/* Main Analytics Matrix */}
           <div className="card shadow-sm mb-4">

@@ -701,6 +701,7 @@ const useScrollBlur = (navbarHeight = 140) => {
   return { isScrolled, scrollY, contentRef };
 };
 const WhatsappChat = () => {
+  const READ_WHATSAPP_STORAGE_KEY = 'whatsapp_read_profiles';
 
   const candidateRef = useRef();
   const location = useLocation();
@@ -1020,6 +1021,44 @@ const WhatsappChat = () => {
     return normalized;
   }, []);
 
+  const [readWhatsappPhones, setReadWhatsappPhones] = useState(() => {
+    try {
+      const savedState = sessionStorage.getItem(READ_WHATSAPP_STORAGE_KEY);
+      return savedState ? JSON.parse(savedState) : {};
+    } catch (error) {
+      console.error('Failed to parse saved WhatsApp read state:', error);
+      return {};
+    }
+  });
+
+  const markPhoneAsReadLocally = useCallback((phone) => {
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) return;
+
+    setReadWhatsappPhones(prev => {
+      const updated = {
+        ...prev,
+        [normalizedPhone]: Date.now()
+      };
+      sessionStorage.setItem(READ_WHATSAPP_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [normalizePhone]);
+
+  const clearPhoneReadState = useCallback((phone) => {
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) return;
+
+    setReadWhatsappPhones(prev => {
+      if (!prev[normalizedPhone]) return prev;
+
+      const updated = { ...prev };
+      delete updated[normalizedPhone];
+      sessionStorage.setItem(READ_WHATSAPP_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [normalizePhone]);
+
   // Helper function to sort profiles by last message time and unread count
   // This ensures proper ordering: unread messages first, then by last message time (newest first)
   const sortProfilesByMessageTime = useCallback((profiles, unreadCounts, lastMsgTimes) => {
@@ -1076,6 +1115,8 @@ const WhatsappChat = () => {
 
     // If not for current chat, find the profile in allProfiles
     if (!isForCurrentChat) {
+      clearPhoneReadState(incomingFrom);
+
       // Use setState callback to access latest allProfiles
       setAllProfiles(prevProfiles => {
         const matchingProfile = prevProfiles.find(profile => {
@@ -1277,7 +1318,6 @@ const WhatsappChat = () => {
       // Automatically mark message as read in backend since chat is open
       // This ensures badge stays cleared even after page refresh
       if (selectedProfile?._candidate?.mobile && data.messageId) {
-        const token = localStorage.getItem('token');
         axios.post(`${backendUrl}/college/markWhatsAppMessagesAsRead`, 
           { phoneNumber: selectedProfile._candidate.mobile },
           { headers: { 'x-auth': token } }
@@ -1348,7 +1388,7 @@ const WhatsappChat = () => {
         icon: '/whatsapp-icon.png'
       });
     }
-  }, [selectedProfile, normalizePhone]);
+  }, [selectedProfile, normalizePhone, clearPhoneReadState, token]);
 
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
@@ -3442,12 +3482,15 @@ const WhatsappChat = () => {
                 // Get temporary count tracked by phone number (if any)
                 const tempCount = prev[phoneKey] || 0;
                 
+                const isLocallyRead = !!readWhatsappPhones[profilePhone];
+
                 // Backend count is the source of truth (includes all unread messages)
                 const backendCount = profile.unreadMessageCount || 0;
                 
-                // Use backend count if available, otherwise use temp count
-                // Backend count should always be >= temp count, so prefer backend
-                const finalCount = backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0);
+                // If this phone was already opened/read locally, suppress stale backend count
+                const finalCount = isLocallyRead
+                  ? 0
+                  : (backendCount > 0 ? backendCount : (tempCount > 0 ? tempCount : 0));
                 
                 if (finalCount > 0) {
                   // console.log('📬 Mapping unread count from phone to profile:', {
@@ -3466,9 +3509,10 @@ const WhatsappChat = () => {
                 }
                 
                 // If no count, just remove phone key if exists
-                if (tempCount > 0) {
+                if (tempCount > 0 || readWhatsappPhones[profilePhone]) {
                   const updated = { ...prev };
                   delete updated[phoneKey];
+                  updated[profile._id] = 0;
                   return updated;
                 }
                 
@@ -3926,6 +3970,8 @@ const WhatsappChat = () => {
         // Clear unread message count IMMEDIATELY when chat opens (before API call)
         // This ensures badge is removed instantly, even if API call is slow
         if (profile?._id) {
+          markPhoneAsReadLocally(profile._candidate.mobile);
+
           setUnreadMessageCounts(prev => {
             const updated = { ...prev };
             updated[profile._id] = 0; // Set to 0 instead of deleting
@@ -3959,6 +4005,8 @@ const WhatsappChat = () => {
           
           // Double-check badge is cleared after API call (in case of race conditions)
           if (profile?._id) {
+            markPhoneAsReadLocally(profile._candidate.mobile);
+
             setUnreadMessageCounts(prev => {
               const updated = { ...prev };
               updated[profile._id] = 0;
@@ -9827,32 +9875,16 @@ const WhatsappChat = () => {
 
                         {/* Profiles List */}
                         {!isLoadingProfiles && allProfiles && (() => {
-                          // Sort profiles: unread messages first, then by last message time
-                          const sortedProfiles = [...allProfiles].sort((a, b) => {
-                            const aUnread = unreadMessageCounts[a._id] || 0;
-                            const bUnread = unreadMessageCounts[b._id] || 0;
-                            const aLastMsgTime = lastMessageTime[a._id] || 0;
-                            const bLastMsgTime = lastMessageTime[b._id] || 0;
-                            
-                            // First priority: Profiles with unread messages
-                            if (aUnread > 0 && bUnread === 0) return -1;
-                            if (aUnread === 0 && bUnread > 0) return 1;
-                            
-                            // Second priority: Among unread, sort by last message time (newest first)
-                            if (aUnread > 0 && bUnread > 0) {
-                              return bLastMsgTime - aLastMsgTime;
-                            }
-                            
-                            // Third priority: Among no unread, sort by last message time (newest first)
-                            if (aLastMsgTime !== bLastMsgTime) {
-                              return bLastMsgTime - aLastMsgTime;
-                            }
-                            
-                            // Default: Keep original order
-                            return 0;
-                          });
-                          
-                          return sortedProfiles.map((profile, profileIndex) => (
+                          const sortedProfiles = sortProfilesByMessageTime(allProfiles, unreadMessageCounts, lastMessageTime) || [];
+                          const shouldPinSelectedProfile = showPanel === 'Whatsapp' && selectedProfile?._id;
+                          const pinnedProfile = shouldPinSelectedProfile
+                            ? sortedProfiles.find(profile => profile._id === selectedProfile._id)
+                            : null;
+                          const orderedProfiles = pinnedProfile
+                            ? [pinnedProfile, ...sortedProfiles.filter(profile => profile._id !== selectedProfile._id)]
+                            : sortedProfiles;
+
+                          return orderedProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
                             {/* Profile Header Card */}
@@ -9915,7 +9947,11 @@ const WhatsappChat = () => {
                                           {(() => {
                                             const profilePhone = normalizePhone(profile._candidate?.mobile);
                                             const phoneKey = profilePhone ? `phone_${profilePhone}` : null;
-                                            const unreadCount = unreadMessageCounts[profile._id] || (phoneKey ? unreadMessageCounts[phoneKey] : 0) || 0;
+                                            const isActiveWhatsappProfile =
+                                              showPanel === 'Whatsapp' && selectedProfile?._id === profile._id;
+                                            const unreadCount = isActiveWhatsappProfile
+                                              ? 0
+                                              : ((unreadMessageCounts[profile._id] ?? (phoneKey ? unreadMessageCounts[phoneKey] : 0)) ?? 0);
                                             return unreadCount > 0 ? (
                                               <span
                                                 className="badge bg-danger"

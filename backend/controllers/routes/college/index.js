@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -1806,31 +1806,32 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 							}
 						} catch (err) {
 						}
-			}
-		}
-		if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
-			if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
-				try {
-					const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
-					if (state) {
-						doc._candidate.personalInfo.permanentAddress.state = state.name;
 					}
-				} catch (err) {
+				}
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.state) {
+					if (typeof doc._candidate.personalInfo.permanentAddress.state === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.state)) {
+						try {
+							const state = await State.findById(doc._candidate.personalInfo.permanentAddress.state);
+							if (state) {
+								doc._candidate.personalInfo.permanentAddress.state = state.name;
+							}
+						} catch (err) {
+						}
+					}
+				}
+				if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
+					if (typeof doc._candidate.personalInfo.permanentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.city)) {
+						try {
+							const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
+							if (city) {
+								doc._candidate.personalInfo.permanentAddress.city = city.name;
+							}
+						} catch (err) {
+						}
+					}
 				}
 			}
 		}
-		if (doc._candidate.personalInfo.permanentAddress && doc._candidate.personalInfo.permanentAddress.city) {
-			if (typeof doc._candidate.personalInfo.permanentAddress.city === 'object' || mongoose.Types.ObjectId.isValid(doc._candidate.personalInfo.permanentAddress.city)) {
-				try {
-					const city = await City.findById(doc._candidate.personalInfo.permanentAddress.city);
-					if (city) {
-						doc._candidate.personalInfo.permanentAddress.city = city.name;
-					}
-				} catch (err) {
-				}
-			}
-		}
-	}}
 		// Process results for document counts and other formatting
 		const results = response.map(doc => {
 			let selectedSubstatus = null;
@@ -2068,7 +2069,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const totalCount = totalCountResult[0]?.total || 0;
 
-		
+
 		const appliedIds = results.map(r => r._id);
 		const followups = await B2cFollowup
 			.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
@@ -2856,7 +2857,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	pipeline.push({
 		$lookup: {
 			from: 'whatsappmessages',
-			let: { 
+			let: {
 				candidateMobile: { $ifNull: ['$_candidate.mobile', ''] },
 				candidateMobileStr: { $toString: { $ifNull: ['$_candidate.mobile', ''] } },
 				collegeId: college._id
@@ -2900,7 +2901,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	pipeline.push({
 		$lookup: {
 			from: 'whatsappmessages',
-			let: { 
+			let: {
 				candidateMobileStr: { $toString: { $ifNull: ['$_candidate.mobile', ''] } },
 				collegeId: college._id
 			},
@@ -4474,10 +4475,10 @@ router.route("/myprofile")
 	.post(authenti, isCollege, async (req, res) => {
 		try {
 			const { collegeInfo, concernedPerson, representativeInfo } = req.body;
-			
+
 			const user = req.user || req.session?.user;
 			const collegeId = req.college?._id || req.session?.user?.collegeId;
-			
+
 			if (!user || !collegeId) {
 				return res.status(401).json({ status: false, message: "User not authenticated" });
 			}
@@ -4542,7 +4543,7 @@ router.route("/myprofile")
 		} catch (err) {
 			console.error('Error updating profile:', err);
 			const errorMessage = err.message || "Something went wrong!";
-			
+
 			// For EJS (session-based), use flash messages
 			if (req.session) {
 				req.flash("error", errorMessage);
@@ -4561,9 +4562,9 @@ router.get('/profile', [isCollege], async (req, res) => {
 			return res.status(401).json({ status: false, message: "User not authenticated" });
 		}
 
-		const college = await College.findOne({ 
-			'_concernPerson._id': user._id, 
-			status: true 
+		const college = await College.findOne({
+			'_concernPerson._id': user._id,
+			status: true
 		})
 			.populate([{
 				path: "_concernPerson",
@@ -4574,12 +4575,12 @@ router.get('/profile', [isCollege], async (req, res) => {
 			return res.status(404).json({ status: false, message: "College not found" });
 		}
 
-		
+
 		const collegeObj = college.toObject ? college.toObject() : college;
 
 		if (collegeObj._concernPerson) {
 			if (Array.isArray(collegeObj._concernPerson)) {
-				const concernPerson = collegeObj._concernPerson.find(cp => 
+				const concernPerson = collegeObj._concernPerson.find(cp =>
 					cp._id && cp._id.toString() === user._id.toString()
 				);
 				if (concernPerson) {
@@ -4636,7 +4637,7 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 			'_concernPerson._id': user._id
 		});
 		const collegeId = college?._id?.toString();
-		
+
 		const populate = [
 			{
 				path: "_qualification",
@@ -4674,7 +4675,7 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 		if (minSalary) {
 			filter["$or"] = [{ isFixed: true, amount: { $gte: minSalary } }, { isFixed: false, min: { $gte: minSalary } }]
 		}
-		
+
 		const allQualification = await Qualification.find({ status: true }).sort({ basic: -1 })
 		const allIndustry = await Industry.find({ status: true })
 		const allStates = await State.find({ countryId: '101', status: { $ne: false } })
@@ -4684,13 +4685,13 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 			if (job._company?.isDeleted === true || job._company?.status === false) {
 				return false;
 			}
-			
+
 			// Check posting type
 			const postingType = job.postingType;
 			if (postingType === 'Private') {
-				const jobCollegeAcNos = Array.isArray(job.collegeAcNo) 
+				const jobCollegeAcNos = Array.isArray(job.collegeAcNo)
 					? job.collegeAcNo.map(no => no.toString().trim())
-					: job.collegeAcNo 
+					: job.collegeAcNo
 						? [job.collegeAcNo.toString().trim()]
 						: [];
 				return jobCollegeAcNos.length > 0 && jobCollegeAcNos.includes(collegeId.toString().trim());
@@ -5064,7 +5065,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 		let errorMessages = []
 		let actualHeadersFound = []; // Store original headers for error message
 		let columnMap = {}; // Map to store column indices
-		
+
 		await readXlsxFile(
 			path.join(__dirname, "../../../public/" + filename)
 		).then((rows) => {
@@ -5072,7 +5073,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			const headerRow = rows[0] || [];
 			actualHeadersFound = headerRow.map(h => h ? h.toString().trim() : ''); // Store original headers
 			const normalizedHeaders = headerRow.map(h => h ? h.toString().trim().toLowerCase().replace(/\s+/g, '').replace(/[\/\(\)]/g, '') : '');
-			
+
 			// Build column map dynamically
 			normalizedHeaders.forEach((header, index) => {
 				const normalized = header.replace(/[\/\(\)]/g, '');
@@ -5105,14 +5106,14 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					columnMap['batchId'] = index;
 				}
 			});
-			
+
 			// Required headers (College is optional - will use logged-in college if not provided)
 			const requiredHeaders = ['name', 'fatherName', 'course'];
-			
+
 			// Check if minimum required headers are present
 			let headersMatch = true;
 			let mismatchDetails = [];
-			
+
 			// Check for required headers
 			for (let reqHeader of requiredHeaders) {
 				if (!columnMap[reqHeader] && columnMap[reqHeader] !== 0) {
@@ -5120,7 +5121,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					mismatchDetails.push(`Required column "${reqHeader}" not found`);
 				}
 			}
-			
+
 			if (!headersMatch) {
 				checkFileError = false;
 				// console.log('Header mismatch details:', mismatchDetails);
@@ -5135,9 +5136,9 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 		})
 
 		if (checkFileError == false) {
-			await fs.promises.unlink("public/" + filename).catch(() => {});
-			return res.status(400).json({ 
-				status: false, 
+			await fs.promises.unlink("public/" + filename).catch(() => { });
+			return res.status(400).json({
+				status: false,
 				message: "Please upload right pattern file. Expected columns: Name (or Candidate Name), Father Name, Course, Year, Contact Number, Email, Gender, DOB, Session/Semester. " +
 					(actualHeadersFound.length > 0 ? `Found columns: ${actualHeadersFound.join(', ')}` : '')
 			});
@@ -5178,12 +5179,12 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					let session = columnMap['session'] !== undefined && rows[columnMap['session']] ? rows[columnMap['session']].toString().trim() : '';
 					// College is optional - use logged-in college if not provided
 					let collegeName = columnMap['collegeName'] !== undefined && rows[columnMap['collegeName']] ? rows[columnMap['collegeName']].toString().trim() : '';
-					
+
 					// If college name not provided, use logged-in college name
 					if (!collegeName && college && college.name) {
 						collegeName = college.name;
 					}
-					
+
 					// Read batchId from Excel
 					let batchId = columnMap['batchId'] !== undefined && rows[columnMap['batchId']] ? rows[columnMap['batchId']].toString().trim() : '';
 
@@ -5208,7 +5209,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					let dobDate = null;
 					if (dob) {
 						let parsedDate = null;
-						
+
 						if (dob instanceof Date) {
 							parsedDate = dob;
 						}
@@ -5241,7 +5242,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 								}
 							}
 						}
-						
+
 						// Validate the parsed date
 						if (parsedDate && !isNaN(parsedDate.getTime())) {
 							// Check if date is reasonable (not too far in past or future)
@@ -5256,11 +5257,11 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					// Check for duplicate candidate - prioritize contact number or email, then fall back to name + fatherName
 					let isExistCandidate = null;
 					let duplicateReason = '';
-					
+
 					// First check by contact number (most unique identifier)
 					if (contactNumber && contactNumber.trim()) {
 						const cleanMobile = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
-						
+
 						if (cleanMobile.length >= 10) {
 							// Try to find by exact match first
 							isExistCandidate = await UploadCandidates.findOne({
@@ -5272,27 +5273,27 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 									{ contactNumber: contactNumber.trim() }
 								]
 							});
-							
+
 							// If not found, check with regex (for partial matches with different formatting)
 							if (!isExistCandidate) {
 								const allCandidates = await UploadCandidates.find({
 									college: college._id,
 									contactNumber: { $exists: true, $ne: null, $ne: '' }
 								}).lean();
-								
+
 								isExistCandidate = allCandidates.find(candidate => {
 									if (!candidate.contactNumber) return false;
 									const storedMobile = String(candidate.contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '').trim();
 									return storedMobile === cleanMobile;
 								});
 							}
-							
+
 							if (isExistCandidate) {
 								duplicateReason = `Contact Number "${contactNumber}"`;
 							}
 						}
 					}
-					
+
 					// If not found by contact number, check by email
 					if (!isExistCandidate && email && email.trim()) {
 						const cleanEmail = email.toLowerCase().trim();
@@ -5300,12 +5301,12 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							email: cleanEmail,
 							college: college._id
 						});
-						
+
 						if (isExistCandidate) {
 							duplicateReason = `Email "${email}"`;
 						}
 					}
-					
+
 					// If still not found, check by name + fatherName + college (fallback)
 					if (!isExistCandidate) {
 						isExistCandidate = await UploadCandidates.findOne({
@@ -5313,7 +5314,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							fatherName: fatherName,
 							college: college._id
 						});
-						
+
 						if (isExistCandidate) {
 							duplicateReason = `Name "${name}" and Father Name "${fatherName}"`;
 						}
@@ -5362,25 +5363,25 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 
 					if (!isExistCandidate && !dup) {
 						allRows.push({ name, fatherName, collegeName, contactNumber, email })
-						
+
 						// Check if user account already exists (role 3 - student/candidate)
 						let existingUser = null;
 						let candidateStatus = 'inactive'; // Default status
-						
+
 						// Check by mobile number (User model has mobile as Number type)
 						if (contactNumber && contactNumber.trim()) {
 							const cleanMobile = String(contactNumber).replace(/^\+91/, '').replace(/^91/, '').replace(/\s/g, '');
 							const mobileNumber = parseInt(cleanMobile);
-							
+
 							// console.log(`🔍 Checking for user with mobile: ${mobileNumber} (original: ${contactNumber})`);
-							
+
 							if (!isNaN(mobileNumber) && mobileNumber > 0) {
 								// Try to find user - check both Number and String format for role (as used in candidateRoutes.js)
 								existingUser = await User.findOne({
 									mobile: mobileNumber,
-									role: 3  
+									role: 3
 								});
-								
+
 								// If not found, try String format (as used in candidateRoutes.js)
 								if (!existingUser) {
 									existingUser = await User.findOne({
@@ -5388,7 +5389,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 										role: "3"
 									});
 								}
-								
+
 								if (existingUser) {
 									candidateStatus = 'active';
 									// console.log(`✅ User account found for mobile ${mobileNumber}, setting status to 'active' | User ID: ${existingUser._id}`);
@@ -5399,25 +5400,25 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 								// console.log(`⚠️ Invalid mobile number format: ${contactNumber}`);
 							}
 						}
-						
-						
+
+
 						if (!existingUser && email && email.trim()) {
 							const cleanEmail = email.toLowerCase().trim();
 							// console.log(`🔍 Checking for user with email: ${cleanEmail}`);
-							
+
 							existingUser = await User.findOne({
 								email: cleanEmail,
-								role: 3  
+								role: 3
 							});
-							
-							
+
+
 							if (!existingUser) {
 								existingUser = await User.findOne({
 									email: cleanEmail,
 									role: "3"
 								});
 							}
-							
+
 							if (existingUser) {
 								candidateStatus = 'active';
 								// console.log(`✅ User account found for email ${cleanEmail}, setting status to 'active' | User ID: ${existingUser._id}`);
@@ -5425,9 +5426,9 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 								// console.log(`ℹ️ No user account found for email ${cleanEmail} with role 3`);
 							}
 						}
-						
+
 						// console.log(`📊 Candidate status for ${name} (${contactNumber || email || 'N/A'}): ${candidateStatus}`);
-						
+
 						// Create UploadCandidates record with all fields
 						const uploadCandidateData = {
 							name: name,
@@ -5444,21 +5445,21 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							batchId: batchId || undefined,
 							status: candidateStatus, // 'active' if user exists, else 'inactive'
 						};
-						
+
 						// Link user if exists
 						if (existingUser) {
 							uploadCandidateData.user = existingUser._id;
 						}
-						
-					
-						
+
+
+
 						const uploadCandidate = await UploadCandidates.create(uploadCandidateData);
 
 						if (!uploadCandidate) {
 							errorMessages.push(`Candidate not created for row ${index + 2}.`)
 							continue;
 						}
-						
+
 						// Create Placement record with "Untouch Leads" status for uploaded candidate
 						try {
 							// Find "Untouch Leads" status (it should already exist)
@@ -5469,7 +5470,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 									{ college: null }
 								]
 							});
-							
+
 							// If status doesn't exist, create it with "Untouch Lead" substatus
 							if (!untouchLeadsStatus) {
 								// Get the highest index for this college
@@ -5480,7 +5481,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 									]
 								}).sort('-index').exec();
 								const newIndex = highestIndexStatus ? highestIndexStatus.index + 1 : 0;
-								
+
 								untouchLeadsStatus = await PlacementStatus.create({
 									title: 'Untouch Leads',
 									description: 'Candidates uploaded but not yet contacted',
@@ -5495,21 +5496,21 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 									}]
 								});
 							}
-							
+
 							// Find "Untouch Lead" substatus from existing status (it should already be there)
 							let untouchSubstatus = null;
 							if (untouchLeadsStatus && untouchLeadsStatus.substatuses && untouchLeadsStatus.substatuses.length > 0) {
-								untouchSubstatus = untouchLeadsStatus.substatuses.find(sub => 
+								untouchSubstatus = untouchLeadsStatus.substatuses.find(sub =>
 									sub.title && (sub.title.toLowerCase() === 'untouch lead' || sub.title.toLowerCase() === 'untouch leads')
 								);
 							}
-							
+
 							// Check if placement already exists for this upload candidate
 							const existingPlacement = await Placement.findOne({
 								uploadCandidate: uploadCandidate._id,
 								college: college._id
 							});
-							
+
 							// Create placement record if it doesn't exist
 							if (!existingPlacement) {
 								await Placement.create({
@@ -5533,7 +5534,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							// Log error but don't fail the upload
 							console.error(`Error creating placement for uploaded candidate ${uploadCandidate._id}:`, placementError);
 						}
-						
+
 						if (contactNumber && contactNumber.trim() && candidateStatus === 'inactive') {
 							try {
 								const sendTemplateData = {
@@ -5545,26 +5546,26 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 
 								// Get token from request headers
 								const authToken = req.headers['x-auth'] || token;
-								
+
 								const protocol = req.protocol || 'http';
 								const host = req.get('host');
 								const baseUrl = `${protocol}://${host}`;
-								
+
 								await axios.post(`${baseUrl}/college/whatsapp/send-template`, sendTemplateData, {
 									headers: {
 										'x-auth': authToken,
 										'Content-Type': 'application/json'
 									},
-									timeout: 10000 
+									timeout: 10000
 								});
-								
+
 								// console.log(`✅ WhatsApp template 'registration_link' sent to ${contactNumber}`);
 							} catch (whatsappError) {
-								
-								 console.error(`⚠️ Failed to send WhatsApp template for row ${index + 2}:`, whatsappError.response?.data?.message || whatsappError.message);
+
+								console.error(`⚠️ Failed to send WhatsApp template for row ${index + 2}:`, whatsappError.response?.data?.message || whatsappError.message);
 							}
 						}
-						
+
 						successCount++;
 					} else {
 						errorMessages.push(`Duplicate candidate found in upload: Name "${name}" and Father Name "${fatherName}" for row ${index + 2}.`)
@@ -5580,7 +5581,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 				};
 
 				await CandidateImport.create(imports);
-				
+
 				// Clean up file
 				await fs.promises.unlink("public/" + filename).catch((err) => {
 					console.log("Error deleting file:", err);
@@ -5596,7 +5597,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 				});
 			}).catch(async (err) => {
 				console.log("Error processing file:", err);
-				await fs.promises.unlink("public/" + filename).catch(() => {});
+				await fs.promises.unlink("public/" + filename).catch(() => { });
 				return res.status(500).json({ status: false, message: "Error processing file: " + err.message });
 			});
 		}
@@ -5655,14 +5656,14 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		const perPage = parseInt(req.query.limit) || 50;
 		const p = parseInt(req.query.page, 10);
 		const page = p || 1;
-		const status = req.query.status; 
+		const status = req.query.status;
 		const search = req.query.search;
 		const course = req.query.course;
 		const year = req.query.year;
 		const session = req.query.session;
 
-		const collegeId = mongoose.Types.ObjectId.isValid(college._id) 
-			? new mongoose.Types.ObjectId(college._id) 
+		const collegeId = mongoose.Types.ObjectId.isValid(college._id)
+			? new mongoose.Types.ObjectId(college._id)
 			: college._id;
 
 		// Build match condition
@@ -5690,16 +5691,16 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 					// Check if values are ObjectIds (course IDs) or strings (course names)
 					const courseIds = courseArray.filter(c => mongoose.Types.ObjectId.isValid(c));
 					const courseNames = courseArray.filter(c => !mongoose.Types.ObjectId.isValid(c));
-					
+
 					// If we have course IDs, fetch course names from database
 					if (courseIds.length > 0) {
-						const courses = await Courses.find({ 
+						const courses = await Courses.find({
 							_id: { $in: courseIds.map(id => new mongoose.Types.ObjectId(id)) }
 						}).select('name');
 						const namesFromIds = courses.map(c => c.name);
 						courseNames.push(...namesFromIds);
 					}
-					
+
 					// Filter by course names (since course is stored as string in UploadCandidates)
 					if (courseNames.length > 0) {
 						matchCondition.course = { $in: courseNames };
@@ -5753,7 +5754,7 @@ router.get("/uploaded-candidates", isCollege, async (req, res) => {
 		]);
 
 		let count = await UploadCandidates.countDocuments(matchCondition);
-		
+
 		const totalPages = Math.ceil(count / perPage);
 
 		return res.status(200).json({
@@ -6094,11 +6095,11 @@ router.route('/uploadTemplates')
 			return res.send({ status: false, message: err.message })
 		}
 	})
-	// router.route("/single").get(auth1, function (req, res) {
+// router.route("/single").get(auth1, function (req, res) {
 router.route("/single").get(isCollege, function (req, res) {
 	try {
 		const XLSX = require('xlsx');
-		
+
 		// Define headers matching the table structure
 		const headers = [
 			'Candidate Name',
@@ -6110,29 +6111,29 @@ router.route("/single").get(isCollege, function (req, res) {
 			'Email',
 			'Gender',
 			'DOB',
-			
-			
+
+
 		];
-		
+
 		// Create worksheet data with headers only (sample template)
 		const worksheetData = [headers];
-		
+
 		// Create workbook and worksheet
 		const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 		const workbook = XLSX.utils.book_new();
 		XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample');
-		
+
 		// Set column widths
 		const colWidths = headers.map(header => ({ wch: Math.max(header.length + 5, 20) }));
 		worksheet['!cols'] = colWidths;
-		
+
 		// Generate buffer
 		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-		
+
 		// Set response headers
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		res.setHeader('Content-Disposition', 'attachment; filename=sample.xlsx');
-		
+
 		// Send the file
 		res.send(excelBuffer);
 	} catch (err) {
@@ -6830,7 +6831,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 				createdBy: userId,
 				collegeId: collegeId
 			});
-			console.log("newFollowup",newFollowup)
+			console.log("newFollowup", newFollowup)
 			await newFollowup.save();
 		}
 
@@ -6887,8 +6888,8 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		doc.logs.push(newLogEntry);
-console.log('[Lead Status Change] Step 5: Log entry added', { logEntry: newLogEntry, id, _leadStatus, _leadSubStatus });
-console.log("newLogEntry", newLogEntry)
+		console.log('[Lead Status Change] Step 5: Log entry added', { logEntry: newLogEntry, id, _leadStatus, _leadSubStatus });
+		console.log("newLogEntry", newLogEntry)
 		// Save the updated document
 		await doc.save();
 		console.log('[Lead Status Change] Step 5: Doc saved', { id, _leadStatus, _leadSubStatus });
@@ -7536,7 +7537,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 
 	}
-		catch (err) {
+	catch (err) {
 		console.error("Error fetching followup counts:", err);
 		return res.status(500).json({
 			success: false,
@@ -7613,7 +7614,7 @@ router.get('/followupcounts-by-counselor', isCollege, async (req, res) => {
 		// Counselor filter – when provided, limit to selected counsellors
 		if (counselorArray.length > 0) {
 			const ids = counselorArray.map(id => new mongoose.Types.ObjectId(id));
-		
+
 			baseMatch.$or = [
 				{ counsellorId: { $in: ids } },
 				{ counsellorId: { $exists: false }, createdBy: { $in: ids } },
@@ -9476,7 +9477,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			}
 
-	
+
 
 			const newLogEntry = {
 				user: user._id,
@@ -9495,7 +9496,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			}
 
 
-		
+
 
 
 
@@ -14780,7 +14781,7 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 			college: collegeId,
 			trainers: trainerId
 		};
-		
+
 		// Only filter by center if centerId is provided
 		if (centerId) {
 			courseQuery.$or = [
@@ -14788,7 +14789,7 @@ router.get('/gettrainersbycourse', isTrainer, async (req, res) => {
 				{ center: centerId }
 			];
 		}
-		
+
 		const courses = await Courses.find(courseQuery)
 			.select('name description image trainers center centerId project')
 			.populate('center', 'name address')
@@ -14857,7 +14858,7 @@ router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
 		// Build course query
 		// IMPORTANT: When filters are provided, they determine the data, not the logged-in user
 		let courseQuery = {};
-		
+
 		// Strategy: If specific filters (trainer/project) are provided, find the college from them
 		// This ensures same filters = same results regardless of who's logged in
 		let targetCollegeId = filterCollegeId || loggedInCollegeId;
@@ -14870,7 +14871,7 @@ router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
 				console.log('✅ Using college from filtered trainer:', targetCollegeId);
 			}
 		}
-		
+
 		// If project filter is provided, get college from that project
 		if (projectId && !filterTrainerId) {
 			const Project = require('../models/project');
@@ -14883,7 +14884,7 @@ router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
 
 		courseQuery.college = targetCollegeId;
 		console.log('🎯 Final Target College ID for query:', targetCollegeId);
-		
+
 		// Add other filters if provided
 		if (filterTrainerId) {
 			courseQuery.trainers = filterTrainerId;
@@ -14929,7 +14930,7 @@ router.get('/dashboard/alltrainerscourses', isTrainer, async (req, res) => {
 		// Apply search filter on trainers if provided
 		if (search && search.trim()) {
 			const searchLower = search.toLowerCase().trim();
-			trainers = trainers.filter(trainer => 
+			trainers = trainers.filter(trainer =>
 				trainer.name.toLowerCase().includes(searchLower) ||
 				(trainer.email && trainer.email.toLowerCase().includes(searchLower)) ||
 				(trainer.mobile && trainer.mobile.includes(search))
@@ -15766,9 +15767,9 @@ router.post('/addDailyDiary', isTrainer, async (req, res) => {
 			trainerName: user?.name || 'Trainer',
 			collegeId
 		});
-// console.log('sendDailyDiaryWhatsappNotifications' , sendDailyDiaryWhatsappNotifications)
+		// console.log('sendDailyDiaryWhatsappNotifications' , sendDailyDiaryWhatsappNotifications)
 		return res.status(200).json({
-			status: true, 	
+			status: true,
 			message: 'Daily diary added successfully',
 			data: dailyDiary
 		});
@@ -16055,26 +16056,26 @@ router.post('/questionBank', isTrainer, async (req, res) => {
 		}
 
 
-			let bankTotal;
-			if (providedTotalMarks !== undefined) {
-				const parsedTotal = Number(providedTotalMarks);
-				if (isNaN(parsedTotal) || parsedTotal <= 0) {
-					return res.status(400).json({ status: false, message: 'providedTotalMarks must be a positive number' });
-				}
-				bankTotal = parsedTotal;
-			} else {
-				bankTotal = Math.max(100, parsedMarks);
+		let bankTotal;
+		if (providedTotalMarks !== undefined) {
+			const parsedTotal = Number(providedTotalMarks);
+			if (isNaN(parsedTotal) || parsedTotal <= 0) {
+				return res.status(400).json({ status: false, message: 'providedTotalMarks must be a positive number' });
 			}
+			bankTotal = parsedTotal;
+		} else {
+			bankTotal = Math.max(100, parsedMarks);
+		}
 
-			const newBank = new AssignmentQuestions({
-				title: 'Question Bank',
-				durationMins: 30,
-				passPercent: 33,
-				totalMarks: bankTotal,
-				questions: [snap],
-				owner: user._id,
-				isPublished: false
-			});
+		const newBank = new AssignmentQuestions({
+			title: 'Question Bank',
+			durationMins: 30,
+			passPercent: 33,
+			totalMarks: bankTotal,
+			questions: [snap],
+			owner: user._id,
+			isPublished: false
+		});
 
 		await newBank.save();
 		return res.status(200).json({ status: true, message: 'Question bank created and question added', data: newBank });
@@ -16086,8 +16087,8 @@ router.post('/questionBank', isTrainer, async (req, res) => {
 });
 
 router.get('/allquestionandanswers', isTrainer, async (req, res) => {
-  try {
-    const user = req.user;
+	try {
+		const user = req.user;
 		const bank = await AssignmentQuestions
 			.findOne({ owner: user._id, title: 'Question Bank' })
 			.lean();
@@ -16106,64 +16107,64 @@ router.get('/allquestionandanswers', isTrainer, async (req, res) => {
 		}
 
 		return res.status(200).json({ status: true, message: 'Question bank retrieved', data: bank });
-  } catch (err) {
-    console.log('GET /allquestionandanswers error:', err.message);
-    return res.status(500).json({ status: false, message: err.message });
-  }
+	} catch (err) {
+		console.log('GET /allquestionandanswers error:', err.message);
+		return res.status(500).json({ status: false, message: err.message });
+	}
 });
 
 router.post('/assignment', isTrainer, async (req, res) => {
-  try {
-    const user = req.user;
-    const { meta, questions } = req.body;
+	try {
+		const user = req.user;
+		const { meta, questions } = req.body;
 
-    if (!meta || !meta.title || !meta.title.trim()) {
-      return res.status(400).json({ status: false, message: 'Assignment title is required' });
-    }
+		if (!meta || !meta.title || !meta.title.trim()) {
+			return res.status(400).json({ status: false, message: 'Assignment title is required' });
+		}
 
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ status: false, message: 'At least one question is required' });
-    }
+		if (!questions || !Array.isArray(questions) || questions.length === 0) {
+			return res.status(400).json({ status: false, message: 'At least one question is required' });
+		}
 
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      if (!q.question || !q.question.trim()) {
-        return res.status(400).json({ status: false, message: `Question ${i + 1}: Question text is required` });
-      }
-      if (!Array.isArray(q.options) || q.options.length !== 4) {
-        return res.status(400).json({ status: false, message: `Question ${i + 1}: Must have exactly 4 options` });
-      }
-      if (q.options.some(opt => !opt || !opt.trim())) {
-        return res.status(400).json({ status: false, message: `Question ${i + 1}: All options must be non-empty` });
-      }
-      if (typeof q.correctIndex !== 'number' || q.correctIndex < 0 || q.correctIndex > 3) {
-        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid correctIndex (0-3) is required` });
-      }
-      if (!q.marks || Number(q.marks) <= 0) {
-        return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid marks is required` });
-      }
-    }
+		for (let i = 0; i < questions.length; i++) {
+			const q = questions[i];
+			if (!q.question || !q.question.trim()) {
+				return res.status(400).json({ status: false, message: `Question ${i + 1}: Question text is required` });
+			}
+			if (!Array.isArray(q.options) || q.options.length !== 4) {
+				return res.status(400).json({ status: false, message: `Question ${i + 1}: Must have exactly 4 options` });
+			}
+			if (q.options.some(opt => !opt || !opt.trim())) {
+				return res.status(400).json({ status: false, message: `Question ${i + 1}: All options must be non-empty` });
+			}
+			if (typeof q.correctIndex !== 'number' || q.correctIndex < 0 || q.correctIndex > 3) {
+				return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid correctIndex (0-3) is required` });
+			}
+			if (!q.marks || Number(q.marks) <= 0) {
+				return res.status(400).json({ status: false, message: `Question ${i + 1}: Valid marks is required` });
+			}
+		}
 
 		const snapQuestions = questions.map(q => ({
-      question: q.question.trim(),
-      options: q.options.map(opt => opt.trim()),
-      correctIndex: q.correctIndex,
-		correctAnswer: q.options[q.correctIndex].trim(),
-		marks: Number(q.marks),
-		shuffleOptions: q.shuffleOptions || false,
-		course: q.course || undefined,
-		centers: q.centers && q.centers.length ? q.centers : undefined,
-    }));
+			question: q.question.trim(),
+			options: q.options.map(opt => opt.trim()),
+			correctIndex: q.correctIndex,
+			correctAnswer: q.options[q.correctIndex].trim(),
+			marks: Number(q.marks),
+			shuffleOptions: q.shuffleOptions || false,
+			course: q.course || undefined,
+			centers: q.centers && q.centers.length ? q.centers : undefined,
+		}));
 
-    const allocatedMarks = snapQuestions.reduce((sum, q) => sum + q.marks, 0);
-    const totalMarks = Number(meta.totalMarks) || allocatedMarks;
+		const allocatedMarks = snapQuestions.reduce((sum, q) => sum + q.marks, 0);
+		const totalMarks = Number(meta.totalMarks) || allocatedMarks;
 
-    if (allocatedMarks > totalMarks) {
-      return res.status(400).json({ 
-        status: false, 
-        message: `Allocated marks (${allocatedMarks}) cannot exceed total marks (${totalMarks})` 
-      });
-    }
+		if (allocatedMarks > totalMarks) {
+			return res.status(400).json({
+				status: false,
+				message: `Allocated marks (${allocatedMarks}) cannot exceed total marks (${totalMarks})`
+			});
+		}
 
 		const assignment = new AssignmentQuestions({
 			title: meta.title.trim(),
@@ -16172,140 +16173,286 @@ router.post('/assignment', isTrainer, async (req, res) => {
 			totalMarks: totalMarks,
 			questions: snapQuestions,
 			owner: user._id,
-			isPublished: true 
+			isPublished: true
 		});
 
-    await assignment.save();
+		await assignment.save();
 
-    return res.status(200).json({ 
-      status: true, 
-      message: 'Assignment created successfully', 
-      data: assignment 
-    });
+		return res.status(200).json({
+			status: true,
+			message: 'Assignment created successfully',
+			data: assignment
+		});
 
-  } catch (err) {
-    console.error('Create assignment error:', err);
-    return res.status(500).json({ 
-      status: false, 
-      message: err.message || 'Failed to create assignment',
-      error: err.message
-    });
-  }
+	} catch (err) {
+		console.error('Create assignment error:', err);
+		return res.status(500).json({
+			status: false,
+			message: err.message || 'Failed to create assignment',
+			error: err.message
+		});
+	}
 });
 
 router.get('/assignment-submissions', isTrainer, async (req, res) => {
-  try {
-    const user = req.user;
-    const { courseId, assignmentId } = req.query;
+	try {
+		const user = req.user;
+		const { courseId, assignmentId } = req.query;
 
-    let filter = {};
-    if (assignmentId) {
-      filter.assignment = assignmentId;
-    }
-    const submissions = await AssignmentSubmission.find(filter)
-      .populate({
-        path: 'candidate',
-        select: 'name email mobile'
-      })
-      .populate({
-        path: 'assignment',
-        select: 'title totalMarks durationMins passPercent questions'
-      })
-      .sort({ createdAt: -1 })
-      .lean();
-    const courseIds = new Set();
-    submissions.forEach(sub => {
-      if (sub.assignment && sub.assignment.questions) {
-        sub.assignment.questions.forEach(q => {
-          if (q.course) courseIds.add(String(q.course));
-        });
-      }
-    });
+		let filter = {};
+		if (assignmentId) {
+			filter.assignment = assignmentId;
+		}
+		const submissions = await AssignmentSubmission.find(filter)
+			.populate({
+				path: 'candidate',
+				select: 'name email mobile'
+			})
+			.populate({
+				path: 'assignment',
+				select: 'title totalMarks durationMins passPercent questions'
+			})
+			.sort({ createdAt: -1 })
+			.lean();
+		const courseIds = new Set();
+		submissions.forEach(sub => {
+			if (sub.assignment && sub.assignment.questions) {
+				sub.assignment.questions.forEach(q => {
+					if (q.course) courseIds.add(String(q.course));
+				});
+			}
+		});
 
-    const courseMap = {};
-    if (courseIds.size > 0) {
-      try {
-        const courses = await Courses.find({ _id: { $in: Array.from(courseIds) } })
-          .select('name project')
-          .populate('project', 'name')
-          .lean();
-        courses.forEach(course => {
-          courseMap[String(course._id)] = {
-            name: course.name,
-            projectId: course.project?._id,
-            projectName: course.project?.name
-          };
-        });
-      } catch (err) {
-        console.error('Error fetching courses:', err);
-      }
-    }
-    let filteredSubmissions = submissions;
-    if (courseId) {
-      filteredSubmissions = submissions.filter(sub => {
-        if (!sub.assignment || !sub.assignment.questions) return false;
-        return sub.assignment.questions.some(q => 
-          q.course && String(q.course) === String(courseId)
-        );
-      });
-    }
+		const courseMap = {};
+		if (courseIds.size > 0) {
+			try {
+				const courses = await Courses.find({ _id: { $in: Array.from(courseIds) } })
+					.select('name project')
+					.populate('project', 'name')
+					.lean();
+				courses.forEach(course => {
+					courseMap[String(course._id)] = {
+						name: course.name,
+						projectId: course.project?._id,
+						projectName: course.project?.name
+					};
+				});
+			} catch (err) {
+				console.error('Error fetching courses:', err);
+			}
+		}
+		let filteredSubmissions = submissions;
+		if (courseId) {
+			filteredSubmissions = submissions.filter(sub => {
+				if (!sub.assignment || !sub.assignment.questions) return false;
+				return sub.assignment.questions.some(q =>
+					q.course && String(q.course) === String(courseId)
+				);
+			});
+		}
 
-    const formattedSubmissions = filteredSubmissions.map(sub => {
-      let courseName = 'N/A';
-      let extractedCourseId = null;
-      let projectId = null;
-      let projectName = 'N/A';
-      
-      if (sub.assignment && sub.assignment.questions && sub.assignment.questions.length > 0) {
-        const firstCourse = sub.assignment.questions.find(q => q.course);
-        if (firstCourse && firstCourse.course) {
-          extractedCourseId = String(firstCourse.course);
-          const courseInfo = courseMap[extractedCourseId];
-          if (courseInfo) {
-            courseName = courseInfo.name || 'N/A';
-            projectId = courseInfo.projectId;
-            projectName = courseInfo.projectName || 'N/A';
-          }
-        }
-      }
+		const formattedSubmissions = filteredSubmissions.map(sub => {
+			let courseName = 'N/A';
+			let extractedCourseId = null;
+			let projectId = null;
+			let projectName = 'N/A';
 
-      return {
-        _id: sub._id,
-        studentName: sub.candidate?.name || 'Unknown',
-        studentEmail: sub.candidate?.email || 'N/A',
-        studentMobile: sub.candidate?.mobile || 'N/A',
-        assignmentTitle: sub.assignment?.title || 'N/A',
-        courseName: courseName,
-        courseId: extractedCourseId,
-        projectId: projectId,
-        projectName: projectName,
-        score: sub.score || 0,
-        totalMarks: sub.totalMarks || 0,
-        percentage: sub.percentage || 0,
-        pass: sub.pass || false,
-        correctCount: sub.correctCount || 0,
-        wrongCount: sub.wrongCount || 0,
-        attemptedCount: sub.attemptedCount || 0,
-        unattemptedCount: sub.unattemptedCount || 0,
-        timeTakenSeconds: sub.timeTakenSeconds || 0,
-        submittedAt: sub.timeSubmitted || sub.createdAt
-      };
-    });
+			if (sub.assignment && sub.assignment.questions && sub.assignment.questions.length > 0) {
+				const firstCourse = sub.assignment.questions.find(q => q.course);
+				if (firstCourse && firstCourse.course) {
+					extractedCourseId = String(firstCourse.course);
+					const courseInfo = courseMap[extractedCourseId];
+					if (courseInfo) {
+						courseName = courseInfo.name || 'N/A';
+						projectId = courseInfo.projectId;
+						projectName = courseInfo.projectName || 'N/A';
+					}
+				}
+			}
 
-    return res.status(200).json({
-      status: true,
-      message: 'Assignment submissions fetched successfully',
-      data: formattedSubmissions
-    });
+			return {
+				_id: sub._id,
+				studentName: sub.candidate?.name || 'Unknown',
+				studentEmail: sub.candidate?.email || 'N/A',
+				studentMobile: sub.candidate?.mobile || 'N/A',
+				assignmentTitle: sub.assignment?.title || 'N/A',
+				courseName: courseName,
+				courseId: extractedCourseId,
+				projectId: projectId,
+				projectName: projectName,
+				score: sub.score || 0,
+				totalMarks: sub.totalMarks || 0,
+				percentage: sub.percentage || 0,
+				pass: sub.pass || false,
+				correctCount: sub.correctCount || 0,
+				wrongCount: sub.wrongCount || 0,
+				attemptedCount: sub.attemptedCount || 0,
+				unattemptedCount: sub.unattemptedCount || 0,
+				timeTakenSeconds: sub.timeTakenSeconds || 0,
+				submittedAt: sub.timeSubmitted || sub.createdAt
+			};
+		});
 
-  } catch (err) {
-    console.error('Get assignment submissions error:', err);
-    return res.status(500).json({
-      status: false,
-      message: err.message || 'Failed to fetch assignment submissions',
-      error: err.message
-    });
-  }
+		return res.status(200).json({
+			status: true,
+			message: 'Assignment submissions fetched successfully',
+			data: formattedSubmissions
+		});
+
+	} catch (err) {
+		console.error('Get assignment submissions error:', err);
+		return res.status(500).json({
+			status: false,
+			message: err.message || 'Failed to fetch assignment submissions',
+			error: err.message
+		});
+	}
 });
+
+
+router.post('/addBatchTask', isCollege, async (req, res) => {
+	try { 
+		const user = req.user;
+		const collegeId = req.college._id;
+		const {batchId,batchName, component,task,owner,support,level,status,remarks  } = req.body
+
+		// console.log("req.body" , req.body)
+		if(!batchName){
+			alert("Batch name is required");
+			return res.status(400).json({
+				status: false,
+				message: "Batch name is required",
+			})
+		}
+		const batch = await Batch.findOne({ name: batchName });
+		if(!batch){
+			alert("Batch not found");
+			return res.status(400).json({
+				status: false,
+				message: "Batch not found",
+			})
+		}
+		const newTask = await BatchMonitor.create({
+			collegeId,
+			batchId: batch._id,
+			batchName: batch.name,
+			component,
+			task,
+			owner,
+			support,
+		})
+		return res.status(200).json({
+			status: true,
+			message: "Batch task added successfully",
+			data: newTask,
+		})
+	}
+	catch (err) {
+
+		console.error('Add batch task error:', err);
+		return res.status(500).json({
+			status: false,
+			message: err.message || 'Failed to add batch task',
+		})
+	}
+
+})
+
+router.get('/getBatchTaskDetail', isCollege, async (req, res) => {
+	try{
+		const user = req.user;
+		const college = req.college;
+
+		if (!college) {
+			return res.status(404).json({ status: false, message: 'College not found' });
+		}
+		const tasks = await BatchMonitor.find({ collegeId: college._id });
+		return res.status(200).json({
+			status: true,
+			message: "Batch task detail fetched successfully",
+			data: tasks,
+		})
+			
+	}
+	catch(err){
+		console.error('Get batch task detail error:', err);
+		return res.status(500).json({
+			status: false,
+			message: err.message || 'Failed to get batch task detail',
+		})
+	}
+})
+// router.post('/addBatchTask', isCollege, async (req, res) => {
+// 	try {
+// 		const collegeId = req.college?._id || null;
+
+// 		const {batchId,batchName, component,task,owner,support,level,status,remarks} = req.body;
+
+// 		// If no meaningful payload is sent, treat this call as "fetch list".
+// 		const isFetchOnly =
+// 			!component &&
+// 			!task &&
+// 			!batchName &&
+// 			(!req.body || Object.keys(req.body).length === 0);
+
+// 		const baseQuery = {};
+// 		if (collegeId) baseQuery.collegeId = collegeId;
+
+// 		if (isFetchOnly) {
+// 			const tasks = await BatchMonitor.find(baseQuery).sort({ createdAt: -1 });
+// 			return res.status(200).json({
+// 				success: true,
+// 				data: tasks
+// 			});
+// 		}
+
+// 		let resolvedBatchId = batchId || null;
+// 		let resolvedBatchName = batchName || '';
+
+// 		if (!resolvedBatchId && resolvedBatchName) {
+// 			const batchDoc = await Batch.findOne({ name: resolvedBatchName }).select('_id name').lean();
+// 			if (batchDoc?._id) {
+// 				resolvedBatchId = batchDoc._id;
+// 				resolvedBatchName = batchDoc.name || resolvedBatchName;
+// 			}
+// 		}
+
+// 		if (resolvedBatchId && !resolvedBatchName) {
+// 			const batchDoc = await Batch.findById(resolvedBatchId).select('name').lean();
+// 			resolvedBatchName = batchDoc?.name || '';
+// 		}
+
+// 		const newTask = await BatchMonitor.create({
+// 			collegeId,
+// 			batchId: resolvedBatchId,
+// 			batchName: resolvedBatchName,
+// 			component,
+// 			task,
+// 			owner: owner || '',
+// 			support: support || '',
+// 			level: level || 'Critical',
+// 			status: status || 'Pending',
+// 			remarks: remarks || '',
+// 			createdBy: req.user?._id,
+// 			updatedBy: req.user?._id
+// 		});
+
+// 		const tasks = await BatchMonitor.find(baseQuery).sort({ createdAt: -1 });
+
+// 		return res.status(200).json({
+// 			success: true,
+// 			message: 'Batch monitoring task saved successfully',
+// 			data: tasks,
+// 			created: newTask
+// 		});
+// 	} catch (err) {
+// 		console.error("Error in /college/addBatchTask:", err);
+// 		return res.status(500).json({
+// 			success: false,
+// 			message: "Internal server error",
+// 			error: err?.message || err
+// 		});
+// 	}
+// });
 
 module.exports = router;

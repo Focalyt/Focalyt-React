@@ -1253,7 +1253,7 @@ const Placements = () => {
 
       const params = {
         page: page,
-        limit: 100,  // Increased limit to show more candidates per page
+        limit: 50,
       };
 
       if (statusFilter) {
@@ -6550,7 +6550,7 @@ console.log("response.data",response.data)
               <nav aria-label="Page navigation" className="mt-2">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({leads.length} results)
+                    Page {currentPage} of {totalPages} ({pageSize} results)
                   </small>
                 </div>
 
