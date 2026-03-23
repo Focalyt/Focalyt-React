@@ -267,7 +267,7 @@ async function run() {
   // console.log("Translating to Punjabi...");
   await translateJson("Punjabi", paPath);
 
-  console.log("Translating to French...");
+  // console.log("Translating to French...");
   // await translateJson("French", frPath);
 
   // console.log("Translation complete.", frPath);
