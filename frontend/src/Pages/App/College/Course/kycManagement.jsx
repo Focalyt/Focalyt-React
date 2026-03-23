@@ -35,9 +35,11 @@ const MultiSelectCheckbox = ({
   };
 
   // Filter options based on search term
-  const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {

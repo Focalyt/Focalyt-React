@@ -37,9 +37,11 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
-  const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   // Get display text for selected items
   const getDisplayText = () => {
@@ -1723,6 +1725,20 @@ const CRMDashboard = () => {
   // Form state for candidate add leads
   const [centerId, setCenterId] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+  const courseDropdownRef = useRef(null);
+  const [isCenterDropdownOpen, setIsCenterDropdownOpen] = useState(false);
+  const centerDropdownRef = useRef(null);
+  const [isQualificationDropdownOpen, setIsQualificationDropdownOpen] = useState(false);
+  const qualificationDropdownRef = useRef(null);
+  const [isCounselorDropdownOpen, setIsCounselorDropdownOpen] = useState(false);
+  const counselorDropdownRef = useRef(null);
+  const [selectSearch, setSelectSearch] = useState({
+    course: '',
+    center: '',
+    qualification: '',
+    counselor: '',
+  });
   const [counselorId, setCounselorId] = useState('');
   const [registeredBy, setRegisteredBy] = useState('');
 
@@ -1762,6 +1778,57 @@ const CRMDashboard = () => {
   const [centers, setCenters] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
+  const updateSelectSearch = (field, value) => {
+    setSelectSearch((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const filteredSortedCourses = useMemo(() => {
+    const query = selectSearch.course.trim().toLowerCase();
+    return [...courses]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((course) => !query || (course?.name || '').toLowerCase().includes(query));
+  }, [courses, selectSearch.course]);
+
+  const filteredSortedCenters = useMemo(() => {
+    const query = selectSearch.center.trim().toLowerCase();
+    return [...centers]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((center) => !query || (center?.name || '').toLowerCase().includes(query));
+  }, [centers, selectSearch.center]);
+
+  const filteredSortedQualifications = useMemo(() => {
+    const query = selectSearch.qualification.trim().toLowerCase();
+    return [...qualifications]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((qualification) => !query || (qualification?.name || '').toLowerCase().includes(query));
+  }, [qualifications, selectSearch.qualification]);
+
+  const filteredSortedCounselors = useMemo(() => {
+    const query = selectSearch.counselor.trim().toLowerCase();
+    return [...counselorOptions]
+      .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+      .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
+  }, [counselorOptions, selectSearch.counselor]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
+        setIsCourseDropdownOpen(false);
+      }
+      if (centerDropdownRef.current && !centerDropdownRef.current.contains(event.target)) {
+        setIsCenterDropdownOpen(false);
+      }
+      if (qualificationDropdownRef.current && !qualificationDropdownRef.current.contains(event.target)) {
+        setIsQualificationDropdownOpen(false);
+      }
+      if (counselorDropdownRef.current && !counselorDropdownRef.current.contains(event.target)) {
+        setIsCounselorDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   //course history
   const [courseHistory, setCourseHistory] = useState([]);
@@ -1776,13 +1843,14 @@ const CRMDashboard = () => {
   const fetchFormData = async () => {
     try {
       setLoadingData(true);
-      // Fetch courses
-      const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json',
-        }
-      });
+
+      // const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
+      //   headers: {
+      //     'x-auth': token,
+      //     'Content-Type': 'application/json',
+      //   }
+      // });
+      const coursesResponse = await axios.get(`${backendUrl}/courses`);
 
       // Fetch qualifications
       const qualificationsResponse = await axios.get(`${backendUrl}/candidate/api/highestQualifications`, {
@@ -1794,8 +1862,11 @@ const CRMDashboard = () => {
 
 
 
-      if (coursesResponse.data.success) {
-        setCourses(coursesResponse.data.data);
+      if (Array.isArray(coursesResponse?.data?.courses)) {
+        setCourses(coursesResponse.data.courses);
+      } else if (coursesResponse.data.success) {
+        const activeCourses = (coursesResponse.data.data || []).filter((course) => course?.status === true);
+        setCourses(activeCourses);
       }
 
 
@@ -1922,6 +1993,11 @@ const CRMDashboard = () => {
 
         // Reset form selection fields
         setCourseId('');
+        setIsCourseDropdownOpen(false);
+        setIsCenterDropdownOpen(false);
+        setIsQualificationDropdownOpen(false);
+        setIsCounselorDropdownOpen(false);
+        setSelectSearch({ course: '', center: '', qualification: '', counselor: '' });
         setCenterId('');
         setCounselorId('');
         setRegisteredBy('');
@@ -4000,6 +4076,10 @@ console.log('API Response:', response.data);
       setShowBulkInputs(false);
       setBulkMode(null);
     }
+    setIsCourseDropdownOpen(false);
+    setIsCenterDropdownOpen(false);
+    setIsQualificationDropdownOpen(false);
+    setIsCounselorDropdownOpen(false);
     setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
@@ -7488,13 +7568,21 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Course<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={courseDropdownRef}>
+                  <input
+                    type="text"
                     id="course"
-                    required
-                    value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search course..."
+                    value={selectSearch.course}
+                    onFocus={() => setIsCourseDropdownOpen(true)}
+                    onClick={() => setIsCourseDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('course', e.target.value);
+                      setCourseId('');
+                      setCenterId('');
+                      setIsCourseDropdownOpen(true);
+                    }}
                     disabled={loadingData}
                     style={{
                       height: '48px',
@@ -7503,16 +7591,60 @@ useEffect(() => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
-
+                      border: '1px solid #e9ecef'
                     }}
+                  />
+                  <input type="hidden" required value={courseId} readOnly />
 
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map((course) => (
-                      <option key={course._id} value={course._id}>{course.name}</option>
-                    ))}
-                  </select>
+                  {isCourseDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCourses.length ? (
+                        filteredSortedCourses.map((course) => (
+                          <button
+                            key={course._id}
+                            type="button"
+                            onClick={() => {
+                              setCourseId(course._id);
+                              updateSelectSearch('course', course.name || '');
+                              updateSelectSearch('center', '');
+                              setCenterId('');
+                              setIsCourseDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {course.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No course found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7520,13 +7652,20 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Training Center<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={centerDropdownRef}>
+                  <input
+                    type="text"
                     id="trainingCenter"
-                    required
-                    value={centerId}
-                    onChange={(e) => setCenterId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search training center..."
+                    value={selectSearch.center}
+                    onFocus={() => courseId && setIsCenterDropdownOpen(true)}
+                    onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('center', e.target.value);
+                      setCenterId('');
+                      if (courseId) setIsCenterDropdownOpen(true);
+                    }}
                     disabled={!courseId}
                     style={{
                       height: '48px',
@@ -7535,15 +7674,58 @@ useEffect(() => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
+                      border: '1px solid #e9ecef'
                     }}
-                  >
+                  />
+                  <input type="hidden" required value={centerId} readOnly />
 
-                    <option>Select Center</option>
-                    {centers.map((center) => (
-                      <option key={center._id} value={center._id}>{center.name}</option>
-                    ))}
-                  </select>
+                  {isCenterDropdownOpen && courseId && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCenters.length ? (
+                        filteredSortedCenters.map((center) => (
+                          <button
+                            key={center._id}
+                            type="button"
+                            onClick={() => {
+                              setCenterId(center._id);
+                              updateSelectSearch('center', center.name || '');
+                              setIsCenterDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {center.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No center found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7751,14 +7933,21 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Highest Qualification<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={qualificationDropdownRef}>
+                  <input
+                    type="text"
                     id="highestQualification"
-                    value={candidateFormData.highestQualification}
-                    onChange={(e) => handleInputChange('highestQualification', e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search highest qualification..."
+                    value={selectSearch.qualification}
+                    onFocus={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onClick={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('qualification', e.target.value);
+                      handleInputChange('highestQualification', '');
+                      if (!loadingData) setIsQualificationDropdownOpen(true);
+                    }}
                     disabled={loadingData}
-                    required
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -7768,12 +7957,56 @@ useEffect(() => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">{loadingData ? 'Loading qualifications...' : 'Select Highest Qualification'}</option>
-                    {!loadingData && qualifications.map((qualification) => (
-                      <option key={qualification._id} value={qualification._id}>{qualification.name}</option>
-                    ))}
-                  </select>
+                  />
+                  <input type="hidden" required value={candidateFormData.highestQualification || ''} readOnly />
+
+                  {isQualificationDropdownOpen && !loadingData && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedQualifications.length ? (
+                        filteredSortedQualifications.map((qualification) => (
+                          <button
+                            key={qualification._id}
+                            type="button"
+                            onClick={() => {
+                              handleInputChange('highestQualification', qualification._id);
+                              updateSelectSearch('qualification', qualification.name || '');
+                              setIsQualificationDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {qualification.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No qualification found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7781,12 +8014,20 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Counselor Name<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={counselorDropdownRef}>
+                  <input
+                    type="text"
                     id="counselorName"
-                    value={counselorId}
-                    onChange={(e) => setCounselorId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search counselor..."
+                    value={selectSearch.counselor}
+                    onFocus={() => setIsCounselorDropdownOpen(true)}
+                    onClick={() => setIsCounselorDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('counselor', e.target.value);
+                      setCounselorId('');
+                      setIsCounselorDropdownOpen(true);
+                    }}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -7796,12 +8037,55 @@ useEffect(() => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">Select Counselor name</option>
-                    {counselorOptions.map((counselor, index) => (
-                      <option key={index} value={counselor.value}>{counselor.label}</option>
-                    ))}
-                  </select>
+                  />
+
+                  {isCounselorDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCounselors.length ? (
+                        filteredSortedCounselors.map((counselor) => (
+                          <button
+                            key={counselor.value}
+                            type="button"
+                            onClick={() => {
+                              setCounselorId(counselor.value);
+                              updateSelectSearch('counselor', counselor.label || '');
+                              setIsCounselorDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {counselor.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No counselor found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mb-3">
