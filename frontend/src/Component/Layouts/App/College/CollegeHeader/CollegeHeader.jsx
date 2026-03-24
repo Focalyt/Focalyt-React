@@ -1,9 +1,40 @@
-import React, { useEffect , useState} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import "./CollegeHeader.css";
 import LanguageSwitcher from '../../../../LanguageSwitcher'
+
+const useScrollBlur = (navbarHeight = 88) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const tickingRef = useRef(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+      setIsScrolled(currentScrollY > navbarHeight / 3);
+      setScrollY(currentScrollY);
+      tickingRef.current = false;
+    };
+
+    const throttledScroll = () => {
+      if (!tickingRef.current) {
+        tickingRef.current = true;
+        window.requestAnimationFrame(handleScroll);
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+    };
+  }, [navbarHeight]);
+
+  return { isScrolled, scrollY };
+};
 
 const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
@@ -12,6 +43,14 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const { t } = useTranslation();
   const [collegeAccountNo, setCollegeAccountNo] = useState(null);
   const [userName, setUserName] = useState('');
+  const { isScrolled, scrollY } = useScrollBlur();
+  const blurStrength = Math.min(18, 6 + scrollY / 24);
+  const headerBackground = isScrolled
+    ? 'rgba(252, 43, 90, 0.78)'
+    : 'rgba(252, 43, 90, 0.96)';
+  const containerBackground = isScrolled
+    ? 'rgba(255, 255, 255, 0.12)'
+    : 'rgba(255, 255, 255, 0.08)';
 
   useEffect(() => {
     const name = localStorage.getItem('name');
@@ -88,9 +127,31 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
 
   return (
     <>
-      <nav className="header-navbar navbar-expand-lg navbar navbar-with-menu floating-nav navbar-theme navbar-shadow">
+      <nav
+        className={`header-navbar navbar-expand-lg navbar navbar-with-menu floating-nav navbar-theme navbar-shadow ${isScrolled ? 'header-navbar-blurred' : ''}`}
+        style={{
+          background: headerBackground,
+          backdropFilter: isScrolled ? `blur(${blurStrength}px)` : 'none',
+          WebkitBackdropFilter: isScrolled ? `blur(${blurStrength}px)` : 'none',
+          boxShadow: isScrolled
+            ? '0 18px 40px rgba(17, 24, 39, 0.14)'
+            : '0 10px 30px rgba(252, 43, 90, 0.12)',
+          border: isScrolled
+            ? '1px solid rgba(255, 255, 255, 0.16)'
+            : '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'background 0.35s ease, backdrop-filter 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease'
+        }}
+      >
         <div className="navbar-wrapper">
-          <div className="navbar-container content">
+          <div
+            className="navbar-container content"
+            style={{
+              background: containerBackground,
+              backdropFilter: isScrolled ? 'blur(10px)' : 'none',
+              WebkitBackdropFilter: isScrolled ? 'blur(10px)' : 'none',
+              transition: 'background 0.35s ease, backdrop-filter 0.35s ease'
+            }}
+          >
             <div className="navbar-collapse" id="navbar-mobile">
               <div className="mr-auto float-left bookmark-wrapper d-flex align-items-center">
                 <ul className="nav navbar-nav">
@@ -248,6 +309,10 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
       <style>
         {
           `
+
+          .header-navbar.header-navbar-blurred {
+            overflow: visible;
+          }
 
           .header-navbar .navbar-container ul.nav li.dropdown .dropdown-menu{
           top:70px;

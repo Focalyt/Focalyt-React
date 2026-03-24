@@ -4124,7 +4124,7 @@ console.log("response.data",response.data)
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: isMobile ? '8px' : '5px' }}
+            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 20px rgba(252,43,90,0.1)', paddingBlock: isMobile ? '8px' : '5px', borderBottom: '2px solid #fecdd3', transition: 'box-shadow 0.3s ease' }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
@@ -4160,123 +4160,87 @@ console.log("response.data",response.data)
 
                   {/* Search and Filter Section */}
                   <div className="col-lg-6  col-mg-12 col-12">
-                    <div className={`d-flex ${isMobile ? 'flex-column gap-2' : 'justify-content-end align-items-center gap-2'}`}>
+                    <div className={`d-flex ${isMobile ? 'align-items-center gap-2' : 'justify-content-end align-items-center gap-2'}`}>
                       {/* Quick Search */}
-                      <div className={`d-flex align-items-center ${isMobile ? 'w-100' : 'gap-2'}`} style={isMobile ? { gap: '8px' } : {}}>
-                        <div className="position-relative" style={isMobile ? { flex: 1, minWidth: 0 } : {}}>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder={isMobile ? "Search..." : "Quick search..."}
-                            value={filters.search}
-                            onChange={(e) => handleFilterChange('search', e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                applyFilters();
-                              }
-                            }}
-                            style={{
-                              width: isMobile ? '100%' : '200px',
-                              paddingRight: filters.search ? (isMobile ? '35px' : '30px') : (isMobile ? '12px' : '12px'),
-                              paddingLeft: isMobile ? '10px' : '12px',
-                              paddingTop: isMobile ? '10px' : '8px',
-                              paddingBottom: isMobile ? '10px' : '8px',
-                              backgroundColor: '#ffffff',
-                              border: '1.5px solid #ced4da',
-                              color: '#212529',
-                              fontSize: isMobile ? '14px' : '13px',
-                              borderRadius: '6px',
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              transition: 'all 0.2s ease'
-                            }}
-                          />
-                         
-                        </div>
-                        {!isMobile && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary"
-                            onClick={applyFilters}
-                            style={{
-                              backgroundColor: '#007bff',
-                              borderColor: '#007bff',
-                              color: 'white',
-                              fontWeight: '500',
-                              padding: '8px 16px',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
-                              transition: 'all 0.2s ease',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            <i className="fas fa-search me-1"></i>
-                            <span>Search</span>
-                          </button>
-                        )}
+                      <div className="position-relative" style={{ flex: isMobile ? 1 : 'unset', minWidth: 0 }}>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Search..."
+                          value={filters.search}
+                          onChange={(e) => handleFilterChange('search', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              applyFilters();
+                            }
+                          }}
+                          style={{
+                            width: isMobile ? '100%' : '200px',
+                            paddingRight: filters.search ? '30px' : '12px',
+                            paddingLeft: '12px',
+                            paddingTop: isMobile ? '10px' : '8px',
+                            paddingBottom: isMobile ? '10px' : '8px',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #e2e8f0',
+                            color: '#212529',
+                            fontSize: '13px',
+                            borderRadius: '10px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        />
                       </div>
 
-                      {isMobile && (
-                        <div className="d-flex gap-2 w-100">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary flex-fill"
-                            onClick={applyFilters}
-                            style={{
-                              backgroundColor: '#007bff',
-                              borderColor: '#007bff',
-                              color: 'white',
-                              fontWeight: '500',
-                              padding: '10px 12px',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <i className="fas fa-search me-1"></i>
-                            <span>Search</span>
-                          </button>
-                          <button
-                            className={`btn btn-sm flex-fill ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                            onClick={() => setShowFilters(!showFilters)}
-                            style={{
-                              backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                              color: showFilters ? '#ffffff' : '#6c757d',
-                              fontWeight: '500',
-                              padding: '10px 12px',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              transition: 'all 0.2s ease',
-                              borderWidth: '1.5px'
-                            }}
-                          >
-                            <i className="fas fa-filter me-1"></i>
-                            <span>Filter</span>
-                          </button>
-                        </div>
-                      )}
+                      {/* Search Button */}
+                      <button
+                        type="button"
+                        onClick={applyFilters}
+                        style={{
+                          background: 'linear-gradient(135deg, #FC2B5A, #a5003a)',
+                          border: 'none',
+                          color: 'white',
+                          fontWeight: '600',
+                          padding: isMobile ? '10px 14px' : '8px 16px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+                          transition: 'all 0.2s ease',
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <i className="fas fa-search"></i>
+                        {!isMobile && <span>Search</span>}
+                      </button>
 
-                      {!isMobile && (
-                        <button
-                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                          onClick={() => setShowFilters(!showFilters)}
-                          style={{
-                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                            color: showFilters ? '#ffffff' : '#6c757d',
-                            fontWeight: '500',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            transition: 'all 0.2s ease',
-                            borderWidth: '1.5px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          <i className="fas fa-filter me-1"></i>
-                          <span>Filter</span>
-                        </button>
-                      )}
+                      {/* Filter Button */}
+                      <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{
+                          background: showFilters ? 'linear-gradient(135deg,#FC2B5A,#a5003a)' : '#ffffff',
+                          color: showFilters ? '#ffffff' : '#64748b',
+                          fontWeight: '600',
+                          padding: isMobile ? '10px 14px' : '8px 16px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          transition: 'all 0.2s ease',
+                          border: showFilters ? 'none' : '1.5px solid #e2e8f0',
+                          boxShadow: showFilters ? '0 4px 10px rgba(252,43,90,0.3)' : 'none',
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          flexShrink: 0,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <i className="fas fa-filter"></i>
+                        {!isMobile && <span>Filter</span>}
+                      </button>
+
                       {/* {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'custom')|| permissions?.permission_type === 'Admin') && (
  
                       <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
@@ -4328,7 +4292,10 @@ console.log("response.data",response.data)
                               minWidth: isMobile ? '100px' : '110px',
                               height: '45px',
                               cursor: 'pointer',
-                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent',
+                              border: selectedStatusFilter === null ? '2px solid #FC2B5A' : '1px solid #f1f5f9',
+                              background: selectedStatusFilter === null ? 'linear-gradient(135deg, #FC2B5A, #a5003a)' : 'white',
+                              borderRadius: '10px',
+                              transition: 'all 0.2s ease',
                               flexShrink: isMobile ? 0 : 1
                             }}
                             onClick={handleTotalCardClick}
@@ -4428,8 +4395,10 @@ console.log("response.data",response.data)
                                     minWidth: isMobile ? '100px' : '110px',
                                     height: '45px',
                                     cursor: 'pointer',
-                                    border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                    backgroundColor: isSelected ? '#f8f9ff' : 'white',
+                                    border: isSelected ? '2px solid #FC2B5A' : '1px solid #f1f5f9',
+                                    backgroundColor: isSelected ? '#fef2f5' : 'white',
+                                    borderRadius: '10px',
+                                    transition: 'all 0.2s ease',
                                     flexShrink: isMobile ? 0 : 1
                                   }}
                                   onClick={() => handleStatusCardClick(status.statusId)}
@@ -4475,21 +4444,28 @@ console.log("response.data",response.data)
                   {/* Left side - Buttons */}
                   <div style={{ display: "flex", gap: "8px" }}>
                   
-                  <button 
-                    className="btn btn-sm btn-outline-primary" 
+                  <button
                     style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
+                      padding: "8px 16px",
+                      fontSize: "12px",
                       fontWeight: "600",
                       display: "flex",
                       alignItems: "center",
-                      gap: "4px"
+                      gap: "6px",
+                      background: 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+                      cursor: sendingBulkJobs ? 'not-allowed' : 'pointer',
+                      opacity: sendingBulkJobs ? 0.7 : 1,
+                      transition: 'all 0.2s ease',
                     }}
                     onClick={handleOpenBulkJobMode}
                     disabled={sendingBulkJobs}
                   >
-                    <i className="fas fa-briefcase" style={{ fontSize: "10px" }}></i>
-                    Bulk jobs
+                    <i className="fas fa-briefcase" style={{ fontSize: "11px" }}></i>
+                    Bulk Jobs
                   </button>
                   
                   </div>
@@ -4656,45 +4632,54 @@ console.log("response.data",response.data)
                 </div>
 
                 {/* Mobile Layout */}
-                <div className="d-md-none">
-                  <div className="row g-2">
-                   
-                      <div className="col-6">
-                        <button className="btn btn-sm btn-outline-primary w-100" style={{
-                          padding: "8px 6px",
-                          fontSize: "10px",
-                          fontWeight: "600",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "4px"
-                        }}
-                        >
-                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
-                          Add Leads
-                        </button>
-                      </div>
-                   
-                  </div>
+                <div className="d-md-none" style={{ marginTop: '8px' }}>
+                  <button
+                    onClick={handleOpenLeadModal}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '7px',
+                      background: 'linear-gradient(135deg, #FC2B5A, #a5003a)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <i className="fas fa-plus" style={{ fontSize: '12px' }}></i>
+                    Add Leads
+                  </button>
                 </div>
               </div>
 
 
               {/* Loading State */}
               {loadingLeads ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                  <p className="mt-3 text-muted">Loading Placements...</p>
+                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <div style={{
+                    width: '48px', height: '48px',
+                    border: '4px solid #fecdd3',
+                    borderTopColor: '#FC2B5A',
+                    borderRadius: '50%',
+                    animation: 'placementSpin 0.8s linear infinite',
+                    margin: '0 auto 16px',
+                  }}></div>
+                  <p style={{ color: '#94a3b8', fontWeight: 600, fontSize: '14px', margin: 0 }}>Loading Placements...</p>
                 </div>
               ) : leads.length === 0 ? (
-                <div className="text-center py-5">
-                  <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                  <h5 className="mt-3 text-muted">
+                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📋</div>
+                  <h5 style={{ color: '#64748b', fontWeight: 700, marginBottom: '6px' }}>
                     {selectedStatusFilter ? 'No placements found for selected status' : 'No Placements Found'}
                   </h5>
-                  <p className="text-muted">
+                  <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
                     {selectedStatusFilter ? 'Try selecting a different status or add new placements.' : 'Start by adding your first Placement using the "Add Candidate" button.'}
                   </p>
                 </div>
@@ -6857,7 +6842,7 @@ console.log("response.data",response.data)
               <div className="modal-footer bg-light">
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  style={{ background: 'white', color: '#64748b', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '8px 16px', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
                   onClick={() => setShowFilters(false)}
                 >
                   <i className="fas fa-times me-1"></i>
@@ -6865,7 +6850,7 @@ console.log("response.data",response.data)
                 </button>
                 <button
                   type="button"
-                  className="btn btn-outline-secondary"
+                  style={{ background: 'white', color: '#FC2B5A', border: '1.5px solid #FC2B5A', borderRadius: '10px', padding: '8px 16px', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
                   onClick={clearFilters}
                 >
                   <i className="fas fa-eraser me-1"></i>
@@ -6873,7 +6858,7 @@ console.log("response.data",response.data)
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  style={{ background: 'linear-gradient(135deg,#FC2B5A,#a5003a)', color: 'white', border: 'none', borderRadius: '10px', padding: '8px 20px', fontWeight: 600, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(252,43,90,0.3)' }}
                   onClick={() => {
                     applyFilters();
                     setShowFilters(false);
@@ -7344,6 +7329,10 @@ console.log("response.data",response.data)
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
       <style>{`
+  @keyframes placementSpin {
+    to { transform: rotate(360deg); }
+  }
+
   .modal .pac-container {
     z-index: 99999 !important;
     position: fixed !important;
@@ -7376,13 +7365,14 @@ console.log("response.data",response.data)
   }
 
   .lead-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(252, 43, 90, 0.13);
+    border-color: #fecdd3;
   }
 
   /* Header Section */
   .lead-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%);
     color: white;
     padding: 1rem;
     position: relative;
@@ -7728,7 +7718,7 @@ console.log("response.data",response.data)
 
   .status-count-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 20px rgba(252, 43, 90, 0.15);
   }
 
   .status-count-card .card-body {
@@ -7751,7 +7741,7 @@ console.log("response.data",response.data)
 
   /* Status-specific colors */
   .status-count-card.total {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%);
     color: white;
   }
 
@@ -7763,22 +7753,25 @@ console.log("response.data",response.data)
 
   .status-count-card.status {
     background: white;
-    border: 1px solid #e9ecef;
+    border: 1px solid #f1f5f9;
   }
 
   .status-count-card.status:hover {
-    border-color: #007bff;
+    border-color: #FC2B5A;
+    background: #fef9f9;
   }
 
   .status-count-card.selected {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
-    border: 2px solid #007bff !important;
-    background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(252, 43, 90, 0.25) !important;
+    border: 2px solid #FC2B5A !important;
+    background: #fef2f5 !important;
   }
 
   .status-count-card.selected.total {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%) !important;
+    border: 2px solid transparent !important;
+    box-shadow: 0 8px 20px rgba(252, 43, 90, 0.4) !important;
   }
 
   /* Status Section Styles */

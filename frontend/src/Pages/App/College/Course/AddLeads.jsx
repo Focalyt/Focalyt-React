@@ -592,476 +592,405 @@ const AddLeads = () => {
     }
   };
 
+  const fldStyle = {
+    width: '100%',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    fontSize: '13px',
+    color: '#1e293b',
+    background: '#f8fafc',
+    outline: 'none',
+  };
+  const lblStyle = {
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '5px',
+  };
+  const reqStar = <span style={{ color: '#FC2B5A' }}>*</span>;
+
   return (
-    <div>
-      {/* Header */}
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-12 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Add Leads</h3>
-              <div className="breadcrumb-wrapper col-12">
-                <ol className="breadcrumb">
-                  <li className="breadcrumb-item">
-                    <a href="/institute/dashboard">Home</a>
-                  </li>
-                  <li className="breadcrumb-item active">Add Leads</li>
-                </ol>
-              </div>
+    <div style={{ background: '#f1f5f9', minHeight: '100vh', padding: '20px' }}>
+
+      {/* Gradient Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        borderRadius: '16px',
+        padding: '24px 32px',
+        marginBottom: '24px',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        boxShadow: '0 10px 25px rgba(252,43,90,0.35)',
+      }}>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '12px', padding: '10px 14px' }}>
+          <i className="fa fa-user-plus" style={{ fontSize: '20px' }}></i>
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px' }}>Add Leads</h2>
+          <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
+            <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
+            <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>
+            <span>Add Leads</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Step 1 — OTP Verification Card */}
+      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)', marginBottom: '20px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg,#FC2B5A,#a5003a)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: 700 }}>1</div>
+          <h5 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '15px' }}>Candidate Verification</h5>
+        </div>
+        <div style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-end' }}>
+
+            {/* Mobile Number */}
+            <div style={{ width: '220px' }}>
+              <label style={lblStyle}>Candidate Number {reqStar}</label>
+              <input
+                type="tel"
+                pattern="[0-9]{10}"
+                onKeyPress={(e) => { if (candidateNumber.length === 10) return false; handleNumberKeyPress(e); }}
+                maxLength="10"
+                required
+                name="number"
+                placeholder="10-digit mobile"
+                value={candidateNumber}
+                onChange={(e) => setCandidateNumber(e.target.value)}
+                disabled={isNumberDisabled}
+                id="user-input"
+                style={{ ...fldStyle, background: isNumberDisabled ? '#f1f5f9' : '#f8fafc' }}
+              />
             </div>
+
+            {/* OTP Field */}
+            {showOtpField && (
+              <div style={{ width: '160px' }} id="otp-field">
+                <label style={lblStyle}>Enter OTP {reqStar}</label>
+                <input
+                  type="number"
+                  required
+                  name="otp"
+                  id="user-otp"
+                  placeholder="4-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  style={fldStyle}
+                />
+              </div>
+            )}
+
+            {/* Send OTP Button */}
+            {showSendBtn && (
+              <div id="sendbtndiv">
+                <button
+                  id="send-otp"
+                  type="button"
+                  onClick={handleSendOtp}
+                  style={{
+                    background: 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                    color: 'white', border: 'none',
+                    borderRadius: '10px', padding: '10px 22px',
+                    fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <i className="fa fa-paper-plane" style={{ marginRight: '7px' }}></i>Send OTP
+                </button>
+              </div>
+            )}
+
+            {/* OTP Actions */}
+            {showOtpActions && (
+              <div id="otp-actions" style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  id="resend-btn"
+                  onClick={handleResendOtp}
+                  style={{
+                    background: 'white', color: '#FC2B5A',
+                    border: '1.5px solid #FC2B5A',
+                    borderRadius: '10px', padding: '10px 18px',
+                    fontWeight: 600, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <i className="fa fa-refresh" style={{ marginRight: '6px' }}></i>Resend
+                </button>
+                <button
+                  id="verify-login-btn"
+                  onClick={handleVerifyOtp}
+                  style={{
+                    background: 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                    color: 'white', border: 'none',
+                    borderRadius: '10px', padding: '10px 22px',
+                    fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(252,43,90,0.3)', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <i className="fa fa-check" style={{ marginRight: '6px' }}></i>Verify OTP
+                </button>
+              </div>
+            )}
+
+            {/* Select Center */}
+            {course.center?.length > 0 && showSelectCenter && (
+              <div id="selectCenter" style={{ width: '220px' }}>
+                <label style={lblStyle}>Training Center {reqStar}</label>
+                <select
+                  onChange={(e) => { setSelectedCenter(e.target.value); removeDisabled('applydiv'); }}
+                  id="centerSelect"
+                  name="center"
+                  value={selectedCenter}
+                  disabled={isCenterSelectDisabled}
+                  style={fldStyle}
+                >
+                  <option value="">Select Training Center</option>
+                  {course.center.map((c, i) => (
+                    <option key={i} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Apply Course Button */}
+            {showApplyDiv && (
+              <div id="applydiv">
+                <button
+                  id="add__centers"
+                  type="button"
+                  onClick={handleApplyCourse}
+                  disabled={isApplyBtnDisabled}
+                  style={{
+                    background: isApplyBtnDisabled ? '#e2e8f0' : 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                    color: isApplyBtnDisabled ? '#94a3b8' : 'white',
+                    border: 'none', borderRadius: '10px', padding: '10px 22px',
+                    fontWeight: 600, fontSize: '13px',
+                    cursor: isApplyBtnDisabled ? 'not-allowed' : 'pointer',
+                    boxShadow: isApplyBtnDisabled ? 'none' : '0 4px 10px rgba(252,43,90,0.3)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <i className="fa fa-graduation-cap" style={{ marginRight: '7px' }}></i>Apply Course
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="content-body">
-        {/* Flash messages would go here */}
+      {/* Step 2 — Candidate Details Form */}
+      {showCandidateDetails && (
+        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)', marginBottom: '20px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg,#FC2B5A,#a5003a)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: 700 }}>2</div>
+            <h5 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '15px' }}>Candidate Details</h5>
+          </div>
+          <div style={{ padding: '20px 24px' }}>
+            <form onSubmit={handleFormSubmit} id="candidateDetails">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
 
-        <section id="add-leads">
-          <div className="row">
-            <div className="col-xl-12 col-lg-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Add Lead</h4>
+                {course.center?.length > 0 && (
+                  <div style={{ flex: '1 1 200px', minWidth: '180px' }} id="selectCenterNewLead">
+                    <label style={lblStyle}>Training Center {reqStar}</label>
+                    <select
+                      id="centerSelectNewLead"
+                      name="selectedCenter"
+                      required
+                      value={formData.selectedCenter}
+                      onChange={(e) => handleFormDataChange('selectedCenter', e.target.value)}
+                      style={fldStyle}
+                    >
+                      <option value="">Select Option</option>
+                      {course.center.map((c, i) => (
+                        <option key={i} value={c._id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+                  <label style={lblStyle}>Name {reqStar}</label>
+                  <input type="text" name="name" maxLength="50" required value={formData.name}
+                    onChange={(e) => handleFormDataChange('name', e.target.value)} style={fldStyle} placeholder="Full name" />
                 </div>
-                <div className="card-content">
-                  <div className="card-body">
-                    <div className="row align-items-center">
-                      <div className="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1">
-                        <label>
-                          Candidate Number
-                          <span className="asterisk">*</span>
-                        </label>
-                        <input
-                          type="tel"
-                          className="form-control"
-                          pattern="[0-9]{10}"
-                          onKeyPress={(e) => {
-                            if (candidateNumber.length === 10) return false;
-                            handleNumberKeyPress(e);
-                          }}
-                          maxLength="10"
-                          required
-                          name="number"
-                          placeholder="Candidate Number"
-                          value={candidateNumber}
-                          onChange={(e) => setCandidateNumber(e.target.value)}
-                          disabled={isNumberDisabled}
-                          id="user-input"
-                        />
-                      </div>
 
-                      <div className={`col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1 ${!showOtpField ? 'd-none' : ''}`} id="otp-field">
-                        <label>
-                          Enter OTP
-                          <span className="asterisk">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          required
-                          name="otp"
-                          id="user-otp"
-                          placeholder="Enter OTP"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                        />
-                      </div>
+                <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+                  <label style={lblStyle}>Email {reqStar}</label>
+                  <input type="email" maxLength="50" name="email" value={formData.email} required
+                    onChange={(e) => handleFormDataChange('email', e.target.value)} style={fldStyle} placeholder="Email address" />
+                </div>
 
-                      <div className={`col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 ${!showSendBtn ? 'd-none' : ''}`} id="sendbtndiv">
-                        <button
-                          id="send-otp"
-                          type="button"
-                          className="btn btn-success px-lg-2 ml-1 waves-effect waves-light"
-                          onClick={handleSendOtp}
-                        >
-                          Send OTP
-                        </button>
-                      </div>
+                <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+                  <label style={lblStyle}>Address</label>
+                  <input ref={addressInputRef} id="loc" type="text" maxLength="100" name="address"
+                    value={formData.address} onChange={(e) => handleFormDataChange('address', e.target.value)}
+                    style={fldStyle} placeholder="Search address..." />
+                </div>
 
-                      <div className={`row align-items-center ${!showOtpActions ? 'd-none' : ''}`} id="otp-actions">
-                        <div className="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2">
-                          <button
-                            className="btn btn-success btn-block waves-effect waves-light text-white btn-block"
-                            id="resend-btn"
-                            onClick={handleResendOtp}
-                          >
-                            Resend OTP
-                          </button>
-                        </div>
-                        <div className="col-xl-1 col-lg-1 col-md-1 col-sm-1 col-1">
-                          <button
-                            className="btn btn-success float-right btn-inline waves-effect waves-light text-white btn-block"
-                            id="verify-login-btn"
-                            onClick={handleVerifyOtp}
-                          >
-                            Verify
-                          </button>
-                        </div>
-                      </div>
+                {/* Hidden location fields */}
+                <input id="state" name="state" type="hidden" value={formData.state} />
+                <input id="city" name="city" type="hidden" value={formData.city} />
+                <input id="longitude" name="longitude" type="hidden" value={formData.longitude} />
+                <input id="latitude" name="latitude" type="hidden" value={formData.latitude} />
 
-                      {course.center?.length > 0 && (
-                        <div id="selectCenter" className={`col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-md-0 mb-1 ${!showSelectCenter ? 'd-none' : ''}`}>
-                          <select
-                            onChange={(e) => {
-                              setSelectedCenter(e.target.value);
-                              removeDisabled('applydiv');
-                            }}
-                            className="form-control"
-                            id="centerSelect"
-                            name="center"
-                            value={selectedCenter}
-                            disabled={isCenterSelectDisabled}
-                          >
-                            <option value="">Select Training Center</option>
-                            {course.center.map((c, i) => (
-                              <option key={i} value={c._id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                <div style={{ flex: '1 1 160px', minWidth: '140px' }} id="pd-gender">
+                  <label style={lblStyle}>Gender {reqStar}</label>
+                  <select name="sex" id="user-gender" value={formData.sex}
+                    onChange={(e) => handleFormDataChange('sex', e.target.value)} style={fldStyle}>
+                    <option value="">Please select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
 
-                      <div id="applydiv" className={`col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 ${!showApplyDiv ? 'd-none' : ''}`}>
-                        <button
-                          id="add__centers"
-                          type="button"
-                          className="btn btn-success px-lg-2 ml-1 waves-effect waves-light"
-                          onClick={handleApplyCourse}
-                          disabled={isApplyBtnDisabled}
-                        >
-                          Apply Course
-                        </button>
-                      </div>
-                    </div>
+                <div style={{ flex: '1 1 160px', minWidth: '140px' }} id="dob-field">
+                  <label style={lblStyle}>Date of Birth {reqStar}</label>
+                  <input type="date" name="dob" value={formData.dob} id="candidate-dob"
+                    onChange={(e) => handleFormDataChange('dob', e.target.value)} style={fldStyle} />
+                </div>
 
-                    <form onSubmit={handleFormSubmit} id="candidateDetails" className={`row ${!showCandidateDetails ? 'd-none' : ''}`}>
-                      <div className="col-12">
-                        <div className="row">
-                          {course.center?.length > 0 && (
-                            <div id="selectCenterNewLead" className="col-xl-3 mb-1">
-                              <label>
-                                Select Training Center <span className="mandatory">*</span>
-                              </label>
-                              <select
-                                className="form-control"
-                                id="centerSelectNewLead"
-                                name="selectedCenter"
-                                required
-                                value={formData.selectedCenter}
-                                onChange={(e) => handleFormDataChange('selectedCenter', e.target.value)}
-                              >
-                                <option value="">Select Option</option>
-                                {course.center.map((c, i) => (
-                                  <option key={i} value={c._id}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
+                <div style={{ flex: '1 1 180px', minWidth: '160px' }} id="pd-number">
+                  <label style={lblStyle}>WhatsApp Number {reqStar}</label>
+                  <input type="tel" maxLength="10" name="whatsapp" value={formData.whatsapp}
+                    id="candidate-whatsapp-number" onChange={(e) => handleFormDataChange('whatsapp', e.target.value)}
+                    style={fldStyle} placeholder="WhatsApp number" />
+                </div>
 
-                          <div className="col-xl-3 mb-1">
-                            <label>
-                              Name <span className="mandatory">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              name="name"
-                              maxLength="50"
-                              required
-                              value={formData.name}
-                              onChange={(e) => handleFormDataChange('name', e.target.value)}
-                            />
-                          </div>
+                <div style={{ flex: '1 1 200px', minWidth: '180px' }} id="highestQuali">
+                  <label style={lblStyle}>Highest Qualification {reqStar}</label>
+                  <select className="single-field" value={formData.highestQualification}
+                    name="highestQualification" id="quali"
+                    onChange={(e) => handleFormDataChange('highestQualification', e.target.value)} style={fldStyle}>
+                    <option value="">Select Qualification</option>
+                    {highestQualification.map((q) => (
+                      <option key={q._id} value={q._id} className="text-capitalize">{q.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-                          <div className="col-xl-3 mb-1">
-                            <label>
-                              Email <span className="mandatory">*</span>
-                            </label>
-                            <input
-                              type="email"
-                              className="form-control"
-                              maxLength="50"
-                              name="email"
-                              value={formData.email}
-                              required
-                              onChange={(e) => handleFormDataChange('email', e.target.value)}
-                            />
-                          </div>
+                <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                  <label style={lblStyle}>Source Type {reqStar}</label>
+                  <select className="single-field" value={formData.sourceType} name="sourceType" id="sourceType"
+                    onChange={(e) => handleFormDataChange('sourceType', e.target.value)} style={fldStyle}>
+                    <option value="">Select Source Type</option>
+                    <option value="Self/HO">Self/HO</option>
+                    <option value="Third Party">Third Party</option>
+                  </select>
+                </div>
 
-                          <div className="col-xl-3 mb-1">
-                            <label>Address</label>
-                            <input
-                              ref={addressInputRef}
-                              id="loc"
-                              type="text"
-                              className="form-control"
-                              maxLength="100"
-                              name="address"
-                              value={formData.address}
-                              onChange={(e) => handleFormDataChange('address', e.target.value)}
-                            />
-                          </div>
+                {formData.sourceType === "Third Party" && (
+                  <div style={{ flex: '1 1 200px', minWidth: '180px' }} id="thirdPartySource">
+                    <label style={lblStyle}>Third Party Source {reqStar}</label>
+                    <select className="single-field" value={formData.source} name="source" id="thirdPartySourceSelect"
+                      onChange={(e) => {
+                        const selectedSource = sources.find(s => s._id === e.target.value);
+                        handleFormDataChange('source', e.target.value);
+                        handleFormDataChange('sourceName', selectedSource ? selectedSource.name : '');
+                      }} style={fldStyle}>
+                      <option value="">Select Third Party Source</option>
+                      {sources.map((source) => (
+                        <option key={source._id} value={source._id} className="text-capitalize">{source.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                          {/* Hidden fields for location data */}
-                          <div className="col-xl-3 mb-1 d-none">
-                            <label>State <span className="mandatory">*</span></label>
-                            <input
-                              id="state"
-                              name="state"
-                              type="hidden"
-                              className="form-control"
-                              maxLength="50"
-                              value={formData.state}
-                            />
-                          </div>
+                {formData.sourceType === "Self/HO" && (
+                  <div style={{ flex: '1 1 200px', minWidth: '180px' }} id="selfHoSource">
+                    <label style={lblStyle}>Self/HO Counselor {reqStar}</label>
+                    <select className="single-field" value={formData.source} name="source" id="selfHoSourceSelect"
+                      onChange={(e) => {
+                        const selectedCounselor = counselors.find(c => c._id === e.target.value);
+                        handleFormDataChange('source', e.target.value);
+                        handleFormDataChange('sourceName', selectedCounselor ? selectedCounselor.name : '');
+                      }} style={fldStyle}>
+                      <option value="">Select Self/HO Counselor</option>
+                      {counselors.map((counselor) => (
+                        <option key={counselor._id} value={counselor._id} className="text-capitalize">{counselor.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
-                          <div className="col-xl-3 mb-1 d-none">
-                            <label>City <span className="mandatory">*</span></label>
-                            <input
-                              id="city"
-                              name="city"
-                              type="hidden"
-                              className="form-control"
-                              maxLength="50"
-                              value={formData.city}
-                            />
-                          </div>
+              <div style={{ marginTop: '20px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                <button type="submit" style={{
+                  background: 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                  color: 'white', border: 'none', borderRadius: '10px',
+                  padding: '11px 32px', fontWeight: 700, fontSize: '14px',
+                  cursor: 'pointer', boxShadow: '0 4px 12px rgba(252,43,90,0.35)',
+                }}>
+                  <i className="fa fa-check-circle" style={{ marginRight: '8px' }}></i>Submit & Apply
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                          <div className="col-xl-3 mb-1 d-none">
-                            <label>Longitude <span className="mandatory">*</span></label>
-                            <input
-                              id="longitude"
-                              name="longitude"
-                              type="hidden"
-                              className="form-control"
-                              maxLength="50"
-                              value={formData.longitude}
-                            />
-                          </div>
-
-                          <div className="col-xl-3 mb-1 d-none">
-                            <label>Latitude <span className="mandatory">*</span></label>
-                            <input
-                              id="latitude"
-                              name="latitude"
-                              type="hidden"
-                              className="form-control"
-                              maxLength="50"
-                              value={formData.latitude}
-                            />
-                          </div>
-
-                          <div className="col-xl-2 mb-1" id="pd-gender">
-                            <label>
-                              Gender<span className="mandatory"> *</span>
-                            </label>
-                            <select
-                              className="form-control"
-                              name="sex"
-                              id="user-gender"
-                              value={formData.sex}
-                              onChange={(e) => handleFormDataChange('sex', e.target.value)}
-                            >
-                              <option value="">Please select</option>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                            </select>
-                          </div>
-
-                          <div className="col-xl-2 mb-1" id="dob-field">
-                            <label>
-                              Date of Birth<span className="mandatory"> *</span>
-                            </label>
-                            <input
-                              type="date"
-                              name="dob"
-                              className="form-control"
-                              value={formData.dob}
-                              id="candidate-dob"
-                              onChange={(e) => handleFormDataChange('dob', e.target.value)}
-                            />
-                          </div>
-
-                          <div className="col-xl-3 mb-1" id="pd-number">
-                            <label>
-                              WhatsApp Number <span className="mandatory"> *</span>
-                            </label>
-                            <input
-                              type="tel"
-                              maxLength="10"
-                              name="whatsapp"
-                              className="form-control"
-                              value={formData.whatsapp}
-                              id="candidate-whatsapp-number"
-                              onChange={(e) => handleFormDataChange('whatsapp', e.target.value)}
-                            />
-                          </div>
-
-                          <div className="col-xl-3 mb-1" id="highestQuali">
-                            <label>
-                              Highest Qualification <span className="mandatory">*</span>
-                            </label>
-                            <select
-                              className="form-control single-field"
-                              value={formData.highestQualification}
-                              name="highestQualification"
-                              id="quali"
-                              onChange={(e) => handleFormDataChange('highestQualification', e.target.value)}
-                            >
-                              <option value="">Select Highest Qualification</option>
-                              {highestQualification.map((q) => (
-                                <option key={q._id} value={q._id} className="text-capitalize">
-                                  {q.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                                                                                                           <div className="col-xl-3 mb-1" id="highestQuali">
-                              <label>
-                               Source Type <span className="mandatory">*</span>
-                              </label>
-                              <select
-                                className="form-control single-field"
-                                value={formData.sourceType}
-                                name="sourceType"
-                                id="sourceType"
-                                onChange={(e) => handleFormDataChange('sourceType', e.target.value)}
-                              >
-                                <option value="">Select Source Type</option>
-                                <option value="Self/HO">Self/HO</option>
-                                <option value="Third Party">Third Party</option>
-                              </select>
-                            </div>
-
-                                                         {/* Second dropdown for Third Party sources */}
-                             {formData.sourceType === "Third Party" && (
-                               <div className="col-xl-3 mb-1" id="thirdPartySource">
-                                 <label>
-                                  Third Party Source <span className="mandatory">*</span>
-                                 </label>
-                                                                   <select
-                                    className="form-control single-field"
-                                    value={formData.source}
-                                    name="source"
-                                    id="thirdPartySourceSelect"
-                                    onChange={(e) => {
-                                      const selectedSource = sources.find(s => s._id === e.target.value);
-                                      handleFormDataChange('source', e.target.value);
-                                      handleFormDataChange('sourceName', selectedSource ? selectedSource.name : '');
-                                    }}
-                                  >
-                                   <option value="">Select Third Party Source</option>
-                                   {sources.map((source) => (
-                                     <option key={source._id} value={source._id} className="text-capitalize">
-                                       {source.name}
-                                     </option>
-                                   ))}
-                                 </select>
-                               </div>
-                             )}
-
-                                                          
-                             {formData.sourceType === "Self/HO" && (
-                               <div className="col-xl-3 mb-1" id="selfHoSource">
-                                 <label>
-                                  Self/HO Counselor <span className="mandatory">*</span>
-                                 </label>
-                                                                   <select
-                                    className="form-control single-field"
-                                    value={formData.source}
-                                    name="source"
-                                    id="selfHoSourceSelect"
-                                    onChange={(e) => {
-                                      const selectedCounselor = counselors.find(c => c._id === e.target.value);
-                                      handleFormDataChange('source', e.target.value);
-                                      handleFormDataChange('sourceName', selectedCounselor ? selectedCounselor.name : '');
-                                    }}
-                                  >
-                                   <option value="">Select Self/HO Counselor</option>
-                                   {counselors.map((counselor) => (
-                                     <option key={counselor._id} value={counselor._id} className="text-capitalize">
-                                       {counselor.name}
-                                     </option>
-                                   ))}
-                                 </select>
-                               </div>
-                             )}
-
-                             
-                                                     
-                        </div>
-                      </div>
-
-                      <div className="col-xl-3 mb-1">
-                        <button type="submit" className="form-control btn btn-success px-lg-2 waves-effect waves-light">
-                          Submit
-                        </button>
-                      </div>
-                    </form>
+      {/* Step 3 — Document Upload */}
+      {course.docsRequired && course.docsRequired.length > 0 && showAddDocs && (
+        <div id="add-docs" style={{ background: 'white', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg,#FC2B5A,#a5003a)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: 700 }}>3</div>
+            <h5 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '15px' }}>Upload Student Documents</h5>
+          </div>
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {course.docsRequired.map((doc, index) => (
+                <div key={index} style={{
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px',
+                  background: uploadedFiles[doc.Name] ? '#f0fdf4' : '#fef6f8',
+                  border: `1.5px solid ${uploadedFiles[doc.Name] ? '#86efac' : '#fecdd3'}`,
+                  borderRadius: '12px', padding: '14px 18px',
+                }}>
+                  <div style={{ flex: '1 1 200px' }}>
+                    <label style={{ ...lblStyle, color: uploadedFiles[doc.Name] ? '#16a34a' : '#64748b' }}>
+                      {doc.Name} <span style={{ color: '#FC2B5A' }}>*</span>
+                    </label>
+                    <input
+                      type="file"
+                      onChange={(e) => handleFileChange(doc.Name, e.target.files)}
+                      required
+                      name="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      id={`file${doc.Name}`}
+                      disabled={uploadedFiles[doc.Name]}
+                      style={{ ...fldStyle, padding: '7px 12px', background: 'white' }}
+                    />
+                  </div>
+                  <div style={{ paddingTop: '18px' }}>
+                    <button
+                      id="add__dcs"
+                      type="button"
+                      onClick={() => uploadFile(doc.Name, doc._id, fileInputs[doc.Name] ? [fileInputs[doc.Name]] : [])}
+                      disabled={uploadedFiles[doc.Name]}
+                      style={{
+                        background: uploadedFiles[doc.Name] ? '#dcfce7' : 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+                        color: uploadedFiles[doc.Name] ? '#16a34a' : 'white',
+                        border: 'none', borderRadius: '10px', padding: '10px 20px',
+                        fontWeight: 600, fontSize: '13px',
+                        cursor: uploadedFiles[doc.Name] ? 'default' : 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <i className={`fa ${uploadedFiles[doc.Name] ? 'fa-check-circle' : 'fa-upload'}`} style={{ marginRight: '7px' }}></i>
+                      {uploadedFiles[doc.Name] ? 'Uploaded' : 'Upload'}
+                    </button>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
-        </section>
+        </div>
+      )}
 
-        {/* Document Upload Section */}
-        {course.docsRequired && course.docsRequired.length > 0 && (
-          <section id="add-docs" className={showAddDocs ? '' : 'd-none'}>
-            <div className="row">
-              <div className="col-xl-12 col-lg-12">
-                <div className="card">
-                  <div className="card-header border border-top-0 border-left-0 border-right-0">
-                    <h4 className="card-title pb-1">Upload Student Documents</h4>
-                  </div>
-                  <div className="card-content">
-                    <div className="card-body">
-                      {course.docsRequired.map((doc, index) => (
-                        <div key={index} className="file-containers row align-items-center">
-                          <div className="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1">
-                            <label>
-                              Add {doc.Name}
-                              <span className="asterisk">*</span>
-                            </label>
-                            <input
-                              type="file"
-                              className="form-control file-inputs fileInput"
-                              onChange={(e) => handleFileChange(doc.Name, e.target.files)}
-                              required
-                              name="file"
-                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                              id={`file${doc.Name}`}
-                              disabled={uploadedFiles[doc.Name]}
-                            />
-                          </div>
-                          <div className="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-m mb-1">
-                            <button
-                              id="add__dcs"
-                              type="button"
-                              className={`btn px-lg-2 ml-1 waves-effect waves-light ${uploadedFiles[doc.Name] ? 'btn-secondary' : 'btn-success'
-                                }`}
-                              onClick={() => uploadFile(doc.Name, doc._id, fileInputs[doc.Name] ? [fileInputs[doc.Name]] : [])}
-                              disabled={uploadedFiles[doc.Name]}
-                            >
-                              {uploadedFiles[doc.Name] ? 'Uploaded' : 'Upload'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className="text-right reset"></div>
-      </div>
     </div>
   );
 };

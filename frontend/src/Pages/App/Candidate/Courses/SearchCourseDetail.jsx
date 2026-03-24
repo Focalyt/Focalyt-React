@@ -211,7 +211,6 @@ const CourseDetails = () => {
       }
     } catch (error) {
       console.error('Error applying for course:', error);
-      window.location.reload();
     }
   };
 
@@ -261,9 +260,8 @@ const CourseDetails = () => {
               value: (paymentData.amount / 100).toFixed(2),               // 💰 amount of the transaction
               currency: "INR"            // 🪙 currency in ISO format
             });
-
-            document.getElementById('completeRegistration').classList.add('show');
-            document.getElementById('completeRegistration').style.display = 'block';
+           
+            setShowCongratulationModal(true);
             document.body.classList.add('modal-open');
           }).catch(error => {
             console.error('Error processing payment status:', error);
@@ -314,6 +312,16 @@ const CourseDetails = () => {
     videoModal.style.display = 'none';
     document.body.classList.remove('modal-open');
     document.getElementsByClassName('modal-backdrop')[0]?.remove();
+  };
+
+  const openApplyModal = () => {
+    
+    setNextbtnVisible(centerRequired);
+    const applyModal = document.getElementById('apply');
+    if (!applyModal) return;
+    applyModal.classList.add('show');
+    applyModal.style.display = 'block';
+    document.body.classList.add('modal-open');
   };
 
   if (loading) {
@@ -740,9 +748,7 @@ const CourseDetails = () => {
                       data-target="#apply"
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('apply').classList.add('show');
-                        document.getElementById('apply').style.display = 'block';
-                        document.body.classList.add('modal-open');
+                        openApplyModal();
                       }}
                     >
                       <i className="la la-paper-plane ml-2"></i>Apply Now
@@ -783,9 +789,7 @@ const CourseDetails = () => {
                         style={{ textDecoration: 'none' }}
                         onClick={(e) => {
                           e.preventDefault();
-                          document.getElementById('apply').classList.add('show');
-                          document.getElementById('apply').style.display = 'block';
-                          document.body.classList.add('modal-open');
+                          openApplyModal();
                         }}
                       >
                         APPLY NOW
@@ -897,9 +901,7 @@ const CourseDetails = () => {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('apply').classList.add('show');
-                        document.getElementById('apply').style.display = 'block';
-                        document.body.classList.add('modal-open');
+                        openApplyModal();
                       }}
                     >
                       <i className="la la-paper-plane ml-3"></i>Register for this Course
@@ -1380,7 +1382,7 @@ const CourseDetails = () => {
                     document.getElementById('completeRegistration').style.display = 'none';
                     document.body.classList.remove('modal-open');
                     document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                    window.location.reload();
+                    setShowCongratulationModal(false);
                   }}
                 >
                   <span aria-hidden="true">&times;</span>
@@ -1418,7 +1420,8 @@ const CourseDetails = () => {
                       document.getElementById('completeRegistration').style.display = 'none';
                       document.body.classList.remove('modal-open');
                       document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                      window.location.href = `/candidate/reqDocs/${courseId}`;
+                      setShowCongratulationModal(false);
+                      navigate(`/candidate/reqDocs/${courseId}`);
                     }}
                   >
                     Upload Documents

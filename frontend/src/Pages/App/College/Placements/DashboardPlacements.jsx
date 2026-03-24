@@ -1085,24 +1085,40 @@ const DashboardPlacements = () => {
 
   if (isLoading) {
     return (
-      <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="mt-3 text-muted">Loading Placements Dashboard...</p>
+      <div style={{ background: '#f1f5f9', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '52px', height: '52px', border: '4px solid #fecdd3',
+            borderTopColor: '#FC2B5A', borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite', margin: '0 auto 16px'
+          }}></div>
+          <p style={{ color: '#94a3b8', fontWeight: 600, fontSize: '14px' }}>Loading Placements Dashboard...</p>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
-    <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-      {/* Header */}
-      <div className="mb-4">
-            <h1 className="display-5 fw-bold text-dark mb-2">Placements Dashboard</h1>
-        <p className="text-muted">Comprehensive analytics and visual records for placements</p>
+    <div className="container-fluid py-4" style={{ backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
+
+      {/* Gradient Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        borderRadius: '16px', padding: '24px 32px', marginBottom: '24px',
+        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        boxShadow: '0 10px 25px rgba(252,43,90,0.35)', flexWrap: 'wrap', gap: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '12px', padding: '10px 14px' }}>
+            <Briefcase size={22} />
           </div>
+          <div>
+            <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px' }}>Placements Dashboard</h2>
+            <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>Comprehensive analytics and visual records for placements</p>
+          </div>
+        </div>
+      </div>
 
       {/* Advanced Date Picker Modal */}
       {showDatePicker && (
@@ -1113,76 +1129,80 @@ const DashboardPlacements = () => {
       )}
 
       {/* Filters */}
-      <div className="card shadow-sm mb-4">
-        <div className="card-body d-flex justify-content-end">
-          <div className="row justify-content-end g-3 w-100">
-            <div className="col-md-12">
-              <div className="d-flex justify-content-end align-items-center gap-2">
-                <div className="input-group" style={{ maxWidth: '300px' }}>
-                  <span className="input-group-text bg-white border-end-0">
-                    <i className="fas fa-search text-muted"></i>
-                  </span>
-                  <input
-                    type="text"
-                    name="name"
-                    className="form-control border-start-0"
-                    placeholder="Quick search..."
-                    value={filterData.name}
-                    onChange={handleFilterChange}
-                  />
-                  {filterData.name && (
-                    <button
-                      className="btn btn-outline-secondary border-start-0"
-                      type="button"
-                      onClick={() => {
-                        setFilterData(prev => ({ ...prev, name: '' }));
-                        fetchPlacementsData();
-                      }}
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setShowDatePicker(true)}
-                  className="btn btn-outline-primary d-flex align-items-center gap-2"
-                >
-                  <CalendarDays size={18} />
-                  {!useCustomDate && selectedPeriod === 'today' ? 'Today' :
-                    !useCustomDate && selectedPeriod === 'last7' ? 'Last 7 days' :
-                    !useCustomDate && selectedPeriod === 'last30' ? 'Last 30 days' :
-                    startDate && endDate && startDate === endDate ?
-                      `${new Date(startDate).toLocaleDateString('en-IN')}` :
-                    startDate && endDate ?
-                      `${new Date(startDate).toLocaleDateString('en-IN')} - ${new Date(endDate).toLocaleDateString('en-IN')}` :
-                      'Select Date Range'
-                  }
-                </button>
-
-                <button
-                  onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                  className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                >
-                  <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                  Filters
-                  {totalSelected > 0 && (
-                    <span className="badge bg-light text-dark ms-1">
-                      {totalSelected}
-                    </span>
-                  )}
-                </button>
-
-                <button 
-                  className="btn btn-primary"
-                  onClick={fetchPlacementsData}
-                >
-                  <RefreshCw size={18} className="me-2" />
-                  Refresh
-                </button>
-              </div>
-            </div>
+      <div style={{ background: 'white', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', marginBottom: '20px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          {/* Search */}
+          <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', background: '#f8fafc', maxWidth: '260px', flex: '1 1 180px' }}>
+            <span style={{ padding: '0 10px', color: '#94a3b8' }}><i className="fas fa-search"></i></span>
+            <input
+              type="text"
+              name="name"
+              style={{ border: 'none', background: 'transparent', padding: '9px 4px', fontSize: '13px', outline: 'none', width: '100%', color: '#1e293b' }}
+              placeholder="Quick search..."
+              value={filterData.name}
+              onChange={handleFilterChange}
+            />
+            {filterData.name && (
+              <button style={{ border: 'none', background: 'transparent', padding: '0 10px', cursor: 'pointer', color: '#94a3b8' }}
+                onClick={() => { setFilterData(prev => ({ ...prev, name: '' })); fetchPlacementsData(); }}>
+                <i className="fas fa-times"></i>
+              </button>
+            )}
           </div>
+
+          {/* Date Picker */}
+          <button onClick={() => setShowDatePicker(true)} style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            border: '1.5px solid #e2e8f0', borderRadius: '10px',
+            padding: '9px 14px', background: '#f8fafc', fontSize: '13px',
+            fontWeight: 600, color: '#475569', cursor: 'pointer', transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#FC2B5A'; e.currentTarget.style.color = '#FC2B5A'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+          >
+            <CalendarDays size={16} />
+            {!useCustomDate && selectedPeriod === 'today' ? 'Today' :
+              !useCustomDate && selectedPeriod === 'last7' ? 'Last 7 days' :
+              !useCustomDate && selectedPeriod === 'last30' ? 'Last 30 days' :
+              startDate && endDate && startDate === endDate ? `${new Date(startDate).toLocaleDateString('en-IN')}` :
+              startDate && endDate ? `${new Date(startDate).toLocaleDateString('en-IN')} – ${new Date(endDate).toLocaleDateString('en-IN')}` :
+              'Select Date Range'}
+          </button>
+
+          {/* Filters Toggle */}
+          <button onClick={() => setIsFilterCollapsed(!isFilterCollapsed)} style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            border: 'none', borderRadius: '10px', padding: '9px 16px',
+            background: !isFilterCollapsed ? 'linear-gradient(135deg,#FC2B5A,#a5003a)' : '#f8fafc',
+            color: !isFilterCollapsed ? 'white' : '#475569',
+            border: !isFilterCollapsed ? 'none' : '1.5px solid #e2e8f0',
+            fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s',
+          }}>
+            <Filter size={15} />
+            Filters
+            {totalSelected > 0 && (
+              <span style={{ background: !isFilterCollapsed ? 'rgba(255,255,255,0.3)' : '#FC2B5A', color: !isFilterCollapsed ? 'white' : 'white', borderRadius: '20px', padding: '1px 7px', fontSize: '11px', fontWeight: 700 }}>
+                {totalSelected}
+              </span>
+            )}
+          </button>
+
+          {/* Refresh */}
+          <button onClick={fetchPlacementsData} style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            background: 'linear-gradient(135deg,#FC2B5A,#a5003a)',
+            color: 'white', border: 'none', borderRadius: '10px',
+            padding: '9px 16px', fontWeight: 600, fontSize: '13px',
+            cursor: 'pointer', boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+            transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <RefreshCw size={15} />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -1213,182 +1233,79 @@ const DashboardPlacements = () => {
           </p>
         </div>
 
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
+        {[
+          { label: 'Unique Jobs', value: metrics.uniqueJobs, icon: <Briefcase size={22} />, color: '#FC2B5A', bg: '#fef2f5', sub: null },
+          { label: 'Multi-Apply Candidates', value: metrics.moreThanTwoThird, icon: <Users size={22} />, color: '#f59e0b', bg: '#fffbeb', sub: null },
+          { label: 'No. of Companies', value: metrics.totalCompanies, icon: <Building size={22} />, color: '#6366f1', bg: '#eef2ff', sub: null },
+          { label: 'Offer Letters', value: metrics.offerLetters, icon: <FileText size={22} />, color: '#10b981', bg: '#ecfdf5', sub: null },
+          { label: 'Total Placements', value: metrics.totalPlacements, icon: <UserCheck size={22} />, color: '#3b82f6', bg: '#eff6ff', sub: `${metrics.placedCount} Placed` },
+        ].map((m, i) => (
+          <div key={i} className="col-md-2">
+            <div style={{
+              background: 'white', borderRadius: '14px', padding: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.07)', height: '100%',
+              borderBottom: `3px solid ${m.color}`,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              cursor: 'default',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${m.color}30`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.07)'; }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <p className="text-muted small mb-1">Unique Jobs</p>
-                  <p className="h3 fw-bold mb-0">
-                    {metrics.uniqueJobs.toLocaleString()}
-                  </p>
+                  <p style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>{m.label}</p>
+                  <p style={{ fontSize: '26px', fontWeight: 800, color: '#1e293b', margin: 0, lineHeight: 1 }}>{m.value.toLocaleString()}</p>
+                  {m.sub && <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0' }}>{m.sub}</p>}
                 </div>
-                <Briefcase className="text-primary opacity-50" size={32} />
+                <div style={{ background: m.bg, color: m.color, borderRadius: '10px', padding: '8px', display: 'flex' }}>
+                  {m.icon}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <p className="text-muted small mb-1">Multi-apply candidates</p>
-                  <p className="h3 fw-bold text-success mb-0">
-                    {metrics.moreThanTwoThird.toLocaleString()}
-                  </p>
-                 
-                </div>
-                <Users className="text-success opacity-50" size={32} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <p className="text-muted small mb-1">No. of Companies</p>
-                  <p className="h3 fw-bold text-primary mb-0">
-                    {metrics.totalCompanies.toLocaleString()}
-                  </p>
-                </div>
-                <Building className="text-primary opacity-50" size={32} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <p className="text-muted small mb-1">Offer Letters</p>
-                  <p className="h3 fw-bold text-success mb-0">
-                    {metrics.offerLetters.toLocaleString()}
-                  </p>
-                </div>
-                <FileText className="text-success opacity-50" size={32} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <p className="text-muted small mb-1">Total Placements</p>
-                  <p className="h3 fw-bold text-info mb-0">
-                    {metrics.totalPlacements.toLocaleString()}
-                  </p>
-                  <p className="small text-muted mb-0">
-                    {metrics.placedCount} Placed
-                  </p>
-                </div>
-                <UserCheck className="text-info opacity-50" size={32} />
-              </div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Job Sharing & Acceptance Metrics */}
       <div className="row g-3 mb-4">
-        <div className="col-md-6">
-          <div className="card shadow-sm h-100 border-0" style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-5px)';
-            e.currentTarget.style.boxShadow = '0 15px 35px rgba(102, 126, 234, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-          }}
-          >
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
+        {[
+          {
+            label: 'Jobs Shared to Students', value: metrics.jobsSharedToStudents,
+            sub: 'Total job offers shared', icon: <Share2 size={28} />,
+            gradient: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+            shadow: 'rgba(252,43,90,0.35)',
+          },
+          {
+            label: 'Jobs Accepted by Candidates', value: metrics.jobsAcceptedByCandidates,
+            sub: `${metrics.jobsSharedToStudents > 0 ? ((metrics.jobsAcceptedByCandidates / metrics.jobsSharedToStudents) * 100).toFixed(1) : 0}% Acceptance Rate`,
+            icon: <CheckCircle size={28} />,
+            gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            shadow: 'rgba(245,158,11,0.35)',
+          }
+        ].map((card, i) => (
+          <div key={i} className="col-md-6">
+            <div style={{
+              background: card.gradient, color: 'white', borderRadius: '16px',
+              padding: '24px', height: '100%',
+              boxShadow: `0 8px 20px ${card.shadow}`,
+              transition: 'transform 0.25s, box-shadow 0.25s', cursor: 'default',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = `0 18px 40px ${card.shadow}`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = `0 8px 20px ${card.shadow}`; }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p className="text-white-50 small mb-1 fw-medium">Jobs Shared to Students</p>
-                  <p className="h2 fw-bold mb-0">
-                    {metrics.jobsSharedToStudents.toLocaleString()}
-                  </p>
-                  <p className="small text-white-50 mb-0 mt-2">
-                    <i className="fas fa-arrow-up me-1"></i>
-                    Total job offers shared
-                  </p>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', fontWeight: 600, opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</p>
+                  <p style={{ margin: '0 0 8px', fontSize: '36px', fontWeight: 800, lineHeight: 1 }}>{card.value.toLocaleString()}</p>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.75 }}><i className="fas fa-arrow-up me-1"></i>{card.sub}</p>
                 </div>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Share2 className="text-white" size={28} />
+                <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {card.icon}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="col-md-6">
-          <div className="card shadow-sm h-100 border-0" style={{
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: 'white',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-5px)';
-            e.currentTarget.style.boxShadow = '0 15px 35px rgba(16, 185, 129, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-          }}
-          >
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <p className="text-white-50 small mb-1 fw-medium">Jobs Accepted by Candidates</p>
-                  <p className="h2 fw-bold mb-0">
-                    {metrics.jobsAcceptedByCandidates.toLocaleString()}
-                  </p>
-                  <p className="small text-white-50 mb-0 mt-2">
-                    <i className="fas fa-percentage me-1"></i>
-                    {metrics.jobsSharedToStudents > 0 
-                      ? ((metrics.jobsAcceptedByCandidates / metrics.jobsSharedToStudents) * 100).toFixed(1)
-                      : 0}% Acceptance Rate
-                  </p>
-                </div>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <CheckCircle className="text-white" size={28} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Placement Performance Matrix */}
@@ -3042,7 +2959,7 @@ const DashboardPlacements = () => {
                       Hide Filters
                     </button>
                     <button
-                      className="btn btn-primary"
+                      style={{ background: 'linear-gradient(135deg,#FC2B5A,#a5003a)', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 18px', fontWeight: 600, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(252,43,90,0.3)' }}
                       onClick={() => {
                         fetchPlacementsData();
                         setIsFilterCollapsed(true);
@@ -3115,7 +3032,7 @@ const DashboardPlacements = () => {
         }
 
         .candidate-row-clickable:hover {
-          background-color: #e9ecef !important;
+          background-color: #fef2f5 !important;
           transform: translateX(2px);
         }
 
@@ -3131,7 +3048,7 @@ const DashboardPlacements = () => {
         }
 
         .expanded-detail-row {
-          border-left: 3px solid #e9ecef !important;
+          border-left: 3px solid #fecdd3 !important;
         }
 
         .expanded-detail-row:first-of-type {
@@ -3156,9 +3073,9 @@ const DashboardPlacements = () => {
           transition: all 0.2s;
         }
         .list-group-item.active {
-          border-left-color: #0d6efd;
-          background-color: #e7f1ff;
-          color: #0a58ca;
+          border-left-color: #FC2B5A;
+          background-color: #fef2f5;
+          color: #a5003a;
         }
 
         .table-hover tbody tr {
@@ -3172,11 +3089,12 @@ const DashboardPlacements = () => {
         }
 
         .table thead th {
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          font-weight: 600;
+          background: linear-gradient(135deg, #fef2f5 0%, #fce7ee 100%);
+          font-weight: 700;
           text-transform: uppercase;
-          font-size: 0.75rem;
-          letter-spacing: 0.5px;
+          font-size: 0.72rem;
+          letter-spacing: 0.06em;
+          color: #64748b;
           border-bottom: 2px solid #dee2e6;
         }
 
@@ -3229,13 +3147,13 @@ const DashboardPlacements = () => {
         }
 
         .multi-select-trigger:hover {
-          border-color: #86b7fe !important;
-          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+          border-color: #FC2B5A !important;
+          box-shadow: 0 0 0 0.2rem rgba(252, 43, 90, 0.15) !important;
         }
 
         .multi-select-trigger.open {
-          border-color: #86b7fe !important;
-          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+          border-color: #FC2B5A !important;
+          box-shadow: 0 0 0 0.2rem rgba(252, 43, 90, 0.2) !important;
         }
 
         .select-display-text {
@@ -3368,13 +3286,13 @@ const DashboardPlacements = () => {
         }
 
         .candidate-job-table-container::-webkit-scrollbar-thumb {
-          background: #888;
+          background: #fca5a5;
           border-radius: 4px;
           transition: background 0.3s ease;
         }
 
         .candidate-job-table-container::-webkit-scrollbar-thumb:hover {
-          background: #555;
+          background: #FC2B5A;
         }
 
         .candidate-job-table-container table thead th {

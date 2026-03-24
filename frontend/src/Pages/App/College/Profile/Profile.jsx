@@ -526,196 +526,252 @@ const Profile = () => {
     return regex.test(type);
   };
 
+  const fldStyle = {
+    width: '100%',
+    padding: '9px 13px',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '10px',
+    fontSize: '13px',
+    outline: 'none',
+    background: '#fff',
+    color: '#333',
+    transition: 'border-color 0.2s',
+  };
+  const fldErrStyle = { ...fldStyle, border: '1.5px solid #ef4444' };
+  const lblStyle = { fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px', display: 'block' };
+  const lblErrStyle = { ...lblStyle, color: '#ef4444' };
+  const reqStar = <span style={{ color: '#ef4444' }}>*</span>;
+  const sectionCardStyle = {
+    background: '#fff',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    boxShadow: '0 2px 16px rgba(252,43,90,0.07)',
+    marginBottom: '24px',
+    border: '1px solid #f1f5f9',
+  };
+  const sectionHeaderStyle = {
+    background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+    padding: '16px 24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  };
+  const fieldWrap = { flex: '1 1 220px', minWidth: '180px', maxWidth: '260px' };
+  const fieldWrapWide = { flex: '1 1 300px', minWidth: '220px', maxWidth: '420px' };
+
   return (
     <>
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-9 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Your Profile</h3>
-              <div className="breadcrumb-wrapper col-12">
-                <ol className="breadcrumb">
-                  <li className="breadcrumb-item">
-                    <a href="#">Your Profile</a>
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
+      {/* Page Header Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        borderRadius: '16px',
+        padding: '22px 28px',
+        marginBottom: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: '0 4px 20px rgba(252,43,90,0.25)',
+      }}>
+        <div>
+          <h2 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '22px', letterSpacing: '-0.3px' }}>
+            <i className="fas fa-university" style={{ marginRight: '10px', opacity: 0.9 }}></i>
+            Your Profile
+          </h2>
+          <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+            Manage college information and representatives
+          </p>
         </div>
+        <button
+          onClick={() => setShowPreviewModal(true)}
+          style={{
+            background: 'rgba(255,255,255,0.18)',
+            border: '1.5px solid rgba(255,255,255,0.4)',
+            color: '#fff',
+            borderRadius: '10px',
+            padding: '8px 18px',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.28)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
+        >
+          <i className="fas fa-eye"></i> Preview
+        </button>
       </div>
 
       {/* College Information Section */}
-      <section id="college-info">
-        <div className="row">
-          <div className="col-xl-12 col-lg-12">
-            <div className="card">
-              <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">College Information</h4>
+      <div style={sectionCardStyle} id="college-info">
+        <div style={sectionHeaderStyle}>
+          <i className="fas fa-building" style={{ color: '#fff', fontSize: '16px' }}></i>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>College Information</h5>
+        </div>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
+
+            <div style={fieldWrap}>
+              <label style={errors.collegeName ? lblErrStyle : lblStyle}>College Name {reqStar}</label>
+              <input
+                type="text"
+                name="name"
+                style={errors.collegeName ? fldErrStyle : fldStyle}
+                value={college.name}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="30"
+                placeholder="Enter college name"
+              />
+            </div>
+
+            <div style={fieldWrap}>
+              <label style={errors.state ? lblErrStyle : lblStyle}>State {reqStar}</label>
+              <select
+                name="stateId"
+                style={errors.state ? fldErrStyle : fldStyle}
+                value={college.stateId}
+                onChange={handleStateChange}
+              >
+                <option value="">Select State</option>
+                {Array.isArray(states) && states.length > 0 ? (
+                  states.map((state) => (
+                    <option key={state._id} value={state._id}>{state.name}</option>
+                  ))
+                ) : (
+                  <option disabled>No states available</option>
+                )}
+              </select>
+            </div>
+
+            <div style={fieldWrap}>
+              <label style={errors.city ? lblErrStyle : lblStyle}>City {reqStar}</label>
+              <select
+                name="cityId"
+                style={errors.city ? fldErrStyle : fldStyle}
+                value={college.cityId}
+                onChange={(e) => handleInputChange(e, 'college')}
+              >
+                <option value="">Select City</option>
+                {cities.map((city) => (
+                  <option key={city._id} value={city._id}>{city.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={fieldWrap}>
+              <label htmlFor="work-loc" style={errors.workLocation ? lblErrStyle : lblStyle}>Work Location {reqStar}</label>
+              <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: errors.workLocation ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0' }}>
+                <div style={{ background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)', padding: '9px 12px', display: 'flex', alignItems: 'center' }}>
+                  <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" style={{ height: '18px' }} />
+                </div>
+                <input
+                  type="text"
+                  id="work-loc"
+                  name="place"
+                  style={{ flex: 1, padding: '9px 12px', border: 'none', outline: 'none', fontSize: '13px', background: '#fff', color: '#333' }}
+                  placeholder="Enter a location"
+                  value={college.place || ''}
+                  onChange={(e) => handleInputChange(e, 'college')}
+                />
               </div>
-              <div className="card-content">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>College Name<span className="mandatory"> *</span></label>
-                      <input
-                        type="text"
-                        name="name"
-                        className={`form-control ${errors.collegeName ? 'error' : ''}`}
-                        value={college.name}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="30"
-                        required
-                      />
-                    </div>
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>State <span className="mandatory"> *</span></label>
-                      <select
-                        className={`form-control ${errors.state ? 'error' : ''}`}
-                        name="stateId"
-                        value={college.stateId}
-                        onChange={handleStateChange}
-                      >
-                        <option value="">Select Option</option>
-                        {Array.isArray(states) && states.length > 0 ? (
-                          states.map((state) => (
-                            <option key={state._id} value={state._id} className="text-capitalize">
-                              {state.name}
-                            </option>
-                          ))
-                        ) : (
-                          <option disabled>No states available</option>
-                        )}
-                      </select>
-                    </div>
+            <div style={fieldWrap}>
+              <label style={errors.university ? lblErrStyle : lblStyle}>University {reqStar}</label>
+              <select
+                name="_university"
+                style={errors.university ? fldErrStyle : fldStyle}
+                value={college._university}
+                onChange={(e) => handleInputChange(e, 'college')}
+              >
+                <option value="">Select University</option>
+                {universities.map((university) => (
+                  <option key={university._id} value={university._id}>{university.name}</option>
+                ))}
+              </select>
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>City <span className="mandatory"> *</span></label>
-                      <select
-                        className={`form-control ${errors.city ? 'error' : ''}`}
-                        name="cityId"
-                        value={college.cityId}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                      >
-                        <option value="">Select City</option>
-                        {cities.map((city) => (
-                          <option key={city._id} value={city._id} className="text-capitalize">
-                            {city.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+            <div style={fieldWrap}>
+              <label style={lblStyle}>Website</label>
+              <input
+                type="text"
+                name="website"
+                style={fldStyle}
+                value={college.website}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="100"
+                placeholder="https://yourwebsite.com"
+              />
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label htmlFor="work-loc">Work Location<span className="mandatory"> *</span></label>
-                      <div className="input-group mb-2">
-                        <div className="input-group-prepend bg-locat">
-                          <div className="input-group-text bg-intext">
-                            <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" />
-                          </div>
-                        </div>
-                        <input
-                          type="text"
-                          className={`form-control ${errors.workLocation ? 'error' : ''}`}
-                          id="work-loc"
-                          name="place"
-                          placeholder="Enter a location"
-                          value={college.place || ''}
-                          onChange={(e) => handleInputChange(e, 'college')}
-                        />
-                      </div>
-                    </div>
+            <div style={fieldWrap}>
+              <label style={lblStyle}>LinkedIn URL</label>
+              <input
+                type="text"
+                name="linkedin"
+                style={fldStyle}
+                value={college.linkedin}
+                onChange={(e) => handleInputChange(e, 'college')}
+                placeholder="https://linkedin.com/..."
+              />
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>University <span className="mandatory"> *</span></label>
-                      <select
-                        className={`form-control ${errors.university ? 'error' : ''}`}
-                        name="_university"
-                        value={college._university}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                      >
-                        <option value="">Select Option</option>
-                        {universities.map((university) => (
-                          <option key={university._id} value={university._id} className="text-capitalize">
-                            {university.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+            <div style={fieldWrap}>
+              <label style={lblStyle}>Facebook</label>
+              <input
+                type="text"
+                name="facebook"
+                style={fldStyle}
+                value={college.facebook}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="100"
+                placeholder="https://facebook.com/..."
+              />
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Website</label>
-                      <input
-                        type="text"
-                        name="website"
-                        className="form-control"
-                        value={college.website}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="100"
-                      />
-                    </div>
+            <div style={fieldWrap}>
+              <label style={lblStyle}>Zipcode</label>
+              <input
+                type="number"
+                name="zipcode"
+                style={fldStyle}
+                value={college.zipcode}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="6"
+                placeholder="400001"
+              />
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Linkedin URL</label>
-                      <input
-                        type="text"
-                        name="linkedin"
-                        className="form-control"
-                        value={college.linkedin}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                      />
-                    </div>
+            <div style={fieldWrapWide}>
+              <label style={lblStyle}>Address</label>
+              <textarea
+                name="address"
+                style={{ ...fldStyle, resize: 'vertical', minHeight: '80px' }}
+                value={college.address}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="150"
+                rows="3"
+                placeholder="Full college address"
+              ></textarea>
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Facebook</label>
-                      <input
-                        type="text"
-                        name="facebook"
-                        className="form-control"
-                        value={college.facebook}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="100"
-                      />
-                    </div>
+            <div style={fieldWrapWide}>
+              <label style={lblStyle}>Description</label>
+              <textarea
+                name="description"
+                style={{ ...fldStyle, resize: 'vertical', minHeight: '80px' }}
+                value={college.description}
+                onChange={(e) => handleInputChange(e, 'college')}
+                maxLength="500"
+                rows="3"
+                placeholder="Brief description about your college"
+              ></textarea>
+            </div>
 
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Zipcode</label>
-                      <input
-                        type="number"
-                        name="zipcode"
-                        className="form-control"
-                        value={college.zipcode}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="6"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Address</label>
-                      <textarea
-                        className="form-control"
-                        name="address"
-                        value={college.address}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="150"
-                        rows="3"
-                      ></textarea>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Description</label>
-                      <textarea
-                        className="form-control"
-                        name="description"
-                        value={college.description}
-                        onChange={(e) => handleInputChange(e, 'college')}
-                        maxLength="500"
-                        rows="3"
-                      ></textarea>
-                    </div>
-
-                    <div className="col-xl-1 col-lg-1 col-md-6 mb-0 mt-2" style={{ alignSelf: 'center' }}>
+            {/* Logo Upload */}
+            <div style={{ flex: '0 0 auto', alignSelf: 'center' }}>
                       <div className="image-upload" style={{ position: 'relative', display: 'inline-block' }}>
                         {(logoPreview || (college.logo && college.logo.trim() !== '')) ? (
                           <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -844,36 +900,9 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-                    {/* <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-1 mt-2">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
-                          Preview (Click Save)
-                        </p>
-                        <button
-                          className="btn"
-                          onClick={() => setShowPreviewModal(true)}
-                          style={{
-                            backgroundColor: '#fc2b5a',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 20px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '500'
-                          }}
-                        >
-                          Preview
-                        </button>
-                      </div>
-                    </div> */}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Preview Modal */}
       {showPreviewModal && (
@@ -1157,177 +1186,185 @@ const Profile = () => {
       )}
 
       {/* Concerned Person Section */}
-      <section id="Concerned-Person">
-        <div className="row">
-          <div className="col-xl-12 col-lg-12">
-            <div className="card">
-              <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">Concerned Person</h4>
-              </div>
-              <div className="card-content">
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Name <span className="mandatory"> *</span></label>
-                      <input
-                        type="text"
-                        name="name"
-                        className={`form-control ${errors.concernName ? 'error' : ''}`}
-                        value={college._concernPerson ? college._concernPerson.name : ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="25"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Designation<span className="mandatory"> *</span></label>
-                      <input
-                        type="text"
-                        name="designation"
-                        className={`form-control ${errors.concernDesignation ? 'error' : ''}`}
-                        value={college._concernPerson?.designation || ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="25"
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Email<span className="mandatory"> *</span></label>
-                      <input
-                        type="email"
-                        name="email"
-                        className={`form-control ${errors.concernEmail ? 'error' : ''}`}
-                        value={college._concernPerson?.email || ''}
-                        onChange={(e) => handleInputChange(e, 'concernPerson')}
-                        maxLength="30"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-1">
-                      <label>Contact Number<span className="mandatory"> *</span></label>
-                      <input
-                        type="number"
-                        name="mobile"
-                        className={`form-control ${errors.concernMobile ? 'error' : ''}`}
-                        value={college._concernPerson?.mobile || userData.mobile || ''}
-                        disabled
-                        placeholder="Mobile number from signup"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <div style={sectionCardStyle} id="Concerned-Person">
+        <div style={sectionHeaderStyle}>
+          <i className="fas fa-user-tie" style={{ color: '#fff', fontSize: '16px' }}></i>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>Concerned Person</h5>
+        </div>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
+            <div style={fieldWrap}>
+              <label style={errors.concernName ? lblErrStyle : lblStyle}>Name {reqStar}</label>
+              <input
+                type="text"
+                name="name"
+                style={errors.concernName ? fldErrStyle : fldStyle}
+                value={college._concernPerson ? college._concernPerson.name : ''}
+                onChange={(e) => handleInputChange(e, 'concernPerson')}
+                maxLength="25"
+                placeholder="Full name"
+              />
+            </div>
+            <div style={fieldWrap}>
+              <label style={errors.concernDesignation ? lblErrStyle : lblStyle}>Designation {reqStar}</label>
+              <input
+                type="text"
+                name="designation"
+                style={errors.concernDesignation ? fldErrStyle : fldStyle}
+                value={college._concernPerson?.designation || ''}
+                onChange={(e) => handleInputChange(e, 'concernPerson')}
+                maxLength="25"
+                placeholder="e.g. Principal"
+              />
+            </div>
+            <div style={fieldWrap}>
+              <label style={errors.concernEmail ? lblErrStyle : lblStyle}>Email {reqStar}</label>
+              <input
+                type="email"
+                name="email"
+                style={errors.concernEmail ? fldErrStyle : fldStyle}
+                value={college._concernPerson?.email || ''}
+                onChange={(e) => handleInputChange(e, 'concernPerson')}
+                maxLength="30"
+                placeholder="email@college.edu"
+              />
+            </div>
+            <div style={fieldWrap}>
+              <label style={errors.concernMobile ? lblErrStyle : lblStyle}>Contact Number {reqStar}</label>
+              <input
+                type="number"
+                name="mobile"
+                style={{ ...fldStyle, background: '#f8f9fa', color: '#888', cursor: 'not-allowed' }}
+                value={college._concernPerson?.mobile || userData.mobile || ''}
+                disabled
+                placeholder="Mobile number from signup"
+              />
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* College Representative Section */}
-      <section id="representativeinfo">
-        <div className="row">
-          <div className="col-xl-12 col-lg-12">
-            <div className="card">
-              <div className="card-header border border-top-0 border-left-0 border-right-0">
-                <h4 className="card-title pb-1">College Representative</h4>
+      {/* College Representatives Section */}
+      <div style={sectionCardStyle} id="representativeinfo">
+        <div style={sectionHeaderStyle}>
+          <i className="fas fa-users" style={{ color: '#fff', fontSize: '16px' }}></i>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>College Representatives</h5>
+        </div>
+        <div style={{ padding: '24px' }}>
+          {college.collegeRepresentatives.map((rep, index) => (
+            <div key={index} style={{
+              display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end',
+              padding: '16px', background: '#fafbfc', borderRadius: '12px',
+              marginBottom: '14px', border: '1px solid #f1f5f9',
+            }}>
+              <div style={fieldWrap}>
+                <label style={lblStyle}>Name</label>
+                <input
+                  style={fldStyle}
+                  type="text"
+                  name="name"
+                  value={rep.name}
+                  onChange={(e) => handleInputChange(e, 'representative', index)}
+                  maxLength="25"
+                  placeholder="Representative name"
+                />
               </div>
-              <div className="card-content">
-                <div className="card-body">
-                  <div id="representativeList">
-                    {college.collegeRepresentatives.map((rep, index) => (
-                      <div className="row representativerow" key={index}>
-                        <div className="col-xl-2 mb-1">
-                          <label>Name</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="name"
-                            value={rep.name}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="25"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Designation</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="designation"
-                            value={rep.designation}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="25"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Email</label>
-                          <input
-                            className="form-control"
-                            type="email"
-                            name="email"
-                            value={rep.email}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="30"
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Contact Number</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="mobile"
-                            value={rep.mobile}
-                            onChange={(e) => handleInputChange(e, 'representative', index)}
-                            maxLength="10"
-                          />
-                        </div>
-                        {index === 0 && (
-                          <div className="col-xl-2 my-auto">
-                            <button
-                              className="btn btn-success text-white"
-                              onClick={addRepresentative}
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="row">
-                    <div className="col-xl-12 text-right">
-                      <button
-                        className="btn btn-danger me-2"
-                        onClick={() => window.location.href = "/college/myprofile"}
-                      >
-                        Reset
-                      </button>
-                      <button
-                        className="btn btn-success text-white ml-2"
-                        onClick={handleSubmit}
-                        disabled={loading}
-                      >
-                        {loading ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {errors.message && (
-                    <div className="row">
-                      <div className="col-xl-12">
-                        <div className="text-danger mt-2">
-                          {errors.message}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+              <div style={fieldWrap}>
+                <label style={lblStyle}>Designation</label>
+                <input
+                  style={fldStyle}
+                  type="text"
+                  name="designation"
+                  value={rep.designation}
+                  onChange={(e) => handleInputChange(e, 'representative', index)}
+                  maxLength="25"
+                  placeholder="e.g. Placement Officer"
+                />
+              </div>
+              <div style={fieldWrap}>
+                <label style={lblStyle}>Email</label>
+                <input
+                  style={fldStyle}
+                  type="email"
+                  name="email"
+                  value={rep.email}
+                  onChange={(e) => handleInputChange(e, 'representative', index)}
+                  maxLength="30"
+                  placeholder="email@college.edu"
+                />
+              </div>
+              <div style={fieldWrap}>
+                <label style={lblStyle}>Contact Number</label>
+                <input
+                  style={fldStyle}
+                  type="text"
+                  name="mobile"
+                  value={rep.mobile}
+                  onChange={(e) => handleInputChange(e, 'representative', index)}
+                  maxLength="10"
+                  placeholder="10-digit number"
+                />
+              </div>
+              {index === 0 && (
+                <div style={{ alignSelf: 'flex-end', paddingBottom: '2px' }}>
+                  <button
+                    onClick={addRepresentative}
+                    style={{
+                      background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                      color: '#fff', border: 'none', borderRadius: '10px',
+                      padding: '9px 18px', fontSize: '13px', fontWeight: '600',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  >
+                    <i className="fas fa-plus"></i> Add
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
+          ))}
+
+          {errors.message && (
+            <div style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>{errors.message}</div>
+          )}
+
+          {/* Save / Reset Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <button
+              onClick={() => window.location.href = '/college/myprofile'}
+              style={{
+                background: '#fff', color: '#64748b', border: '1.5px solid #e2e8f0',
+                borderRadius: '10px', padding: '9px 24px', fontSize: '13px',
+                fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f8f9fa'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >
+              <i className="fas fa-undo" style={{ marginRight: '6px' }}></i>Reset
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{
+                background: loading ? '#ccc' : 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                color: '#fff', border: 'none', borderRadius: '10px',
+                padding: '9px 28px', fontSize: '13px', fontWeight: '600',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: loading ? 'none' : '0 4px 14px rgba(252,43,90,0.35)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+            >
+              {loading
+                ? <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'profileSpin 0.8s linear infinite', marginRight: '8px', verticalAlign: 'middle' }}></span>Saving...</>
+                : <><i className="fas fa-save" style={{ marginRight: '6px' }}></i>Save Profile</>
+              }
+            </button>
           </div>
         </div>
-      </section>
+      </div>
 <style>
   {
     `
@@ -1360,13 +1397,13 @@ const Profile = () => {
 <style>
   {
     `
-    input[type="text"], 
-input[type="email"], 
+    input[type="text"],
+input[type="email"],
 input[type="number"],
 input[type="tel"],
 input[type="date"],
 select {
-  background-color: transparent !important;
+  background-color: #fff;
   border: var(--bs-border-width) solid var(--bs-border-color);
   color: #333 !important;
 }
@@ -1446,6 +1483,9 @@ a {
 }
 label {
     font-size: 0.80rem !important;
+}
+@keyframes profileSpin {
+  to { transform: rotate(360deg); }
 }
 .input-group {
     position: relative;

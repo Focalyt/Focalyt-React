@@ -158,8 +158,8 @@ const updatedPermission = async () => {
         console.log('center', center)
         setFormData({
             name: center.name,
-            address: center.address,
-            status: center.status,
+            address: center.address || center.location || '',
+            status: center.status === true ? 'active' : center.status === false ? 'inactive' : (center.status || 'active'),
         });
         setShowEditForm(true);
     };
@@ -189,6 +189,7 @@ const updatedPermission = async () => {
             fetchCenters()
             setShowDeleteModal(false);
             setCenterToDelete(null);
+            alert('Center deleted successfully');
         } catch (error) {
             alert(error.message || 'Error deleting center');
         }
@@ -357,13 +358,18 @@ const updatedPermission = async () => {
 
 
                 // Edit existing center (PUT)
+                const editPayload = {
+                    name: formData.name?.trim(),
+                    address: formData.address?.trim() || '',
+                    status: formData.status === 'active',
+                };
                 const response = await fetch(`${backendUrl}/college/edit_center/${editingCenter._id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'x-auth': token,
                     },
-                    body: JSON.stringify(formData),
+                    body: JSON.stringify(editPayload),
                 });
 
                 if (!response.ok) {
@@ -373,6 +379,7 @@ const updatedPermission = async () => {
 
                 fetchCenters()
                 setShowEditForm(false);
+                alert('Center updated successfully');
             } else if (alignCenter) {
 
                 const response = await fetch(`${backendUrl}/college/asign_center/${selctedAlignCenter}`, {
@@ -417,6 +424,7 @@ const updatedPermission = async () => {
                 fetchCenters()
 
                 setShowAddForm(false);
+                alert('Center added successfully');
             }
 
             resetForm();

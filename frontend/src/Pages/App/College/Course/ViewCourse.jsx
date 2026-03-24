@@ -1,18 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Table,
-  Form,
-  Button,
-  Breadcrumb
-} from 'react-bootstrap';
+import { Form } from 'react-bootstrap';
 import { Edit } from 'react-feather';
 import qs from 'query-string';
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#64748b',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  marginBottom: '5px',
+};
+
+const inputStyle = {
+  width: '100%',
+  border: '1.5px solid #e2e8f0',
+  borderRadius: '10px',
+  padding: '9px 14px',
+  fontSize: '13px',
+  color: '#1e293b',
+  background: '#f8fafc',
+  outline: 'none',
+  transition: 'border-color 0.2s',
+};
+
+const btnPrimaryStyle = {
+  background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '10px',
+  padding: '9px 20px',
+  fontWeight: 600,
+  fontSize: '13px',
+  cursor: 'pointer',
+  boxShadow: '0 4px 10px rgba(252,43,90,0.3)',
+  whiteSpace: 'nowrap',
+};
+
+const btnOutlineStyle = {
+  background: 'white',
+  color: '#FC2B5A',
+  border: '1.5px solid #FC2B5A',
+  borderRadius: '10px',
+  padding: '9px 20px',
+  fontWeight: 600,
+  fontSize: '13px',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const tdStyle = {
+  padding: '12px 16px',
+  fontSize: '13px',
+  color: '#475569',
+  verticalAlign: 'middle',
+};
 
 const ViewCourses = () => {
   const navigate = useNavigate();
@@ -152,267 +197,318 @@ const ViewCourses = () => {
   };
 
   return (
-    <div className="">
-      {/* Header */}
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-9 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">All Courses</h3>
-              <Breadcrumb>
-                <Breadcrumb.Item href="/institute/dashboard">Home</Breadcrumb.Item>
-                <Breadcrumb.Item active>All Courses</Breadcrumb.Item>
-              </Breadcrumb>
-            </div>
+    <div style={{ background: '#f1f5f9', minHeight: '100vh', padding: '20px' }}>
+
+      {/* Modern Gradient Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        borderRadius: '16px',
+        padding: '24px 32px',
+        marginBottom: '24px',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: '0 10px 25px rgba(252, 43, 90, 0.35)',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+          }}>
+            <i className="fa fa-list-alt" style={{ fontSize: '20px' }}></i>
           </div>
+          <div>
+            <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>All Courses</h2>
+            <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
+              <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
+              <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>
+              <span>All Courses</span>
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '13px', opacity: 0.9 }}>Total: {courses.length} courses</span>
         </div>
       </div>
 
-      {/* Content Body */}
-      <div className="content-body">
-        <section className="list-view">
-          <Row>
-            <Col xs={12} className="rounded equal-height-2 coloumn-2">
-              <Card>
-                <Card.Body>
-                  {/* Archive Toggle */}
-                  <Row className="p-1">
-                    <Col xl={6}>
-                      <Row>
-                        <div className="archieve pl-1">
-                          <Form.Check
-                            type="checkbox"
-                            id="checkbox1"
-                            checked={isArchived}
-                            onChange={handleArchivedChange}
-                            label="Show Archived"
-                            style={{ marginBottom: '4px' }}
-                          />
-                        </div>
-                      </Row>
-                    </Col>
-                  </Row>
+      {/* Main Card */}
+      <div style={{
+        background: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
+        overflow: 'hidden',
+      }}>
 
-                  {/* Filter Form */}
-                  <Row className="mb-2">
-                    <Col xl={12} lg={12}>
-                      <Form onSubmit={handleFilterSubmit}>
-                        <Row>
-                          <Col xl={2} className="ml-1 mt-1">
-                            <Form.Group>
-                              <Form.Label>Name</Form.Label>
-                              <Form.Control
-                                type="text"
-                                name="name"
-                                value={filterData.name}
-                                onChange={handleInputChange}
-                                maxLength={25}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col xl={2} className="ml-1 mt-1">
-                            <Form.Group>
-                              <Form.Label>From Date</Form.Label>
-                              <Form.Control
-                                type="date"
-                                name="FromDate"
-                                value={filterData.FromDate}
-                                onChange={handleInputChange}
-                                isInvalid={!filterData.FromDate && filterData.ToDate}
-                              />
-                              <Form.Control.Feedback type="invalid">
-                                Please select a from date.
-                              </Form.Control.Feedback>
-                            </Form.Group>
-                          </Col>
-                          <Col xl={2} className="ml-1 mt-1">
-                            <Form.Group>
-                              <Form.Label>To Date</Form.Label>
-                              <Form.Control
-                                type="date"
-                                name="ToDate"
-                                value={filterData.ToDate}
-                                onChange={handleInputChange}
-                                isInvalid={filterData.FromDate && !filterData.ToDate}
-                              />
-                              <Form.Control.Feedback type="invalid">
-                                Please select a to date.
-                              </Form.Control.Feedback>
-                            </Form.Group>
-                          </Col>
-                          <Col xl={2} className="ml-1 mt-1">
-                            <Form.Group>
-                              <Form.Label>Profile</Form.Label>
-                              <Form.Control
-                                as="select"
-                                name="Profile"
-                                value={filterData.Profile}
-                                onChange={handleInputChange}
-                                className="text-capitalize"
-                              >
-                                <option value="">Select</option>
-                                <option value="All" className="text-capitalize">All</option>
-                                <option value="true" className="text-capitalize">Completed</option>
-                                <option value="false" className="text-capitalize">Due</option>
-                              </Form.Control>
-                            </Form.Group>
-                          </Col>
-                          <Col xl={3} className="text-center mt-1" style={{ marginTop: '2.5rem !important' }}>
-                            <Button
-                              variant="success"
-                              type="submit"
-                              className="waves-effect waves-light text-white d-inline"
-                            >
-                              Go
-                            </Button>
-                            <Button
-                              variant="danger"
-                              className="d-inline waves-effect waves-light mb-2 text-white mx-1"
-                              onClick={handleResetFilters}
-                            >
-                              RESET
-                            </Button>
-                          </Col>
-                        </Row>
-                      </Form>
-                    </Col>
-                  </Row>
+        {/* Filter Section */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <h5 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '15px', paddingLeft: '12px', borderLeft: '4px solid #FC2B5A', borderRadius: '2px' }}>
+              Filter Courses
+            </h5>
+            {/* Archive Toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+              <div style={{ position: 'relative', width: '40px', height: '22px' }}>
+                <input
+                  type="checkbox"
+                  id="checkbox1"
+                  checked={isArchived}
+                  onChange={handleArchivedChange}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                />
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: isArchived ? '#FC2B5A' : '#cbd5e1',
+                  borderRadius: '20px',
+                  transition: '0.2s',
+                  cursor: 'pointer',
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '3px',
+                    left: isArchived ? '21px' : '3px',
+                    width: '16px', height: '16px',
+                    background: 'white',
+                    borderRadius: '50%',
+                    transition: '0.2s',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  }}></div>
+                </div>
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Show Archived</span>
+            </label>
+          </div>
 
-                  {/* Courses Table */}
-                  <div className="table-responsive">
-                    <Table hover className="table-hover-animation mb-0">
-                      <thead>
-                        <tr>
-                          <th>Sector</th>
-                          <th>Course Level</th>
-                          <th>Course Name</th>
-                          <th>Duration</th>
-                          {(status === 'true' || status === true) && (
-                            <th>Add Leads</th>
-                          )}
-                          <th>Status</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {courses.map((course, i) => (
-                          <tr key={course._id}>
-                            <td style={{ padding: '14px' }}>
-                              {course.sectors?.map((sector, j) => (
-                                <div key={sector._id}>{sector.name}</div>
-                              ))}
-                            </td>
-                            <td>{course.courseLevel}</td>
-                            <td>{course.name}</td>
-                            {/* FIXED: Show actual duration instead of _id */}
-                            <td>{course.duration || 'N/A'}</td>
-                            {(course.status === 'true' || course.status === true) && (
-                              <td className="text-capitalize text-nowrap">
-                                <Link
-                                  to={`/institute/viewcourse/${course._id}/candidate/addleads`}
-                                  className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-                                  style={{ padding: '7px' }}
-                                >
-                                  Add leads
-                                </Link>
-                              </td>
-                            )}
-                            <td>
-                              <div className="custom-control custom-switch custom-control-inline p-0">
-                                {/* FIXED: Unique ID and proper event handling */}
-                                <input 
-                                  type="checkbox" 
-                                  id={`customSwitch${course._id}`} 
-                                  className="custom-control-input" 
-                                  onChange={() => handleToggleStatus(course._id, course.status)} 
-                                  checked={course.status === true || course.status === 'true'} 
-                                />
-                                <label 
-                                  htmlFor={`customSwitch${course._id}`} 
-                                  className="toggleSwitch"
-                                ></label>
-                              </div>
-                            </td>
-                            <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center border-0" style={{ padding: "14px" }}>
-                              <Link to={`/institute/courses/edit/${course._id}`}>
-                                <Edit size={20} className="primary" />
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </section>
+          <Form onSubmit={handleFilterSubmit}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+              {/* Name */}
+              <div style={{ flex: '1 1 160px', minWidth: '140px' }}>
+                <label style={labelStyle}>Course Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={filterData.name}
+                  onChange={handleInputChange}
+                  maxLength={25}
+                  placeholder="Search by name..."
+                  style={inputStyle}
+                />
+              </div>
+              {/* From Date */}
+              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
+                <label style={labelStyle}>From Date</label>
+                <input
+                  type="date"
+                  name="FromDate"
+                  value={filterData.FromDate}
+                  onChange={handleInputChange}
+                  style={{ ...inputStyle, borderColor: (!filterData.FromDate && filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
+                />
+                {(!filterData.FromDate && filterData.ToDate) && (
+                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
+                )}
+              </div>
+              {/* To Date */}
+              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
+                <label style={labelStyle}>To Date</label>
+                <input
+                  type="date"
+                  name="ToDate"
+                  value={filterData.ToDate}
+                  onChange={handleInputChange}
+                  style={{ ...inputStyle, borderColor: (filterData.FromDate && !filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
+                />
+                {(filterData.FromDate && !filterData.ToDate) && (
+                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
+                )}
+              </div>
+              {/* Profile */}
+              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
+                <label style={labelStyle}>Profile</label>
+                <select
+                  name="Profile"
+                  value={filterData.Profile}
+                  onChange={handleInputChange}
+                  style={inputStyle}
+                >
+                  <option value="">Select</option>
+                  <option value="All">All</option>
+                  <option value="true">Completed</option>
+                  <option value="false">Due</option>
+                </select>
+              </div>
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '8px', paddingBottom: '1px' }}>
+                <button type="submit" style={btnPrimaryStyle}>
+                  <i className="fa fa-search" style={{ marginRight: '6px' }}></i> Search
+                </button>
+                <button type="button" onClick={handleResetFilters} style={btnOutlineStyle}>
+                  <i className="fa fa-refresh" style={{ marginRight: '6px' }}></i> Reset
+                </button>
+              </div>
+            </div>
+          </Form>
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowX: 'auto' }}>
+          {courses.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📚</div>
+              <p style={{ color: '#94a3b8', fontWeight: 600, fontSize: '15px', margin: 0 }}>No courses found</p>
+              <p style={{ color: '#cbd5e1', fontSize: '13px', marginTop: '4px' }}>Try adjusting your filters</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc' }}>
+                  {['#', 'Sector', 'Course Level', 'Course Name', 'Duration',
+                    ...(status === 'true' || status === true ? ['Add Leads'] : []),
+                    'Status', 'Action'].map((h, i) => (
+                    <th key={i} style={{
+                      padding: '12px 16px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      borderBottom: '2px solid #f1f5f9',
+                      whiteSpace: 'nowrap',
+                      textAlign: h === 'Action' ? 'center' : 'left',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((course, i) => (
+                  <tr key={course._id} style={{
+                    borderBottom: '1px solid #f8fafc',
+                    transition: 'background 0.15s',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fef6f8'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* # */}
+                    <td style={tdStyle}>
+                      <span style={{
+                        background: '#fef2f5', color: '#FC2B5A',
+                        borderRadius: '6px', padding: '2px 8px',
+                        fontSize: '12px', fontWeight: 700,
+                      }}>{i + 1}</span>
+                    </td>
+                    {/* Sector */}
+                    <td style={tdStyle}>
+                      {course.sectors?.map((sector) => (
+                        <span key={sector._id} style={{
+                          display: 'inline-block',
+                          background: '#f1f5f9', color: '#475569',
+                          borderRadius: '6px', padding: '2px 8px',
+                          fontSize: '12px', fontWeight: 500,
+                          margin: '2px',
+                        }}>{sector.name}</span>
+                      ))}
+                    </td>
+                    {/* Course Level */}
+                    <td style={tdStyle}>
+                      <span style={{
+                        background: '#fef6f8', color: '#FC2B5A',
+                        borderRadius: '20px', padding: '3px 10px',
+                        fontSize: '12px', fontWeight: 600,
+                        border: '1px solid #fecdd3',
+                      }}>{course.courseLevel}</span>
+                    </td>
+                    {/* Course Name */}
+                    <td style={{ ...tdStyle, fontWeight: 600, color: '#1e293b', maxWidth: '200px' }}>
+                      {course.name}
+                    </td>
+                    {/* Duration */}
+                    <td style={{ ...tdStyle, color: '#475569' }}>
+                      <i className="fa fa-clock-o" style={{ marginRight: '5px', color: '#94a3b8', fontSize: '13px' }}></i>
+                      {course.duration || 'N/A'}
+                    </td>
+                    {/* Add Leads */}
+                    {(course.status === 'true' || course.status === true) && (
+                      <td style={tdStyle}>
+                        <Link
+                          to={`/institute/viewcourse/${course._id}/candidate/addleads`}
+                          style={{
+                            background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                            color: 'white', textDecoration: 'none',
+                            borderRadius: '8px', padding: '6px 14px',
+                            fontSize: '12px', fontWeight: 600,
+                            boxShadow: '0 2px 8px rgba(252,43,90,0.3)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <i className="fa fa-plus" style={{ marginRight: '5px' }}></i>Add Leads
+                        </Link>
+                      </td>
+                    )}
+                    {/* Status Toggle */}
+                    <td style={tdStyle}>
+                      <div className="custom-control custom-switch custom-control-inline p-0">
+                        <input
+                          type="checkbox"
+                          id={`customSwitch${course._id}`}
+                          className="custom-control-input"
+                          onChange={() => handleToggleStatus(course._id, course.status)}
+                          checked={course.status === true || course.status === 'true'}
+                        />
+                        <label htmlFor={`customSwitch${course._id}`} className="toggleSwitch"></label>
+                      </div>
+                    </td>
+                    {/* Action */}
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <Link to={`/institute/courses/edit/${course._id}`} style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: '34px', height: '34px',
+                        background: '#fef2f5',
+                        borderRadius: '8px',
+                        color: '#FC2B5A',
+                        transition: 'all 0.2s',
+                        border: '1px solid #fecdd3',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
+                      >
+                        <Edit size={15} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      <style>
-        {`
-          tbody tr{
-            border-bottom: 1px solid ;
-          }
-          .primary {
-            color: #FC2B5A!important;
-          }
-          .custom-table td{
-            padding: 14px!important;
-            font-size: 12.5px!important;
-          }
-          
-          /* Hide the checkbox inputs */
-          .custom-control-input {
-            display: none;
-          }
+      <style>{`
+        .custom-control-input { display: none; }
 
-          .toggleSwitch {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            width: 50px;
-            height: 30px;
-            background-color: rgb(82, 82, 82);
-            border-radius: 20px;
-            cursor: pointer;
-            transition-duration: .2s;
-          }
-
-          .toggleSwitch::after {
-            content: "";
-            position: absolute;
-            height: 18px;
-            width: 18px;
-            left: 5px;
-            background-color: transparent;
-            border-radius: 50%;
-            transition-duration: .2s;
-            box-shadow: 5px 2px 7px rgba(8, 8, 8, 0.26);
-            border: 5px solid white;
-          }
-
-          .custom-control-input:checked + .toggleSwitch::after {
-            transform: translateX(25px);
-            transition-duration: .2s;
-            background-color: white;
-          }
-
-          .custom-control-input:checked + .toggleSwitch {
-            background-color: #FC2B5A;
-            transition-duration: .2s;
-            height: 1.671rem;
-          }
-
-          .custom-control-input:checked ~ .custom-control-label::before {
-            color: #fff;
-            border-color: #FC2B5A;
-            background-color: #FC2B5A;
-          }
-        `}
-      </style>
+        .toggleSwitch {
+          display: flex; align-items: center; justify-content: center;
+          position: relative; width: 46px; height: 26px;
+          background-color: #cbd5e1; border-radius: 20px;
+          cursor: pointer; transition: 0.2s;
+        }
+        .toggleSwitch::after {
+          content: ""; position: absolute;
+          height: 18px; width: 18px; left: 4px;
+          background-color: white; border-radius: 50%;
+          transition: 0.2s;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        .custom-control-input:checked + .toggleSwitch {
+          background-color: #FC2B5A;
+        }
+        .custom-control-input:checked + .toggleSwitch::after {
+          transform: translateX(20px);
+        }
+        .primary { color: #FC2B5A !important; }
+      `}</style>
     </div>
   );
 };

@@ -566,9 +566,9 @@ const CandidateLogin = () => {
                                             type="tel"
                                             className="form-control"
                                             placeholder="Mobile / मोबाइल"
-                                            maxLength="10"
+                                            maxLength="11"
                                             value={mobileNumber}
-                                            onChange={(e) => setMobileNumber(e.target.value)}
+                                            onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                             onKeyPress={handleMobileNumberKeyPress}
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter") {

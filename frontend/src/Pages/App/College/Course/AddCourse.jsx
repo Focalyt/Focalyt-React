@@ -5,6 +5,8 @@ import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import Choices from 'choices.js';
 import 'choices.js/public/assets/styles/choices.min.css';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Custom styles to match the original application
 const styles = {
@@ -36,10 +38,26 @@ const AddCourse = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const navigate = useNavigate();
+  const sectorRef = useRef(null);
+  const verticalRef = useRef(null);
+  const projectRef = useRef(null);
   const centerRef = useRef(null);
   const choicesInstance = useRef(null);
+  const searchableChoicesInstances = useRef({});
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const sortOptionsByName = (items = []) => {
+    if (!Array.isArray(items)) return [];
+
+    return [...items].sort((a, b) =>
+      String(a?.name || a?.title || '').localeCompare(
+        String(b?.name || b?.title || ''),
+        undefined,
+        { sensitivity: 'base', numeric: true }
+      )
+    );
+  };
 
   // State for data from API
   const [sectors, setSectors] = useState([]);
@@ -132,6 +150,10 @@ const AddCourse = () => {
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const showToast = (message, type = 'error') => {
+    if (type === 'error') toast.error(message);
+    else toast.success(message);
+  };
 
   // Fetch centers when project changes
   useEffect(() => {
@@ -147,7 +169,7 @@ const AddCourse = () => {
         });
 
         if (response.data.success) {
-          setCenters(response.data.data); // Set the centers
+          setCenters(sortOptionsByName(response.data.data)); // Set the centers
         } else {
           setCenters([]); // Handle case where no data is returned
         }
@@ -167,7 +189,7 @@ const AddCourse = () => {
         // Replace these URLs with your actual API endpoints
         const sectorsResponse = await axios.get(`${backendUrl}/api/sectorList`);
         console.log('Sectors response:', sectorsResponse.data);
-        setSectors(Array.isArray(sectorsResponse.data) ? sectorsResponse.data : []);
+        setSectors(sortOptionsByName(Array.isArray(sectorsResponse.data) ? sectorsResponse.data : []));
       } catch (error) {
         console.error('Error fetching initial data:', error);
         // Set empty arrays as fallback
@@ -177,6 +199,82 @@ const AddCourse = () => {
 
     fetchData();
   }, [backendUrl]);
+
+  useEffect(() => {
+    const searchableConfigs = [
+      {
+        key: 'sector',
+        element: sectorRef.current,
+        value: formData.sectors,
+        optionsLength: sectors.length,
+        placeholder: 'Search sector'
+      },
+      {
+        key: 'vertical',
+        element: verticalRef.current,
+        value: formData.vertical,
+        optionsLength: verticals.length,
+        placeholder: 'Search vertical'
+      },
+      {
+        key: 'project',
+        element: projectRef.current,
+        value: formData.project,
+        optionsLength: projects.length,
+        placeholder: 'Search project'
+      }
+    ];
+
+    searchableConfigs.forEach(({ key, element, value, optionsLength, placeholder }) => {
+      const existingInstance = searchableChoicesInstances.current[key];
+
+      if (existingInstance) {
+        try {
+          existingInstance.destroy();
+        } catch (error) {
+          console.warn(`Error destroying ${key} Choices instance:`, error);
+        }
+        searchableChoicesInstances.current[key] = null;
+      }
+
+      if (!element || optionsLength === 0) return;
+
+      try {
+        const instance = new Choices(element, {
+          searchEnabled: true,
+          searchPlaceholderValue: placeholder,
+          itemSelectText: '',
+          shouldSort: false,
+          allowHTML: false,
+          placeholder: true,
+          placeholderValue: placeholder
+        });
+
+        if (value) {
+          instance.setChoiceByValue(value);
+        }
+
+        searchableChoicesInstances.current[key] = instance;
+      } catch (error) {
+        console.error(`Error initializing ${key} Choices:`, error);
+      }
+    });
+
+    return () => {
+      Object.keys(searchableChoicesInstances.current).forEach((key) => {
+        const instance = searchableChoicesInstances.current[key];
+        if (!instance) return;
+
+        try {
+          instance.destroy();
+        } catch (error) {
+          console.warn(`Error cleaning up ${key} Choices instance:`, error);
+        }
+
+        searchableChoicesInstances.current[key] = null;
+      });
+    };
+  }, [sectors, verticals, projects, formData.sectors, formData.vertical, formData.project]);
 
   // Consolidated Choices.js management - FIXED VERSION
   useEffect(() => {
@@ -209,9 +307,11 @@ const AddCourse = () => {
         choicesInstance.current = new Choices(centerRef.current, {
           removeItemButton: true,
           searchEnabled: true,
+          searchPlaceholderValue: 'Search training center',
           itemSelectText: '',
           placeholder: false,
           allowHTML: false,
+          shouldSort: false,
           maxItemCount: -1,
           duplicateItemsAllowed: false,
           delimiter: ',',
@@ -254,7 +354,7 @@ const AddCourse = () => {
             headers: { 'x-auth': token }
           });
           if (response.data.success) {
-            setProjects(response.data.data);
+            setProjects(sortOptionsByName(response.data.data));
           } else {
             setProjects([]);
             console.error('Failed to fetch projects');
@@ -277,7 +377,7 @@ const AddCourse = () => {
         headers: { 'x-auth': token }
       });
       // Update the whole enhancedEntities but keep other keys unchanged
-      setVerticals(newVertical.data.data);
+      setVerticals(sortOptionsByName(newVertical.data.data));
     } catch (error) {
       console.error('Error fetching verticals:', error);
       setVerticals([]);
@@ -414,6 +514,11 @@ const AddCourse = () => {
     setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
   };
 
+  // Remove a document field
+  const removeDocumentField = (index) => {
+    setDocsRequired(docsRequired.filter((_, i) => i !== index));
+  };
+
   // Update document field value
   const updateDocumentField = (index, value, field) => {
     const updatedDocs = [...docsRequired];
@@ -453,7 +558,10 @@ const AddCourse = () => {
 
     // Set all errors at once
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (Object.keys(errors).length > 0) {
+      showToast('Please fill in all required fields marked with *');
+    }
+    return errors;
   };
 
   // Reset form to initial state
@@ -936,9 +1044,34 @@ const AddCourse = () => {
     e.preventDefault();
 
     console.log(docsRequired, 'docsRequired')
-    
 
-    if (!validateForm()) return;
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      // Field id map — same order as requiredFields
+      const fieldIdMap = {
+        sectors: 'sectors',
+        courseLevel: 'courseLevel',
+        vertical: 'vertical',
+        project: 'project',
+        name: 'name',
+        duration: 'duration',
+        qualification: 'qualification',
+        trainingMode: 'trainingMode',
+        address: 'address',
+        ojt: 'ojt',
+        emiOptionAvailable: 'emiOptionAvailable',
+      };
+      const firstErrorField = Object.keys(errors)[0];
+      const fieldId = fieldIdMap[firstErrorField];
+      if (fieldId) {
+        const el = document.getElementById(fieldId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+        }
+      }
+      return;
+    }
 
     const user = JSON.parse(sessionStorage.getItem('user'));
 
@@ -1047,22 +1180,39 @@ const AddCourse = () => {
 
   return (
     <div className="content-body">
-      {/* Header */}
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-9 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Add Course</h3>
-              <div className="breadcrumb-wrapper col-12">
-                <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><a href="/institute/dashboard">Home</a></li>
-                  <li className="breadcrumb-item active">Add Course</li>
-                </ol>
-              </div>
-            </div>
-          </div>
+      {/* Modern Gradient Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        borderRadius: '16px',
+        padding: '24px 32px',
+        marginBottom: '28px',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        boxShadow: '0 10px 25px rgba(252, 43, 90, 0.35)'
+      }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <i className="fa fa-graduation-cap" style={{ fontSize: '22px' }}></i>
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>Add New Course</h2>
+          <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
+            <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
+            <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>
+            <span>Add Course</span>
+          </p>
         </div>
       </div>
+
+      <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} closeOnClick pauseOnHover />
 
       {/* Success Message */}
       {submitSuccess && (
@@ -1091,6 +1241,7 @@ const AddCourse = () => {
                           className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
                           name="sectors"
                           id="sectors"
+                          ref={sectorRef}
                           value={formData.sectors}
                           onChange={handleChange}
                         >
@@ -1108,7 +1259,7 @@ const AddCourse = () => {
 
                       {/* Course Level */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseblock">
-                        <label htmlFor="courseLevel">Course Level</label>
+                        <label htmlFor="courseLevel" style={{ color: formErrors.courseLevel ? '#ef4444' : '' }}>Course Level <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.courseLevel ? 'is-invalid' : ''}`}
                           name="courseLevel"
@@ -1146,11 +1297,12 @@ const AddCourse = () => {
 
                       {/* Vertical */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="vertical">Vertical</label>
+                        <label htmlFor="vertical" style={{ color: formErrors.vertical ? '#ef4444' : '' }}>Vertical <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.vertical ? 'is-invalid' : ''}`}
                           name="vertical"
                           id="vertical"
+                          ref={verticalRef}
                           value={formData.vertical}
                           onChange={handleChange}
                         >
@@ -1164,11 +1316,12 @@ const AddCourse = () => {
 
                       {/* Project */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="project">Project</label>
+                        <label htmlFor="project" style={{ color: formErrors.project ? '#ef4444' : '' }}>Project <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
                           name="project"
                           id="project"
+                          ref={projectRef}
                           value={formData.project}
                           onChange={handleChange}
                         >
@@ -1198,7 +1351,7 @@ const AddCourse = () => {
 
                       {/* Name */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="nameblock">
-                        <label htmlFor="name">Name</label>
+                        <label htmlFor="name" style={{ color: formErrors.name ? '#ef4444' : '' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.name ? 'is-invalid' : ''}`}
                           type="text"
@@ -1212,7 +1365,7 @@ const AddCourse = () => {
 
                       {/* Duration */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="durationblock">
-                        <label htmlFor="duration">Duration</label>
+                        <label htmlFor="duration" style={{ color: formErrors.duration ? '#ef4444' : '' }}>Duration <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.duration ? 'is-invalid' : ''}`}
                           type="text"
@@ -1252,7 +1405,7 @@ const AddCourse = () => {
 
                       {/* Qualification */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="qualificationblock">
-                        <label htmlFor="qualification">Qualification</label>
+                        <label htmlFor="qualification" style={{ color: formErrors.qualification ? '#ef4444' : '' }}>Qualification <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.qualification ? 'is-invalid' : ''}`}
                           name="qualification"
@@ -1442,7 +1595,7 @@ const AddCourse = () => {
 
                       {/* OJT */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="ojtblock">
-                        <label htmlFor="ojt">OJT</label>
+                        <label htmlFor="ojt" style={{ color: formErrors.ojt ? '#ef4444' : '' }}>OJT <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.ojt ? 'is-invalid' : ''}`}
                           name="ojt"
@@ -1524,7 +1677,7 @@ const AddCourse = () => {
 
                       {/* EMI Option */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="emioptionblock">
-                        <label htmlFor="emiOptionAvailable">EMI Option Available</label>
+                        <label htmlFor="emiOptionAvailable" style={{ color: formErrors.emiOptionAvailable ? '#ef4444' : '' }}>EMI Option Available <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.emiOptionAvailable ? 'is-invalid' : ''}`}
                           name="emiOptionAvailable"
@@ -1628,6 +1781,26 @@ const AddCourse = () => {
                               <option value="true">Yes</option>
                               <option value="false">No</option>
                             </select>
+                          </div>
+                          <div className="col-xl-1 col-sm-12 col-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeDocumentField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -2183,68 +2356,247 @@ const AddCourse = () => {
 
         {/* Submit Buttons */}
         <div className="row mt-3 mb-5">
-          <div className="col-lg-12 col-md-12 col-sm-12 col-12 text-right">
+          <div className="col-lg-12 col-md-12 col-sm-12 col-12" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button
               type="button"
               onClick={resetForm}
-              className="btn btn-danger waves-effect waves-light mr-2"
-              // disabled={isSubmitting}
+              style={{
+                background: 'white',
+                color: '#ef4444',
+                border: '2px solid #ef4444',
+                borderRadius: '10px',
+                padding: '10px 28px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.target.style.background = '#ef4444'; e.target.style.color = 'white'; }}
+              onMouseLeave={e => { e.target.style.background = 'white'; e.target.style.color = '#ef4444'; }}
             >
+              <i className="fa fa-refresh" style={{ marginRight: '6px' }}></i>
               Reset
             </button>
             <button
               type="submit"
-              className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
-              // disabled={isSubmitting}
+              style={{
+                background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 32px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(252, 43, 90, 0.4)',
+                transition: 'all 0.2s',
+              }}
             >
-              {/* {isSubmitting ? 'Saving...' : 'Save'} */}
-              Save
+              <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
+              Save Course
             </button>
           </div>
         </div>
       </form>
-      <style>
-        {`
-          .ck-editor__editable_inline{
-            height:40px;
-          }
-        `}
-      </style>
+      <style>{`
+        /* ===== Modern AddCourse Page Styles ===== */
 
-      <style>
-{
-  `
-  .form-control {
-    padding: 0.6rem 0.7rem;
-    height: 40px;
-}
-.card .card-header {
-    display: flex
-;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    border-bottom: none;
-    padding: 1.5rem 1.5rem 0;
-    background-color: transparent;
-}
-.card .card-header .card-title {
-    margin-bottom: 0;
-}
-.card .card-title {
-    font-size: 1rem !important;
-    
-}
-.card .card-title {
-    font-weight: 500;
-    letter-spacing: 0.05rem;
-    font-size: 1.32rem;
-    margin-bottom: 0.5rem;
-}
-  `
-}
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(40px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
 
-      </style>
+        .content-body {
+          background: #f1f5f9;
+          min-height: 100vh;
+        }
+
+        #course-info .card,
+        #docsRequired .card,
+        #add-docs .card,
+        #testimonial-videos .card,
+        #extra-features .card,
+        #counselor-info .card,
+        #faq-section .card {
+          border-radius: 16px !important;
+          border: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
+          margin-bottom: 24px !important;
+        }
+
+        .card .card-header {
+          display: flex !important;
+          align-items: center !important;
+          flex-wrap: wrap !important;
+          justify-content: space-between !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 20px 24px 16px !important;
+          background-color: transparent !important;
+        }
+
+        .card .card-header .card-title {
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+          letter-spacing: -0.01em !important;
+          margin-bottom: 0 !important;
+          padding-left: 14px !important;
+          position: relative !important;
+        }
+        .card .card-header .card-title::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 18px;
+          background: linear-gradient(135deg, #FC2B5A, #764ba2);
+          border-radius: 4px;
+        }
+
+        .card-body {
+          padding: 20px 24px 24px !important;
+        }
+
+        label {
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #64748b;
+          margin-bottom: 6px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+
+        .form-control {
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          padding: 9px 14px !important;
+          height: auto !important;
+          min-height: 42px !important;
+          font-size: 14px !important;
+          color: #1e293b !important;
+          background: #f8fafc !important;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease !important;
+          box-shadow: none !important;
+        }
+        .form-control:focus {
+          border-color: #FC2B5A !important;
+          box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12) !important;
+          background: #ffffff !important;
+          outline: none !important;
+        }
+        .form-control.is-invalid {
+          border-color: #ef4444 !important;
+          background: #fff8f8 !important;
+        }
+        .invalid-feedback {
+          font-size: 12px !important;
+          color: #ef4444 !important;
+          margin-top: 4px !important;
+        }
+
+        .add-another-button, .add-button {
+          background: linear-gradient(135deg, #10b981, #059669) !important;
+          border: none !important;
+          border-radius: 10px !important;
+          padding: 9px 20px !important;
+          font-weight: 600 !important;
+          font-size: 13px !important;
+          color: white !important;
+          box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3) !important;
+        }
+
+        .uploadedVideos.card,
+        .uploadedPhotos.card,
+        .brouchers.card,
+        .thumbnails.card {
+          border-radius: 14px !important;
+          border: 2px dashed #cbd5e1 !important;
+          box-shadow: none !important;
+          background: #fafbfc !important;
+          transition: border-color 0.2s !important;
+        }
+        .uploadedVideos.card:hover,
+        .uploadedPhotos.card:hover,
+        .brouchers.card:hover,
+        .thumbnails.card:hover {
+          border-color: #FC2B5A !important;
+        }
+        .uploadedVideos h5,
+        .uploadedPhotos h5,
+        .brouchers h5,
+        .thumbnails h5 {
+          font-size: 13px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.06em !important;
+        }
+
+        input[type="file"] {
+          font-size: 12px !important;
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          padding: 6px 10px !important;
+          background: white !important;
+          cursor: pointer !important;
+          width: 100% !important;
+        }
+
+        .requiredDocsRow {
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding-bottom: 12px !important;
+          margin-bottom: 4px !important;
+        }
+
+        .ck-editor__editable_inline {
+          min-height: 120px !important;
+          border-radius: 0 0 8px 8px !important;
+          font-size: 14px !important;
+        }
+        .ck.ck-editor__top .ck-sticky-panel .ck-toolbar {
+          border-radius: 8px 8px 0 0 !important;
+        }
+
+        .questionanswerrow {
+          background: #fafbfc !important;
+          border-radius: 12px !important;
+          padding: 16px !important;
+          border: 1px solid #f1f5f9 !important;
+        }
+
+        .btn-sm.btn-danger {
+          background: #ef4444 !important;
+          border: none !important;
+          border-radius: 6px !important;
+        }
+
+        .choices__inner {
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          background: #f8fafc !important;
+          font-size: 14px !important;
+        }
+        .choices__list--dropdown {
+          border-radius: 10px !important;
+          border: 1.5px solid #e2e8f0 !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+        }
+
+        .alert-success {
+          border-radius: 10px !important;
+          border: none !important;
+          background: #d1fae5 !important;
+          color: #065f46 !important;
+          font-weight: 600 !important;
+        }
+
+        .form-check-inline input[type="radio"] {
+          accent-color: #FC2B5A !important;
+          cursor: pointer !important;
+        }
+      `}</style>
     </div>
   );
 };
