@@ -53,15 +53,12 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
     : 'rgba(255, 255, 255, 0.08)';
 
   useEffect(() => {
-    const name = localStorage.getItem('name');
-    if (name) {
-      setUserName(name);
-    }
-
     const userData = sessionStorage.getItem('user');
     if (userData) {
       try {
         const parsedUserData = JSON.parse(userData);
+        setUserName(parsedUserData?.name || '');
+
         if (parsedUserData?.collegeId) {
           setCollegeAccountNo(parsedUserData.collegeId);
         }
@@ -274,7 +271,7 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
                       <span className="text-white">
                         <ul className="list-unstyled LanguageSwitcher">
                           <li>
-                            <span className="user-status text-white">{t('available')}</span>
+                            <span className="user-status text-white">{userName || t('available')}</span>
                           </li>
                           {/* <li>
                             <span className="user-status text-white"><LanguageSwitcher/></span>

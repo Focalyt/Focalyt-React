@@ -574,12 +574,21 @@ const UserManagement = ({
                       </td>
                       
                       <td>
-                        <button
-                          className={`btn btn-sm ${user.status === 'active' ? 'btn-success' : 'btn-outline-secondary'}`}
-                          onClick={() => handleStatusChange(user.id, user.status)}
-                        >
-                          {user.status === 'active' ? 'Active' : 'Inactive'}
-                        </button>
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="form-check form-switch m-0">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              role="switch"
+                              checked={user.status === 'active'}
+                              onChange={() => handleStatusChange(user.user_id, user.status)}
+                              disabled={!onStatusChange}
+                            />
+                          </div>
+                          <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                            {user.status === 'active' }
+                          </span>
+                        </div>
                       </td>
                       
                       <td>

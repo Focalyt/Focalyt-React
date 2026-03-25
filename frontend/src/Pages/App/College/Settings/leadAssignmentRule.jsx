@@ -51,6 +51,7 @@ const LeadAssignmentRule = ({ users = [], enhancedEntities = {} }) => {
   // Sample data for dropdowns
   const centers = enhancedEntities.CENTER || [];
   const courses = enhancedEntities.COURSE || [];
+  const activeUsers = users.filter((user) => user.status === 'active');
 
   useEffect(() => {
     console.log(courses, 'courses')
@@ -847,7 +848,7 @@ const LeadAssignmentRule = ({ users = [], enhancedEntities = {} }) => {
                     <div className="border-top pt-4 mt-4">
                       <h6 className="fw-medium text-dark mb-3">Then Assigned Counselor(s) will be</h6>
                       <MultiSelectDropdown
-                        options={users}
+                        options={activeUsers}
                         selected={formData.assignedCounselors}
                         onChange={handleCounselorChange}
                         placeholder="Select"

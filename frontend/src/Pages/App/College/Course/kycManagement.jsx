@@ -622,7 +622,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
           setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);

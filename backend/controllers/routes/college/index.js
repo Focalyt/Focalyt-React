@@ -12105,15 +12105,19 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 
 		});
 
-		let counselors = []
-		college._concernPerson.forEach(person => {
-			let data = {
-				_id: person?._id?._id || '',
-				name: person?._id?.name || ''
-			}
-			counselors.push(data)
+		const counselors = [];
+		college._concernPerson.forEach((person) => {
+			const concernUser = person?._id;
+			if (!concernUser?._id || !concernUser?.name) return;
+			if (concernUser.status !== true) return;
+			if (concernUser.isDeleted === true) return;
 
-		})
+			counselors.push({
+				_id: concernUser._id,
+				name: concernUser.name,
+				status: concernUser.status
+			});
+		});
 
 
 		res.json({

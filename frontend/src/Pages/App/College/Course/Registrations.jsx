@@ -778,7 +778,10 @@ const CRMDashboard = () => {
             setCenterOptions(centersMapped);
           }
           
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);

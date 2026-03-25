@@ -595,7 +595,7 @@ router.get('/reporting-managers', checkPermission('can_view_users'), async (req,
 
 
 
-router.put('/:userId/status', checkPermission('can_edit_users'), async (req, res) => {
+router.put('/:userId/status', [isCollege, checkPermission('can_edit_users')], async (req, res) => {
   try {
     const { userId } = req.params;
     const { status } = req.body;
