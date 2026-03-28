@@ -120,3 +120,4 @@ module.exports.ReferralShareOffer = require("./referralShareOffer");
 module.exports.BotTraining = require("./botTraining");
 module.exports.BotTrainingRule = require("./botTrainingRule");
 module.exports.BatchMonitor = require("./batchMonitor");
+module.exports.LRP = require("./lrp");

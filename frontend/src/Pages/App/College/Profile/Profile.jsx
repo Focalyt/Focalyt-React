@@ -550,7 +550,7 @@ const Profile = () => {
     border: '1px solid #f1f5f9',
   };
   const sectionHeaderStyle = {
-    background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+    background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
     padding: '16px 24px',
     display: 'flex',
     alignItems: 'center',
@@ -563,7 +563,7 @@ const Profile = () => {
     <>
       {/* Page Header Banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
         borderRadius: '16px',
         padding: '22px 28px',
         marginBottom: '24px',

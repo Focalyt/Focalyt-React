@@ -222,7 +222,7 @@ const ViewCourses = () => {
             <i className="fa fa-list-alt" style={{ fontSize: '20px' }}></i>
           </div>
           <div>
-            <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>All Courses</h2>
+            <h2 style={{ margin: 0, fontWeight: 700, fontSize: 'clamp(18px,2vw,22px)', letterSpacing: '-0.02em' }}>All Courses</h2>
             <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
               <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
               <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>

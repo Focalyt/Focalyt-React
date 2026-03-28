@@ -101,6 +101,7 @@ import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
 import Target from './Pages/App/College/Target/Target';
+import Lrp from './Pages/App/College/LRP/Lrp';
 
 
 import CompanyLayout from './Component/Layouts/App/Company';
@@ -312,6 +313,7 @@ const Layout = () => {
           <Route path='whatsappWallet' element={<WhatsappWallet/>}/>
           <Route path='emailTemplate' element={<EmailTemplate/>}/>
           <Route path='target' element={<Target/>}/>
+          <Route path='lrp' element={<Lrp/>}/>
         </Route>
 
         {/* company  */}

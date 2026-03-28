@@ -1924,7 +1924,43 @@ const CRMDashboard = () => {
     e.preventDefault();
 
     try {
+      // Frontend validation (to avoid silent backend 500s)
+      const errors = [];
+      const name = (candidateFormData.name || '').trim();
+      const mobile = String(candidateFormData.mobile || '').trim();
+      const whatsapp = String(candidateFormData.whatsapp || '').trim();
+      const email = (candidateFormData.email || '').trim();
+      const sex = (candidateFormData.sex || '').trim();
+      const highestQualification = candidateFormData.highestQualification || '';
+      const dobRaw = candidateFormData.dob;
+
+      if (!courseId) errors.push('Please select Course');
+      if (!centerId) errors.push('Please select Center');
+      if (!counselorId) errors.push('Please select Counselor');
+      if (!registeredBy) errors.push('Please select Source');
+
+      if (!name) errors.push('Please enter Name');
+      if (!mobile) errors.push('Please enter Mobile number');
+      if (mobile && !/^\d{10}$/.test(mobile)) errors.push('Mobile number must be 10 digits');
+      if (!whatsapp) errors.push('Please enter WhatsApp number');
+      if (whatsapp && !/^\d{10}$/.test(whatsapp)) errors.push('WhatsApp number must be 10 digits');
+      if (!sex) errors.push('Please select Gender');
+      if (!dobRaw) errors.push('Please select Date of Birth');
+      if (!highestQualification) errors.push('Please select Highest Qualification');
+      if (email && !/^\S+@\S+\.\S+$/.test(email)) errors.push('Please enter a valid Email');
+
+      if (errors.length > 0) {
+        setFormErrors({ addLead: errors });
+        alert(errors.join('\n'));
+        return;
+      }
+
       setIsSubmitting(true);
+
+      const dob =
+        dobRaw instanceof Date && !isNaN(dobRaw.getTime())
+          ? dobRaw.toISOString()
+          : dobRaw;
 
       // Prepare the data according to the API structure
       const requestData = {
@@ -1932,13 +1968,13 @@ const CRMDashboard = () => {
         centerId,
         counselorId,
         candidateData: {
-          name: candidateFormData.name,
-          mobile: candidateFormData.mobile,
-          email: candidateFormData.email,
-          sex: candidateFormData.sex,
-          dob: candidateFormData.dob,
-          whatsapp: candidateFormData.whatsapp,
-          highestQualification: candidateFormData.highestQualification,
+          name,
+          mobile,
+          email,
+          sex,
+          dob,
+          whatsapp,
+          highestQualification,
           personalInfo: {
             currentAddress: {
               fullAddress: candidateFormData.personalInfo.currentAddress.fullAddress,
@@ -1967,6 +2003,12 @@ const CRMDashboard = () => {
 
       if (response.data.status) {
         alert("Lead added successfully");
+
+        // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
+        setActiveCrmFilter(0);
+        const newFilterData = { ...(filterData || {}) };
+        delete newFilterData.leadStatus;
+        setFilterData(newFilterData);
 
         // Reset all form fields
         setCandidateFormData({
@@ -2004,6 +2046,12 @@ const CRMDashboard = () => {
         setCenterId('');
         setCounselorId('');
         setRegisteredBy('');
+
+        // After adding, refresh list from first page so the new lead is visible immediately
+        setCurrentPage(1);
+        await fetchProfileData(newFilterData, 1);
+
+        closePanel();
       }
       else {
         alert(response.data.message);
@@ -2011,12 +2059,10 @@ const CRMDashboard = () => {
 
     } catch (error) {
       console.error('Error submitting form:', error);
+      alert(error?.response?.data?.message || error?.message || 'Failed to add lead');
     } finally {
 
       setIsSubmitting(false);
-      closePanel();
-
-      fetchProfileData();
     }
   };
 
@@ -3182,6 +3228,7 @@ console.log('API Response:', response.data);
     const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
     const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
 
+    const fd = formDataRef.current || formData;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
@@ -3197,11 +3244,11 @@ console.log('API Response:', response.data);
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      ...(fd.projects.values.length > 0 && { projects: JSON.stringify(fd.projects.values) }),
+      ...(fd.verticals.values.length > 0 && { verticals: JSON.stringify(fd.verticals.values) }),
+      ...(fd.course.values.length > 0 && { course: JSON.stringify(fd.course.values) }),
+      ...(fd.center.values.length > 0 && { center: JSON.stringify(fd.center.values) }),
+      ...(fd.counselor.values.length > 0 && { counselor: JSON.stringify(fd.counselor.values) })
     });
 
     try {

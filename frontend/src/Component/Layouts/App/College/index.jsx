@@ -1255,6 +1255,13 @@ function CollegeLayout({ children }) {
 
       <style>
         {`
+
+        @media(max-width:425px){
+        html body .content .content-wrapper {
+    margin-top: 3rem !important;
+    padding: 1.8rem 1rem 0 !important;
+}
+        }
         html body .content .content-wrapper {
     margin-top: 6rem;
     padding: 1.8rem 2.2rem 0;

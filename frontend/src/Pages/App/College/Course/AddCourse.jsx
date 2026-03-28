@@ -1182,7 +1182,7 @@ const AddCourse = () => {
     <div className="content-body">
       {/* Modern Gradient Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+        background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
         borderRadius: '16px',
         padding: '24px 32px',
         marginBottom: '28px',
@@ -1235,7 +1235,7 @@ const AddCourse = () => {
                   <div className="card-body">
                     <div className="row">
                       {/* Sector */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="sectorblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="sectorblock">
                         <label htmlFor="sectors">Sector</label>
                         <select
                           className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
@@ -1258,7 +1258,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Course Level */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseblock">
                         <label htmlFor="courseLevel" style={{ color: formErrors.courseLevel ? '#ef4444' : '' }}>Course Level <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.courseLevel ? 'is-invalid' : ''}`}
@@ -1278,7 +1278,7 @@ const AddCourse = () => {
 
 
                       {/* Course Fee Type */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
                         <label htmlFor="courseFeeType">Course Fee Type</label>
                         <select
                           className="form-control"
@@ -1296,7 +1296,7 @@ const AddCourse = () => {
                       
 
                       {/* Vertical */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseProjectblock">
                         <label htmlFor="vertical" style={{ color: formErrors.vertical ? '#ef4444' : '' }}>Vertical <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.vertical ? 'is-invalid' : ''}`}
@@ -1315,7 +1315,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Project */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseProjectblock">
                         <label htmlFor="project" style={{ color: formErrors.project ? '#ef4444' : '' }}>Project <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
@@ -1334,7 +1334,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Course Type */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseTypeblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseTypeblock">
                         <label htmlFor="courseType">Course Type</label>
                         <select
                           className="form-control"
@@ -1350,7 +1350,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Name */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="nameblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="nameblock">
                         <label htmlFor="name" style={{ color: formErrors.name ? '#ef4444' : '' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.name ? 'is-invalid' : ''}`}
@@ -1364,7 +1364,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Duration */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="durationblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="durationblock">
                         <label htmlFor="duration" style={{ color: formErrors.duration ? '#ef4444' : '' }}>Duration <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.duration ? 'is-invalid' : ''}`}
@@ -1378,7 +1378,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Certifying Agency */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="certifyingAgency">Certifying Agency</label>
                         <input
                           className="form-control"
@@ -1391,8 +1391,8 @@ const AddCourse = () => {
                       </div>
 
                       {/* Certifying Agency Website */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
-                        <label htmlFor="certifyingAgencyWebsite">Certifying Agency Website</label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                        <label style={{whiteSpace: 'nowrap'}} htmlFor="certifyingAgencyWebsite">Certifying Agency Website</label>
                         <input
                           className="form-control"
                           type="text"
@@ -1404,7 +1404,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Qualification */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="qualificationblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="qualificationblock">
                         <label htmlFor="qualification" style={{ color: formErrors.qualification ? '#ef4444' : '' }}>Qualification <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.qualification ? 'is-invalid' : ''}`}
@@ -1425,7 +1425,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Age */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="age">Age</label>
                         <input
                           className="form-control"
@@ -1438,7 +1438,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Experience */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="experience">Experience</label>
                         <input
                           className="form-control"
@@ -1451,7 +1451,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Training Mode */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="trainingblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="trainingblock">
                         <label htmlFor="trainingMode">Training Mode</label>
                         <select
                           className={`form-control ${formErrors.trainingMode ? 'is-invalid' : ''}`}
@@ -1470,7 +1470,7 @@ const AddCourse = () => {
 
                       {/* Online Training Timing (conditional) */}
                       {showTrainingFields.online && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="onlinetrainingblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="onlinetrainingblock">
                           <label htmlFor="onlineTrainingTiming">Online training Timing</label>
                           <textarea
                             className="form-control"
@@ -1484,7 +1484,7 @@ const AddCourse = () => {
 
                       {/* Offline Training Timing (conditional) */}
                       {showTrainingFields.offline && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="offlinetrainingblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="offlinetrainingblock">
                           <label htmlFor="offlineTrainingTiming">Offline training Timing</label>
                           <textarea
                             className="form-control"
@@ -1498,7 +1498,7 @@ const AddCourse = () => {
 
                       {/* Training Center (conditional) */}
                       {showTrainingFields.trainingCenter && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="trainingCenterblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="trainingCenterblock">
                           <label htmlFor="trainingCenter">Training Center</label>
                           <select
                             className="form-control"
@@ -1520,7 +1520,7 @@ const AddCourse = () => {
                       )}
 
                       {/* Address */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="addressblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="addressblock">
                         <label htmlFor="address">Address</label>
                         <select
                           className={`form-control ${formErrors.address ? 'is-invalid' : ''}`}
@@ -1538,7 +1538,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* City */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="cityblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="cityblock">
                         <label htmlFor="city">City</label>
                         <input
                           className="form-control"
@@ -1551,7 +1551,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* State */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="stateblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="stateblock">
                         <label htmlFor="state">State</label>
                         <input
                           className="form-control"
@@ -1565,7 +1565,7 @@ const AddCourse = () => {
 
                       {/* App Link (conditional) */}
                       {showAddressFields.appLink && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="applinkblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="applinkblock">
                           <label htmlFor="appLink">App link</label>
                           <input
                             className="form-control"
@@ -1580,7 +1580,7 @@ const AddCourse = () => {
 
                       {/* Address Input (conditional) */}
                       {showAddressFields.addressInput && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="addressinputblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="addressinputblock">
                           <label htmlFor="addressInput">Address</label>
                           <input
                             className="form-control"
@@ -1594,7 +1594,7 @@ const AddCourse = () => {
                       )}
 
                       {/* OJT */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="ojtblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="ojtblock">
                         <label htmlFor="ojt" style={{ color: formErrors.ojt ? '#ef4444' : '' }}>OJT <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.ojt ? 'is-invalid' : ''}`}
@@ -1611,7 +1611,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Registration Charges */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="registrationCharges">Registration Charges</label>
                         <input
                           className="form-control"
@@ -1624,7 +1624,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Course Fee */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="courseFee">Course Fee</label>
                         <input
                           className="form-control"
@@ -1637,7 +1637,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Cut Price */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="cutPrice">Cut Price</label>
                         <input
                           className="form-control"
@@ -1650,7 +1650,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Exam Fee */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="examFee">Exam Fee</label>
                         <input
                           className="form-control"
@@ -1663,7 +1663,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Other Fee */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="otherFee">Other fee if any</label>
                         <input
                           className="form-control"
@@ -1676,7 +1676,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* EMI Option */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="emioptionblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="emioptionblock">
                         <label htmlFor="emiOptionAvailable" style={{ color: formErrors.emiOptionAvailable ? '#ef4444' : '' }}>EMI Option Available <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.emiOptionAvailable ? 'is-invalid' : ''}`}
@@ -1693,7 +1693,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Max EMI Tenure */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="maxEMITenure">Max EMI Tenure</label>
                         <input
                           className="form-control"
@@ -1706,7 +1706,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Stipend During Training */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="stipendDuringTraining">Stipend During Training</label>
                         <input
                           className="form-control"
@@ -1719,7 +1719,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Last Date for Apply */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="lastDateForApply">Last date for apply</label>
                         <input
                           className="form-control"
@@ -2380,7 +2380,7 @@ const AddCourse = () => {
             <button
               type="submit"
               style={{
-                background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',
