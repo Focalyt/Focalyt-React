@@ -161,6 +161,36 @@ async function createLinkedB2BLead(req, body) {
   }
 }
 
+router.get("/", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit || "100"), 10) || 100));
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      LRP.find({})
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      LRP.countDocuments({}),
+    ]);
+
+    return res.json({
+      success: true,
+      data: items,
+      total,
+      page,
+      limit,
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: err?.message || "Unable to fetch LRP records",
+    });
+  }
+});
+
 router.post("/", async (req, res) => {
   try {
     const body = req.body || {};
@@ -185,6 +215,9 @@ router.post("/", async (req, res) => {
     }
 
     const doc = {
+      college: req.college?._id,
+      createdBy: req.user?._id,
+
       partnerType: body.partnerType,
       implementationPartnerName: body.implementationPartnerName,
       visitDate: body.visitDate ? new Date(body.visitDate) : body.visitDate,

@@ -4,6 +4,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { Link } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
@@ -625,6 +626,7 @@ const B2BSales = () => {
         alert('✅ Follow-up saved and scheduled successfully!');
       }
 
+      window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
       alert('❌ Error processing request');
@@ -2979,6 +2981,24 @@ const B2BSales = () => {
                         >
                           <i className="fas fa-filter me-1"></i>
                         </button>
+
+                        <Link
+                          to="/institute/lrp"
+                          className="btn btn-sm btn-outline-secondary"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            textDecoration: 'none',
+                          }}
+                          title="Add Day Visit Report (LRP)"
+                        >
+                          <i className="fas fa-clipboard-list" style={{ fontSize: '10px' }}></i>
+                          Day Visit Report
+                        </Link>
                         
                         {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                           <>
@@ -3120,6 +3140,25 @@ const B2BSales = () => {
                   {/* Mobile Layout */}
                   <div className="col-12 d-md-none mt-2">
                     <div className="row g-2">
+                      <div className="col-12">
+                        <Link
+                          to="/institute/lrp"
+                          className="btn w-100 btn-outline-secondary"
+                          style={{
+                            padding: '10px 12px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <i className="fas fa-clipboard-list" style={{ fontSize: '14px' }}></i>
+                          Day Visit Report
+                        </Link>
+                      </div>
                       {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                         <>
                           <div className="col-6">

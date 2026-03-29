@@ -1394,13 +1394,26 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       );
 
       if (response.data.success) {
-        // If KYC was updated, show a success message
-          // if (response.data.kycUpdated) {
-          //   alert('All documents verified! KYC status has been updated.');
-          // } else {
-          // }
-        alert(`Document ${status.toLowerCase()} successfully!`);
-
+        let msg = `Document ${status.toLowerCase()} successfully!`;
+        if (response.data.documentVerifiedWhatsAppSent) {
+          msg += ' All mandatory documents are verified; document_verified WhatsApp was sent to the student.';
+        } else if (response.data.documentVerifiedWhatsAppSkippedNoPhone && status === 'Verified') {
+          msg += ' All mandatory documents are verified, but WhatsApp was not sent (no mobile/WhatsApp on profile).';
+        } else if (response.data.documentVerifiedWhatsAppError) {
+          msg += ` All mandatory documents are verified, but WhatsApp failed: ${response.data.documentVerifiedWhatsAppError}`;
+        } else if (response.data.allMandatoryDocsVerified && status === 'Verified') {
+          msg += ' All mandatory documents are now verified.';
+        }
+        if (status === 'Rejected') {
+          if (response.data.documentRejectedWhatsAppSent) {
+            msg += ' document_rejected_ WhatsApp was sent to the student.';
+          } else if (response.data.documentRejectedWhatsAppSkippedNoPhone) {
+            msg += ' WhatsApp was not sent (no mobile/WhatsApp on profile).';
+          } else if (response.data.documentRejectedWhatsAppError) {
+            msg += ` WhatsApp failed: ${response.data.documentRejectedWhatsAppError}`;
+          }
+        }
+        alert(msg);
 
         // Refresh the profile data
         await fetchProfileData();

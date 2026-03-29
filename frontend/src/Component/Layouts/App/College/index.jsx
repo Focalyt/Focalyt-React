@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { Link, Outlet, useLocation } from "react-router-dom";
 import CollegeHeader from './CollegeHeader/CollegeHeader';
 import CollegeFooter from './CollegeFooter/CollegeFooter';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,6 +20,11 @@ import {
   faCircle as farCircle, faCirclePlay as farCirclePlay, faShareFromSquare as farShareFromSquare, faBell as farBell, faMoneyBill1 as farMoneyBill1,
 } from "@fortawesome/free-regular-svg-icons";
 
+/** B2C CRM: enum planned | missed | done — badge & reminders only for planned */
+const isB2cFollowupPlanned = (row) => {
+  const st = String(row.followupStatus || row.status || 'planned').toLowerCase();
+  return st === 'planned';
+};
 
 function CollegeLayout({ children }) {
   const navigate = useNavigate();
@@ -30,6 +36,15 @@ function CollegeLayout({ children }) {
   const [user, setUser] = useState();
   const [collegeLogo, setCollegeLogo] = useState(null);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [todayB2cFollowupCount, setTodayB2cFollowupCount] = useState(0);
+  const [todayB2bFollowupCount, setTodayB2bFollowupCount] = useState(0);
+  const [b2cImminentSoon, setB2cImminentSoon] = useState(false);
+  const [b2bImminentSoon, setB2bImminentSoon] = useState(false);
+  const upcomingB2cRef = useRef([]);
+  const upcomingB2bRef = useRef([]);
+  /** Map key → last toast time (ms); cleared when follow-up time passes */
+  const b2cFollowupLastToastRef = useRef(new Map());
+  const b2bFollowupLastToastRef = useRef(new Map());
   const location = useLocation();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -41,6 +56,77 @@ function CollegeLayout({ children }) {
     fetchCollegeLogo();
     fetchUnreadCount();
   }, []);
+
+  const localDayKey = (d) => {
+    const x = new Date(d);
+    if (Number.isNaN(x.getTime())) return '';
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  };
+
+  const refreshB2cCalendarInsights = useCallback(async () => {
+    if (!token || !backendUrl) return;
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endWindow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const response = await axios.get(`${backendUrl}/college/candidate/calendar-visit-data`, {
+        params: {
+          startDate: startOfDay.toISOString(),
+          endDate: endWindow.toISOString(),
+        },
+        headers: { 'x-auth': token },
+      });
+      if (!response.data?.status) {
+        setTodayB2cFollowupCount(0);
+        upcomingB2cRef.current = [];
+        return;
+      }
+      const raw = response.data.data || [];
+      const b2c = raw.filter((row) => row.sourceType === 'b2c_followup').filter(isB2cFollowupPlanned);
+      upcomingB2cRef.current = b2c;
+      const todayKey = localDayKey(now);
+      setTodayB2cFollowupCount(b2c.filter((row) => localDayKey(row.start) === todayKey).length);
+    } catch (error) {
+      console.error('Error fetching B2C calendar insights:', error);
+      setTodayB2cFollowupCount(0);
+      upcomingB2cRef.current = [];
+    }
+  }, [token, backendUrl]);
+
+  const refreshB2bFollowupInsights = useCallback(async () => {
+    if (!token || !backendUrl) return;
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endWindow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const response = await axios.get(`${backendUrl}/college/b2b/followups-reminder-data`, {
+        params: {
+          startDate: startOfDay.toISOString(),
+          endDate: endWindow.toISOString(),
+        },
+        headers: { 'x-auth': token },
+      });
+      if (!response.data?.status) {
+        setTodayB2bFollowupCount(0);
+        upcomingB2bRef.current = [];
+        return;
+      }
+      const rows = response.data.data || [];
+      upcomingB2bRef.current = rows;
+      const todayKey = localDayKey(now);
+      setTodayB2bFollowupCount(
+        rows.filter((row) => localDayKey(row.start) === todayKey).length
+      );
+    } catch (error) {
+      console.error('Error fetching B2B follow-up insights:', error);
+      setTodayB2bFollowupCount(0);
+      upcomingB2bRef.current = [];
+    }
+  }, [token, backendUrl]);
+
+  const refreshAllFollowupInsights = useCallback(async () => {
+    await Promise.all([refreshB2cCalendarInsights(), refreshB2bFollowupInsights()]);
+  }, [refreshB2cCalendarInsights, refreshB2bFollowupInsights]);
 
   // Fetch unread message count
   const fetchUnreadCount = async () => {
@@ -98,6 +184,99 @@ function CollegeLayout({ children }) {
       window.removeEventListener('whatsappMessagesRead', handleMessagesRead);
     };
   }, []);
+
+  useEffect(() => {
+    refreshAllFollowupInsights();
+  }, [refreshAllFollowupInsights, location.pathname]);
+
+  useEffect(() => {
+    const onFocus = () => refreshAllFollowupInsights();
+    const onB2cCalendarUpdated = () => refreshB2cCalendarInsights();
+    const onB2bFollowupUpdated = () => refreshB2bFollowupInsights();
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('b2c-calendar-updated', onB2cCalendarUpdated);
+    window.addEventListener('b2b-followup-updated', onB2bFollowupUpdated);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('b2c-calendar-updated', onB2cCalendarUpdated);
+      window.removeEventListener('b2b-followup-updated', onB2bFollowupUpdated);
+    };
+  }, [refreshAllFollowupInsights, refreshB2cCalendarInsights, refreshB2bFollowupInsights]);
+
+  useEffect(() => {
+    if (!token || !backendUrl) return;
+    const id = window.setInterval(() => refreshAllFollowupInsights(), 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [token, backendUrl, refreshAllFollowupInsights]);
+
+  /**
+   * From 20 min before follow-up until start: toast every 5 min (first when entering T−20).
+   * Stops when follow-up time has passed. Badge blink ~15–25 min before.
+   */
+  useEffect(() => {
+    if (!token) return;
+    const WINDOW_MINUTES = 20;
+    const REPEAT_MS = 5 * 60 * 1000;
+    const IMMINENT_LO = 15;
+    const IMMINENT_HI = 25;
+
+    const tick = () => {
+      const now = Date.now();
+      let imminentB2c = false;
+      let imminentB2b = false;
+
+      const runRow = (row, kind) => {
+        const ms = new Date(row.start).getTime();
+        if (Number.isNaN(ms)) return;
+        const lastMap = kind === 'b2c' ? b2cFollowupLastToastRef.current : b2bFollowupLastToastRef.current;
+        const key = `${kind}-${row.id}-${ms}`;
+
+        if (now >= ms) {
+          lastMap.delete(key);
+          return;
+        }
+
+        const minutesUntil = (ms - now) / 60000;
+        if (minutesUntil >= IMMINENT_LO && minutesUntil <= IMMINENT_HI) {
+          if (kind === 'b2c') imminentB2c = true;
+          else imminentB2b = true;
+        }
+
+        if (minutesUntil > WINDOW_MINUTES) return;
+
+        const lastToast = lastMap.get(key);
+        if (lastToast != null && now - lastToast < REPEAT_MS) return;
+
+        lastMap.set(key, now);
+        const name = row.candidateName || row.title || 'Follow-up';
+        const mins = Math.max(1, Math.round(minutesUntil));
+        const toastKey =
+          kind === 'b2c'
+            ? 'followup_reminder_toast_repeat'
+            : 'followup_b2b_reminder_toast_repeat';
+        toast.info(t(toastKey, { name, minutes: mins }), {
+          position: 'top-right',
+          autoClose: 12000,
+          style: { background: '#fc2b5a', color: '#fff' },
+          progressStyle: { background: 'rgba(255, 255, 255, 0.45)' },
+        });
+      };
+
+      for (const row of upcomingB2cRef.current) {
+        runRow(row, 'b2c');
+      }
+      for (const row of upcomingB2bRef.current) {
+        runRow(row, 'b2b');
+      }
+
+      setB2cImminentSoon((prev) => (prev === imminentB2c ? prev : imminentB2c));
+      setB2bImminentSoon((prev) => (prev === imminentB2b ? prev : imminentB2b));
+    };
+
+    tick();
+    const id = window.setInterval(tick, 25000);
+    return () => window.clearInterval(id);
+  }, [token, t]);
 
   // Listen for logo updates from profile page
   useEffect(() => {
@@ -477,6 +656,15 @@ function CollegeLayout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <style>{`
+        @keyframes b2c-followup-badge-blink {
+          0%, 100% { opacity: 1; filter: brightness(1); }
+          50% { opacity: 0.72; filter: brightness(1.15); }
+        }
+        .b2c-followup-badge-blink {
+          animation: b2c-followup-badge-blink 1.1s ease-in-out infinite;
+        }
+      `}</style>
       <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
           <div className={`navbar-header ${expanded ? 'expanded' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '15px', position: 'relative' }}>
@@ -702,9 +890,33 @@ function CollegeLayout({ children }) {
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
-                      <Link to="/institute/calenderb2c" onClick={() => handleSidebarClose()}>
+                      <Link
+                        to="/institute/calenderb2c"
+                        onClick={() => handleSidebarClose()}
+                        style={{ position: 'relative' }}
+                      >
                         <FontAwesomeIcon icon={faCalendarAlt} />
                         <span className="menu-title">{t('candidate_visit_calendar')}</span>
+                        {todayB2cFollowupCount > 0 && (
+                          <span
+                            className={`badge rounded-pill ms-1 ${b2cImminentSoon ? 'bg-warning text-dark b2c-followup-badge-blink' : 'bg-primary'}`}
+                            style={{
+                              fontSize: '0.7rem',
+                              minWidth: '18px',
+                              padding: '2px 6px',
+                              position: 'absolute',
+                              top: '2px',
+                              left: '40px',
+                            }}
+                            title={
+                              b2cImminentSoon
+                                ? `${t('followup_soon_heading')} — ${t('today_b2c_followups')}`
+                                : t('today_b2c_followups')
+                            }
+                          >
+                            {todayB2cFollowupCount > 99 ? '99+' : todayB2cFollowupCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
@@ -765,9 +977,33 @@ function CollegeLayout({ children }) {
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
-                      <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
+                      <Link
+                        to="/institute/b2bfollowup"
+                        onClick={() => handleSidebarClose()}
+                        style={{ position: 'relative' }}
+                      >
                         <FontAwesomeIcon icon={faCalendarAlt} />
                         <span className="menu-title">{t('calendar_follow_up')}</span>
+                        {todayB2bFollowupCount > 0 && (
+                          <span
+                            className={`badge rounded-pill ms-1 ${b2bImminentSoon ? 'bg-warning text-dark b2c-followup-badge-blink' : 'bg-primary'}`}
+                            style={{
+                              fontSize: '0.7rem',
+                              minWidth: '18px',
+                              padding: '2px 6px',
+                              position: 'absolute',
+                              top: '2px',
+                              left: '40px',
+                            }}
+                            title={
+                              b2bImminentSoon
+                                ? `${t('followup_soon_heading')} — ${t('today_b2b_followups')}`
+                                : t('today_b2b_followups')
+                            }
+                          >
+                            {todayB2bFollowupCount > 99 ? '99+' : todayB2bFollowupCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                   </ul>

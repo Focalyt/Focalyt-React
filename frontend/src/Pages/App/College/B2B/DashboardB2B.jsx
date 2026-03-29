@@ -3,11 +3,59 @@ import axios from 'axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays, Phone, Mail, MapPin, User, Briefcase, Eye, Edit, History, Plus } from 'lucide-react';
 
+/** LRP model fields (order matches backend/controllers/models/lrp.js) */
+const LRP_TABLE_COLUMNS = [
+  { key: 'partnerType', label: 'Partner type' },
+  { key: 'implementationPartnerName', label: 'Implementation partner' },
+  { key: 'visitDate', label: 'Visit date' },
+  { key: 'geoTaggedPhoto', label: 'Geo-tagged photo' },
+  { key: 'state', label: 'State' },
+  { key: 'district', label: 'District' },
+  { key: 'schoolNameAddress', label: 'School name & address' },
+  { key: 'schoolType', label: 'School type' },
+  { key: 'schoolTypeOther', label: 'School type (other)' },
+  { key: 'schoolEmail', label: 'School email' },
+  { key: 'coordinatorNameContact', label: 'Coordinator name & contact' },
+  { key: 'decisionMaker', label: 'Decision maker' },
+  { key: 'studentsClass2to12', label: 'Students (class 2–12)' },
+  { key: 'hasLabs', label: 'Has labs' },
+  { key: 'interestedWorkshop', label: 'Interested in workshop' },
+  { key: 'avgStudentsPerClass', label: 'Avg students / class' },
+  { key: 'preferredPlan', label: 'Preferred plan' },
+  { key: 'managementReadyApprove', label: 'Management ready to approve' },
+  { key: 'meetingWithSeniorStaff', label: 'Meeting with senior staff' },
+  { key: 'nextMeetingDate', label: 'Next meeting date' },
+  { key: 'hasComputerLab', label: 'Has computer lab' },
+  { key: 'computersAvailable', label: 'Computers available' },
+  { key: 'fftlClasses', label: 'FFTL classes' },
+  { key: 'openForPartnership', label: 'Open for partnership' },
+  { key: 'teachersAvailable', label: 'Teachers available' },
+  { key: 'proposalExplainedSubmitted', label: 'Proposal explained / submitted' },
+  { key: 'poExpectedTimeline', label: 'PO expected timeline' },
+  { key: 'leadStatus', label: 'Lead status' },
+  { key: 'lockLead', label: 'Lock lead' },
+  { key: 'otherRemarks', label: 'Other remarks' },
+];
+
+const formatLrpCell = (key, value) => {
+  if (value === undefined || value === null || value === '') return '—';
+  if (key === 'visitDate' || key === 'nextMeetingDate') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+  }
+  if (key === 'geoTaggedPhoto' && typeof value === 'string') {
+    return (
+      <a href={value} target="_blank" rel="noopener noreferrer" className="small">
+        Open
+      </a>
+    );
+  }
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value);
+  return String(value);
+};
 
 const B2BDashboard = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
 
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -34,27 +82,86 @@ const B2BDashboard = () => {
     end: new Date()
   });
 
-  // Fetch dashboard data
+  const [lrpRecords, setLrpRecords] = useState([]);
+  const [lrpLoading, setLrpLoading] = useState(true);
+  const [lrpError, setLrpError] = useState(null);
+
+  const parseLrpRows = (payload) => {
+    if (!payload || typeof payload !== 'object') return [];
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.records)) return payload.records;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  };
+
   const fetchDashboardData = async () => {
+    const userRaw = sessionStorage.getItem('user');
+    const parsed = userRaw ? JSON.parse(userRaw) : {};
+    const authToken = parsed.token;
+
     try {
       setIsLoading(true);
-      
-      const response = await axios.get(`${backendUrl}/college/b2b/dashboard`, {
-        headers: { 'x-auth': token },
-        params: {
-          startDate: dateRange.start.toISOString(),
-          endDate: dateRange.end.toISOString(),
-          period: selectedPeriod
-        }
-      });
+      setLrpLoading(true);
+      setLrpError(null);
 
-      if (response.data.status) {
-        setDashboardData(response.data.data);
+      if (!backendUrl || !authToken) {
+        setLrpError(!authToken ? 'Not logged in (missing token).' : 'Backend URL is not configured.');
+        setLrpRecords([]);
+        return;
+      }
+
+      const headers = { 'x-auth': authToken };
+
+      const [dashResult, lrpResult] = await Promise.allSettled([
+        axios.get(`${backendUrl}/college/b2b/dashboard`, {
+          headers,
+          params: {
+            startDate: dateRange.start.toISOString(),
+            endDate: dateRange.end.toISOString(),
+            period: selectedPeriod
+          }
+        }),
+        axios.get(`${backendUrl}/college/lrp`, {
+          headers,
+          params: { limit: 200, page: 1 },
+          validateStatus: (s) => s >= 200 && s < 500
+        })
+      ]);
+
+      if (dashResult.status === 'fulfilled' && dashResult.value?.data?.status) {
+        setDashboardData(dashResult.value.data.data);
+      } else if (dashResult.status === 'rejected') {
+        console.error('Error fetching dashboard data:', dashResult.reason);
+      }
+
+      if (lrpResult.status === 'fulfilled') {
+        const res = lrpResult.value;
+        const status = res.status;
+        const body = res.data;
+        if (status === 401 || status === 403) {
+          setLrpError(body?.message || 'Not authorized to load LRP. Please log in again.');
+          setLrpRecords([]);
+        } else if (status >= 400) {
+          setLrpError(body?.message || `Could not load LRP (HTTP ${status}).`);
+          setLrpRecords([]);
+        } else if (body?.success === false) {
+          setLrpError(body?.message || 'Could not load LRP.');
+          setLrpRecords([]);
+        } else {
+          setLrpRecords(parseLrpRows(body));
+        }
+      } else {
+        const err = lrpResult.reason;
+        const msg = err?.response?.data?.message || err?.message || 'Failed to load LRP records';
+        setLrpError(msg);
+        setLrpRecords([]);
+        console.error('Error fetching LRP records:', err);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setIsLoading(false);
+      setLrpLoading(false);
     }
   };
 
@@ -252,6 +359,60 @@ const B2BDashboard = () => {
                 </div>
                 <DollarSign className="text-success opacity-50" size={32} />
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* LRP visits (saved from /college/lrp POST) */}
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <div className="card shadow-sm">
+            <div className="card-body">
+              <h3 className="h5 fw-semibold mb-3 d-flex align-items-center gap-2">
+                <MapPin className="text-primary" size={20} />
+                LRP records
+              </h3>
+              <p className="text-muted small mb-3">
+                Submissions from the <strong>LRP</strong> form only (not B2B CRM leads). All form fields ({LRP_TABLE_COLUMNS.length} columns); scroll sideways on small screens.
+              </p>
+              {lrpError && (
+                <div className="alert alert-warning py-2 small mb-3" role="alert">
+                  {lrpError}
+                </div>
+              )}
+              {lrpLoading ? (
+                <div className="text-center py-4 text-muted">Loading LRP data…</div>
+              ) : lrpRecords.length === 0 && !lrpError ? (
+                <div className="text-center py-4 text-muted">
+                  No LRP form submissions yet. If you only added leads under B2B Sales, they appear in <strong>Recent Leads</strong> below, not here.
+                </div>
+              ) : lrpRecords.length === 0 ? null : (
+                <div className="table-responsive" style={{ maxHeight: '70vh' }}>
+                  <table className="table table-sm table-bordered table-hover align-middle mb-0" style={{ fontSize: '0.75rem' }}>
+                    <thead className="table-light">
+                      <tr>
+                        {LRP_TABLE_COLUMNS.map((col) => (
+                          <th key={col.key} className="text-nowrap px-2 py-2 small" title={col.label}>
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lrpRecords.map((row) => (
+                        <tr key={row._id}>
+                          {LRP_TABLE_COLUMNS.map((col) => (
+                            <td key={col.key} className="px-2 py-1" style={{ maxWidth: 200, whiteSpace: col.key === 'geoTaggedPhoto' ? 'nowrap' : 'normal', wordBreak: 'break-word' }}>
+                              {formatLrpCell(col.key, row[col.key])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>

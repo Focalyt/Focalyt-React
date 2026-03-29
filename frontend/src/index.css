@@ -18,3 +18,18 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+:root {
+  --toastify-color-info: #fc2b5a;
+  --toastify-text-color-info: #fff;
+  --toastify-icon-color-info: #fff;
+}
+
+.Toastify__toast-theme--colored.Toastify__toast--info {
+  background: #fc2b5a !important;
+  color: #fff !important;
+}
+
+.Toastify__toast-theme--colored.Toastify__toast--info .Toastify__toast-icon svg {
+  fill: #fff;
+}

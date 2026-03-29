@@ -2,6 +2,7 @@ const { Schema, model } = require("mongoose");
 
 const lrpSchema = new Schema(
   {
+    college: { type: Schema.Types.ObjectId, ref: "College" },
     partnerType: { type: String, required: true, trim: true }, 
     implementationPartnerName: { type: String, required: true, trim: true },
     visitDate: { type: Date, required: true },
@@ -35,6 +36,7 @@ const lrpSchema = new Schema(
     leadStatus: { type: String, required: true, trim: true }, 
     lockLead: { type: String, required: true, trim: true }, 
     otherRemarks: { type: String, trim: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );

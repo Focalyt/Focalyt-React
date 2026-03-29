@@ -228,8 +228,8 @@ commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 
 		const events = await getAllGoogleCalendarEvents({
 			user,
-			timeMin: timeMin.toISOString(),
-			timeMax: timeMax.toISOString()
+			startDate: timeMin.toISOString(),
+			endDate: timeMax.toISOString(),
 		});
 
 		if (events.error) {

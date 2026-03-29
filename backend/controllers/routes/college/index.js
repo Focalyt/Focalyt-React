@@ -9948,7 +9948,21 @@ router.get("/lead-history/:leadId", isCollege, async (req, res) => {
 // Get admission list
 // Verify document and update KYC status
 
-
+function mandatoryDocsFullyVerified(course, uploadedDocsList) {
+	const required = (course?.docsRequired || []).filter(
+		(d) => d.mandatory === true && d.status !== false
+	);
+	if (!required.length) return false;
+	for (const reqDoc of required) {
+		const rid = reqDoc._id.toString();
+		const matching = (uploadedDocsList || []).filter(
+			(u) => u.docsId && u.docsId.toString() === rid
+		);
+		const latest = matching.length ? matching[matching.length - 1] : null;
+		if (!latest || latest.status !== "Verified") return false;
+	}
+	return true;
+}
 
 router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req, res) => {
 	try {
@@ -9968,6 +9982,7 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		const docId = profile.uploadedDocs.find(doc => doc._id.toString() === validUploadId.toString()).docsId;
 
+		const allMandatoryVerifiedBefore = mandatoryDocsFullyVerified(profile._course, profile.uploadedDocs);
 
 		//merge docsRequired and uploadedDocs
 
@@ -10075,52 +10090,126 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		await profile.save();
 
-		// Check if all mandatory documents are verified after saving
-		let allMandatoryDocsVerified = true;
+		const updatedProfile = await AppliedCourses.findById(validProfileId)
+			.populate("_course", "docsRequired")
+			.populate("_candidate", "mobile whatsapp name");
+		const allMandatoryDocsVerified = mandatoryDocsFullyVerified(
+			updatedProfile._course,
+			updatedProfile.uploadedDocs
+		);
 
-		// Get the updated profile to check current status
-		const updatedProfile = await AppliedCourses.findById(validProfileId).populate('_course');
-		const updatedRequiredDocs = updatedProfile._course?.docsRequired || [];
-		const updatedUploadedDocs = updatedProfile.uploadedDocs || [];
+		let documentVerifiedWhatsAppSent = false;
+		let documentVerifiedWhatsAppError = null;
+		let documentVerifiedWhatsAppSkippedNoPhone = false;
+		if (
+			status === "Verified" &&
+			allMandatoryDocsVerified &&
+			!allMandatoryVerifiedBefore
+		) {
+			const rawPhone =
+				updatedProfile._candidate?.whatsapp ?? updatedProfile._candidate?.mobile;
+			if (rawPhone) {
+				try {
+					const authToken = req.headers["x-auth"];
+					const protocol = req.protocol || "http";
+					const host = req.get("host");
+					const apiBase = `${protocol}://${host}`;
+					await axios.post(
+						`${apiBase}/college/whatsapp/send-template`,
+						{
+							templateName: "document_verified",
+							to: String(rawPhone),
+							collegeId: collegeId.toString(),
+							registrationId: validProfileId.toString(),
+							variableValues: [],
+						},
+						{
+							headers: {
+								"x-auth": authToken,
+								"Content-Type": "application/json",
+							},
+							timeout: 15000,
+						}
+					);
+					documentVerifiedWhatsAppSent = true;
+				} catch (whatsappErr) {
+					documentVerifiedWhatsAppError =
+						whatsappErr.response?.data?.message || whatsappErr.message || "WhatsApp send failed";
+					console.error(
+						"document_verified template send failed:",
+						documentVerifiedWhatsAppError
+					);
+				}
+			} else {
+				documentVerifiedWhatsAppSkippedNoPhone = true;
+			}
+		}
 
-		// Create map of uploaded docs by docsId
-		const updatedUploadedDocsMap = {};
-		updatedUploadedDocs.forEach(d => {
-			if (d.docsId) updatedUploadedDocsMap[d.docsId.toString()] = d;
-		});
-
-		// Check each mandatory document
-		// for (const reqDoc of updatedRequiredDocs) {
-		// 	if (reqDoc.mandatory) {
-		// 		const uploadedDoc = updatedUploadedDocsMap[reqDoc._id.toString()];
-		// 		// If mandatory doc is not uploaded or not verified, set flag to false
-		// 		if (!uploadedDoc || uploadedDoc.status !== 'Verified') {
-		// 			allMandatoryDocsVerified = false;
-		// 			break;
-		// 		}
-		// 	}
-		// }
-
-		// If all mandatory docs are verified, update KYC status to true
-		// if (allMandatoryDocsVerified && !updatedProfile.kyc) {
-		// 	updatedProfile.kyc = true;
-		// 	await updatedProfile.save();
-
-
-		// 	const newStatusLogs = await statusLogHelper(id, {
-		// 		kycApproved: true
-		// 	});
-
-
-		// }
+		let documentRejectedWhatsAppSent = false;
+		let documentRejectedWhatsAppError = null;
+		let documentRejectedWhatsAppSkippedNoPhone = false;
+		if (status === "Rejected") {
+			const rawPhoneReject =
+				updatedProfile._candidate?.whatsapp ?? updatedProfile._candidate?.mobile;
+			if (rawPhoneReject) {
+				const studentName = updatedProfile._candidate?.name || "Student";
+				const reasonText =
+					rejectionReason && String(rejectionReason).trim()
+						? String(rejectionReason).trim().slice(0, 900)
+						: "Please re-upload your document as per instructions.";
+				try {
+					const authToken = req.headers["x-auth"];
+					const protocol = req.protocol || "http";
+					const host = req.get("host");
+					const apiBase = `${protocol}://${host}`;
+					await axios.post(
+						`${apiBase}/college/whatsapp/send-template`,
+						{
+							templateName: "document_rejected_",
+							to: String(rawPhoneReject),
+							collegeId: collegeId.toString(),
+							registrationId: validProfileId.toString(),
+							variableValues: [studentName, reasonText],
+						},
+						{
+							headers: {
+								"x-auth": authToken,
+								"Content-Type": "application/json",
+							},
+							timeout: 15000,
+						}
+					);
+					documentRejectedWhatsAppSent = true;
+				} catch (whatsappErr) {
+					documentRejectedWhatsAppError =
+						whatsappErr.response?.data?.message ||
+						whatsappErr.message ||
+						"WhatsApp send failed";
+					console.error(
+						"document_rejected_ template send failed:",
+						documentRejectedWhatsAppError
+					);
+				}
+			} else {
+				documentRejectedWhatsAppSkippedNoPhone = true;
+			}
+		}
 
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
-			// kycUpdated: profile.kyc === true,
-			// verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
 			requiredCount,
-			allMandatoryDocsVerified: allMandatoryDocsVerified
+			allMandatoryDocsVerified,
+			documentVerifiedWhatsAppSent,
+			documentVerifiedWhatsAppSkippedNoPhone,
+			...(documentVerifiedWhatsAppError && {
+				documentVerifiedWhatsAppError,
+			}),
+			documentRejectedWhatsAppSent,
+			documentRejectedWhatsAppSkippedNoPhone,
+			...(documentRejectedWhatsAppError && {
+				documentRejectedWhatsAppError,
+			}),
 		});
 
 	} catch (err) {
