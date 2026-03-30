@@ -1,24 +1,178 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShare, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faShare, faDownload, faFilter } from '@fortawesome/free-solid-svg-icons';
 import $ from 'jquery';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
+const PostText = React.memo(function PostText({ content, postId, isExpanded, onToggleExpand }) {
+  const textRef = useRef(null);
+  const [truncated, setTruncated] = useState(false);
+
+  useEffect(() => {
+    const checkTruncation = () => {
+      if (!textRef.current) return;
+      const element = textRef.current;
+
+      const style = window.getComputedStyle(element);
+      const lineHeight = parseFloat(style.lineHeight) || 1.5 * parseFloat(style.fontSize);
+
+      const originalStyles = {
+        maxHeight: element.style.maxHeight,
+        overflow: element.style.overflow,
+        webkitLineClamp: element.style.webkitLineClamp,
+      };
+
+      element.style.maxHeight = 'none';
+      element.style.overflow = 'visible';
+      element.style.webkitLineClamp = 'unset';
+
+      const fullHeight = element.scrollHeight;
+      const lineCount = Math.ceil(fullHeight / lineHeight);
+      setTruncated(lineCount > 3);
+
+      element.style.maxHeight = originalStyles.maxHeight;
+      element.style.overflow = originalStyles.overflow;
+      element.style.webkitLineClamp = originalStyles.webkitLineClamp;
+    };
+
+    const timer = setTimeout(checkTruncation, 10);
+    window.addEventListener('resize', checkTruncation);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', checkTruncation);
+    };
+  }, [content]);
+
+  return (
+    <div className="post-text-container">
+      <div ref={textRef} className={isExpanded ? "show-text" : "hidden-text"}>
+        {content || "No content available"}
+      </div>
+
+      {truncated && (
+        <div
+          className={`toggle-more ${truncated ? 'toggle-more-visible' : 'toggle-more-hidden'}`}
+          onClick={() => onToggleExpand(postId)}
+        >
+          {isExpanded ? "See less..." : "See more..."}
+        </div>
+      )}
+    </div>
+  );
+});
+
+const PostCarousel = React.memo(function PostCarousel({ files, postId }) {
+  const sliderRef = useRef(null);
+  const slickInitialized = useRef(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const initSlickSlider = (selector, options) => {
+    if (typeof $ !== 'undefined') {
+      $(selector).slick(options);
+    }
+  };
+
+  useEffect(() => {
+    if (!files || files.length === 0) return;
+
+    if (sliderRef.current && !slickInitialized.current) {
+      const slickOptions = {
+        dots: true,
+        infinite: true,
+        slidesToShow: 1,
+        slidesToScroll: 1,
+        arrows: true,
+        autoplay: true,
+        autoplaySpeed: 1500,
+        responsive: [
+          { breakpoint: 1366, settings: { slidesToShow: 1 } },
+          { breakpoint: 768, settings: { slidesToShow: 1 } },
+        ],
+        beforeChange: (current, next) => {
+          setCurrentIndex(next);
+        },
+        initialSlide: 0,
+      };
+
+      initSlickSlider(`#slider-${postId}`, slickOptions);
+      slickInitialized.current = true;
+    }
+
+    return () => {
+      if (slickInitialized.current && sliderRef.current) {
+        try {
+          $(`#slider-${postId}`).slick('unslick');
+          slickInitialized.current = false;
+        } catch (e) {
+          console.error("Error unslicking slider:", e);
+        }
+      }
+    };
+  }, [files, postId]);
+
+  if (!files || files.length === 0) return null;
+
+  return (
+    <div className="postsection" id={`post-${postId}`}>
+      <div className="slider_images" id={`slider-${postId}`} ref={sliderRef}>
+        {files.map((file, index) => (
+          <div key={index}>
+            {file.fileType === "image" ? (
+              <img
+                src={file.fileURL}
+                className="d-block w-100"
+                alt={`Slide ${index + 1}`}
+                style={{
+                  height: "400px",
+                  maxHeight: "400px",
+                  objectFit: "contain",
+                }}
+              />
+            ) : file.fileType === "video" ? (
+              <video
+                className="d-block w-100"
+                controls
+                muted
+                playsInline
+                style={{
+                  height: "400px",
+                  maxHeight: "400px",
+                  objectFit: "contain",
+                }}
+              >
+                <source src={file.fileURL} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {files.length > 1 && (
+        <div className="carousel-counter">
+          {currentIndex + 1}/{files.length}
+        </div>
+      )}
+    </div>
+  );
+});
+
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
-  const [currentSlides, setCurrentSlides] = useState({});
 
   const [startDate, setStartDate] = useState();
   const [endDate, setEndDate] = useState();
   const [filterData, setFilterData] = useState();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -44,14 +198,6 @@ function Community() {
       try {
         const response = await axios.get(`${backendUrl}/community`);
         setPosts(response.data.posts);
-
-        // Initialize current slide for each post
-        const initialSlides = {};
-        response.data.posts.forEach((post, index) => {
-          const postId = post._id ? `post-${post._id}` : `post-${index}`;
-          initialSlides[postId] = 0;
-        });
-        setCurrentSlides(initialSlides);
       } catch (error) {
         console.error("Error fetching posts data:", error);
       }
@@ -60,7 +206,7 @@ function Community() {
   }, [backendUrl]);
 
   // Text expansion toggle handler
-  const toggleExpand = (postId) => {
+  const toggleExpand = useCallback((postId) => {
     setExpandedPosts(prev => {
       const newState = {
         ...prev,
@@ -74,11 +220,11 @@ function Community() {
 
       return newState;
     });
-  };
+  }, []);
 
 
 
-  const handleDownloadAllImages = async (files) => {
+  const handleDownloadAllImages = useCallback(async (files) => {
     if (!files || files.length === 0) {
       alert("No files to download!");
       return;
@@ -181,7 +327,7 @@ function Community() {
       console.error("Error creating ZIP:", error);
       alert("An error occurred while creating the ZIP file. Please try again.");
     }
-  };
+  }, []);
 
   // Alternative approach without using JSZip for browsers that block it
   const downloadFilesSequentially = (files) => {
@@ -230,7 +376,7 @@ function Community() {
 
 
   // Share handler
-  const handleShare = (postId) => {
+  const handleShare = useCallback((postId) => {
     const postUrl = `${window.location.origin}${window.location.pathname}#${postId}`;
 
     const shareData = {
@@ -254,201 +400,79 @@ function Community() {
       document.body.removeChild(tempInput);
       alert("Link copied to clipboard! Share it manually.");
     }
-  };
+  }, []);
 
-  // PostText component with fixed line count
-  const PostText = ({ content, postId }) => {
-    const textRef = useRef(null);
-    const [truncated, setTruncated] = useState(false);
-    const isExpanded = expandedPosts[postId];
+  const renderedPosts = useMemo(() => {
+    if (!posts || posts.length === 0) return null;
 
-    // Check if content exceeds the defined line count
-    useEffect(() => {
-      const checkTruncation = () => {
-        if (textRef.current) {
-          const element = textRef.current;
+    return posts.map((post, index) => {
+      const postId = post._id ? `post-${post._id}` : `post-${index}`;
+      const isExpanded = !!expandedPosts[postId];
 
-          // Calculate how many lines of text we have
-          const style = window.getComputedStyle(element);
-          const lineHeight = parseFloat(style.lineHeight) || 1.5 * parseFloat(style.fontSize);
+      return (
+        <div className="blog--card" id={postId} key={post._id || index}>
+          <div className="card-header">
+            <div className="inner__card">
+              <div className="user_image text-black">
+                <figure>
+                  <img src="/favicon.ico" alt="" />
+                </figure>
+              </div>
+              <h3 className="user__name text-black">
+                <span className="start__name"><b>Focalyt</b></span>
 
-          // Force the element to temporarily show all content to measure it
-          const originalStyles = {
-            maxHeight: element.style.maxHeight,
-            overflow: element.style.overflow,
-            webkitLineClamp: element.style.webkitLineClamp
-          };
+                {post.tags && post.tags.length > 0 && (
+                  <>
+                    <span className="tag__user">
+                      is with <b>{post.tags[0].name}</b>
+                    </span>
 
-          element.style.maxHeight = 'none';
-          element.style.overflow = 'visible';
-          element.style.webkitLineClamp = 'unset';
-
-          // Get the full height
-          const fullHeight = element.scrollHeight;
-
-          // Calculate the number of lines
-          const lineCount = Math.ceil(fullHeight / lineHeight);
-
-          // Set truncated flag if lines exceed our limit
-          setTruncated(lineCount > 3); // 3 lines limit
-
-          // Restore original styles
-          element.style.maxHeight = originalStyles.maxHeight;
-          element.style.overflow = originalStyles.overflow;
-          element.style.webkitLineClamp = originalStyles.webkitLineClamp;
-        }
-      };
-
-      // Run after a small delay to ensure content is rendered
-      const timer = setTimeout(checkTruncation, 10);
-
-      // Also check on window resize
-      window.addEventListener('resize', checkTruncation);
-
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('resize', checkTruncation);
-      };
-    }, [content]);
-
-    return (
-      <div className="post-text-container">
-        <div
-          ref={textRef}
-          className={isExpanded ? "show-text" : "hidden-text"}
-        >
-          {content || "No content available"}
-        </div>
-
-        {truncated && (
-          <div
-            className={`toggle-more ${truncated ? 'toggle-more-visible' : 'toggle-more-hidden'}`}
-            onClick={() => toggleExpand(postId)}
-          >
-            {isExpanded ? "See less..." : "See more..."}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Carousel component
-  const PostCarousel = ({ files, postId }) => {
-    const sliderRef = useRef(null);
-    const slickInitialized = useRef(false);
-    const currentIndex = currentSlides[postId] || 0;
-
-    // Function to initialize Slick Slider
-    const initSlickSlider = (selector, options) => {
-      if (typeof $ !== 'undefined') {
-        $(selector).slick(options);
-      }
-    };
-
-    // Initialize the slider when component mounts
-    useEffect(() => {
-      if (!files || files.length === 0) return;
-
-      // Only initialize slick if it hasn't been already
-      if (sliderRef.current && !slickInitialized.current) {
-        const slickOptions = {
-          dots: true,
-          infinite: true,
-          slidesToShow: 1,
-          slidesToScroll: 1,
-          arrows: true,
-          autoplay: true,
-          autoplaySpeed: 1500, // Match your existing 5-second interval
-          responsive: [
-            { breakpoint: 1366, settings: { slidesToShow: 1 } },
-            { breakpoint: 768, settings: { slidesToShow: 1 } },
-          ],
-          // Synchronize slick's state with your React state
-          beforeChange: (current, next) => {
-            setCurrentSlides((prev) => ({
-              ...prev,
-              [postId]: next,
-            }));
-          },
-          initialSlide: currentIndex // Start at the current index
-        };
-
-        // Initialize slick slider
-        initSlickSlider(`#slider-${postId}`, slickOptions);
-        slickInitialized.current = true;
-      }
-
-      // Cleanup function to destroy slick when component unmounts
-      return () => {
-        if (slickInitialized.current && sliderRef.current) {
-          try {
-            $(`#slider-${postId}`).slick('unslick');
-            slickInitialized.current = false;
-          } catch (e) {
-            console.error("Error unslicking slider:", e);
-          }
-        }
-      };
-    }, [files, postId]);
-
-    // Update slick slider when currentIndex changes
-    useEffect(() => {
-      if (slickInitialized.current && sliderRef.current) {
-        try {
-          $(`#slider-${postId}`).slick('slickGoTo', currentIndex);
-        } catch (e) {
-          console.error("Error going to slide:", e);
-        }
-      }
-    }, [currentIndex, postId]);
-
-    if (!files || files.length === 0) return null;
-
-    return (
-      <div className="postsection" id={`post-${postId}`}>
-        <div className="slider_images" id={`slider-${postId}`} ref={sliderRef}>
-          {files.map((file, index) => (
-            <div key={index}>
-              {file.fileType === "image" ? (
-                <img
-                  src={file.fileURL}
-                  className="d-block w-100"
-                  alt={`Slide ${index + 1}`}
-                  style={{
-                    height: "400px",
-                    maxHeight: "400px",
-                    objectFit: "contain",
-                  }}
-                />
-              ) : file.fileType === "video" ? (
-                <video
-                  className="d-block w-100"
-                  controls
-                  muted
-                  playsInline
-                  style={{
-                    height: "400px",
-                    maxHeight: "400px",
-                    objectFit: "contain",
-                  }}
-                >
-                  <source src={file.fileURL} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              ) : null}
+                    {post.tags.length > 1 && (
+                      <>
+                        <span className="more__user strong"> & <b>{post.tags.length - 1}</b></span>
+                        <span className="other"><b> Others</b></span>
+                      </>
+                    )}
+                  </>
+                )}
+              </h3>
             </div>
-          ))}
-        </div>
 
-        {/* Custom Slide Counter */}
-        {files.length > 1 && (
-          <div className="carousel-counter">
-            {currentIndex + 1}/{files.length}
+            <h5 className="blog__title text-black">
+              <PostText
+                content={post.content}
+                postId={postId}
+                isExpanded={isExpanded}
+                onToggleExpand={toggleExpand}
+              />
+            </h5>
           </div>
-        )}
-      </div>
-    );
-  };
+
+          <div className="card-content">
+            {post.files && post.files.length > 0 && (
+              <div className="card-image">
+                <div className="happy_candidates" id="blog--images">
+                  <PostCarousel files={post.files} postId={postId} />
+                </div>
+              </div>
+            )}
+
+            <div className="interaction-buttons d-flex align-items-center justify-content-around">
+              <div className="share_link" onClick={() => handleShare(postId)}>
+                <FontAwesomeIcon icon={faShare} /> Share
+              </div>
+              <div
+                className="share_link"
+                onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
+              >
+                <FontAwesomeIcon icon={faDownload} /> Download
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    });
+  }, [expandedPosts, handleDownloadAllImages, handleShare, posts, toggleExpand]);
   useEffect(() => {
     // Handle post scrolling from URL hash on load
     const postId = window.location.hash.substring(1);
@@ -465,9 +489,109 @@ function Community() {
       <section className="section-padding-top-40 mt-5">
         <div className="container-fluid p-0">
           <div className="mainContentLayout">
+            <div className="d-flex">
+              {!isSidebarOpen && (
+                <button
+                  type="button"
+                  className="sidebar-toggle-btn"
+                  onClick={() => setIsSidebarOpen((prev) => !prev)}
+                >
+                  <span className="sidebar-toggle-icon" />
+                </button>
+              )}
+              <div
+                className="filter-section container"
+                style={{ marginTop: "7px", marginBottom: "1.5rem", position: "relative" }}
+              >
+                {!isSidebarOpen && (
+                  <button
+                    type="button"
+                    className="filter-toggle-btn"
+                    aria-expanded={isFilterOpen}
+                    aria-label="Open filters"
+                    onClick={() => setIsFilterOpen((prev) => !prev)}
+                  >
+                    <FontAwesomeIcon icon={faFilter} />
+                    <span className="filter-toggle-text">Filter</span>
+                  </button>
+                )}
+
+                  <div
+                    className={`filter-overlay ${isFilterOpen ? 'open' : ''}`}
+                    onClick={() => setIsFilterOpen(false)}
+                    role="presentation"
+                  />
+
+                  <div className={`filter-drawer ${isFilterOpen ? 'open' : ''}`}>
+                    <div className="filter-drawer-header">
+                      <div className="filter-drawer-title">Filters</div>
+                      <button
+                        type="button"
+                        className="filter-close-btn"
+                        onClick={() => setIsFilterOpen(false)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  <div className="row align-items-center">
+                    <div className="col-md-3 CaledarSpace">
+                      <label>Start Date:</label>
+                      <DatePicker
+                        selected={startDate}
+                        onChange={(date) => setStartDate(date)}
+                        dateFormat="dd-MM-yyyy"
+                        className="form-control"
+                        placeholderText="Select Start Date"
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <label>End Date:</label>
+                      <DatePicker
+                        selected={endDate}
+                        onChange={(date) => setEndDate(date)}
+                        dateFormat="dd-MM-yyyy"
+                        className="form-control"
+                        placeholderText="Select End Date"
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <button
+                        className="btn btn-primary mt-2 w-100 filterBtn"
+                        onClick={() => {
+                          handleFilter();
+                          setIsFilterOpen(false);
+                        }}
+                      >
+                        Filter Posts
+                      </button>
+                    </div>
+                    <div className="col-md-3">
+                      <button
+                        className="btn btn-secondary mt-2 w-100"
+                        onClick={() => {
+                          setStartDate("");
+                          setEndDate("");
+                          setFilterData([]);
+                          setIsFilterOpen(false);
+                        }}
+                      >
+                        Reset Filter
+                      </button>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+           </div>
             <div className="mainContainer">
-            <div className="leftSidebar">
+              <div className={`leftSidebar LeftSide  ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar">
+                  <button
+                    type="button"
+                    className="sidebar-close-btn"
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    ×
+                  </button>
                   {/* Notification Banner */}
                   <div className="notification">
                     <span className="close">×</span>
@@ -537,127 +661,10 @@ function Community() {
                 </div>
               </div>
               <div className="mainBody">
-                <div className="filter-section container my-4">
-                  <div className="row align-items-center">
-                    <div className="col-md-3">
-                      <label>Start Date:</label>
-                      <DatePicker
-                        selected={startDate}
-                        onChange={(date) => setStartDate(date)}
-                        dateFormat="dd-MM-yyyy"
-                        className="form-control"
-                        placeholderText="Select Start Date"
-                      />
-                    </div>
-                    <div className="col-md-3">
-                      <label>End Date:</label>
-                      <DatePicker
-                        selected={endDate}
-                        onChange={(date) => setEndDate(date)}
-                        dateFormat="dd-MM-yyyy"
-                        className="form-control"
-                        placeholderText="Select End Date"
-                      />
-                    </div>
-                    <div className="col-md-3">
-                      <button
-                        className="btn btn-primary mt-2 w-100 filterBtn"
-                        onClick={() => handleFilter()}
-                      >
-                        Filter Posts
-                      </button>
-                    </div>
-                    <div className="col-md-3">
-                      <button
-                        className="btn btn-secondary mt-2 w-100"
-                        onClick={() => {
-                          setStartDate("");
-                          setEndDate("");
-                          setFilterData([]);
-                        }}
-                      >
-                        Reset Filter
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              
 
-                {posts && posts.length > 0 ? (
-                  posts.map((post, index) => {
-                    const postId = post._id ? `post-${post._id}` : `post-${index}`;
-
-                    return (
-                      <div className="blog--card" id={postId} key={post._id || index}>
-                        {/* Header Section */}
-                        <div className="card-header">
-                          <div className="inner__card">
-                            <div className="user_image text-black">
-                              <figure>
-                                <img src="/favicon.ico" alt="" />
-                              </figure>
-                            </div>
-                            <h3 className="user__name text-black">
-                              <span className="start__name"><b>Focalyt</b></span>
-
-                              {post.tags && post.tags.length > 0 && (
-                                <>
-                                  <span className="tag__user">
-                                    is with <b>{post.tags[0].name}</b>
-                                  </span>
-
-                                  {post.tags.length > 1 && (
-                                    <>
-                                      <span className="more__user strong"> & <b>{post.tags.length - 1}</b></span>
-                                      <span className="other"><b> Others</b></span>
-                                    </>
-                                  )}
-                                </>
-                              )}
-                            </h3>
-                          </div>
-
-                          <h5 className="blog__title text-black">
-                            <PostText
-                              content={post.content}
-                              postId={postId}
-                            />
-                          </h5>
-                        </div>
-
-                        {/* Main Content */}
-                        <div className="card-content">
-                          {post.files && post.files.length > 0 && (
-                            <div className="card-image">
-                              <div className="happy_candidates" id="blog--images">
-                                <PostCarousel
-                                  files={post.files}
-                                  postId={postId}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Interaction Buttons */}
-                          <div className="interaction-buttons d-flex align-items-center justify-content-around">
-                            <div
-                              className="share_link"
-                              onClick={() => handleShare(postId)}
-                            >
-                              <FontAwesomeIcon icon={faShare} /> Share
-                            </div>
-                            <div
-                              className="share_link"
-                              onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
-                            >
-                              <FontAwesomeIcon icon={faDownload} /> Download
-                            </div>
-
-
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                {renderedPosts ? (
+                  renderedPosts
                 ) : (
                   <div className="col-12 text-center py-5">
                     <h3 className="text-muted">No posts available.</h3>
@@ -679,18 +686,18 @@ function Community() {
   width: 100%;
 }
 
-.mainContainer {
+.mainContainer { /* changes done*/
   display: flex;
   width: 100%;
-  height: 100vh;
+  /* height: 100vh;  Previous fixed height commented for better scroll */
 }
 
-.mainContent {
+.mainContent {  /* cahnges done*/
   display: flex;
   width: 100%;
-  height: 100vh;
-  border: 1px solid red;
-  /* margin-top: 80px; */
+  /* height: 100vh;  Previous fixed height commented for better scroll */
+  /* border: 1px solid red;  Old debug border commented */
+  /* margin-top: 80px;  Old layout tweak commented */
 }
 .section-padding-top-40{
   padding-top: 45px ;
@@ -1904,28 +1911,238 @@ video.post-media-item {
     padding: 6px 10px;
   }
 }
+       `
+        }
+      </style>
 
+      <style>
+        {
+          `
+          .sidebar-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  background-color: #f3345a;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin-bottom: 12px;
+}
+
+.filter-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  padding: 0 12px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  background-color: #f3345a;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin-bottom: 12px;
+}
+
+.filter-toggle-text {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+.filter-toggle-btn svg {
+  font-size: 16px;
+}
+
+.filter-overlay {
+  display: none;
+}
+
+.filter-drawer {
+  display: block;
+}
+
+.filter-drawer-header {
+  display: none;
+}
+
+.filter-close-btn {
+  display: none;
+}
+
+.sidebar-toggle-icon {
+  width: 18px;
+  height: 2px;
+  background-color: #ffffff;
+  position: relative;
+  display: inline-block;
+}
+
+.sidebar-toggle-icon::before,
+.sidebar-toggle-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 18px;
+  height: 2px;
+  background-color: #ffffff;
+}
+
+.sidebar-toggle-icon::before {
+  top: -6px;
+}
+
+.sidebar-toggle-icon::after {
+  top: 6px;
+}
+
+.sidebar-close-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  color: #4b5563;
+  z-index: 2;
+}
 
 @media (max-width: 767px) {
+  .CaledarSpace{
+    margin-bottom:10px;
+  }
+  .filter-toggle-btn {
+    display: flex;
+    position: sticky;
+    top: 100px;
+    right: 16px;
+    margin-left: auto;
+    // z-index: 1040;
+  }
+
+  .filter-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    will-change: opacity;
+    z-index: 1045;
+  }
+
+  .filter-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .filter-drawer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 92vw;
+    max-width: 460px;
+    height: 90vh;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+    padding: 16px;
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+    pointer-events: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    will-change: transform, opacity;
+    z-index: 1050;
+  }
+
+  .filter-drawer.open {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+
+  .filter-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .filter-drawer-title {
+    font-weight: 700;
+    color: #111827;
+    font-size: 16px;
+  }
+
+  .filter-close-btn {
+    display: inline-flex;
+    border: none;
+    background: transparent;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    color: #4b5563;
+  }
+
   .mainContainer {
     flex-direction: column;
+    position: relative;
   }
   
   .leftSidebar {
-    width: 100%;
-    height: auto;
-    min-height: auto;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    width: 260px;
+    height: 100vh;
+    min-height: 100vh;
+    z-index: 1050;
+    transition: left 0.3s ease;
   }
   
+  .leftSidebar.open {
+    left: 0;
+  }
+
   .mainBody {
     width: 100%;
   }
   
   .sidebar {
     width: 100%;
-    height: auto;
+    height: 100%;
+    position: relative;
+  }
+
+  .sidebar-toggle-btn {
+    display: flex;
+    position: sticky;
+    top: 100px;
+    left: 16px;
+    // z-index: 1040;
+  }
+
+  .sidebar-close-btn {
+    display: block;
   }
 }
+
+
           `
         }
       </style>

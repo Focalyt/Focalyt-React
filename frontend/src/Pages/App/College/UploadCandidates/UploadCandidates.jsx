@@ -845,7 +845,7 @@ const UploadCandidates = () => {
                 Import candidate spreadsheets, review upload history, and manage candidate records from one organized workspace.
               </p>
             </div>
-            <div className="upload-hero-metrics compact">
+            {/* <div className="upload-hero-metrics compact">
               <div className="upload-metric-card">
                 <span className="metric-label">Current View</span>
                 <strong>{currentTabConfig.title}</strong>
@@ -858,7 +858,7 @@ const UploadCandidates = () => {
                 <span className="metric-label">Search</span>
                 <strong>{appliedSearchTerm ? 'Active' : 'All Records'}</strong>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <div className="upload-toolbar-card">
@@ -887,7 +887,7 @@ const UploadCandidates = () => {
             </div>
 
             <div className="toolbar-actions-row">
-              <button
+              {/* <button
                 type="button"
                 className="toolbar-action-pill"
                 onClick={() => setShowFilterModal(true)}
@@ -895,7 +895,7 @@ const UploadCandidates = () => {
                 <i className="fas fa-sliders"></i>
                 Filters
                 {totalActiveFilters > 0 && <span className="toolbar-count">{totalActiveFilters}</span>}
-              </button>
+              </button> */}
 
               <button
                 type="button"

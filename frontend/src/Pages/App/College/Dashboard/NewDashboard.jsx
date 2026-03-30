@@ -326,12 +326,24 @@ const MultiSelectCheckbox = ({
     isOpen,
     onToggle
 }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) setSearchTerm('');
+    }, [isOpen]);
+
     const handleCheckboxChange = (value) => {
         const newValues = selectedValues.includes(value)
             ? selectedValues.filter(v => v !== value)
             : [...selectedValues, value];
         onChange(newValues);
     };
+
+    const visibleOptions = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return options;
+        return options.filter((option) => String(option?.label ?? '').toLowerCase().includes(term));
+    }, [options, searchTerm]);
 
     // Get display text for selected items
     const getDisplayText = () => {
@@ -387,13 +399,15 @@ const MultiSelectCheckbox = ({
                                     className="form-control"
                                     placeholder={`Search ${title.toLowerCase()}...`}
                                     onClick={(e) => e.stopPropagation()}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
                         </div>
 
                         {/* Options List */}
                         <div className="options-list-new">
-                            {options.map((option) => (
+                            {visibleOptions.map((option) => (
                                 <label key={option.value} className="option-item-new">
                                     <input
                                         type="checkbox"
@@ -413,6 +427,13 @@ const MultiSelectCheckbox = ({
                                 <div className="no-options">
                                     <i className="fas fa-info-circle me-2"></i>
                                     No {title.toLowerCase()} available
+                                </div>
+                            )}
+
+                            {options.length > 0 && visibleOptions.length === 0 && (
+                                <div className="no-options">
+                                    <i className="fas fa-search me-2"></i>
+                                    No matches for "{searchTerm}"
                                 </div>
                             )}
                         </div>
@@ -2670,31 +2691,7 @@ const LeadAnalyticsDashboard = () => {
 
                                 <div className="col-md-12">
                                     <div className="d-flex justify-content-end align-items-center gap-2">
-                                        <div className="input-group" style={{ maxWidth: '300px' }}>
-                                            <span className="input-group-text bg-white border-end-0 input-height">
-                                                <i className="fas fa-search text-muted"></i>
-                                            </span>
-                                            <input
-                                                type="text"
-                                                name="name"
-                                                className="form-control border-start-0 m-0"
-                                                placeholder="Quick search..."
-                                                value={filterData.name}
-                                                onChange={handleFilterChange}
-                                            />
-                                            {filterData.name && (
-                                                <button
-                                                    className="btn btn-outline-secondary border-start-0"
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setFilterData(prev => ({ ...prev, name: '' }));
-                                                        fetchProfileData();
-                                                    }}
-                                                >
-                                                    <i className="fas fa-times"></i>
-                                                </button>
-                                            )}
-                                        </div>
+                                        {/* <divr cv> */}
 
                                         <button
                                             onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}

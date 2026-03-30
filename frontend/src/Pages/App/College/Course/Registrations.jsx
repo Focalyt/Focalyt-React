@@ -13199,67 +13199,67 @@ useEffect(() => {
                                                   const backendCounts = profile?.docCounts || {};
                                                   return (
                                                     <>
-                                                      <div className="stat-card total-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-file-alt"></i>
+                                                      <div className="stat-card total-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-file-alt docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.totalRequired || 0}</h4>
                                                           <p>Total Required</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                      <div className="stat-card uploaded-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-cloud-upload-alt docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.uploadedCount || 0}</h4>
                                                           <p>Uploaded</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-arrow-up"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card pending-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-clock"></i>
+                                                      <div className="stat-card pending-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-clock docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                           <p>Pending Review</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-exclamation-triangle"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card verified-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-check-circle"></i>
+                                                      <div className="stat-card verified-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-check-circle docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.verifiedCount || 0}</h4>
                                                           <p>Approved</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-thumbs-up"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-times-circle"></i>
+                                                      <div className="stat-card rejected-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-times-circle docIcon "></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.RejectedCount || 0}</h4>
                                                           <p>Rejected</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-arrow-down"></i>
                                                         </div>
                                                       </div>
@@ -22475,13 +22475,24 @@ max-width: 600px;
     white-space: nowrap;
     width: 100%;
   }
+    .docIcon{
+padding:12px;
+}
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     .CButton {
       font-size: 13px;
       padding: 2px;
       white-space:nowrap;
     }
+      ..docDetails{
+         display: block !important;
+        text-align: -webkit-center;
+        position: relative;
+        height: 177px;
+        width: 105px;
+        padding: 13px;
+    } 
   }
 
 

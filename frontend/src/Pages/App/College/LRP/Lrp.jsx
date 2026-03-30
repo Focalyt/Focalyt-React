@@ -526,7 +526,7 @@ function Lrp() {
       <form onSubmit={onSubmit}>
         {step === 1 && (
           <Card number={1} title="Partner & Visit Details">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" , alignItems: "flex-end"}}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>B2B lead category {reqStar}</label>
                 <select
@@ -635,7 +635,7 @@ function Lrp() {
 
         {step === 2 && (
           <Card number={2} title="State & District">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" , alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>State {reqStar}</label>
                 <select
@@ -678,7 +678,7 @@ function Lrp() {
 
         {step === 3 && (
           <Card number={3} title="School Details">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px"  , alignItems: "flex-end"}}>
               <div style={{ flex: "1 1 420px", minWidth: 260 }}>
                 <label style={lblStyle}>School Name & Address? {reqStar}</label>
                 <input
@@ -760,9 +760,9 @@ function Lrp() {
                   placeholder="10-digit (if not in coordinator)"
                   style={fldStyle}
                 />
-                <div style={{ marginTop: 4, fontSize: 11, color: "#64748b" }}>
+                {/* <div style={{ marginTop: 4, fontSize: 11, color: "#64748b" }}>
                   Required for linked B2B lead if coordinator line has no mobile.
-                </div>
+                </div> */}
                 <FieldError name="b2bMobile" />
               </div>
 
@@ -949,7 +949,7 @@ function Lrp() {
 
         {step === 4 && (
           <Card number={4} title="Program & Lead Status">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px"  , alignItems: "flex-end"}}>
               <div style={{ flex: "1 1 360px", minWidth: 260 }}>
                 <label style={lblStyle}>For which classes is the school interested in implementing the FFTL training program? {reqStar}</label>
                 <select
