@@ -339,22 +339,34 @@ const MultiSelectCheckbox = ({
         onChange(newValues);
     };
 
+    const optionsSafe = Array.isArray(options) ? options : [];
+    const normalizeLabel = (option) => String(option?.label ?? '').trim();
+
+    const sortedOptions = useMemo(() => {
+        return [...optionsSafe].sort((a, b) =>
+            normalizeLabel(a).localeCompare(normalizeLabel(b), undefined, {
+                numeric: true,
+                sensitivity: 'base'
+            })
+        );
+    }, [optionsSafe]);
+
     const visibleOptions = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
-        if (!term) return options;
-        return options.filter((option) => String(option?.label ?? '').toLowerCase().includes(term));
-    }, [options, searchTerm]);
+        if (!term) return sortedOptions;
+        return sortedOptions.filter((option) => normalizeLabel(option).toLowerCase().includes(term));
+    }, [sortedOptions, searchTerm]);
 
     // Get display text for selected items
     const getDisplayText = () => {
         if (selectedValues.length === 0) {
             return `Select ${title}`;
         } else if (selectedValues.length === 1) {
-            const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+            const selectedOption = optionsSafe.find(opt => opt.value === selectedValues[0]);
             return selectedOption ? selectedOption.label : selectedValues[0];
         } else if (selectedValues.length <= 2) {
             const selectedLabels = selectedValues.map(val => {
-                const option = options.find(opt => opt.value === val);
+                const option = optionsSafe.find(opt => opt.value === val);
                 return option ? option.label : val;
             });
             return selectedLabels.join(', ');
@@ -423,14 +435,14 @@ const MultiSelectCheckbox = ({
                                 </label>
                             ))}
 
-                            {options.length === 0 && (
+                            {optionsSafe.length === 0 && (
                                 <div className="no-options">
                                     <i className="fas fa-info-circle me-2"></i>
                                     No {title.toLowerCase()} available
                                 </div>
                             )}
 
-                            {options.length > 0 && visibleOptions.length === 0 && (
+                            {optionsSafe.length > 0 && visibleOptions.length === 0 && (
                                 <div className="no-options">
                                     <i className="fas fa-search me-2"></i>
                                     No matches for "{searchTerm}"
@@ -442,7 +454,7 @@ const MultiSelectCheckbox = ({
                         {selectedValues.length > 0 && (
                             <div className="options-footer">
                                 <small className="text-muted">
-                                    {selectedValues.length} of {options.length} selected
+                                    {selectedValues.length} of {optionsSafe.length} selected
                                 </small>
                             </div>
                         )}

@@ -362,21 +362,34 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
-  const filteredOptions = options.filter(option => {
-    const label = String(option?.label ?? '');
-    return label.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const optionsSafe = Array.isArray(options) ? options : [];
+  const normalizeLabel = (option) => String(option?.label ?? '').trim();
+
+  const sortedOptions = useMemo(() => {
+    return [...optionsSafe].sort((a, b) =>
+      normalizeLabel(a).localeCompare(normalizeLabel(b), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+    );
+  }, [optionsSafe]);
+
+  const filteredOptions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return sortedOptions;
+    return sortedOptions.filter(option => normalizeLabel(option).toLowerCase().includes(q));
+  }, [sortedOptions, searchTerm]);
 
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
       return `${t('select')} ${title}`;
     } else if (selectedValues.length === 1) {
-      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      const selectedOption = optionsSafe.find(opt => opt.value === selectedValues[0]);
       return selectedOption ? selectedOption.label : selectedValues[0];
     } else if (selectedValues.length <= 2) {
       const selectedLabels = selectedValues.map(val => {
-        const option = options.find(opt => opt.value === val);
+        const option = optionsSafe.find(opt => opt.value === val);
         return option ? option.label : val;
       });
       return selectedLabels.join(', ');
@@ -2324,6 +2337,8 @@ const LeadAnalyticsDashboard = () => {
   const [activeSection, setActiveSection] = useState('main'); // 'main' | 'ai' | 'counselor'
   const [b2cHoveredCol, setB2cHoveredCol] = useState(null);
   const [b2cSheetHoveredCol, setB2cSheetHoveredCol] = useState(null);
+  const [showB2cAiReview, setShowB2cAiReview] = useState(false);
+  const [b2cAiReview, setB2cAiReview] = useState(null);
 
 
   const legacyB2cFunnelDashboardRows = useMemo(() => ([
@@ -2540,6 +2555,120 @@ const LeadAnalyticsDashboard = () => {
       documents: getB2cDocumentsText(lead),
     }))
   ), [filteredData]);
+
+  const runB2cAiSupervisorReview = () => {
+    const normalize = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const total = Array.isArray(filteredData) ? filteredData.length : 0;
+    const rows = Array.isArray(b2cFunnelDashboardRows) ? b2cFunnelDashboardRows : [];
+    const statusCols = Array.isArray(b2cStatusColumns) ? b2cStatusColumns : [];
+
+    const issues = [];
+    const recommendations = [];
+
+    if (total === 0) {
+      issues.push({
+        severity: 'error',
+        code: 'NO_DATA',
+        message: 'No leads found for the current filters. Funnel cannot be reviewed.'
+      });
+      recommendations.push('Try removing filters or widening date range, then run the review again.');
+    }
+
+    if (statusCols.length === 0) {
+      issues.push({
+        severity: 'error',
+        code: 'NO_STATUS_COLUMNS',
+        message: 'No status columns detected. Check if `_leadStatus.title` is present in the API response.'
+      });
+      recommendations.push('Ensure every lead has `_leadStatus.title`, and that statuses are configured in the system.');
+    }
+
+    const unknownMonthRows = rows.filter(r => normalize(r?.month) === 'unknown');
+    if (unknownMonthRows.length > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'UNKNOWN_MONTH',
+        message: `${unknownMonthRows.length} funnel rows have month = "Unknown" (missing/invalid lead dates).`
+      });
+      recommendations.push('Ensure leads have valid `createdAt` (preferred) so month-wise funnel is accurate.');
+    }
+
+    const groupSet = new Set(rows.map(r => String(r?.group || '').trim()).filter(Boolean));
+    if (groupSet.size === 0 && total > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'UNKNOWN_GROUP',
+        message: 'Could not derive Center/Lead Source grouping for many leads.'
+      });
+      recommendations.push('Ensure leads have `_center.name` or a valid source field so grouping is meaningful.');
+    }
+
+    // Status distribution from filteredData
+    const statusCounts = {};
+    (Array.isArray(filteredData) ? filteredData : []).forEach((lead) => {
+      const title = String(lead?._leadStatus?.title || 'Unknown').trim() || 'Unknown';
+      statusCounts[title] = (statusCounts[title] || 0) + 1;
+    });
+
+    const topStatuses = Object.entries(statusCounts)
+      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+      .slice(0, 5)
+      .map(([k, v]) => ({ status: k, count: v }));
+
+    // Closure stage sanity
+    const normCols = statusCols.map(normalize);
+    const hasClosure = normCols.some(s =>
+      s.includes('admission') ||
+      s.includes('converted') ||
+      s.includes('closed') ||
+      s.includes('enrolled') ||
+      s.includes('registration done')
+    );
+    if (!hasClosure && statusCols.length > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'NO_CLOSURE_STAGE',
+        message: 'No obvious closure stage found in status columns (e.g., Admission/Converted/Closed).'
+      });
+      recommendations.push('Add a clear closure status (Admission Done / Converted) so funnel conversion can be measured.');
+    }
+
+    // At Center ratio
+    const atCenterTotal = rows.reduce((s, r) => s + (Number(r?.atCenter) || 0), 0);
+    const candidateTotal = rows.reduce((s, r) => s + (Number(r?.totalCandidate) || 0), 0);
+    const atCenterRate = candidateTotal > 0 ? (atCenterTotal / candidateTotal) * 100 : 0;
+    if (candidateTotal > 0 && atCenterRate < 5) {
+      issues.push({
+        severity: 'warn',
+        code: 'LOW_AT_CENTER',
+        message: `At Center is low (${atCenterRate.toFixed(1)}%). Check if \`inZeroPeriod\` / \`batchAssigned\` flags are populated.`
+      });
+      recommendations.push('Verify backend is setting `inZeroPeriod` or `batchAssigned` correctly for B2C leads.');
+    }
+
+    const errorCount = issues.filter(i => i.severity === 'error').length;
+    const warnCount = issues.filter(i => i.severity === 'warn').length;
+    let score = 100 - (errorCount * 30 + warnCount * 10);
+    if (score < 0) score = 0;
+
+    const verdict = errorCount > 0 ? 'needs_changes' : warnCount > 2 ? 'review' : 'approved';
+
+    setB2cAiReview({
+      verdict,
+      score,
+      issues,
+      recommendations,
+      snapshot: {
+        totalLeads: total,
+        statusColumnCount: statusCols.length,
+        groupCount: groupSet.size,
+        atCenterRate: Number(atCenterRate.toFixed(1)),
+        topStatuses
+      }
+    });
+    setShowB2cAiReview(true);
+  };
 
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -3007,8 +3136,119 @@ const LeadAnalyticsDashboard = () => {
                   <Target className="text-primary" size={20} />
                   B2C Funnel 
                 </h2>
-                    
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-dark btn-sm"
+                    onClick={runB2cAiSupervisorReview}
+                    title="AI Supervisor review for current funnel"
+                  >
+                    AI Supervisor Review
+                  </button>
+                </div>
               </div>
+
+              {showB2cAiReview && (
+                <div
+                  className="modal fade show"
+                  style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}
+                  role="dialog"
+                  aria-modal="true"
+                >
+                  <div className="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div className="modal-content">
+                      <div className="modal-header">
+                        <h5 className="modal-title">B2C Funnel AI Supervisor Review</h5>
+                        <button type="button" className="btn-close" onClick={() => setShowB2cAiReview(false)} aria-label="Close"></button>
+                      </div>
+                      <div className="modal-body">
+                        {!b2cAiReview ? (
+                          <div className="text-muted">No review generated yet.</div>
+                        ) : (
+                          <>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                              <span className={`badge ${
+                                b2cAiReview.verdict === 'approved' ? 'bg-success' :
+                                b2cAiReview.verdict === 'review' ? 'bg-warning text-dark' :
+                                'bg-danger'
+                              }`}>
+                                {String(b2cAiReview.verdict).toUpperCase()}
+                              </span>
+                              <span className="badge bg-primary">Score: {b2cAiReview.score}</span>
+                              <span className="badge bg-light text-dark">Leads: {b2cAiReview.snapshot?.totalLeads ?? 0}</span>
+                              <span className="badge bg-light text-dark">Statuses: {b2cAiReview.snapshot?.statusColumnCount ?? 0}</span>
+                              <span className="badge bg-light text-dark">Groups: {b2cAiReview.snapshot?.groupCount ?? 0}</span>
+                              <span className="badge bg-light text-dark">At Center: {b2cAiReview.snapshot?.atCenterRate ?? 0}%</span>
+                            </div>
+
+                            {Array.isArray(b2cAiReview.issues) && b2cAiReview.issues.length > 0 ? (
+                              <div className="mb-3">
+                                <h6 className="fw-semibold mb-2">Issues</h6>
+                                <ul className="mb-0">
+                                  {b2cAiReview.issues.map((it, idx) => (
+                                    <li key={idx}>
+                                      <span className={`fw-semibold ${it.severity === 'error' ? 'text-danger' : 'text-warning'}`}>
+                                        {String(it.severity).toUpperCase()}
+                                      </span>
+                                      {it.code ? <span className="text-muted"> ({it.code})</span> : null}
+                                      {' — '}
+                                      {it.message}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <div className="alert alert-success mb-3">
+                                No critical issues detected for the current funnel.
+                              </div>
+                            )}
+
+                            {Array.isArray(b2cAiReview.recommendations) && b2cAiReview.recommendations.length > 0 && (
+                              <div className="mb-3">
+                                <h6 className="fw-semibold mb-2">Recommendations</h6>
+                                <ul className="mb-0">
+                                  {b2cAiReview.recommendations.map((rec, idx) => (
+                                    <li key={idx}>{rec}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {Array.isArray(b2cAiReview.snapshot?.topStatuses) && b2cAiReview.snapshot.topStatuses.length > 0 && (
+                              <div className="mb-0">
+                                <h6 className="fw-semibold mb-2">Top statuses (current filters)</h6>
+                                <div className="table-responsive">
+                                  <table className="table table-sm table-bordered mb-0">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>Status</th>
+                                        <th className="text-end">Count</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {b2cAiReview.snapshot.topStatuses.map((row, idx) => (
+                                        <tr key={idx}>
+                                          <td>{row.status}</td>
+                                          <td className="text-end">{row.count}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={() => setShowB2cAiReview(false)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="table-responsive mb-4 b2c-table-wrap">
                 <table className="table table-bordered align-middle mb-0 b2c-dashboard-table" style={{ minWidth: 'max-content' }}>
