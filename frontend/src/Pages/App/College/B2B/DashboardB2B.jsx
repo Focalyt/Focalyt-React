@@ -373,9 +373,9 @@ const B2BDashboard = () => {
                 <MapPin className="text-primary" size={20} />
                 LRP records
               </h3>
-              <p className="text-muted small mb-3">
+              {/* <p className="text-muted small mb-3">
                 Submissions from the <strong>LRP</strong> form only (not B2B CRM leads). All form fields ({LRP_TABLE_COLUMNS.length} columns); scroll sideways on small screens.
-              </p>
+              </p> */}
               {lrpError && (
                 <div className="alert alert-warning py-2 small mb-3" role="alert">
                   {lrpError}

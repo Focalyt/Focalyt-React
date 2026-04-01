@@ -62,14 +62,16 @@ const {
 } = require("../../../models");
 const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const LeadCategory = require("../../../models/b2b/leadCategory");
-const Lead = require("../../../models/b2b/lead");
+const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
 
-const router = express.Router();
+function createB2BRouter(LeadModel = defaultLeadModel) {
+	const Lead = LeadModel;
+	const router = express.Router();
 
 
 
@@ -3184,4 +3186,8 @@ router.get('/followups-reminder-data', isCollege, async (req, res) => {
 	}
 });
 
-module.exports = router;
+	return router;
+}
+
+module.exports = createB2BRouter();
+module.exports.createB2BRouter = createB2BRouter;

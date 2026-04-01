@@ -44,6 +44,7 @@ const trainerRoutes = require('./trainer');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
+const b2bCopyRoutes = require("./b2b/b2b_copy");
 const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
 const placementRoutes = require("./placement");
@@ -98,6 +99,7 @@ const createB2cGoogleCalendarFollowup = async ({ reqUser, appliedCourseId, follo
 };
 
 router.use("/b2b", isCollege, b2bRoutes);
+router.use("/b2b_copy", isCollege, b2bCopyRoutes);
 router.use("/statusB2b", statusB2bRoutes);
 router.use("/placementStatus", placementRoutes);
 router.use("/androidApp", androidAppRoutes);

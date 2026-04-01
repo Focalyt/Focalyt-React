@@ -127,6 +127,7 @@ import AttendanceManagement from './Component/Layouts/App/College/ProjectManagem
 import Whatapp from './Pages/App/College/Whatapp/Whatapp';
 import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
 import B2BSales from './Pages/App/College/B2B/B2BSales';
+import B2BSalesCopy from './Pages/App/College/B2B/B2BSales_copy';
 import StatusB2C from './Pages/App/College/Status/statusB2C'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
@@ -158,6 +159,8 @@ import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
 import Assignment from './Pages/App/Trainer/Assignment/Assignment';
 import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
+import TrainerAttendance from './Pages/App/Trainer/Attendance/Attendance';
+import TrainerAvailability from './Pages/App/Trainer/Availability/Availability';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -300,6 +303,7 @@ const Layout = () => {
           <Route path='whatapp' element={<Whatapp/>}/>
           <Route path='whatappTemplate' element={<WhatappTemplate/>}/>
           <Route path='sales' element={<B2BSales/>}/>
+          <Route path='sales_copy' element={<B2BSalesCopy/>}/>
           <Route path='statusdesignb2c' element={<StatusB2C/>}/>
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
@@ -357,6 +361,8 @@ const Layout = () => {
         <Route path='center' element={<Center/>}/>
         <Route path='assignment' element={<Assignment/>}/>
         <Route path='createassignment' element={<CreateAssignment/>}/>
+        <Route path='attendance' element={<TrainerAttendance/>}/>
+        <Route path='availability' element={<TrainerAvailability/>}/>
         </Route>
 
 

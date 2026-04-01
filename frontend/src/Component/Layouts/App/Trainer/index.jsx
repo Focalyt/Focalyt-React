@@ -165,6 +165,20 @@ function TrainerLayout({ children }){
               </Link>
             </li>
 
+            <li className={`nav-item ${location.pathname === '/trainer/attendance' ? 'active' : ''}`}>
+              <Link to="/trainer/attendance" onClick={() => handleSidebarClose()}>
+                <FontAwesomeIcon icon={faUserCheck} />
+                <span className="menu-title">Attendance</span>
+              </Link>
+            </li>
+
+            <li className={`nav-item ${location.pathname === '/trainer/availability' ? 'active' : ''}`}>
+              <Link to="/trainer/availability" onClick={() => handleSidebarClose()}>
+                <FontAwesomeIcon icon={faCalendarAlt} />
+                <span className="menu-title">Availability</span>
+              </Link>
+            </li>
+
             
             <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
               <a href="#" onClick={() => toggleSubmenu('courses')}>
