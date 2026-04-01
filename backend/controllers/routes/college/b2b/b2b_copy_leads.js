@@ -101,6 +101,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
         leadOwner,
         approvalStatus,
         leadStatus: leadStatusBucket,
+        hasFollowUp,
       } = req.query;
 
       const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
@@ -150,6 +151,9 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
           ...(leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
           ...(typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
           ...(subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+          ...(String(hasFollowUp).toLowerCase() === 'true'
+            ? [{ followUp: { $exists: true, $ne: null } }]
+            : []),
           ...(startDate || endDate
             ? [
                 {

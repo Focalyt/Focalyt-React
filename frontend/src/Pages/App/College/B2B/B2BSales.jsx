@@ -170,6 +170,7 @@ const useNavHeight = (dependencies = []) => {
   const [navHeight, setNavHeight] = useState(140); // Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
@@ -181,8 +182,9 @@ const useNavHeight = (dependencies = []) => {
   const calculateWidth = useCallback(() => {
 
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -225,17 +227,19 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width };
+  return { navRef, navHeight, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateWidth = useCallback(() => {
 
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -273,7 +277,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { widthRef, width };
+  return { widthRef, width, leftOffset };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -1702,7 +1706,7 @@ const B2BSales = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
+  const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -2860,7 +2864,18 @@ const B2BSales = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '5px' }}
+            <nav
+              ref={navRef}
+              className=""
+              style={{
+                zIndex: 11,
+                backgroundColor: 'white',
+                position: 'fixed',
+                width: `${width}px`,
+                left: `${leftOffset}px`,
+                boxShadow: '0 4px 25px 0 #0000001a',
+                paddingBlock: '5px'
+              }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">

@@ -170,6 +170,7 @@ const useNavHeight = (dependencies = []) => {
   const [navHeight, setNavHeight] = useState(140); // Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
@@ -179,10 +180,10 @@ const useNavHeight = (dependencies = []) => {
   }, []);
 
   const calculateWidth = useCallback(() => {
-
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -225,17 +226,18 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width };
+  return { navRef, navHeight, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateWidth = useCallback(() => {
-
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -273,7 +275,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { widthRef, width };
+  return { widthRef, width, leftOffset };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -368,6 +370,7 @@ const B2BSales = () => {
   const [mainTab, setMainTab] = useState('lead'); // lead | performance | followup | documents
   const [leadTab, setLeadTab] = useState('approval'); // add | approval | report
   const [leadApprovalTab, setLeadApprovalTab] = useState('pending'); // pending | approved | rejected
+  const [leadApprovalView, setLeadApprovalView] = useState('cards'); // cards | table
   const [performanceTab, setPerformanceTab] = useState('all'); // all | hot | warm | cold | prospect (approved leads)
   const [followupTab, setFollowupTab] = useState('planned'); // done | planned | scheduled | missed
   const [scheduledDays, setScheduledDays] = useState('1'); // for scheduled dropdown (days)
@@ -1066,6 +1069,8 @@ const B2BSales = () => {
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
+  const [followupLeadsData, setFollowupLeadsData] = useState([]);
+  const [loadingFollowupLeads, setLoadingFollowupLeads] = useState(false);
 
   // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
@@ -1087,6 +1092,45 @@ const B2BSales = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  const fetchFollowupLeads = async () => {
+    if (!token) return;
+    try {
+      setLoadingFollowupLeads(true);
+      const eff = { ...filters };
+
+      const params = {
+        page: 1,
+        limit: 500,
+        hasFollowUp: true,
+      };
+
+      if (eff.search) params.search = eff.search;
+      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
+      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
+      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+      if (eff.approvalStatus) params.approvalStatus = eff.approvalStatus;
+
+      const response = await axios.get(`${backendUrl}/college/b2b_copy/leads`, {
+        headers: { 'x-auth': token },
+        params,
+      });
+
+      if (response.data?.status) {
+        const fetched = response.data?.data?.leads || [];
+        setFollowupLeadsData(fetched);
+      } else {
+        setFollowupLeadsData([]);
+      }
+    } catch (e) {
+      console.error('fetchFollowupLeads', e);
+      setFollowupLeadsData([]);
+    } finally {
+      setLoadingFollowupLeads(false);
+    }
+  };
+
   useEffect(() => {
     if (mainTab === 'lead') {
       fetchLeads(selectedStatusFilter, 1);
@@ -1104,6 +1148,21 @@ const B2BSales = () => {
     }
     fetchLeads(null, 1, opts);
   }, [mainTab, performanceTab]);
+
+  useEffect(() => {
+    if (mainTab !== 'followup') return;
+    fetchFollowupLeads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (mainTab === 'followup') fetchFollowupLeads();
+    };
+    window.addEventListener('b2b-followup-updated', handler);
+    return () => window.removeEventListener('b2b-followup-updated', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainTab]);
 
   const fetchPerformanceSummary = async () => {
     if (!token) return;
@@ -1895,10 +1954,169 @@ const B2BSales = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
+  const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
+  const b2bCycleUiStyles = `
+    /* ============================================================
+      B2B Cycle — Dark Industrial CRM shell (scoped)
+      Based on the provided HTML UI (6329-8033).
+      Only affects elements under .b2b-cycle.
+      ============================================================ */
+    .b2b-cycle {
+      --bg:        #f1f5f9;
+      --surface:   #ffffff;
+      --card:      #ffffff;
+      --card-hi:   #f8fafc;
+      --border:    rgba(0,0,0,0.08);
+      --border-hi: rgba(0,0,0,0.14);
+      --red:       #FC2B5A;
+      --red-dark:  #a5003a;
+      --red-glow:  rgba(252,43,90,0.18);
+      --red-soft:  rgba(252,43,90,0.08);
+      --gold:      #f59e0b;
+      --green:     #22c55e;
+      --blue:      #3b82f6;
+      --orange:    #f97316;
+      --text-1:    #1e293b;
+      --text-2:    #64748b;
+      --text-3:    #94a3b8;
+      --mono:      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans:      ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      --radius-sm: 6px;
+      --radius:    12px;
+      --radius-lg: 18px;
+      --transition: 200ms cubic-bezier(0.4,0,0.2,1);
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      font-family: var(--sans);
+      overflow-x: hidden;
+      position: relative;
+    }
+    .b2b-cycle *, .b2b-cycle *::before, .b2b-cycle *::after { box-sizing: border-box; }
+    .b2b-cycle ::-webkit-scrollbar { width: 5px; height: 5px; }
+    .b2b-cycle ::-webkit-scrollbar-track { background: transparent; }
+    .b2b-cycle ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 9px; }
+
+   
+    .b2b-cycle .topbar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .b2b-cycle .topbar-logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--red), var(--red-dark));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff; font-weight: 800;
+      box-shadow: 0 0 20px var(--red-glow);
+    }
+    .b2b-cycle .topbar-name { font-size: 15px; font-weight: 800; color: var(--text-1); letter-spacing: -0.3px; }
+    .b2b-cycle .topbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+    .b2b-cycle .breadcrumb {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-3); font-family: var(--mono);
+    }
+    .b2b-cycle .breadcrumb a { color: var(--text-2); text-decoration: none; }
+    .b2b-cycle .breadcrumb a:hover { color: var(--red); }
+    .b2b-cycle .breadcrumb-sep { color: var(--text-3); }
+    .b2b-cycle .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .b2b-cycle .search-wrap { position: relative; display: flex; align-items: center; }
+    .b2b-cycle .search-input {
+      width: 240px; height: 36px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-1); font-size: 13px;
+      padding: 0 36px 0 14px;
+      outline: none; transition: var(--transition);
+    }
+    .b2b-cycle .search-input::placeholder { color: var(--text-3); }
+    .b2b-cycle .search-input:focus { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+    .b2b-cycle .search-icon { position: absolute; right: 11px; color: var(--text-3); font-size: 11px; pointer-events: none; }
+    .b2b-cycle .icon-btn {
+      width: 36px; height: 36px; border-radius: var(--radius-sm);
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text-2); cursor: pointer; display: flex;
+      align-items: center; justify-content: center; font-size: 13px;
+      transition: var(--transition);
+    }
+    .b2b-cycle .icon-btn:hover { border-color: var(--border-hi); color: var(--text-1); }
+    .b2b-cycle .icon-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+    .b2b-cycle .layout { display: flex; padding-top: 60px; min-height: 100vh; }
+    .b2b-cycle .sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      position: fixed; top: 60px; left: 0; bottom: 0;
+      overflow-y: auto; padding: 16px 0;
+    }
+    .b2b-cycle .sidebar-section { margin-bottom: 24px; }
+    .b2b-cycle .sidebar-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+      color: var(--text-3); text-transform: uppercase;
+      padding: 0 16px; margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+    .b2b-cycle .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px; cursor: pointer; font-size: 13px;
+      color: var(--text-2); font-weight: 600;
+      transition: var(--transition); text-decoration: none;
+      position: relative;
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+    }
+    .b2b-cycle .sidebar-item i { width: 16px; font-size: 12px; text-align: center; }
+    .b2b-cycle .sidebar-item:hover { color: var(--text-1); background: var(--card); }
+    .b2b-cycle .sidebar-item.active { color: var(--red); background: var(--red-soft); }
+    .b2b-cycle .sidebar-item.active::before {
+      content: ''; position: absolute; left: 0; top: 4px; bottom: 4px;
+      width: 3px; background: var(--red); border-radius: 0 3px 3px 0;
+    }
+
+    .b2b-cycle .main {
+      margin-left: 220px; flex: 1;
+      padding: 24px;
+      max-width: calc(100vw - 220px);
+      position: relative;
+      z-index: 1;
+    }
+    .b2b-cycle::before {
+      content: '';
+      position: fixed; top: 0; left: 220px; right: 0; height: 300px;
+      background: radial-gradient(ellipse at 70% 0%, rgba(252,43,90,0.05) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .b2b-cycle .main-tabs {
+      display: flex; gap: 2px; margin-bottom: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px; width: fit-content;
+    }
+    .b2b-cycle .main-tab {
+      padding: 8px 18px; border-radius: 9px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      color: var(--text-2); border: none; background: none;
+      transition: var(--transition);
+      font-family: var(--sans);
+    }
+    .b2b-cycle .main-tab i { font-size: 11px; }
+    .b2b-cycle .main-tab:hover { color: var(--text-1); }
+    .b2b-cycle .main-tab.active {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(232,41,76,0.35);
+    }
+
+    @media (max-width: 900px) {
+      .b2b-cycle .sidebar { display: none; }
+      .b2b-cycle .main { margin-left: 0; max-width: 100vw; padding: 16px; }
+      .b2b-cycle::before { left: 0; }
+      .b2b-cycle .search-input { width: 160px; }
+    }
+  `;
   const tabs = [
     'Lead Details', ,
     'Documents'
@@ -2836,28 +3054,171 @@ const B2BSales = () => {
   };
 
   const renderPanelHome = () => {
+    const actions = [
+      {
+        key: 'editPanel',
+        icon: 'fas fa-exchange-alt',
+        label: 'Change Status',
+        desc: 'Update lead status & sub-status',
+        onClick: () => openEditPanel(selectedProfile, 'StatusChange'),
+      },
+      {
+        key: 'Reffer',
+        icon: 'fas fa-share-alt',
+        label: 'Refer Lead',
+        desc: 'Assign lead to a counselor',
+        onClick: () => openRefferPanel(selectedProfile, 'Reffer'),
+      },
+      {
+        key: 'leadHistory',
+        icon: 'fas fa-history',
+        label: 'History',
+        desc: 'View full activity timeline',
+        onClick: () => openleadHistoryPanel(selectedProfile),
+      },
+      {
+        key: 'followUp',
+        icon: 'fas fa-calendar-plus',
+        label: 'Set Follow-up',
+        desc: 'Schedule next follow-up date',
+        onClick: () => openEditPanel(selectedProfile, 'SetFollowup'),
+      },
+    ];
+
     const panelContent = (
-      <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-layer-group text-primary"></i>
+      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+          padding: '18px 20px 16px',
+          position: 'relative',
+        }}>
+          <div className="d-flex justify-content-between align-items-start">
+            <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <i className="fas fa-building" style={{ color: '#fff', fontSize: '14px' }}></i>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    color: '#fff', fontWeight: 700, fontSize: '14px',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {selectedProfile?.businessName || 'Lead Details'}
+                  </div>
+                  {selectedProfile?.typeOfB2B && (
+                    <div style={{
+                      color: 'rgba(255,255,255,0.75)', fontSize: '11px', marginTop: '1px',
+                    }}>
+                      {typeof selectedProfile.typeOfB2B === 'object'
+                        ? (selectedProfile.typeOfB2B?.name || selectedProfile.typeOfB2B?._id || '')
+                        : selectedProfile.typeOfB2B}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            <h6 className="mb-0 fw-medium text-primary">
-              {selectedProfile?.businessName ? selectedProfile.businessName : 'Lead Actions'}
-            </h6>
+            <button
+              type="button"
+              onClick={closePanel}
+              style={{
+                background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px',
+                width: '30px', height: '30px', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <i className="fas fa-times" style={{ color: '#fff', fontSize: '13px' }}></i>
+            </button>
           </div>
-          <div className="d-flex align-items-center">
-            <PanelActionToolbar />
-            <button className="btn-close" type="button" onClick={closePanel}></button>
-          </div>
+
+          {/* Lead meta row */}
+          {selectedProfile && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+              {selectedProfile.status && (
+                <span style={{
+                  background: 'rgba(255,255,255,0.2)', color: '#fff',
+                  fontSize: '11px', fontWeight: 600, borderRadius: '20px',
+                  padding: '3px 10px', letterSpacing: '0.3px',
+                }}>
+                  {typeof selectedProfile.status === 'object'
+                    ? (selectedProfile.status?.title || selectedProfile.status?.name || selectedProfile.status?._id || '')
+                    : selectedProfile.status}
+                </span>
+              )}
+              {selectedProfile.city && (
+                <span style={{
+                  background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)',
+                  fontSize: '11px', borderRadius: '20px', padding: '3px 10px',
+                }}>
+                  <i className="fas fa-map-marker-alt me-1" style={{ fontSize: '10px' }}></i>
+                  {selectedProfile.city}
+                </span>
+              )}
+              {selectedProfile.mobile && (
+                <span style={{
+                  background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)',
+                  fontSize: '11px', borderRadius: '20px', padding: '3px 10px',
+                }}>
+                  <i className="fas fa-phone me-1" style={{ fontSize: '10px' }}></i>
+                  {selectedProfile.mobile}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <div className="card-body">
-          <div className="text-muted" style={{ fontSize: '13px' }}>
-            Select an action from the icons above to open its panel.
+
+        {/* Action tiles */}
+        <div style={{ padding: '16px', background: '#fafbfc' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+            Quick Actions
           </div>
-          <div className="mt-3 small text-muted">
-            Available: Change Status, Refer, History, Set Follow-up.
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {actions.map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                onClick={action.onClick}
+                style={{
+                  background: '#fff',
+                  border: '1.5px solid #f1f5f9',
+                  borderRadius: '12px',
+                  padding: '14px 12px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = '#FC2B5A';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(252,43,90,0.12)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#f1f5f9';
+                  e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.transform = 'none';
+                }}
+              >
+                <div style={{
+                  width: '34px', height: '34px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: '8px',
+                }}>
+                  <i className={action.icon} style={{ color: '#fff', fontSize: '14px' }}></i>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: '#1e293b', marginBottom: '2px' }}>
+                  {action.label}
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
+                  {action.desc}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -3194,10 +3555,15 @@ const B2BSales = () => {
 
   // ===== Derived data for redesigned tabs =====
   const nowTs = Date.now();
-  const followupLeads = (leads || []).filter((l) => !!l?.followUp);
+  const followupSourceLeads = mainTab === 'followup' ? followupLeadsData : leads;
+  const followupLeads = (followupSourceLeads || []).filter((l) => !!l?.followUp);
   const followupBuckets = followupLeads.reduce(
     (acc, l) => {
-      const fu = l.followUp || {};
+      // `followUp` can be populated object OR just an ObjectId string.
+      const fu =
+        l && typeof l.followUp === 'object' && l.followUp !== null
+          ? l.followUp
+          : {};
       const status = (fu.status || '').toLowerCase();
       const scheduledTs = fu.scheduledDate ? new Date(fu.scheduledDate).getTime() : NaN;
 
@@ -3223,8 +3589,33 @@ const B2BSales = () => {
     { done: [], planned: [], scheduled: [], missed: [] }
   );
 
+  const followupVisibleLeads = useMemo(() => {
+    const bucket =
+      followupTab === 'done' ? followupBuckets.done :
+      followupTab === 'missed' ? followupBuckets.missed :
+      followupTab === 'scheduled' ? followupBuckets.scheduled :
+      followupBuckets.planned;
+
+    if (followupTab !== 'scheduled') return bucket;
+
+    const days = parseInt(scheduledDays, 10);
+    const maxDays = Number.isFinite(days) ? days : 1;
+
+    return bucket.filter((l) => {
+      const fu =
+        l && typeof l.followUp === 'object' && l.followUp !== null
+          ? l.followUp
+          : {};
+      const ts = fu.scheduledDate ? new Date(fu.scheduledDate).getTime() : NaN;
+      if (!Number.isFinite(ts)) return false;
+      const diffDays = (ts - Date.now()) / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= maxDays;
+    });
+  }, [followupBuckets, followupTab, scheduledDays]);
+
   return (
-    <div className="container-fluid">
+    <div className="container-fluid b2b-cycle">
+      <style>{b2bCycleUiStyles}</style>
 
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass} style={{
@@ -3256,50 +3647,36 @@ const B2BSales = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '5px' }}
+            <nav
+              ref={navRef}
+              className="topbar"
+              style={{
+                zIndex: 11,
+                position: 'fixed',
+                width: `${width}px`,
+                left: `${leftOffset}px`,
+                boxShadow: '0 4px 25px 0 #0000001a',
+                paddingBlock: '5px',
+              }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h5 className="fw-bold text-dark mb-0 me-3" style={{ fontSize: '1.1rem' }}>B2B Cycle</h5>
-                      <div className="btn-group btn-group-sm ms-2" role="group" aria-label="B2B main tabs">
-                        <button
-                          type="button"
-                          className={`btn ${mainTab === 'lead' ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => { setMainTab('lead'); setLeadTab('approval'); }}
-                        >
-                          Lead
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${mainTab === 'performance' ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => { setMainTab('performance'); setPerformanceTab('all'); }}
-                        >
-                          Performance
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${mainTab === 'followup' ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => setMainTab('followup')}
-                        >
-                          Followup
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${mainTab === 'documents' ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => setMainTab('documents')}
-                        >
-                          Documents
-                        </button>
-                      </div>
-                      <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 small">
-                          <li className="breadcrumb-item">
-                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                          </li>
-                          <li className="breadcrumb-item active">B2B Cycle</li>
-                        </ol>
+                      <Link to="/institute/dashboard" className="topbar-brand">
+                        <span className="topbar-logo">B2</span>
+                        <span className="topbar-name" style={{
+                          background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                        }}>B2B Cycle</span>
+                      </Link>
+                      <div className="topbar-sep" />
+                      <nav className="breadcrumb" aria-label="breadcrumb">
+                        <Link to="/institute/dashboard">Home</Link>
+                        <span className="breadcrumb-sep">/</span>
+                        <span>B2B Cycle</span>
                       </nav>
                     </div>
                   </div>
@@ -3312,36 +3689,22 @@ const B2BSales = () => {
                         {/* Quick Search */}
                         <div className="d-flex align-items-center gap-2">
                           <div className="position-relative">
+                            <div className="search-wrap">
                             <input
                               type="text"
-                              className="form-control form-control-sm"
-                              placeholder="Quick search..."
+                              className="search-input"
+                              placeholder="Search leads…"
                               value={filters.search}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 handleFilterChange('search', val);
                                 if (val === '') applyFilters({ search: '' });
                               }}
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                  applyFilters();
-                                }
-                              }}
-                              style={{
-                                width: '200px',
-                                paddingRight: '30px',
-                                paddingLeft: '12px',
-                                paddingTop: '8px',
-                                paddingBottom: '8px',
-                                backgroundColor: '#ffffff',
-                                border: '1.5px solid #ced4da',
-                                color: '#212529',
-                                fontSize: '13px',
-                                borderRadius: '6px',
-                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                transition: 'all 0.2s ease'
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') applyFilters();
                               }}
                             />
+                            <i className="fas fa-search search-icon" />
                             {filters.search && (
                               <button
                                 type="button"
@@ -3369,6 +3732,7 @@ const B2BSales = () => {
                                 <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
                               </button>
                             )}
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -3376,14 +3740,14 @@ const B2BSales = () => {
                             onClick={applyFilters}
                             disabled={!filters.search}
                             style={{
-                              backgroundColor: '#007bff',
-                              borderColor: '#007bff',
+                              background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                              border: 'none',
                               color: 'white',
                               fontWeight: '500',
                               padding: '8px 16px',
                               borderRadius: '6px',
                               fontSize: '13px',
-                              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                              boxShadow: '0 2px 4px rgba(252, 43, 90, 0.3)',
                               transition: 'all 0.2s ease'
                             }}
                           >
@@ -3392,100 +3756,16 @@ const B2BSales = () => {
                         </div>
 
                         <button
-                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          className={`icon-btn ${showFilters ? 'active' : ''}`}
                           onClick={() => setShowFilters(!showFilters)}
                           style={{
-                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                            color: showFilters ? '#ffffff' : '#6c757d',
-                            fontWeight: '500',
                             padding: '8px 16px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
                             transition: 'all 0.2s ease',
-                            borderWidth: '1.5px'
                           }}
                         >
                           <i className="fas fa-filter me-1"></i>
                         </button>
 
-                        <Link
-                          to="/institute/lrp"
-                          className="btn btn-sm btn-outline-secondary"
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            textDecoration: 'none',
-                          }}
-                          title="Add Day Visit Report (LRP)"
-                        >
-                          <i className="fas fa-clipboard-list" style={{ fontSize: '10px' }}></i>
-                          Day Visit Report
-                        </Link>
-                        
-                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
-                          <>
-                            <button className="btn btn-sm btn-outline-primary" style={{
-                              padding: "6px 12px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                              onClick={handleOpenLeadModal}
-                            >
-                              <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
-                              Add Lead
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-outline-primary" 
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "11px",
-                                fontWeight: "600",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px"
-                              }}
-                              onClick={() => {
-                                setShowBulkInputs(true);
-                                setBulkMode('bulkupload');
-                                setInput1Value('');
-                                setShowBulkUploadModal(true);
-                              }}
-                            >
-                              <i className="fas fa-file-upload" style={{ fontSize: "10px" }}></i>
-                              Bulk Upload
-                            </button>
-                          </>
-                        )}
-                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                          <button 
-                            className="btn btn-sm btn-outline-primary" 
-                            disabled={loadingLeads || leads.length === 0}
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            onClick={() => {
-                              setShowBulkInputs(true);
-                              setBulkMode('bulkrefer');
-                              setInput1Value('');
-                              openRefferPanel(null, 'RefferAllLeads');
-                            }}
-                          >
-                            <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                            Refer All Leads
-                          </button>
-                        )}
                       </div>
 
                       {/* Right side - Input Fields for Bulk Refer */}
@@ -3566,98 +3846,10 @@ const B2BSales = () => {
                   {/* Mobile Layout */}
                   <div className="col-12 d-md-none mt-2">
                     <div className="row g-2">
-                      <div className="col-12">
-                        <Link
-                          to="/institute/lrp"
-                          className="btn w-100 btn-outline-secondary"
-                          style={{
-                            padding: '10px 12px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          <i className="fas fa-clipboard-list" style={{ fontSize: '14px' }}></i>
-                          Day Visit Report
-                        </Link>
-                      </div>
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
-                        <>
-                          <div className="col-6">
-                            <button className="btn w-100" style={{
-                              padding: "12px 8px",
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              backgroundColor: '#007bff',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
-                              transition: 'all 0.2s ease'
-                            }}
-                              onClick={handleOpenLeadModal}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
-                              }}
-                            >
-                              <i className="fas fa-plus" style={{ fontSize: "14px" }}></i>
-                              Add Lead
-                            </button>
-                          </div>
-                          <div className="col-6">
-                            <button className="btn w-100" style={{
-                              padding: "12px 8px",
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              backgroundColor: '#28a745',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
-                              transition: 'all 0.2s ease'
-                            }}
-                              onClick={() => {
-                                setShowBulkInputs(true);
-                                setBulkMode('bulkupload');
-                                setInput1Value('');
-                                setShowBulkUploadModal(true);
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
-                              }}
-                            >
-                              <i className="fas fa-file-upload" style={{ fontSize: "14px" }}></i>
-                              Bulk Upload
-                            </button>
-                          </div>
-                        </>
-                      )}
                       {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                         <div className="col-6">
-                          <button 
-                            className="btn w-100" 
+                          <button
+                            className="btn w-100"
                             disabled={loadingLeads || leads.length === 0}
                             style={{
                               padding: "12px 8px",
@@ -3843,18 +4035,18 @@ const B2BSales = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
+                              boxShadow: '0 2px 8px rgba(252, 43, 90, 0.3)',
                               transition: 'all 0.2s ease'
                             }}
                             onMouseEnter={(e) => {
                               if (!e.currentTarget.disabled) {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(252, 43, 90, 0.4)';
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(252, 43, 90, 0.3)';
                             }}
                           >
                             <i className="fas fa-search" style={{ fontSize: '16px' }}></i>
@@ -3871,17 +4063,17 @@ const B2BSales = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              boxShadow: showFilters ? '0 2px 8px rgba(252, 43, 90, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
                               transition: 'all 0.2s ease',
                               borderWidth: '1.5px'
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(252, 43, 90, 0.2)';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
+                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(252, 43, 90, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
                             }}
                           >
                             <i className="fas fa-filter" style={{ fontSize: '16px' }}></i>
@@ -3891,170 +4083,6 @@ const B2BSales = () => {
                     </div>
                   </div>
 
-                  {/* Lead = approval summary. Performance = All/Hot/Warm/Cold/Prospect (approved only). Else = CRM pipeline. */}
-                  <div className="col-12 mt-1">
-                    <div className="d-flex flex-wrap gap-1 align-items-center mt-sm-3 mt-3">
-                      {mainTab === 'lead' ? (
-                        loadingApprovalSummary ? (
-                          <div className="d-flex gap-2">
-                            {[1, 2, 3].map((i) => (
-                              <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px' }}>
-                                <div className="card-body d-flex align-items-center justify-content-center py-1">
-                                  <div className="spinner-border spinner-border-sm text-primary" role="status">
-                                    <span className="visually-hidden">Loading...</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <>
-                            <div
-                              className="card border-0 shadow-sm"
-                              style={{ minWidth: '120px', height: '45px', background: 'linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%)' }}
-                            >
-                              <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                                <div>
-                                  <div className="text-white fw-bold" style={{ fontSize: '11px' }}>Total leads</div>
-                                  <small className="text-white" style={{ fontSize: '10px', opacity: 0.95 }}>{approvalSummary.total}</small>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #198754' }}>
-                              <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                                <div>
-                                  <div className="fw-bold text-success" style={{ fontSize: '11px' }}>Accepted</div>
-                                  <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.accepted}</small>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #dc3545' }}>
-                              <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                                <div>
-                                  <div className="fw-bold text-danger" style={{ fontSize: '11px' }}>Rejected</div>
-                                  <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.rejected}</small>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )
-                      ) : mainTab === 'performance' ? (
-                        loadingPerformanceSummary ? (
-                          <div className="d-flex gap-2">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '100px', height: '45px' }}>
-                                <div className="card-body d-flex align-items-center justify-content-center py-1">
-                                  <div className="spinner-border spinner-border-sm text-primary" role="status">
-                                    <span className="visually-hidden">Loading...</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <>
-                            {[
-                              { id: 'all', label: 'All', countKey: 'all', accent: '#0d6efd' },
-                              { id: 'hot', label: 'Hot', countKey: 'hot', accent: '#dc3545' },
-                              { id: 'warm', label: 'Warm', countKey: 'warm', accent: '#fd7e14' },
-                              { id: 'cold', label: 'Cold', countKey: 'cold', accent: '#6c757d' },
-                              { id: 'prospect', label: 'Prospect', countKey: 'prospect', accent: '#198754' },
-                            ].map(({ id, label, countKey, accent }) => {
-                              const count = performanceSummary[countKey] ?? 0;
-                              const selected = performanceTab === id;
-                              return (
-                                <div
-                                  key={id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => setPerformanceTab(id)}
-                                  onKeyDown={(e) => e.key === 'Enter' && setPerformanceTab(id)}
-                                  className="card border-0 shadow-sm"
-                                  style={{
-                                    minWidth: '100px',
-                                    height: '45px',
-                                    cursor: 'pointer',
-                                    border: selected ? `2px solid ${accent}` : '1px solid #dee2e6',
-                                    background: selected ? `${accent}14` : '#fff',
-                                  }}
-                                >
-                                  <div className="card-body p-1 text-center d-flex flex-column align-items-center justify-content-center h-100">
-                                    <span className="fw-bold" style={{ fontSize: '11px', color: '#212529' }}>{label}</span>
-                                    <small className="text-muted" style={{ fontSize: '10px' }}>{count} leads</small>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </>
-                        )
-                      ) : loadingStatusCounts ? (
-                        <div className="d-flex gap-2">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
-                              <div className="card-body d-flex align-items-center justify-content-center">
-                                <div className="spinner-border spinner-border-sm text-primary" role="status">
-                                  <span className="visually-hidden">Loading...</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                          <div
-                            className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
-                            style={{
-                              minWidth: '110px',
-                              height: '45px',
-                              cursor: 'pointer',
-                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
-                            }}
-                            onClick={handleTotalCardClick}
-                            title="Click to view all leads"
-                          >
-                            <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                              <div className="d-flex align-items-center">
-                                <i className="fas fa-chart-line me-1" style={{ color: '#007bff', fontSize: '12px' }}></i>
-                                <div>
-                                  <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
-                                  <small style={{ color: '#ffffff', fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {statusCounts.map((status, index) => {
-                            const isSelected = selectedStatusFilter === status.statusId;
-                            return (
-                              <div
-                                key={status.statusId || index}
-                                className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
-                                style={{
-                                  minWidth: '110px',
-                                  height: '45px',
-                                  cursor: 'pointer',
-                                  border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                  backgroundColor: isSelected ? '#f8f9ff' : 'white'
-                                }}
-                                onClick={() => handleStatusCardClick(status.statusId)}
-                                title={`Click to view ${status.statusName} leads`}
-                              >
-                                <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                                  <div className="d-flex align-items-center">
-                                    <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
-                                    <div>
-                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
             </nav>
@@ -4068,6 +4096,176 @@ const B2BSales = () => {
             marginTop: `${navHeight + 5}px`,
             transition: 'margin-top 0.2s ease-in-out'
           }}>
+            {/* Main Tab Bar */}
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: '#fff', borderRadius: '14px', padding: '6px', boxShadow: '0 2px 12px rgba(252,43,90,0.08)', border: '1px solid #f1f5f9' }}>
+              {[
+                { id: 'lead', label: 'Lead', icon: 'fas fa-handshake' },
+                { id: 'performance', label: 'Performance', icon: 'fas fa-chart-line' },
+                { id: 'followup', label: 'Followup', icon: 'fas fa-calendar-check' },
+                { id: 'documents', label: 'Documents', icon: 'fas fa-file-alt' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setMainTab(tab.id);
+                    if (tab.id === 'lead') setLeadTab('approval');
+                    if (tab.id === 'performance') setPerformanceTab('all');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '9px 12px',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                    background: mainTab === tab.id ? 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)' : 'transparent',
+                    color: mainTab === tab.id ? '#fff' : '#64748b',
+                    boxShadow: mainTab === tab.id ? '0 4px 12px rgba(252,43,90,0.3)' : 'none',
+                  }}
+                >
+                  <i className={tab.icon} style={{ fontSize: '12px' }}></i>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sub-tabs / Status chips */}
+            <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
+              {mainTab === 'lead' ? (
+                loadingApprovalSummary ? (
+                  <>{[1,2,3].map(i => (
+                    <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px' }}>
+                      <div className="card-body d-flex align-items-center justify-content-center">
+                        <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                      </div>
+                    </div>
+                  ))}</>
+                ) : (
+                  <>
+                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)' }}>
+                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
+                        <div>
+                          <div className="text-white fw-bold" style={{ fontSize: '11px' }}>Total leads</div>
+                          <small className="text-white" style={{ fontSize: '10px', opacity: 0.95 }}>{approvalSummary.total}</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #198754' }}>
+                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
+                        <div>
+                          <div className="fw-bold text-success" style={{ fontSize: '11px' }}>Accepted</div>
+                          <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.accepted}</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #dc3545' }}>
+                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
+                        <div>
+                          <div className="fw-bold text-danger" style={{ fontSize: '11px' }}>Rejected</div>
+                          <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.rejected}</small>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
+              ) : mainTab === 'performance' ? (
+                loadingPerformanceSummary ? (
+                  <>{[1,2,3,4,5].map(i => (
+                    <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '100px', height: '45px' }}>
+                      <div className="card-body d-flex align-items-center justify-content-center">
+                        <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                      </div>
+                    </div>
+                  ))}</>
+                ) : (
+                  <>
+                    {[
+                      { id: 'all', label: 'All', countKey: 'all', accent: '#FC2B5A' },
+                      { id: 'hot', label: 'Hot', countKey: 'hot', accent: '#dc3545' },
+                      { id: 'warm', label: 'Warm', countKey: 'warm', accent: '#fd7e14' },
+                      { id: 'cold', label: 'Cold', countKey: 'cold', accent: '#6c757d' },
+                      { id: 'prospect', label: 'Prospect', countKey: 'prospect', accent: '#198754' },
+                    ].map(({ id, label, countKey, accent }) => {
+                      const count = performanceSummary[countKey] ?? 0;
+                      const selected = performanceTab === id;
+                      return (
+                        <div
+                          key={id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setPerformanceTab(id)}
+                          onKeyDown={(e) => e.key === 'Enter' && setPerformanceTab(id)}
+                          className="card border-0 shadow-sm"
+                          style={{ minWidth: '100px', height: '45px', cursor: 'pointer', border: selected ? `2px solid ${accent}` : '1px solid #dee2e6', background: selected ? `${accent}14` : '#fff' }}
+                        >
+                          <div className="card-body p-1 text-center d-flex flex-column align-items-center justify-content-center h-100">
+                            <span className="fw-bold" style={{ fontSize: '11px', color: '#212529' }}>{label}</span>
+                            <small className="text-muted" style={{ fontSize: '10px' }}>{count} leads</small>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )
+              ) : loadingStatusCounts ? (
+                <>{[1,2,3,4].map(i => (
+                  <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
+                    <div className="card-body d-flex align-items-center justify-content-center">
+                      <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                    </div>
+                  </div>
+                ))}</>
+              ) : (
+                <>
+                  <div
+                    className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
+                    style={{ minWidth: '110px', height: '45px', cursor: 'pointer', border: selectedStatusFilter === null ? '2px solid #FC2B5A' : '1px solid transparent' }}
+                    onClick={handleTotalCardClick}
+                    title="Click to view all leads"
+                  >
+                    <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-chart-line me-1" style={{ color: '#fff', fontSize: '12px' }}></i>
+                        <div>
+                          <h6 className="mb-0 fw-bold" style={{ color: '#fff', fontSize: '12px' }}>Total</h6>
+                          <small style={{ color: '#fff', fontSize: '10px' }}>{totalLeads} leads</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {statusCounts.map((status, index) => {
+                    const isSelected = selectedStatusFilter === status.statusId;
+                    return (
+                      <div
+                        key={status.statusId || index}
+                        className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
+                        style={{ minWidth: '110px', height: '45px', cursor: 'pointer', border: isSelected ? '2px solid #FC2B5A' : '1px solid transparent', backgroundColor: isSelected ? '#fff0f3' : 'white' }}
+                        onClick={() => handleStatusCardClick(status.statusId)}
+                        title={`Click to view ${status.statusName} leads`}
+                      >
+                        <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-tag me-1" style={{ color: '#FC2B5A', fontSize: '12px' }}></i>
+                            <div>
+                              <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
+                              <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+
             {mainTab === 'lead' && (
               <section className="mb-3">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
@@ -4079,10 +4277,52 @@ const B2BSales = () => {
                           Add Lead → <b>Lead Status</b> (Hot / Warm / Cold / Prospect) is saved with the lead → Approval (Pending). After <b>Accept</b>, use the <b>Performance</b> tab to work leads by the same status.
                         </div>
                       </div>
-                      <div className="d-flex flex-wrap gap-2">
-                        <button className={`btn btn-sm ${leadTab === 'add' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setLeadTab('add')}>
-                          Add Lead
-                        </button>
+                      <div className="d-flex flex-wrap gap-2 align-items-center">
+                        {/* Add Lead button */}
+                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                          <>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={handleOpenLeadModal}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
+                            >
+                              <i className="fas fa-plus" style={{ fontSize: '11px' }}></i>
+                              Add Lead
+                            </button>
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => { setShowBulkInputs(true); setBulkMode('bulkupload'); setInput1Value(''); setShowBulkUploadModal(true); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
+                            >
+                              <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
+                              Bulk Upload
+                            </button>
+                          </>
+                        )}
+                        {/* Day Visit Report */}
+                        <Link
+                          to="/institute/lrp"
+                          className="btn btn-sm btn-outline-secondary"
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px', textDecoration: 'none' }}
+                          title="Add Day Visit Report"
+                        >
+                          <i className="fas fa-clipboard-list" style={{ fontSize: '11px' }}></i>
+                          Day Visit Report
+                        </Link>
+                        {/* Refer All Leads */}
+                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeads || leads.length === 0}
+                            onClick={() => { setShowBulkInputs(true); setBulkMode('bulkrefer'); setInput1Value(''); openRefferPanel(null, 'RefferAllLeads'); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: '11px' }}></i>
+                            Refer All
+                          </button>
+                        )}
+                        {/* Sub-tabs */}
+                        <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 4px' }}></div>
                         <button className={`btn btn-sm ${leadTab === 'approval' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setLeadTab('approval')}>
                           Approval
                           <span className="badge bg-danger ms-2">{approvalSummary.pending ?? 0}</span>
@@ -4092,18 +4332,6 @@ const B2BSales = () => {
                         </button>
                       </div>
                     </div>
-
-                    {leadTab === 'add' && (
-                      <div className="mt-3">
-                        <div className="alert alert-info mb-2" style={{ fontSize: '13px' }}>
-                          Use the existing <b>Add Lead</b> flow. Click below to open form.
-                        </div>
-                        <button className="btn btn-primary" onClick={() => setShowAddLeadModal(true)}>
-                          <i className="fas fa-plus me-2"></i>
-                          Add Lead
-                        </button>
-                      </div>
-                    )}
 
                     {leadTab === 'approval' && (
                       <div className="mt-3">
@@ -4131,13 +4359,161 @@ const B2BSales = () => {
                           </button>
                         </div>
 
-                        <div className="table-responsive">
-                          {loadingApprovalList ? (
-                            <div className="text-center py-4 text-muted">
-                              <div className="spinner-border spinner-border-sm text-primary" role="status" />
-                              <span className="ms-2">Loading…</span>
-                            </div>
-                          ) : (
+                        <div className="d-flex justify-content-end mb-2">
+                          <div className="btn-group btn-group-sm" role="group" aria-label="Approval view toggle">
+                            <button
+                              type="button"
+                              className={`btn ${leadApprovalView === 'cards' ? 'btn-primary' : 'btn-outline-primary'}`}
+                              onClick={() => setLeadApprovalView('cards')}
+                            >
+                              Cards
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn ${leadApprovalView === 'table' ? 'btn-primary' : 'btn-outline-primary'}`}
+                              onClick={() => setLeadApprovalView('table')}
+                            >
+                              Table
+                            </button>
+                          </div>
+                        </div>
+
+                        {loadingApprovalList ? (
+                          <div className="text-center py-4 text-muted">
+                            <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                            <span className="ms-2">Loading…</span>
+                          </div>
+                        ) : approvalListLeads.length === 0 ? (
+                          <div className="text-center text-muted py-3">No leads in this bucket yet.</div>
+                        ) : leadApprovalView === 'cards' ? (
+                          <div className="row g-2">
+                            {approvalListLeads.map((lead, leadIndex) => (
+                              <div key={lead._id || leadIndex} className="col-12">
+                                <div className="lead-card">
+                                  <div className="lead-header">
+                                    <div className="lead-title-section">
+                                      <h5 className="lead-business-name">
+                                        {lead.businessName || 'Business Name Not Available'}
+                                      </h5>
+                                      <p className="lead-contact-person">
+                                        <i className="fas fa-user me-2"></i>
+                                        {lead.concernPersonName || 'Contact Person Not Available'}
+                                      </p>
+
+                                      <div className="lead-contact-info">
+                                        {lead.email && (
+                                          <div className="lead-contact-item">
+                                            <i className="fas fa-envelope"></i>
+                                            <span>{lead.email}</span>
+                                          </div>
+                                        )}
+                                        {lead.mobile && (
+                                          <div className="lead-contact-item">
+                                            <i className="fas fa-phone"></i>
+                                            <span>{lead.mobile}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="lead-badges">
+                                      {!!lead._id && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-light border"
+                                          onClick={() => toggleLeadCardCollapsed(lead._id)}
+                                          title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
+                                          style={{ borderRadius: '999px', padding: '4px 8px', marginRight: '6px' }}
+                                        >
+                                          <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
+                                        </button>
+                                      )}
+
+                                      <span className="lead-badge" style={{ background: '#6c757d', color: '#fff' }} title="Lead status at add time">
+                                        {lead.leadStatus
+                                          ? ({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)
+                                          : '—'}
+                                      </span>
+
+                                      {lead.leadAddedBy?.name && (
+                                        <span className="lead-badge" style={{ background: '#0dcaf0', color: '#212529' }} title="Added by">
+                                          {lead.leadAddedBy.name}
+                                        </span>
+                                      )}
+
+                                      {leadApprovalTab === 'pending' && (
+                                        <div className="d-flex gap-1 ms-2">
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-success"
+                                            onClick={() => handleApprovalDecision(lead._id, 'Approved')}
+                                          >
+                                            Approve
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-outline-danger"
+                                            onClick={() => handleApprovalDecision(lead._id, 'Rejected')}
+                                          >
+                                            Reject
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {!lead._id || !collapsedLeadCards.has(lead._id) ? (
+                                    <div className="lead-content">
+                                      <div className="status-section mb-2">
+                                        <div className="d-flex align-items-center justify-content-between">
+                                          <div className="d-flex align-items-center">
+                                            <i className="fas fa-tag text-primary me-2"></i>
+                                            <span className="fw-bold text-dark">CRM Status:</span>
+                                            <span className="ms-2 badge bg-primary">
+                                              {lead.status?.title || lead.status?.name || 'No Status'}
+                                            </span>
+                                          </div>
+                                          <button
+                                            className="btn btn-sm btn-outline-primary"
+                                            onClick={() => openPanelHome(lead)}
+                                            title="Open panel"
+                                          >
+                                            <i className="fas fa-arrow-right me-1"></i>
+                                            Open
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="compact-info-section">
+                                        <div className="compact-info-grid">
+                                          {lead.address && (
+                                            <div className="compact-info-item">
+                                              <i className="fas fa-map-marker-alt text-danger"></i>
+                                              <span className="compact-info-label">Address:</span>
+                                              <span className="compact-info-value">{lead.address}</span>
+                                            </div>
+                                          )}
+                                          {lead.leadOwner?.name && (
+                                            <div className="compact-info-item">
+                                              <i className="fas fa-user-tie text-warning"></i>
+                                              <span className="compact-info-label">Owner:</span>
+                                              <span className="compact-info-value">{lead.leadOwner.name}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>
+                                      Card collapsed. Click the chevron to expand.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="table-responsive">
                             <table className="table table-sm align-middle">
                               <thead>
                                 <tr>
@@ -4185,17 +4561,10 @@ const B2BSales = () => {
                                     </td>
                                   </tr>
                                 ))}
-                                {approvalListLeads.length === 0 && (
-                                  <tr>
-                                    <td colSpan="5" className="text-center text-muted py-3">
-                                      No leads in this bucket yet.
-                                    </td>
-                                  </tr>
-                                )}
                               </tbody>
                             </table>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -4591,14 +4960,46 @@ const B2BSales = () => {
               <section className="mb-3">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
                   <div className="card-body">
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    {/* <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                       <h6 className="mb-0 fw-bold">Followup</h6>
                       <div className="d-flex flex-wrap gap-2 align-items-center">
                         <div className="btn-group btn-group-sm" role="group" aria-label="Followup tabs">
-                          <button className={`btn ${followupTab === 'done' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setFollowupTab('done')}>Done</button>
-                          <button className={`btn ${followupTab === 'planned' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFollowupTab('planned')}>Planned</button>
-                          <button className={`btn ${followupTab === 'scheduled' ? 'btn-info' : 'btn-outline-info'}`} onClick={() => setFollowupTab('scheduled')}>Scheduled</button>
-                          <button className={`btn ${followupTab === 'missed' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setFollowupTab('missed')}>Missed</button>
+                          <button
+                            className={`btn ${followupTab === 'done' ? 'btn-success' : 'btn-outline-success'}`}
+                            onClick={() => setFollowupTab('done')}
+                          >
+                            Done
+                            <span className="ms-2 badge bg-success">
+                              {loadingFollowupLeads ? '—' : (followupBuckets.done.length || 0)}
+                            </span>
+                          </button>
+                          <button
+                            className={`btn ${followupTab === 'planned' ? 'btn-primary' : 'btn-outline-primary'}`}
+                            onClick={() => setFollowupTab('planned')}
+                          >
+                            Planned
+                            <span className="ms-2 badge bg-primary">
+                              {loadingFollowupLeads ? '—' : (followupBuckets.planned.length || 0)}
+                            </span>
+                          </button>
+                          <button
+                            className={`btn ${followupTab === 'scheduled' ? 'btn-info' : 'btn-outline-info'}`}
+                            onClick={() => setFollowupTab('scheduled')}
+                          >
+                            Scheduled
+                            <span className="ms-2 badge bg-info text-dark">
+                              {loadingFollowupLeads ? '—' : (followupBuckets.scheduled.length || 0)}
+                            </span>
+                          </button>
+                          <button
+                            className={`btn ${followupTab === 'missed' ? 'btn-danger' : 'btn-outline-danger'}`}
+                            onClick={() => setFollowupTab('missed')}
+                          >
+                            Missed
+                            <span className="ms-2 badge bg-danger">
+                              {loadingFollowupLeads ? '—' : (followupBuckets.missed.length || 0)}
+                            </span>
+                          </button>
                         </div>
                         {followupTab === 'scheduled' && (
                           <select className="form-select form-select-sm" value={scheduledDays} onChange={(e) => setScheduledDays(e.target.value)} style={{ width: '140px' }}>
@@ -4608,9 +5009,204 @@ const B2BSales = () => {
                           </select>
                         )}
                       </div>
+                    </div> */}
+
+                    {/* Followup summary cards (like Performance tab) */}
+                    {/* <div className="d-flex flex-wrap gap-2 align-items-center mt-3">
+                      {[
+                        { id: 'done', label: 'Done', count: followupBuckets.done.length || 0, border: '#198754', bg: '#eaf7f0', text: '#198754' },
+                        { id: 'planned', label: 'Planned', count: followupBuckets.planned.length || 0, border: '#0d6efd', bg: '#eef5ff', text: '#0d6efd' },
+                        { id: 'scheduled', label: 'Scheduled', count: followupBuckets.scheduled.length || 0, border: '#0dcaf0', bg: '#e8fbff', text: '#0dcaf0' },
+                        { id: 'missed', label: 'Missed', count: followupBuckets.missed.length || 0, border: '#dc3545', bg: '#fdecee', text: '#dc3545' },
+                      ].map((c) => {
+                        const selected = followupTab === c.id;
+                        return (
+                          <div
+                            key={c.id}
+                            role="button"
+                            tabIndex={0}
+                            className="card border-0 shadow-sm"
+                            onClick={() => setFollowupTab(c.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') setFollowupTab(c.id);
+                            }}
+                            style={{
+                              minWidth: '110px',
+                              height: '45px',
+                              cursor: 'pointer',
+                              border: selected ? `2px solid ${c.border}` : `1px solid ${c.border}`,
+                              backgroundColor: selected ? c.bg : '#fff',
+                            }}
+                            title={`Click to view ${c.label} followups`}
+                          >
+                            <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
+                              <div>
+                                <div className="fw-bold" style={{ fontSize: '11px', color: c.text }}>
+                                  {c.label}
+                                </div>
+                                <small className="text-muted" style={{ fontSize: '10px' }}>
+                                  {loadingFollowupLeads ? 'Loading…' : `${c.count} lead${c.count === 1 ? '' : 's'}`}
+                                </small>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div> */}
+
+                    {/* Lead cards (same content as Lead tab cards) */}
+                    <div className="row g-2 mt-3">
+                      {loadingFollowupLeads ? (
+                        <div className="col-12 text-center text-muted py-4">Loading followups...</div>
+                      ) : followupVisibleLeads.length === 0 ? (
+                        <div className="col-12 text-center text-muted py-4">No followups found.</div>
+                      ) : (
+                        followupVisibleLeads.map((lead, leadIndex) => (
+                          <div key={lead._id || leadIndex} className="col-12">
+                            <div className="lead-card">
+                            
+                              <div className="lead-header">
+                                <div className="lead-title-section">
+                                  <h5 className="lead-business-name">
+                                    {lead.businessName || 'Business Name Not Available'}
+                                  </h5>
+                                  <p className="lead-contact-person">
+                                    <i className="fas fa-user me-2"></i>
+                                    {lead.concernPersonName || 'Contact Person Not Available'}
+                                  </p>
+
+                                 
+                                  <div className="lead-contact-info">
+                                    {lead.email && (
+                                      <div className="lead-contact-item">
+                                        <i className="fas fa-envelope"></i>
+                                        <span>{lead.email}</span>
+                                      </div>
+                                    )}
+                                    {lead.designation && (
+                                      <div className="lead-contact-item">
+                                        <i className="fas fa-id-badge"></i>
+                                        <span>{lead.designation}</span>
+                                      </div>
+                                    )}
+                                    {lead.mobile && (
+                                      <div className="lead-contact-item">
+                                        <i className="fas fa-phone"></i>
+                                        <span>{lead.mobile}</span>
+                                      </div>
+                                    )}
+                                    {lead.whatsapp && (
+                                      <div className="lead-contact-item">
+                                        <i className="fab fa-whatsapp"></i>
+                                        <span>{lead.whatsapp}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="lead-badges">
+                                  {!!lead._id && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-light border"
+                                      onClick={() => toggleLeadCardCollapsed(lead._id)}
+                                      title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
+                                      style={{ borderRadius: '999px', padding: '4px 8px', marginRight: '6px' }}
+                                    >
+                                      <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
+                                    </button>
+                                  )}
+                                  {lead.leadCategory?.name && (
+                                    <span className="lead-badge category">
+                                      {lead.leadCategory.name}
+                                    </span>
+                                  )}
+                                  {lead.typeOfB2B?.name && (
+                                    <span className="lead-badge type">
+                                      {lead.typeOfB2B.name}
+                                    </span>
+                                  )}
+                                  {lead.leadStatus && (
+                                    <span className="lead-badge" style={{ background: '#6f42c1', color: '#fff' }} title="Lead status at add time">
+                                      {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              
+                              {!lead._id || !collapsedLeadCards.has(lead._id) ? (
+                                <div className="lead-content">
+                                  
+                                  <div className="status-section mb-2">
+                                    <div className="d-flex align-items-center justify-content-between">
+                                      <div className="d-flex align-items-center">
+                                        <i className="fas fa-tag text-primary me-2"></i>
+                                        <span className="fw-bold text-dark">CRM Status:</span>
+                                        <span className="ms-2 badge bg-primary">
+                                          {lead.status?.title || lead.status?.name || 'No Status'}
+                                        </span>
+                                        {lead.subStatus && (
+                                          <span className="ms-2 badge bg-secondary">
+                                            {(() => {
+                                              const subId = typeof lead.subStatus === 'object' ? lead.subStatus?._id : lead.subStatus;
+                                              const substatus = lead.status?.substatuses?.find(sub => String(sub._id) === String(subId));
+                                              return substatus?.title || (typeof lead.subStatus === 'object' ? (lead.subStatus?.title || 'No Sub-Status') : 'No Sub-Status');
+                                            })()}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <button
+                                        className="btn btn-sm btn-outline-primary"
+                                        onClick={() => openPanelHome(lead)}
+                                        title="Open panel"
+                                      >
+                                        <i className="fas fa-arrow-right me-1"></i>
+                                        Open
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                 
+                                  <div className="compact-info-section">
+                                    <div className="compact-info-grid">
+                                      {lead.address && (
+                                        <div className="compact-info-item">
+                                          <i className="fas fa-map-marker-alt text-danger"></i>
+                                          <span className="compact-info-label">Address:</span>
+                                          <span className="compact-info-value">{lead.address}</span>
+                                        </div>
+                                      )}
+                                      {lead.leadOwner?.name && (
+                                        <div className="compact-info-item">
+                                          <i className="fas fa-user-tie text-warning"></i>
+                                          <span className="compact-info-label">Owner:</span>
+                                          <span className="compact-info-value">{lead.leadOwner.name}</span>
+                                        </div>
+                                      )}
+                                      {lead.leadAddedBy?.name && (
+                                        <div className="compact-info-item">
+                                          <i className="fas fa-user-plus text-info"></i>
+                                          <span className="compact-info-label">Added:</span>
+                                          <span className="compact-info-value">{lead.leadAddedBy.name}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>
+                                  Card collapsed. Click the chevron to expand.
+                                </div>
+                              )}
+
+                              
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
 
-                    <div className="table-responsive mt-3">
+                    {/* <div className="table-responsive mt-3">
                       <table className="table table-sm align-middle">
                         <thead>
                           <tr>
@@ -4621,43 +5217,33 @@ const B2BSales = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {(() => {
-                            const bucket =
-                              followupTab === 'done' ? followupBuckets.done :
-                              followupTab === 'missed' ? followupBuckets.missed :
-                              followupTab === 'scheduled' ? followupBuckets.scheduled :
-                              followupBuckets.planned;
-
-                            const days = parseInt(scheduledDays, 10);
-                            const withinScheduled = followupTab !== 'scheduled'
-                              ? bucket
-                              : bucket.filter((l) => {
-                                const ts = l?.followUp?.scheduledDate ? new Date(l.followUp.scheduledDate).getTime() : NaN;
-                                if (!Number.isFinite(ts)) return false;
-                                const diffDays = (ts - Date.now()) / (1000 * 60 * 60 * 24);
-                                return diffDays >= 0 && diffDays <= (Number.isFinite(days) ? days : 1);
-                              });
-
-                            if (withinScheduled.length === 0) {
+                          {loadingFollowupLeads ? (
+                            <tr>
+                              <td colSpan="4" className="text-center text-muted py-3">Loading followups...</td>
+                            </tr>
+                          ) : followupVisibleLeads.length === 0 ? (
+                            <tr>
+                              <td colSpan="4" className="text-center text-muted py-3">No followups found.</td>
+                            </tr>
+                          ) : (
+                            followupVisibleLeads.map((l) => {
+                              const fu =
+                                l && typeof l.followUp === 'object' && l.followUp !== null
+                                  ? l.followUp
+                                  : {};
                               return (
-                                <tr>
-                                  <td colSpan="4" className="text-center text-muted py-3">No followups found.</td>
+                                <tr key={l._id}>
+                                  <td className="fw-semibold">{l.businessName || '—'}</td>
+                                  <td>{l.concernPersonName || '—'}</td>
+                                  <td>{fu.scheduledDate ? new Date(fu.scheduledDate).toLocaleString() : '—'}</td>
+                                  <td>{fu.status || 'Pending'}</td>
                                 </tr>
                               );
-                            }
-
-                            return withinScheduled.map((l) => (
-                              <tr key={l._id}>
-                                <td className="fw-semibold">{l.businessName || '—'}</td>
-                                <td>{l.concernPersonName || '—'}</td>
-                                <td>{l.followUp?.scheduledDate ? new Date(l.followUp.scheduledDate).toLocaleString() : '—'}</td>
-                                <td>{l.followUp?.status || 'Pending'}</td>
-                              </tr>
-                            ));
-                          })()}
+                            })
+                          )}
                         </tbody>
                       </table>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </section>
@@ -5532,7 +6118,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
   
   .modal .pac-item-selected {
-    background-color: #007bff;
+    background-color: #FC2B5A;
     color: white;
   }
 
@@ -5554,13 +6140,13 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   /* Bulk selection highlight */
   .lead-card.bulk-selected {
-    outline: 2px solid #0d6efd;
-    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.25);
+    outline: 2px solid #FC2B5A;
+    box-shadow: 0 8px 25px rgba(252, 43, 90, 0.25);
   }
 
   /* Header Section */
   .lead-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%);
     color: white;
     padding: 1rem;
     position: relative;
@@ -5780,13 +6366,13 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .contact-link {
-    color: #007bff;
+    color: #FC2B5A;
     text-decoration: none;
     font-weight: 600;
   }
 
   .contact-link:hover {
-    color: #0056b3;
+    color: #a5003a;
     text-decoration: underline;
   }
 
@@ -5835,7 +6421,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .action-btn.view {
-    background: linear-gradient(135deg, #007bff, #0056b3);
+    background: linear-gradient(135deg, #FC2B5A, #a5003a);
   }
 
   .action-btn.refer {
@@ -6242,8 +6828,42 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 }
 `}
 </style>
+<style>{`
+  /* B2B Brand Color Overrides */
+  .btn-primary {
+    background-color: #FC2B5A !important;
+    border-color: #FC2B5A !important;
+  }
+  .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background-color: #a5003a !important;
+    border-color: #a5003a !important;
+  }
+  .btn-outline-primary {
+    color: #FC2B5A !important;
+    border-color: #FC2B5A !important;
+  }
+  .btn-outline-primary:hover, .btn-outline-primary.active {
+    background-color: #FC2B5A !important;
+    border-color: #FC2B5A !important;
+    color: #fff !important;
+  }
+  .badge.bg-primary { background-color: #FC2B5A !important; }
+  .text-primary { color: #FC2B5A !important; }
+  .page-item.active .page-link {
+    background-color: #FC2B5A !important;
+    border-color: #FC2B5A !important;
+  }
+  .page-link { color: #FC2B5A !important; }
+  .page-link:hover { color: #a5003a !important; }
+  .spinner-border.text-primary { color: #FC2B5A !important; }
+  .form-check-input:checked { background-color: #FC2B5A !important; border-color: #FC2B5A !important; }
+`}
+</style>
     </div >
   );
 };
 
 export default B2BSales;
+
+
+
