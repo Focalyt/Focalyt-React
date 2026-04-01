@@ -1092,11 +1092,11 @@ const B2BSales = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  const fetchFollowupLeads = async () => {
+  const fetchFollowupLeads = async (filterOverrides = {}) => {
     if (!token) return;
     try {
       setLoadingFollowupLeads(true);
-      const eff = { ...filters };
+      const eff = { ...filters, ...filterOverrides };
 
       const params = {
         page: 1,
@@ -1111,6 +1111,8 @@ const B2BSales = () => {
       if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
       if (eff.approvalStatus) params.approvalStatus = eff.approvalStatus;
+      if (eff.status) params.status = eff.status;
+      if (eff.subStatus) params.subStatus = eff.subStatus;
 
       const response = await axios.get(`${backendUrl}/college/b2b_copy/leads`, {
         headers: { 'x-auth': token },
@@ -3613,6 +3615,14 @@ const B2BSales = () => {
     });
   }, [followupBuckets, followupTab, scheduledDays]);
 
+  const followupStatusFilteredLeads = useMemo(() => {
+    if (!selectedStatusFilter) return followupVisibleLeads;
+    return followupVisibleLeads.filter((l) => {
+      const statusId = typeof l?.status === 'object' && l?.status !== null ? l.status?._id : l?.status;
+      return String(statusId) === String(selectedStatusFilter);
+    });
+  }, [followupVisibleLeads, selectedStatusFilter]);
+
   return (
     <div className="container-fluid b2b-cycle">
       <style>{b2bCycleUiStyles}</style>
@@ -5056,12 +5066,14 @@ const B2BSales = () => {
 
                     {/* Lead cards (same content as Lead tab cards) */}
                     <div className="row g-2 mt-3">
-                      {loadingFollowupLeads ? (
-                        <div className="col-12 text-center text-muted py-4">Loading followups...</div>
-                      ) : followupVisibleLeads.length === 0 ? (
-                        <div className="col-12 text-center text-muted py-4">No followups found.</div>
+                      {loadingLeads ? (
+                        <div className="col-12 text-center text-muted py-4">Loading leads...</div>
+                      ) : leads.length === 0 ? (
+                        <div className="col-12 text-center text-muted py-4">
+                          {selectedStatusFilter ? 'No leads found for selected status.' : 'No leads found.'}
+                        </div>
                       ) : (
-                        followupVisibleLeads.map((lead, leadIndex) => (
+                        leads.map((lead, leadIndex) => (
                           <div key={lead._id || leadIndex} className="col-12">
                             <div className="lead-card">
                             
