@@ -9,6 +9,21 @@ import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+/** First occurrence wins — avoids duplicate cards when the same lead appears twice in an API array. */
+function dedupeLeadsById(list) {
+  if (!Array.isArray(list) || list.length === 0) return Array.isArray(list) ? list : [];
+  const seen = new Set();
+  const out = [];
+  for (const lead of list) {
+    const id = lead?._id != null ? String(lead._id) : null;
+    if (id) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    out.push(lead);
+  }
+  return out;
+}
 
 // Google Maps API styles
 const mapStyles = `
@@ -366,14 +381,23 @@ const B2BSales = () => {
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
 
-  // ===== New UI tabs (requested redesign) =====
-  const [mainTab, setMainTab] = useState('lead'); // lead | performance | followup | documents
+  // ===== Single-page layout (no main tabs): sections scroll vertically =====
   const [leadTab, setLeadTab] = useState('approval'); // add | approval | report
   const [leadApprovalTab, setLeadApprovalTab] = useState('pending'); // pending | approved | rejected
   const [leadApprovalView, setLeadApprovalView] = useState('cards'); // cards | table
   const [performanceTab, setPerformanceTab] = useState('all'); // all | hot | warm | cold | prospect (approved leads)
-  const [followupTab, setFollowupTab] = useState('planned'); // done | planned | scheduled | missed
+  const [followupTab, setFollowupTab] = useState('pending'); // done | pending | scheduled | missed
+  /** Single "Followup & documents" card: which inner list to show */
+  const [activitySectionView, setActivitySectionView] = useState('followup'); // followup | documents
+  /** Only ONE cards area on page (Lead section) */
+  const [cardsView, setCardsView] = useState('lead'); // lead | performance | followup | documents
+  /** Topbar: visible tabs with dropdowns */
+  const [topbarMenuOpen, setTopbarMenuOpen] = useState(null); // 'lead' | 'performance' | 'followup' | 'documents' | null
+  const topbarMenuRef = useRef(null);
+  const topbarMenuCloseTimerRef = useRef(null);
   const [scheduledDays, setScheduledDays] = useState('1'); // for scheduled dropdown (days)
+  const scheduledDaysSelectRef = useRef(null);
+  const prevFollowupTabRef = useRef('pending');
 
   /** Sales copy: API-driven approval counts + list */
   const [approvalSummary, setApprovalSummary] = useState({
@@ -394,6 +418,12 @@ const B2BSales = () => {
     prospect: 0,
   });
   const [loadingPerformanceSummary, setLoadingPerformanceSummary] = useState(false);
+  /** Approved-lead list (Performance section) — separate from CRM `leads` used for Documents / filters */
+  const [performanceLeads, setPerformanceLeads] = useState([]);
+  const [loadingPerformanceLeads, setLoadingPerformanceLeads] = useState(false);
+  const [performancePage, setPerformancePage] = useState(1);
+  const [performanceTotalPages, setPerformanceTotalPages] = useState(1);
+  const [performanceListTotal, setPerformanceListTotal] = useState(0);
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -427,6 +457,10 @@ const B2BSales = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
 
+  /** Documents tab: add doc (name + URL) per lead */
+  const [leadDocForm, setLeadDocForm] = useState({});
+  const [savingLeadDocId, setSavingLeadDocId] = useState(null);
+  const [docApprovalKey, setDocApprovalKey] = useState(null);
 
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -459,6 +493,7 @@ const B2BSales = () => {
     address: '',
     city: '',
     state: '',
+    block: '',
     latitude: '',
     longitude: '',
     designation: '',
@@ -491,8 +526,7 @@ const B2BSales = () => {
 
   //side pannel stats
   const [showPanel, setShowPanel] = useState('')
-  const [panelActionsOpen, setPanelActionsOpen] = useState(false);
-  const panelActionsRef = useRef(null);
+
 
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
@@ -1120,7 +1154,7 @@ const B2BSales = () => {
       });
 
       if (response.data?.status) {
-        const fetched = response.data?.data?.leads || [];
+        const fetched = dedupeLeadsById(response.data?.data?.leads || []);
         setFollowupLeadsData(fetched);
       } else {
         setFollowupLeadsData([]);
@@ -1134,37 +1168,61 @@ const B2BSales = () => {
   };
 
   useEffect(() => {
-    if (mainTab === 'lead') {
-      fetchLeads(selectedStatusFilter, 1);
-    }
-  }, [mainTab]);
-
-  useEffect(() => {
-    if (mainTab !== 'performance') return;
-    const opts = {
-      approvalStatus: 'Approved',
-      fetchLimit: 200,
-    };
-    if (performanceTab !== 'all') {
-      opts.performanceLeadStatus = performanceTab;
-    }
-    fetchLeads(null, 1, opts);
-  }, [mainTab, performanceTab]);
-
-  useEffect(() => {
-    if (mainTab !== 'followup') return;
+    fetchLeads(selectedStatusFilter, 1);
     fetchFollowupLeads();
+    fetchStatusCounts();
+    fetchPerformanceSummary();
+    fetchPerformanceLeads(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainTab]);
+  }, []);
+
+  useEffect(() => {
+    fetchPerformanceLeads(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [performanceTab]);
 
   useEffect(() => {
     const handler = () => {
-      if (mainTab === 'followup') fetchFollowupLeads();
+      fetchFollowupLeads();
     };
     window.addEventListener('b2b-followup-updated', handler);
     return () => window.removeEventListener('b2b-followup-updated', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainTab]);
+  }, []);
+
+  // Open the "Next X days" select when user switches into Scheduled (not on every re-render)
+  useEffect(() => {
+    const prev = prevFollowupTabRef.current;
+    prevFollowupTabRef.current = followupTab;
+    if (followupTab !== 'scheduled') return;
+    if (prev === 'scheduled') return;
+
+    const raf = window.requestAnimationFrame(() => {
+      const el = scheduledDaysSelectRef.current;
+      if (!el) return;
+      if (typeof el.showPicker === 'function') {
+        try {
+          el.showPicker();
+        } catch {
+          el.focus();
+        }
+      } else {
+        el.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [followupTab]);
+
+  useEffect(() => {
+    if (!topbarMenuOpen) return;
+    const close = (e) => {
+      if (topbarMenuRef.current && !topbarMenuRef.current.contains(e.target)) {
+        setTopbarMenuOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [topbarMenuOpen]);
 
   const fetchPerformanceSummary = async () => {
     if (!token) return;
@@ -1183,18 +1241,13 @@ const B2BSales = () => {
     }
   };
 
-  useEffect(() => {
-    if (mainTab !== 'performance') return;
-    fetchPerformanceSummary();
-  }, [mainTab]);
-
-  // Auto-select leads based on Input 1 value for bulk refer
+  // Auto-select leads based on Input 1 value for bulk refer (Performance list = approved leads)
   useEffect(() => {
     if (bulkMode !== 'bulkrefer') {
       return;
     }
 
-    if (!leads || leads.length === 0) {
+    if (!performanceLeads || performanceLeads.length === 0) {
       return;
     }
 
@@ -1205,12 +1258,10 @@ const B2BSales = () => {
       return;
     }
 
-    // Get total available leads
-    const totalAvailableLeads = totalLeads || leads.length;
+    const totalAvailableLeads = performanceListTotal || performanceLeads.length;
     const validNumValue = Math.min(numValue, totalAvailableLeads);
 
-    // If user wants more leads than currently loaded, fetch them
-    if (validNumValue > leads.length && validNumValue > 0) {
+    if (validNumValue > performanceLeads.length && validNumValue > 0) {
       const fetchLeadsForSelection = async () => {
         if (!token) return;
 
@@ -1219,7 +1270,8 @@ const B2BSales = () => {
           const params = {
             page: 1,
             limit: validNumValue.toString(),
-            ...(selectedStatusFilter && { status: selectedStatusFilter }),
+            approvalStatus: 'Approved',
+            ...(performanceTab !== 'all' ? { leadStatus: performanceTab } : {}),
             ...(eff.search && { search: eff.search }),
             ...(eff.leadCategory && { leadCategory: eff.leadCategory }),
             ...(eff.typeOfB2B && { typeOfB2B: eff.typeOfB2B }),
@@ -1236,15 +1288,14 @@ const B2BSales = () => {
           });
 
           if (response.data.status && response.data.data.leads) {
-            const fetchedLeads = response.data.data.leads;
+            const fetchedLeads = dedupeLeadsById(response.data.data.leads);
             const selectedLeadsData = fetchedLeads.slice(0, validNumValue);
             const leadsToSelect = selectedLeadsData.map(lead => lead._id);
             setSelectedProfiles(leadsToSelect);
           }
         } catch (error) {
           console.error('Error fetching leads for selection:', error);
-          // Fallback: select from current leads
-          const selectedLeadsData = leads.slice(0, Math.min(validNumValue, leads.length));
+          const selectedLeadsData = performanceLeads.slice(0, Math.min(validNumValue, performanceLeads.length));
           const leadsToSelect = selectedLeadsData.map(lead => lead._id);
           setSelectedProfiles(leadsToSelect);
         }
@@ -1252,12 +1303,38 @@ const B2BSales = () => {
 
       fetchLeadsForSelection();
     } else {
-      // Select from current leads
-      const selectedLeadsData = leads.slice(0, validNumValue);
+      const selectedLeadsData = performanceLeads.slice(0, validNumValue);
       const leadsToSelect = selectedLeadsData.map(lead => lead._id);
       setSelectedProfiles(leadsToSelect);
     }
-  }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
+  }, [input1Value, bulkMode, performanceLeads, performanceListTotal, performanceTab, filters, token]);
+
+  const scrollToB2bSection = useCallback((sectionId) => {
+    const el = typeof document !== 'undefined' ? document.getElementById(sectionId) : null;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const openTopbarMenu = useCallback((key) => {
+    if (topbarMenuCloseTimerRef.current) {
+      window.clearTimeout(topbarMenuCloseTimerRef.current);
+      topbarMenuCloseTimerRef.current = null;
+    }
+    setTopbarMenuOpen(key);
+  }, []);
+
+  const scheduleCloseTopbarMenu = useCallback(() => {
+    if (topbarMenuCloseTimerRef.current) {
+      window.clearTimeout(topbarMenuCloseTimerRef.current);
+    }
+    topbarMenuCloseTimerRef.current = window.setTimeout(() => {
+      setTopbarMenuOpen(null);
+      topbarMenuCloseTimerRef.current = null;
+    }, 200);
+  }, []);
+
+  const toggleTopbarMenu = useCallback((key) => {
+    setTopbarMenuOpen((cur) => (cur === key ? null : key));
+  }, []);
 
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
@@ -1268,7 +1345,12 @@ const B2BSales = () => {
     // });
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
+    setCardsView('lead');
+    setLeadTab('report');
+    setCollapsedLeadCards(() => new Set());
     fetchLeads(statusId, 1);
+    fetchFollowupLeads({ status: statusId });
+    window.setTimeout(() => scrollToB2bSection('b2b-section-lead'), 50);
   };
 
   // Handle total card click (show all leads)
@@ -1279,8 +1361,59 @@ const B2BSales = () => {
     // });
     setSelectedStatusFilter(null);
     setCurrentPage(1);
+    setCardsView('lead');
+    setLeadTab('report');
+    setCollapsedLeadCards(() => new Set());
     fetchLeads(null, 1);
+    fetchFollowupLeads({ status: null, subStatus: null });
+    window.setTimeout(() => scrollToB2bSection('b2b-section-lead'), 50);
   };
+
+  const getSubStatusTitle = useCallback((lead) => {
+    if (!lead?.subStatus) return null;
+    const subId = typeof lead.subStatus === 'object' ? lead.subStatus?._id : lead.subStatus;
+    const substatus = lead.status?.substatuses?.find((sub) => String(sub._id) === String(subId));
+    return substatus?.title || (typeof lead.subStatus === 'object' ? (lead.subStatus?.title || 'No Sub-Status') : 'No Sub-Status');
+  }, []);
+
+  const getLeadAgeText = useCallback((lead) => {
+    const createdAt = lead?.createdAt ? new Date(lead.createdAt) : null;
+    if (!createdAt || Number.isNaN(createdAt.getTime())) return '—';
+    const diffMs = Date.now() - createdAt.getTime();
+    if (diffMs < 0) return '—';
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    if (days >= 1) return `${days}d ${hours}h`;
+    return `${hours}h`;
+  }, []);
+
+  const getLockText = useCallback((lead) => {
+    const lockDays = Number(lead?.lockLeadDays);
+    const createdAt = lead?.createdAt ? new Date(lead.createdAt) : null;
+    if (!lockDays || !createdAt || Number.isNaN(createdAt.getTime())) return '—';
+    const lockUntilMs = createdAt.getTime() + lockDays * 24 * 60 * 60 * 1000;
+    const remainingMs = lockUntilMs - Date.now();
+    if (remainingMs <= 0) return 'Unlocked';
+    const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+    return `Locked (${remainingDays}d left)`;
+  }, []);
+
+  const getLeadOwnerName = useCallback((lead) => {
+    const owner = lead?.leadOwner;
+    if (!owner) return '—';
+    if (typeof owner === 'object' && owner !== null) return owner?.name || '—';
+    const match = (users || []).find((u) => String(u?._id) === String(owner));
+    return match?.name || '—';
+  }, [users]);
+
+  const getLeadAddedByName = useCallback((lead) => {
+    const added = lead?.leadAddedBy;
+    if (!added) return '—';
+    if (typeof added === 'object' && added !== null) return added?.name || '—';
+    const match = (users || []).find((u) => String(u?._id) === String(added));
+    return match?.name || '—';
+  }, [users]);
 
   // Filter handlers
   const handleFilterChange = (key, value) => {
@@ -1303,7 +1436,9 @@ const B2BSales = () => {
   const applyFilters = (filterOverrides = {}) => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, filterOverrides);
-    fetchStatusCounts(filterOverrides); // Update status counts with current filters
+    fetchStatusCounts(filterOverrides);
+    fetchPerformanceLeads(1);
+    fetchFollowupLeads();
   };
 
   const clearFilters = () => {
@@ -1321,7 +1456,9 @@ const B2BSales = () => {
     });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
-    fetchStatusCounts(); // Update status counts after clearing filters
+    fetchStatusCounts();
+    fetchPerformanceLeads(1);
+    fetchFollowupLeads();
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
@@ -1329,7 +1466,7 @@ const B2BSales = () => {
       closePanel();
       setLoadingLeads(true);
 
-      const eff = { ...filters, ...filterOverrides };
+      const eff = { fetchLimit: 300, ...filters, ...filterOverrides };
 
       // Build query parameters
       const params = {
@@ -1391,7 +1528,7 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        const fetchedLeads = response.data.data.leads || [];
+        const fetchedLeads = dedupeLeadsById(response.data.data.leads || []);
         
         // console.log('📥 [FRONTEND] Response received:', {
         //   status: response.data.status,
@@ -1441,6 +1578,50 @@ const B2BSales = () => {
       console.error('Error fetching leads:', error);
     } finally {
       setLoadingLeads(false);
+    }
+  };
+
+  const fetchPerformanceLeads = async (page = 1) => {
+    if (!token) return;
+    try {
+      closePanel();
+      setLoadingPerformanceLeads(true);
+      const eff = {
+        ...filters,
+        approvalStatus: 'Approved',
+        fetchLimit: 200,
+        ...(performanceTab !== 'all' ? { performanceLeadStatus: performanceTab } : {}),
+      };
+      const params = { page };
+      if (eff.search) params.search = eff.search;
+      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
+      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
+      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+      if (eff.status) params.status = eff.status;
+      if (eff.subStatus) params.subStatus = eff.subStatus;
+      if (eff.approvalStatus) params.approvalStatus = eff.approvalStatus;
+      if (eff.performanceLeadStatus) params.leadStatus = eff.performanceLeadStatus;
+      if (eff.fetchLimit) params.limit = eff.fetchLimit;
+
+      const response = await axios.get(`${backendUrl}/college/b2b_copy/leads`, {
+        headers: { 'x-auth': token },
+        params,
+      });
+
+      if (response.data.status) {
+        setPerformanceLeads(dedupeLeadsById(response.data.data.leads || []));
+        if (response.data.data.pagination) {
+          setPerformanceTotalPages(response.data.data.pagination.totalPages || 1);
+          setPerformancePage(response.data.data.pagination.currentPage || page);
+          setPerformanceListTotal(response.data.data.pagination.totalLeads || 0);
+        }
+      }
+    } catch (error) {
+      console.error('fetchPerformanceLeads', error);
+    } finally {
+      setLoadingPerformanceLeads(false);
     }
   };
 
@@ -1509,48 +1690,98 @@ const B2BSales = () => {
       await fetchApprovalSummary();
       fetchPerformanceSummary();
       const map = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-      const approvalStatus = map[leadApprovalTab];
+      const approvalStatus = leadApprovalTab === 'all' ? null : map[leadApprovalTab];
       const listRes = await axios.get(`${backendUrl}/college/b2b_copy/leads`, {
         headers: { 'x-auth': token },
-        params: { approvalStatus, limit: 500, page: 1 },
+        params: { ...(approvalStatus ? { approvalStatus } : {}), limit: 500, page: 1 },
       });
       if (listRes.data.status) {
-        setApprovalListLeads(listRes.data.data.leads || []);
+        setApprovalListLeads(dedupeLeadsById(listRes.data.data.leads || []));
       }
-      if (mainTab === 'performance') {
-        const opts = { approvalStatus: 'Approved', fetchLimit: 200 };
-        if (performanceTab !== 'all') {
-          opts.performanceLeadStatus = performanceTab;
-        }
-        fetchLeads(null, 1, opts);
-      } else {
-        fetchLeads(selectedStatusFilter, currentPage);
-      }
+      fetchPerformanceLeads(1);
+      fetchLeads(selectedStatusFilter, 1);
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to update approval');
     }
   };
 
-  useEffect(() => {
-    if (mainTab !== 'lead') return;
-    fetchApprovalSummary();
-  }, [mainTab]);
+  const getLeadDocForm = (leadId) => leadDocForm[leadId] || { name: '', fileUrl: '' };
+
+  const setLeadDocFormField = (leadId, field, value) => {
+    setLeadDocForm((prev) => {
+      const cur = prev[leadId] || { name: '', fileUrl: '' };
+      return { ...prev, [leadId]: { ...cur, [field]: value } };
+    });
+  };
+
+  const handleAddLeadDocument = async (leadId) => {
+    const { name, fileUrl } = getLeadDocForm(leadId);
+    if (!name?.trim() || !fileUrl?.trim()) {
+      alert('Document name aur file URL dono zaroori hain (pehle file upload karke URL paste karein).');
+      return;
+    }
+    setSavingLeadDocId(leadId);
+    try {
+      const res = await axios.post(
+        `${backendUrl}/college/b2b_copy/leads/${leadId}/documents`,
+        { name: name.trim(), fileUrl: fileUrl.trim() },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!res.data?.status) {
+        alert(res.data?.message || 'Failed to add document');
+        return;
+      }
+      const updated = res.data.data;
+      setLeads((prev) => prev.map((l) => (String(l._id) === String(leadId) ? updated : l)));
+      setLeadDocForm((prev) => ({ ...prev, [leadId]: { name: '', fileUrl: '' } }));
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to add document');
+    } finally {
+      setSavingLeadDocId(null);
+    }
+  };
+
+  const handleLeadDocumentApproval = async (leadId, docId, decision) => {
+    if (!leadId || !docId || !['Approved', 'Rejected'].includes(decision)) return;
+    const key = `${leadId}:${docId}`;
+    setDocApprovalKey(key);
+    try {
+      const res = await axios.patch(
+        `${backendUrl}/college/b2b_copy/leads/${leadId}/documents/${docId}/approval`,
+        { decision },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!res.data?.status) {
+        alert(res.data?.message || 'Update failed');
+        return;
+      }
+      const updated = res.data.data;
+      setLeads((prev) => prev.map((l) => (String(l._id) === String(leadId) ? updated : l)));
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to update document status');
+    } finally {
+      setDocApprovalKey(null);
+    }
+  };
 
   useEffect(() => {
-    if (mainTab !== 'lead' || leadTab !== 'approval') return;
+    fetchApprovalSummary();
+  }, []);
+
+  useEffect(() => {
+    if (leadTab !== 'approval') return;
     const map = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-    const approvalStatus = map[leadApprovalTab];
-    if (!approvalStatus) return;
+    const approvalStatus = leadApprovalTab === 'all' ? null : map[leadApprovalTab];
     let cancelled = false;
     (async () => {
       try {
         setLoadingApprovalList(true);
         const response = await axios.get(`${backendUrl}/college/b2b_copy/leads`, {
           headers: { 'x-auth': token },
-          params: { approvalStatus, limit: 500, page: 1 },
+          params: { ...(approvalStatus ? { approvalStatus } : {}), limit: 500, page: 1 },
         });
         if (!cancelled && response.data.status) {
-          setApprovalListLeads(response.data.data.leads || []);
+          setApprovalListLeads(dedupeLeadsById(response.data.data.leads || []));
         }
       } catch (e) {
         console.error('approval list fetch', e);
@@ -1561,7 +1792,7 @@ const B2BSales = () => {
     return () => {
       cancelled = true;
     };
-  }, [mainTab, leadTab, leadApprovalTab, backendUrl, token]);
+  }, [leadTab, leadApprovalTab, backendUrl, token]);
 
 
   // Check if user can update a lead
@@ -1596,7 +1827,7 @@ const B2BSales = () => {
 
       if (response.data.status) {
         // Refresh the leads list
-        fetchLeads(selectedStatusFilter, currentPage);
+        fetchLeads(selectedStatusFilter, 1);
 
         // Refresh status counts
         fetchStatusCounts();
@@ -1629,6 +1860,7 @@ const B2BSales = () => {
         address: leadFormData.address,
         city: leadFormData.city,
         state: leadFormData.state,
+        block: leadFormData.block,
         concernPersonName: leadFormData.concernPersonName,
         designation: leadFormData.designation,
         email: leadFormData.email,
@@ -1669,7 +1901,6 @@ const B2BSales = () => {
       if (response.data.status) {
         const createdLeadId = response.data?.data?._id;
         if (createdLeadId) {
-          setMainTab('lead');
           setLeadTab('approval');
           setLeadApprovalTab('pending');
         }
@@ -1691,6 +1922,7 @@ const B2BSales = () => {
           address: '',
           city: '',
           state: '',
+          block: '',
           designation: '',
           email: '',
           mobile: '',
@@ -1736,6 +1968,7 @@ const B2BSales = () => {
       address: '',
       city: '',
       state: '',
+      block: '',
       designation: '',
       email: '',
       mobile: '',
@@ -1850,7 +2083,7 @@ const B2BSales = () => {
         }
 
         // Refresh the leads list and status counts
-        fetchLeads(selectedStatusFilter, currentPage);
+        fetchLeads(selectedStatusFilter, 1);
         fetchStatusCounts();
 
         // Clear file after 3 seconds
@@ -1907,8 +2140,27 @@ const B2BSales = () => {
   };
 
   const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
-    fetchLeads(selectedStatusFilter, newPage);
+    fetchPerformanceLeads(newPage);
+  };
+
+  const getPerformancePaginationPages = () => {
+    const delta = 2;
+    const range = [];
+    let start = Math.max(1, performancePage - delta);
+    let end = Math.min(performanceTotalPages, performancePage + delta);
+
+    if (end - start < 4) {
+      if (start === 1) {
+        end = Math.min(performanceTotalPages, start + 4);
+      } else {
+        start = Math.max(1, end - 4);
+      }
+    }
+
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+    return range;
   };
   useEffect(() => {
     getPaginationPages()
@@ -1973,10 +2225,10 @@ const B2BSales = () => {
       --card-hi:   #f8fafc;
       --border:    rgba(0,0,0,0.08);
       --border-hi: rgba(0,0,0,0.14);
-      --red:       #FC2B5A;
-      --red-dark:  #a5003a;
-      --red-glow:  rgba(252,43,90,0.18);
-      --red-soft:  rgba(252,43,90,0.08);
+      --red:       #ff4d7a;
+      --red-dark:  #c01855;
+      --red-glow:  rgba(255,77,122,0.18);
+      --red-soft:  rgba(255,77,122,0.08);
       --gold:      #f59e0b;
       --green:     #22c55e;
       --blue:      #3b82f6;
@@ -2087,7 +2339,7 @@ const B2BSales = () => {
     .b2b-cycle::before {
       content: '';
       position: fixed; top: 0; left: 220px; right: 0; height: 300px;
-      background: radial-gradient(ellipse at 70% 0%, rgba(252,43,90,0.05) 0%, transparent 70%);
+      background: radial-gradient(ellipse at 70% 0%, rgba(255,77,122,0.05) 0%, transparent 70%);
       pointer-events: none; z-index: 0;
     }
 
@@ -2356,7 +2608,6 @@ const B2BSales = () => {
     });
   };
 
-
   const closePanel = () => {
     // Hide bulk inputs when bulk refer panel is closed
     if (showPanel === 'RefferAllLeads') {
@@ -2450,7 +2701,7 @@ const B2BSales = () => {
             const modified = bulkRes?.data?.data?.modified;
             const okCount = typeof modified === 'number' ? modified : (selectedProfiles?.length || 0);
             alert(`Referred ${okCount} lead(s) successfully!`);
-            await fetchLeads(selectedStatusFilter, currentPage);
+            await fetchLeads(selectedStatusFilter, 1);
             await fetchStatusCounts();
             closePanel();
             return;
@@ -2476,7 +2727,7 @@ const B2BSales = () => {
 
         if (ok > 0) {
           alert(`Referred ${ok} lead(s) successfully${failed ? `, ${failed} failed` : ''}.`);
-          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchLeads(selectedStatusFilter, 1);
           await fetchStatusCounts();
           closePanel();
           return;
@@ -2495,7 +2746,7 @@ const B2BSales = () => {
 
       if (response?.data?.status) {
         alert('Lead referred successfully!');
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, 1);
         await fetchStatusCounts();
         closePanel();
         return;
@@ -2562,184 +2813,70 @@ const B2BSales = () => {
     }
   };
 
-  useEffect(() => {
-    // close dropdown when panel/lead changes
-    setPanelActionsOpen(false);
-  }, [showPanel, selectedProfile?._id]);
-
-  useEffect(() => {
-    const onDocDown = (e) => {
-      if (!panelActionsOpen) return;
-      const el = panelActionsRef.current;
-      if (el && !el.contains(e.target)) setPanelActionsOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown);
-    return () => document.removeEventListener('mousedown', onDocDown);
-  }, [panelActionsOpen]);
-
-  const PanelActionToolbar = () => {
-    const hasLead = !!selectedProfile?._id;
-    const disabled = !hasLead || showPanel === 'RefferAllLeads';
-    const isActive = (key) => showPanel === key;
-
-    return (
-      <div ref={panelActionsRef} className="position-relative me-2" aria-label="Panel actions">
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-primary"
-          disabled={disabled}
-          onClick={() => setPanelActionsOpen((v) => !v)}
-          title="Actions"
-          style={{ borderRadius: '10px', padding: '6px 10px' }}
-        >
-          <i className="fas fa-sliders-h me-1"></i>
-          Actions
-          <i className={`fas fa-chevron-${panelActionsOpen ? 'up' : 'down'} ms-2`} style={{ fontSize: '10px' }}></i>
-        </button>
-
-        {panelActionsOpen && !disabled && (
-          <div
-            className="card border-0 shadow-sm"
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: 'calc(100% + 8px)',
-              minWidth: '220px',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              zIndex: 50,
-            }}
-          >
-            <div className="list-group list-group-flush">
-              <button
-                type="button"
-                className={`list-group-item list-group-item-action d-flex align-items-center gap-2 ${isActive('editPanel') ? 'active' : ''}`}
-                onClick={() => { setPanelActionsOpen(false); if (!isActive('editPanel')) openEditPanel(selectedProfile, 'StatusChange'); }}
-              >
-                <i className="fas fa-edit"></i>
-                <span className="fw-semibold">Change Status</span>
-              </button>
-              <button
-                type="button"
-                className={`list-group-item list-group-item-action d-flex align-items-center gap-2 ${isActive('Reffer') ? 'active' : ''}`}
-                onClick={() => { setPanelActionsOpen(false); if (!isActive('Reffer')) openRefferPanel(selectedProfile, 'Reffer'); }}
-              >
-                <i className="fas fa-share"></i>
-                <span className="fw-semibold">Refer</span>
-              </button>
-              <button
-                type="button"
-                className={`list-group-item list-group-item-action d-flex align-items-center gap-2 ${isActive('leadHistory') ? 'active' : ''}`}
-                onClick={() => { setPanelActionsOpen(false); if (!isActive('leadHistory')) openleadHistoryPanel(selectedProfile); }}
-              >
-                <i className="fas fa-history"></i>
-                <span className="fw-semibold">History</span>
-              </button>
-              <button
-                type="button"
-                className={`list-group-item list-group-item-action d-flex align-items-center gap-2 ${isActive('followUp') ? 'active' : ''}`}
-                onClick={() => { setPanelActionsOpen(false); if (!isActive('followUp')) openEditPanel(selectedProfile, 'SetFollowup'); }}
-              >
-                <i className="fas fa-calendar-plus"></i>
-                <span className="fw-semibold">Set Follow-up</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // Render Status Change Panel
   const renderStatusChangePanel = () => {
+    const panelInputStyle = {
+      height: '44px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
+      background: '#f8fafc', fontSize: '13px', paddingInline: '12px',
+      outline: 'none', width: '100%', color: '#1e293b',
+    };
+    const panelLabelStyle = {
+      fontSize: '11px', fontWeight: 700, color: '#64748b',
+      textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'block',
+    };
     const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-edit text-primary"></i>
+      <div style={{ borderRadius: '16px', overflow: 'hidden', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}>
+        {/* Gradient Header */}
+        <div style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-exchange-alt" style={{ color: '#fff', fontSize: '14px' }}></i>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Change Status</div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                  {selectedProfile?.businessName || 'Lead'}
+                </div>
+              </div>
             </div>
-            <h6 className="mb-0 fw-medium text-primary">
-              Change Status for {selectedProfile?.businessName || 'Lead'}
-            </h6>
-          </div>
-          <div className='d-flex align-items-center'>
-            {userData.googleAuthToken?.accessToken && (
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm me-2 google-btn"
-                onClick={handleGoogleLogout}
-              >
-                Disconnect Google Calendar
-              </button>
-            )}
-            <PanelActionToolbar />
-            <button className="btn-close" type="button" onClick={closePanel}></button>
+            <button type="button" onClick={closePanel} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <i className="fas fa-times" style={{ color: '#fff', fontSize: '13px' }}></i>
+            </button>
           </div>
         </div>
 
-        <div className="card-body">
+        {/* Body */}
+        <div style={{ padding: '20px 18px' }}>
           {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
-              {/* Status Selection */}
-              <div className="mb-3">
-                <label htmlFor="status" className="form-label small fw-medium text-dark">
-                  Status<span className="text-danger">*</span>
-                </label>
-                <select
-                  className="form-select border-0 bgcolor"
-                  id="status"
-                  value={seletectedStatus}
-                  style={{
-                    height: '42px',
-                    paddingTop: '8px',
-                    paddingInline: '10px',
-                    width: '100%',
-                    backgroundColor: '#f1f2f6'
-                  }}
-                  onChange={handleStatusChange}
-                >
+              <div style={{ marginBottom: '16px' }}>
+                <label style={panelLabelStyle}>Status <span style={{ color: '#ff4d7a' }}>*</span></label>
+                <select style={panelInputStyle} value={seletectedStatus} onChange={handleStatusChange}>
                   <option value="">Select Status</option>
-                  {statuses.map((status, index) => (
+                  {statuses.map((status) => (
                     <option key={status._id} value={status._id}>{status.name}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Sub-Status Selection */}
-              <div className="mb-3">
-                <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                  Sub-Status
-                </label>
-                <select
-                  className="form-select border-0 bgcolor"
-                  id="subStatus"
-                  value={seletectedSubStatus?._id || ''}
-                  style={{
-                    height: '42px',
-                    paddingTop: '8px',
-                    backgroundColor: '#f1f2f6',
-                    paddingInline: '10px',
-                    width: '100%'
-                  }}
-                  onChange={handleSubStatusChange}
-                >
+              <div style={{ marginBottom: '16px' }}>
+                <label style={panelLabelStyle}>Sub-Status</label>
+                <select style={panelInputStyle} value={seletectedSubStatus?._id || ''} onChange={handleSubStatusChange}>
                   <option value="">Select Sub-Status</option>
-                  {subStatuses.map((subStatus, index) => (
+                  {subStatuses.map((subStatus) => (
                     <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Follow-up Section (if substatus has followup) */}
-              {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
-                <div className="mb-3">
-                  <h6 className="text-dark mb-2">Follow-up Details</h6>
-                  <div className="row">
-                    <div className="col-6 ps-3">
-                      <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                        Next Action Date <span className="text-danger">*</span>
-                      </label>
+              {seletectedSubStatus?.hasFollowup && (
+                <div style={{ marginBottom: '16px', padding: '14px', background: '#fef2f4', borderRadius: '12px', border: '1px solid #fecdd3' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff4d7a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>Follow-up Details</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={panelLabelStyle}>Date <span style={{ color: '#ff4d7a' }}>*</span></label>
                       <DatePicker
                         className="form-control border-0 bgcolor small-date"
                         onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
@@ -2748,74 +2885,62 @@ const B2BSales = () => {
                         minDate={today}
                       />
                     </div>
-                    <div className="col-6">
-                      <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                        Time <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        className="form-control border-0 bgcolor"
-                        id="actionTime"
+                    <div>
+                      <label style={panelLabelStyle}>Time <span style={{ color: '#ff4d7a' }}>*</span></label>
+                      <input type="time" style={{ ...panelInputStyle, background: '#fff' }}
                         onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
                         value={followupFormData.followupTime}
-                        style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                       />
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Remarks Section - Only show if substatus has hasRemarks: true */}
-              {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
-                <div className="mb-3">
-                  <label htmlFor="remarks" className="form-label small fw-medium text-dark">
-                    Remarks <span className="text-danger">*</span>
-                  </label>
+              {seletectedSubStatus?.hasRemarks && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={panelLabelStyle}>Remarks <span style={{ color: '#ff4d7a' }}>*</span></label>
                   <textarea
-                    className="form-control border-0 bgcolor"
-                    id="remarks"
-                    rows="4"
+                    rows="3"
                     onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
                     value={followupFormData.remarks}
                     placeholder="Enter remarks about this status change..."
-                    style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
                     required
+                    style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', padding: '10px 12px', resize: 'none', outline: 'none', color: '#1e293b' }}
                   />
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closePanel}
-                >
+              {userData.googleAuthToken?.accessToken && (
+                <div style={{ marginBottom: '14px' }}>
+                  <button type="button" onClick={handleGoogleLogout} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                    Disconnect Google Calendar
+                  </button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button type="button" onClick={closePanel} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                >
+                <button type="submit" style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,77,122,0.3)' }}>
                   Update Status
                 </button>
               </div>
             </form>
           ) : !isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>
-                  Login with Google to Update Status
-                </button>
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fef2f4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <i className="fab fa-google" style={{ color: '#ff4d7a', fontSize: '20px' }}></i>
               </div>
+              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '14px' }}>Connect Google Calendar to update status</p>
+              <button onClick={handleGoogleLogin} style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                Login with Google
+              </button>
             </div>
           )}
-
           {isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <i className="fas fa-spinner fa-spin" style={{ color: '#ff4d7a', fontSize: '24px' }}></i>
             </div>
           )}
         </div>
@@ -2849,181 +2974,103 @@ const B2BSales = () => {
 
   // Render Follow-up Panel
   const renderFollowupPanel = () => {
+    const panelInputStyle = {
+      height: '44px', borderRadius: '10px', border: '1.5px solid #e2e8f0',
+      background: '#f8fafc', fontSize: '13px', paddingInline: '12px',
+      outline: 'none', width: '100%', color: '#1e293b',
+    };
+    const panelLabelStyle = {
+      fontSize: '11px', fontWeight: 700, color: '#64748b',
+      textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'block',
+    };
     const panelContent = (
-      <div className="card border-0 shadow-sm" style={{
-        borderRadius: '12px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-        border: '1px solid #e9ecef'
-      }}>
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom" style={{
-          borderRadius: '12px 12px 0 0',
-          borderBottom: '2px solid #f8f9fa',
-          backgroundColor: '#f8f9fa'
-        }}>
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-calendar-plus text-success" style={{ fontSize: '18px' }}></i>
+      <div style={{ borderRadius: '16px', overflow: 'hidden', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}>
+        {/* Gradient Header */}
+        <div style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-calendar-plus" style={{ color: '#fff', fontSize: '14px' }}></i>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Set Follow-up</div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                  {selectedProfile?.businessName || 'Lead'}
+                </div>
+              </div>
             </div>
-            <h6 className="mb-0 fw-medium text-success" style={{ fontSize: '16px', fontWeight: '600' }}>
-              Set Follow-up for {selectedProfile?.businessName || 'Lead'}
-            </h6>
-          </div>
-          <div className="d-flex align-items-center">
-            {userData.googleAuthToken?.accessToken && (
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm me-2 google-btn"
-                onClick={handleGoogleLogout}
-                style={{
-                  fontSize: '12px',
-                  padding: '4px 10px',
-                  borderRadius: '999px'
-                }}
-              >
-                Disconnect Google Calendar
-              </button>
-            )}
-            <PanelActionToolbar />
-            <button className="btn-close" type="button" onClick={closePanel} style={{
-              fontSize: '14px',
-              padding: '4px',
-              borderRadius: '50%',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#f8f9fa',
-              border: 'none',
-              color: '#6c757d'
-            }}></button>
+            <button type="button" onClick={closePanel} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <i className="fas fa-times" style={{ color: '#fff', fontSize: '13px' }}></i>
+            </button>
           </div>
         </div>
 
-        <div className="card-body" style={{ padding: '24px' }}>
+        {/* Body */}
+        <div style={{ padding: '20px 18px' }}>
           {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
-              {/* Follow-up Date and Time */}
-              <div className="row mb-4">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                    Follow-up Date <span className="text-danger">*</span>
-                  </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={panelLabelStyle}>Follow-up Date <span style={{ color: '#ff4d7a' }}>*</span></label>
                   <DatePicker
-                    className="form-control border-0 bgcolor"
+                    className="form-control border-0 bgcolor small-date"
                     onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
                     value={followupFormData.followupDate}
                     format="dd/MM/yyyy"
                     minDate={today}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1.5px solid #ced4da',
-                      borderRadius: '8px',
-                      height: '42px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
                   />
                 </div>
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="time"
-                    className="form-control border-0 bgcolor"
-                    id="actionTime"
+                <div>
+                  <label style={panelLabelStyle}>Time <span style={{ color: '#ff4d7a' }}>*</span></label>
+                  <input type="time" style={panelInputStyle}
                     onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
                     value={followupFormData.followupTime}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1.5px solid #ced4da',
-                      borderRadius: '8px',
-                      height: '42px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
                   />
                 </div>
               </div>
 
-              {/* Remarks */}
-              <div className="mb-4">
-                <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                  Follow-up Notes
-                </label>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={panelLabelStyle}>Follow-up Notes</label>
                 <textarea
-                  className="form-control border-0 bgcolor"
-                  id="followupRemarks"
-                  rows="4"
+                  rows="3"
                   onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
                   value={followupFormData.remarks}
                   placeholder="Enter follow-up notes..."
-                  style={{
-                    resize: 'none',
-                    backgroundColor: '#ffffff',
-                    border: '1.5px solid #ced4da',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    fontSize: '14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    minHeight: '100px'
-                  }}
+                  style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', padding: '10px 12px', resize: 'none', outline: 'none', color: '#1e293b' }}
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="d-flex justify-content-end gap-3 mt-4">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closePanel}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    borderWidth: '1.5px',
-                    minWidth: '100px'
-                  }}
-                >
+              {userData.googleAuthToken?.accessToken && (
+                <div style={{ marginBottom: '14px' }}>
+                  <button type="button" onClick={handleGoogleLogout} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                    Disconnect Google Calendar
+                  </button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={closePanel} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-success"
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    backgroundColor: '#28a745',
-                    borderColor: '#28a745',
-                    minWidth: '120px',
-                    boxShadow: '0 2px 4px rgba(40, 167, 69, 0.2)'
-                  }}
-                >
+                <button type="submit" style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,77,122,0.3)' }}>
                   Set Follow-up
                 </button>
               </div>
             </form>
           ) : !isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>
-                  Login with Google to Set Follow-up
-                </button>
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fef2f4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <i className="fab fa-google" style={{ color: '#ff4d7a', fontSize: '20px' }}></i>
               </div>
+              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '14px' }}>Connect Google Calendar to set follow-ups</p>
+              <button onClick={handleGoogleLogin} style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                Login with Google
+              </button>
             </div>
           )}
-
           {isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <i className="fas fa-spinner fa-spin" style={{ color: '#ff4d7a', fontSize: '24px' }}></i>
             </div>
           )}
         </div>
@@ -3091,7 +3138,7 @@ const B2BSales = () => {
       <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+          background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)',
           padding: '18px 20px 16px',
           position: 'relative',
         }}>
@@ -3195,8 +3242,8 @@ const B2BSales = () => {
                   boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#FC2B5A';
-                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(252,43,90,0.12)';
+                  e.currentTarget.style.borderColor = '#ff4d7a';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(255,77,122,0.12)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={e => {
@@ -3207,7 +3254,7 @@ const B2BSales = () => {
               >
                 <div style={{
                   width: '34px', height: '34px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                  background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginBottom: '8px',
                 }}>
@@ -3254,103 +3301,74 @@ const B2BSales = () => {
   // Render Reffer Panel (Desktop Sidebar or Mobile Modal)
 
   const renderRefferPanel = () => {
+    const isDisabled = !selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value);
+    const panelLabelStyle = {
+      fontSize: '11px', fontWeight: 700, color: '#64748b',
+      textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'block',
+    };
     const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-user-edit text-secondary"></i>
+      <div style={{ borderRadius: '16px', overflow: 'hidden', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}>
+        {/* Gradient Header */}
+        <div style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-share-alt" style={{ color: '#fff', fontSize: '14px' }}></i>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>
+                  {showPanel === 'RefferAllLeads' ? 'Refer All Leads' : 'Refer Lead'}
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                  {showPanel === 'RefferAllLeads' ? 'Assign selected leads to counselor' : (selectedProfile?.businessName || 'Lead')}
+                </div>
+              </div>
             </div>
-            <h6 className="mb-0 followUp fw-medium">
-              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?.businessName || 'Unknown'} to Counselor`)}
-              {showPanel === 'RefferAllLeads' && (`Refer All Leads to Counselor`)}
-            </h6>
-          </div>
-          <div className="d-flex align-items-center">
-            <button className="btn-close" type="button" onClick={closePanel}>
-              {/* <i className="fa-solid fa-xmark"></i> */}
+            <button type="button" onClick={closePanel} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <i className="fas fa-times" style={{ color: '#fff', fontSize: '13px' }}></i>
             </button>
           </div>
         </div>
 
-        <div className="card-body">
+        {/* Body */}
+        <div style={{ padding: '20px 18px' }}>
           <form>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={panelLabelStyle}>Select Counselor <span style={{ color: '#ff4d7a' }}>*</span></label>
+              <select
+                style={{ height: '44px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', paddingInline: '12px', outline: 'none', width: '100%', color: '#1e293b' }}
+                onChange={handleConcernPersonChange}
+              >
+                <option value="">Select Counselor</option>
+                {users.map((counselor, index) => (
+                  <option key={index} value={counselor._id}>{counselor.name}</option>
+                ))}
+              </select>
+            </div>
 
-
-            <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
-              <div className="mb-1">
-                <label htmlFor="counselor" className="form-label small fw-medium text-dark">
-                  Select Counselor<span className="text-danger">*</span>
-                </label>
-                <div className="d-flex">
-                  <div className="form-floating flex-grow-1">
-                    <select
-                      className="form-select border-0  bgcolor"
-                      id="counselor"
-                      style={{
-                        height: '42px',
-                        paddingTop: '8px',
-                        paddingInline: '10px',
-                        width: '100%',
-                        backgroundColor: '#f1f2f6'
-                      }}
-                      onChange={handleConcernPersonChange}
-                    >
-                      <option value="">Select Counselor</option>
-                      {users.map((counselor, index) => (
-                        <option key={index} value={counselor._id}>{counselor.name}</option>))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </>
-
-            {/* Bulk refer info (selection happens from the bulk bar above the cards) */} 
             {showPanel === 'RefferAllLeads' && (
-              <div className="mb-3 p-2 bg-light rounded" style={{ fontSize: '13px' }}>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-muted">
-                    <i className="fas fa-users me-1"></i>
-                    Selected Leads:
+              <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#fef2f4', borderRadius: '10px', border: '1px solid #fecdd3' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    <i className="fas fa-users me-1"></i> Selected Leads
                   </span>
-                  <span className="fw-semibold text-primary">
-                    {selectedProfiles?.length || 0}
-                  </span>
+                  <span style={{ fontWeight: 700, color: '#ff4d7a', fontSize: '13px' }}>{selectedProfiles?.length || 0}</span>
                 </div>
-                <small className="text-muted d-block mt-1">
-                  Type a number in the bulk bar above the lead cards to auto-select.
-                </small>
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>Type a number in the bulk bar above to auto-select leads.</div>
               </div>
             )}
 
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closePanel}
-              >
-                CLOSE
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button type="button" onClick={closePanel} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+                Close
               </button>
               <button
                 type="button"
-                className="btn text-white"
                 onClick={(e) => handleReferLead(e)}
-                disabled={
-                  !selectedConcernPerson || 
-                  (showPanel === 'RefferAllLeads' && (selectedProfiles.length === 0 && !input1Value))
-                }
-                style={{ 
-                  backgroundColor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : '#fd7e14', 
-                  border: 'none', 
-                  padding: '8px 24px', 
-                  fontSize: '14px',
-                  cursor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? 'not-allowed' : 'pointer'
-                }}
+                disabled={isDisabled}
+                style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: isDisabled ? '#e2e8f0' : 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: isDisabled ? '#94a3b8' : '#fff', fontWeight: 700, fontSize: '13px', cursor: isDisabled ? 'not-allowed' : 'pointer', boxShadow: isDisabled ? 'none' : '0 4px 12px rgba(255,77,122,0.3)' }}
               >
-                {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
+                {showPanel === 'Reffer' ? 'Refer Lead' : 'Refer All Leads'}
               </button>
             </div>
           </form>
@@ -3409,123 +3427,104 @@ const B2BSales = () => {
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderLeadHistoryPanel = () => {
     const panelContent = (
-      <>
-        {leadLogsLoading ? (
-          <div className="d-flex justify-content-center align-items-center h-100">
-            <div className="text-center">
-              <i className="fas fa-spinner fa-spin"></i>
-            </div>
-          </div>
-        ) : (
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-              <div className="d-flex align-items-center">
-                <div className="me-2">
-                  <i className="fas fa-history text-primary"></i>
-                </div>
-                <h6 className="mb-0 fw-medium">Lead History</h6>
+      <div style={{ borderRadius: '16px', overflow: 'hidden', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}>
+        {/* Gradient Header */}
+        <div style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-history" style={{ color: '#fff', fontSize: '14px' }}></i>
               </div>
-              <button className="btn-close" type="button" onClick={closePanel}></button>
+              <div>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Lead History</div>
+                <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '11px', marginTop: '2px' }}>
+                  {leadLogs?.logs?.length || 0} events recorded
+                </div>
+              </div>
             </div>
+            <button type="button" onClick={closePanel} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <i className="fas fa-times" style={{ color: '#fff', fontSize: '13px' }}></i>
+            </button>
+          </div>
+        </div>
 
-            <div className="card-body p-0 d-flex flex-column h-100">
-              {/* Scrollable Content Area */}
-              <div
-                className="flex-grow-1 overflow-auto px-3 py-2"
-                style={{
-                  maxHeight: isMobile ? '60vh' : '65vh',
-                  minHeight: '200px'
-                }}
-              >
-                {leadLogs && leadLogs.logs && leadLogs.logs.length > 0 ? (
-                  <div className="timeline">
-                    {leadLogs.logs.map((log, index) => (
-                      <div key={index} className="timeline-item mb-4">
-                        <div className="timeline-marker">
-                          <div className="timeline-marker-icon">
-                            <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
-                          </div>
-                          {index !== leadLogs.logs.length - 1 && (
-                            <div className="timeline-line"></div>
-                          )}
-                        </div>
+        {/* Timeline Body */}
+        <div style={{ padding: '16px 18px', overflowY: 'auto', maxHeight: isMobile ? '60vh' : '65vh' }}>
+          {leadLogsLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <i className="fas fa-spinner fa-spin" style={{ color: '#ff4d7a', fontSize: '24px' }}></i>
+            </div>
+          ) : leadLogs?.logs?.length > 0 ? (
+            <div style={{ position: 'relative' }}>
+              {leadLogs.logs.map((log, index) => (
+                <div key={index} style={{ display: 'flex', gap: '12px', marginBottom: index !== leadLogs.logs.length - 1 ? '4px' : '0' }}>
+                  {/* Timeline line + dot */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', marginTop: '14px', flexShrink: 0, boxShadow: '0 0 0 3px rgba(255,77,122,0.15)' }}></div>
+                    {index !== leadLogs.logs.length - 1 && (
+                      <div style={{ width: '2px', flex: 1, background: '#f1f5f9', minHeight: '24px', marginTop: '4px' }}></div>
+                    )}
+                  </div>
 
-                        <div className="timeline-content">
-                          <div className="card border-0 shadow-sm">
-                            <div className="card-body p-3">
-                              <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                                <span className="bg-light text-dark border">
-                                  {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  }) : 'Unknown Date'}
-                                </span>
-                                <small className="text-muted">
-                                  <i className="fas fa-user me-1"></i>
-                                  Modified By: {log.user || 'Unknown User'}
-                                </small>
-                              </div>
+                  {/* Log card */}
+                  <div style={{ flex: 1, background: '#fafbfc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px' }}>
+                    {/* Date + user row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                      <span style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontSize: '11px', fontWeight: 600, borderRadius: '6px', padding: '3px 9px' }}>
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        }) : 'Unknown Date'}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        <i className="fas fa-user me-1"></i>{log.user || 'Unknown'}
+                      </span>
+                    </div>
 
-                              <div className="mb-2">
-                                <strong className="text-dark d-block mb-1">Action:</strong>
-                                <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                                  {log.action ? (
-                                    log.action.split(';').map((actionPart, actionIndex) => (
-                                      <div key={actionIndex} className="mb-1">
-                                        • {actionPart.trim()}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-muted">No action specified</div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {log.remarks && (
-                                <div>
-                                  <strong className="text-dark d-block mb-1">Remarks:</strong>
-                                  <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                    {log.remarks}
-                                  </p>
-                                </div>
-                              )}
+                    {/* Action */}
+                    {log.action && (
+                      <div style={{ marginBottom: log.remarks ? '8px' : '0' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Action</div>
+                        <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.6' }}>
+                          {log.action.split(';').map((part, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '6px' }}>
+                              <span style={{ color: '#ff4d7a', flexShrink: 0 }}>•</span>
+                              <span>{part.trim()}</span>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                    <div className="mb-3">
-                      <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                    </div>
-                    <h6 className="text-muted mb-2">No History Available</h6>
-                    <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-                  </div>
-                )}
-              </div>
+                    )}
 
-              {/* Fixed Footer */}
-              <div className="border-top px-3 py-3 bg-light">
-                <div className="d-flex justify-content-end">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={closePanel}
-                  >
-                    <i className="fas fa-times me-1"></i>
-                    Close
-                  </button>
+                    {/* Remarks */}
+                    {log.remarks && (
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Remarks</div>
+                        <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.5' }}>{log.remarks}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          </div>
-        )}
-      </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fef2f4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <i className="fas fa-history" style={{ color: '#ff4d7a', fontSize: '20px', opacity: 0.6 }}></i>
+              </div>
+              <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '14px', marginBottom: '4px' }}>No History</div>
+              <div style={{ color: '#94a3b8', fontSize: '12px' }}>No actions have been recorded yet.</div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #f1f5f9', background: '#fafbfc' }}>
+          <button type="button" onClick={closePanel} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+            Close
+          </button>
+        </div>
+      </div>
     );
 
     if (isMobile) {
@@ -3557,7 +3556,7 @@ const B2BSales = () => {
 
   // ===== Derived data for redesigned tabs =====
   const nowTs = Date.now();
-  const followupSourceLeads = mainTab === 'followup' ? followupLeadsData : leads;
+  const followupSourceLeads = followupLeadsData;
   const followupLeads = (followupSourceLeads || []).filter((l) => !!l?.followUp);
   const followupBuckets = followupLeads.reduce(
     (acc, l) => {
@@ -3568,27 +3567,29 @@ const B2BSales = () => {
           : {};
       const status = (fu.status || '').toLowerCase();
       const scheduledTs = fu.scheduledDate ? new Date(fu.scheduledDate).getTime() : NaN;
+      const hasSchedule = Number.isFinite(scheduledTs);
 
+      // Backend: status Pending | Completed | Rescheduled (see followUp model)
       if (status === 'completed') {
         acc.done.push(l);
         return acc;
       }
 
-      if (Number.isFinite(scheduledTs) && scheduledTs < nowTs && status !== 'completed') {
+      if (hasSchedule && scheduledTs < nowTs) {
         acc.missed.push(l);
         return acc;
       }
 
-      // planned: has followup pending but no strict scheduled window
-      acc.planned.push(l);
-
-      // scheduled window bucket for dropdown
-      if (Number.isFinite(scheduledTs)) {
+      if (hasSchedule && scheduledTs >= nowTs) {
         acc.scheduled.push(l);
+        return acc;
       }
+
+      // Pending: open followup, no upcoming/past scheduled slot on record
+      acc.pending.push(l);
       return acc;
     },
-    { done: [], planned: [], scheduled: [], missed: [] }
+    { done: [], pending: [], scheduled: [], missed: [] }
   );
 
   const followupVisibleLeads = useMemo(() => {
@@ -3596,7 +3597,7 @@ const B2BSales = () => {
       followupTab === 'done' ? followupBuckets.done :
       followupTab === 'missed' ? followupBuckets.missed :
       followupTab === 'scheduled' ? followupBuckets.scheduled :
-      followupBuckets.planned;
+      followupBuckets.pending;
 
     if (followupTab !== 'scheduled') return bucket;
 
@@ -3622,6 +3623,21 @@ const B2BSales = () => {
       return String(statusId) === String(selectedStatusFilter);
     });
   }, [followupVisibleLeads, selectedStatusFilter]);
+
+  /** CRM sub-status has `hasAttachment` → lead needs documents at this stage */
+  const leadsNeedingDocuments = useMemo(() => {
+    return (leads || []).filter((lead) => {
+      const subs = lead?.status?.substatuses;
+      if (!Array.isArray(subs) || subs.length === 0) return false;
+      const subId =
+        lead.subStatus && typeof lead.subStatus === 'object' && lead.subStatus !== null
+          ? lead.subStatus._id
+          : lead.subStatus;
+      if (!subId) return false;
+      const sub = subs.find((s) => String(s._id) === String(subId));
+      return !!sub?.hasAttachment;
+    });
+  }, [leads]);
 
   return (
     <div className="container-fluid b2b-cycle">
@@ -3667,22 +3683,20 @@ const B2BSales = () => {
                 left: `${leftOffset}px`,
                 boxShadow: '0 4px 25px 0 #0000001a',
                 paddingBlock: '5px',
+                background:'#fff'
               }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <Link to="/institute/dashboard" className="topbar-brand">
-                        <span className="topbar-logo">B2</span>
+                      <Link to="/institute/dashboard" className="topbar-brand text-black">
+                        
                         <span className="topbar-name" style={{
-                          background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
+                         
+                          
                         }}>B2B Cycle</span>
                       </Link>
-                      <div className="topbar-sep" />
                       <nav className="breadcrumb" aria-label="breadcrumb">
                         <Link to="/institute/dashboard">Home</Link>
                         <span className="breadcrumb-sep">/</span>
@@ -3750,14 +3764,14 @@ const B2BSales = () => {
                             onClick={applyFilters}
                             disabled={!filters.search}
                             style={{
-                              background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
+                              background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)',
                               border: 'none',
                               color: 'white',
                               fontWeight: '500',
                               padding: '8px 16px',
                               borderRadius: '6px',
                               fontSize: '13px',
-                              boxShadow: '0 2px 4px rgba(252, 43, 90, 0.3)',
+                              boxShadow: '0 2px 4px rgba(255, 77, 122, 0.3)',
                               transition: 'all 0.2s ease'
                             }}
                           >
@@ -3796,7 +3810,7 @@ const B2BSales = () => {
                             placeholder="Input 1"
                             value={input1Value}
                             onChange={(e) => {
-                              const maxValue = totalLeads || leads?.length || 0;
+                              const maxValue = performanceListTotal || performanceLeads?.length || 0;
                               let inputValue = e.target.value.replace(/[^0-9]/g, '');
                               
                               if (inputValue === '') {
@@ -3834,7 +3848,7 @@ const B2BSales = () => {
                           <input
                             type="text"
                             placeholder="Input 2"
-                            value={totalLeads || leads?.length || 0}
+                            value={performanceListTotal || performanceLeads?.length || 0}
                             readOnly
                             style={{
                               width: "50%",
@@ -3860,7 +3874,7 @@ const B2BSales = () => {
                         <div className="col-6">
                           <button
                             className="btn w-100"
-                            disabled={loadingLeads || leads.length === 0}
+                            disabled={loadingPerformanceLeads || performanceLeads.length === 0}
                             style={{
                               padding: "12px 8px",
                               fontSize: "13px",
@@ -3869,13 +3883,13 @@ const B2BSales = () => {
                               alignItems: "center",
                               justifyContent: "center",
                               gap: "6px",
-                              backgroundColor: loadingLeads || leads.length === 0 ? '#ccc' : '#6c757d',
+                              backgroundColor: loadingPerformanceLeads || performanceLeads.length === 0 ? '#ccc' : '#6c757d',
                               color: 'white',
                               border: 'none',
                               borderRadius: '8px',
                               boxShadow: '0 2px 8px rgba(108, 117, 125, 0.3)',
                               transition: 'all 0.2s ease',
-                              cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                              cursor: loadingPerformanceLeads || performanceLeads.length === 0 ? 'not-allowed' : 'pointer'
                             }}
                             onClick={() => {
                               setShowBulkInputs(true);
@@ -3884,7 +3898,7 @@ const B2BSales = () => {
                               openRefferPanel(null, 'RefferAllLeads');
                             }}
                             onMouseEnter={(e) => {
-                              if (!loadingLeads && leads.length > 0) {
+                              if (!loadingPerformanceLeads && performanceLeads.length > 0) {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
                                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(108, 117, 125, 0.4)';
                               }
@@ -3916,7 +3930,7 @@ const B2BSales = () => {
                               placeholder="Input 1"
                               value={input1Value}
                               onChange={(e) => {
-                                const maxValue = totalLeads || leads?.length || 0;
+                                const maxValue = performanceListTotal || performanceLeads?.length || 0;
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 
                                 if (inputValue === '') {
@@ -3954,7 +3968,7 @@ const B2BSales = () => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={totalLeads || leads?.length || 0}
+                              value={performanceListTotal || performanceLeads?.length || 0}
                               readOnly
                               style={{
                                 width: "50%",
@@ -4045,18 +4059,18 @@ const B2BSales = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(252, 43, 90, 0.3)',
+                              boxShadow: '0 2px 8px rgba(255, 77, 122, 0.3)',
                               transition: 'all 0.2s ease'
                             }}
                             onMouseEnter={(e) => {
                               if (!e.currentTarget.disabled) {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(252, 43, 90, 0.4)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 77, 122, 0.4)';
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(252, 43, 90, 0.3)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(255, 77, 122, 0.3)';
                             }}
                           >
                             <i className="fas fa-search" style={{ fontSize: '16px' }}></i>
@@ -4073,17 +4087,17 @@ const B2BSales = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: showFilters ? '0 2px 8px rgba(252, 43, 90, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              boxShadow: showFilters ? '0 2px 8px rgba(255, 77, 122, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
                               transition: 'all 0.2s ease',
                               borderWidth: '1.5px'
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(252, 43, 90, 0.2)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 77, 122, 0.2)';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(252, 43, 90, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
+                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(255, 77, 122, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
                             }}
                           >
                             <i className="fas fa-filter" style={{ fontSize: '16px' }}></i>
@@ -4106,87 +4120,251 @@ const B2BSales = () => {
             marginTop: `${navHeight + 5}px`,
             transition: 'margin-top 0.2s ease-in-out'
           }}>
-            {/* Main Tab Bar */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: '#fff', borderRadius: '14px', padding: '6px', boxShadow: '0 2px 12px rgba(252,43,90,0.08)', border: '1px solid #f1f5f9' }}>
-              {[
-                { id: 'lead', label: 'Lead', icon: 'fas fa-handshake' },
-                { id: 'performance', label: 'Performance', icon: 'fas fa-chart-line' },
-                { id: 'followup', label: 'Followup', icon: 'fas fa-calendar-check' },
-                { id: 'documents', label: 'Documents', icon: 'fas fa-file-alt' },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setMainTab(tab.id);
-                    if (tab.id === 'lead') setLeadTab('approval');
-                    if (tab.id === 'performance') setPerformanceTab('all');
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '9px 12px',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                    background: mainTab === tab.id ? 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)' : 'transparent',
-                    color: mainTab === tab.id ? '#fff' : '#64748b',
-                    boxShadow: mainTab === tab.id ? '0 4px 12px rgba(252,43,90,0.3)' : 'none',
-                  }}
-                >
-                  <i className={tab.icon} style={{ fontSize: '12px' }}></i>
-                  {tab.label}
-                </button>
-              ))}
+            {/* Lead actions + navigation (one strip) */}
+            <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div className="card-body py-2 px-3">
+                <div className="d-flex flex-wrap align-items-center gap-1">
+
+                  <div className="d-flex flex-wrap gap-1 align-items-center flex-grow-1 justify-content-sm-end">
+                    {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={handleOpenLeadModal}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
+                        >
+                          <i className="fas fa-plus" style={{ fontSize: '10px' }}></i>
+                          Add Lead
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => { setShowBulkInputs(true); setBulkMode('bulkupload'); setInput1Value(''); setShowBulkUploadModal(true); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
+                        >
+                          <i className="fas fa-file-upload" style={{ fontSize: '10px' }}></i>
+                          Bulk Upload
+                        </button>
+                      </>
+                    )}
+                    {/* Lead Report moved into each lead card */}
+                    {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        disabled={loadingPerformanceLeads || performanceLeads.length === 0}
+                        onClick={() => { setShowBulkInputs(true); setBulkMode('bulkrefer'); setInput1Value(''); openRefferPanel(null, 'RefferAllLeads'); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
+                      >
+                        <i className="fas fa-share-alt" style={{ fontSize: '10px' }}></i>
+                        Refer All
+                      </button>
+                    )}
+                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
+                    <div className="d-flex flex-wrap gap-1 align-items-center position-relative" ref={topbarMenuRef}>
+                      {/* Lead tab + dropdown */}
+                      <div
+                        className="position-relative"
+                        onMouseEnter={() => openTopbarMenu('lead')}
+                        onMouseLeave={scheduleCloseTopbarMenu}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => toggleTopbarMenu('lead')}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 10px', fontSize: '12px' }}
+                          title="Lead"
+                          aria-expanded={topbarMenuOpen === 'lead'}
+                        >
+                          <i className="fas fa-handshake" style={{ fontSize: '10px' }} aria-hidden />
+                          Lead
+                          <i className="fas fa-chevron-down ms-1" style={{ fontSize: '8px', opacity: 0.75 }} aria-hidden />
+                        </button>
+                        {topbarMenuOpen === 'lead' && (
+                          <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '210px', left: 0 }} role="menu">
+                            {[
+                              { sub: 'all', label: 'All', count: approvalSummary.total ?? 0, badgeClass: 'bg-secondary' },
+                              { sub: 'pending', label: 'Pending', count: approvalSummary.pending ?? 0, badgeClass: 'bg-warning text-dark' },
+                              { sub: 'approved', label: 'Accepted', count: approvalSummary.accepted ?? 0, badgeClass: 'bg-success' },
+                              { sub: 'rejected', label: 'Rejected', count: approvalSummary.rejected ?? 0, badgeClass: 'bg-danger' },
+                            ].map(({ sub, label, count, badgeClass }) => (
+                              <li key={sub} role="none">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="dropdown-item d-flex align-items-center justify-content-between gap-2 py-2 px-3 border-0 bg-transparent w-100 text-start"
+                                  style={{ fontSize: '13px' }}
+                                  onClick={() => {
+                                    setTopbarMenuOpen(null);
+                                    setCardsView('lead');
+                                    setLeadTab('approval');
+                                    setLeadApprovalTab(sub);
+                                    setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                  }}
+                                >
+                                  <span>{label}</span>
+                                  <span className={`badge ${badgeClass}`}>{loadingApprovalSummary ? '…' : count}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* Performance tab + dropdown */}
+                      <div
+                        className="position-relative"
+                        onMouseEnter={() => openTopbarMenu('performance')}
+                        onMouseLeave={scheduleCloseTopbarMenu}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => toggleTopbarMenu('performance')}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 10px', fontSize: '12px' }}
+                          title="Performance"
+                          aria-expanded={topbarMenuOpen === 'performance'}
+                        >
+                          <i className="fas fa-chart-line" style={{ fontSize: '10px' }} aria-hidden />
+                          Performance
+                          <i className="fas fa-chevron-down ms-1" style={{ fontSize: '8px', opacity: 0.75 }} aria-hidden />
+                        </button>
+                        {topbarMenuOpen === 'performance' && (
+                          <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '220px', left: 0 }} role="menu">
+                            {[
+                              { id: 'all', label: 'All' },
+                              { id: 'hot', label: 'Hot' },
+                              { id: 'warm', label: 'Warm' },
+                              { id: 'cold', label: 'Cold' },
+                              { id: 'prospect', label: 'Prospect' },
+                            ].map(({ id, label }) => (
+                              <li key={id} role="none">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="dropdown-item d-flex align-items-center justify-content-between gap-2 py-2 px-3 border-0 bg-transparent w-100 text-start"
+                                  style={{ fontSize: '13px' }}
+                                  onClick={() => {
+                                    setTopbarMenuOpen(null);
+                                    setCardsView('performance');
+                                    setPerformanceTab(id);
+                                    setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                  }}
+                                >
+                                  <span>{label}</span>
+                                  <span className="badge bg-secondary">{loadingPerformanceSummary ? '—' : (performanceSummary[id] ?? 0)}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* Followup tab + dropdown */}
+                      <div
+                        className="position-relative"
+                        onMouseEnter={() => openTopbarMenu('followup')}
+                        onMouseLeave={scheduleCloseTopbarMenu}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => toggleTopbarMenu('followup')}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 10px', fontSize: '12px' }}
+                          title="Followup"
+                          aria-expanded={topbarMenuOpen === 'followup'}
+                        >
+                          <i className="fas fa-calendar-check" style={{ fontSize: '10px' }} aria-hidden />
+                          Followup
+                          <i className="fas fa-chevron-down ms-1" style={{ fontSize: '8px', opacity: 0.75 }} aria-hidden />
+                        </button>
+                        {topbarMenuOpen === 'followup' && (
+                          <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '220px', left: 0 }} role="menu">
+                            {[
+                              { sub: 'done', label: 'Done', count: followupBuckets.done.length },
+                              { sub: 'pending', label: 'Pending', count: followupBuckets.pending.length },
+                              { sub: 'scheduled', label: 'Scheduled', count: followupBuckets.scheduled.length },
+                              { sub: 'missed', label: 'Missed', count: followupBuckets.missed.length },
+                            ].map(({ sub, label, count }) => (
+                              <li key={sub} role="none">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="dropdown-item d-flex align-items-center justify-content-between gap-2 py-2 px-3 border-0 bg-transparent w-100 text-start"
+                                  style={{ fontSize: '13px' }}
+                                  onClick={() => {
+                                    setTopbarMenuOpen(null);
+                                    setCardsView('followup');
+                                    setActivitySectionView('followup');
+                                    setFollowupTab(sub);
+                                    setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                  }}
+                                >
+                                  <span>{label}</span>
+                                  <span className="badge bg-secondary">{loadingFollowupLeads ? '—' : count}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* Documents tab + dropdown */}
+                      <div
+                        className="position-relative"
+                        onMouseEnter={() => openTopbarMenu('documents')}
+                        onMouseLeave={scheduleCloseTopbarMenu}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => toggleTopbarMenu('documents')}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 10px', fontSize: '12px' }}
+                          title="Documents"
+                          aria-expanded={topbarMenuOpen === 'documents'}
+                        >
+                          <i className="fas fa-file-alt" style={{ fontSize: '10px' }} aria-hidden />
+                          Documents
+                          <i className="fas fa-chevron-down ms-1" style={{ fontSize: '8px', opacity: 0.75 }} aria-hidden />
+                        </button>
+                        {topbarMenuOpen === 'documents' && (
+                          <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '220px', left: 0 }} role="menu">
+                            <li role="none">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="dropdown-item d-flex align-items-center justify-content-between gap-2 py-2 px-3 border-0 bg-transparent w-100 text-start"
+                                style={{ fontSize: '13px' }}
+                                onClick={() => {
+                                  setTopbarMenuOpen(null);
+                                setCardsView('documents');
+                                  setActivitySectionView('documents');
+                                setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                }}
+                              >
+                                <span>Documents required</span>
+                                <span className="badge bg-warning text-dark">{loadingLeads ? '…' : leadsNeedingDocuments.length}</span>
+                              </button>
+                            </li>
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
+                    <button
+                      className={`btn btn-sm ${leadTab === 'report' ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => { setCardsView('lead'); setLeadTab('report'); setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0); }}
+                      style={{ borderRadius: '20px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' }}
+                    >
+                      Lead Report
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Sub-tabs / Status chips */}
-            <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
-              {mainTab === 'lead' ? (
-                loadingApprovalSummary ? (
-                  <>{[1,2,3].map(i => (
-                    <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px' }}>
-                      <div className="card-body d-flex align-items-center justify-content-center">
-                        <div className="spinner-border spinner-border-sm text-primary" role="status" />
-                      </div>
-                    </div>
-                  ))}</>
-                ) : (
-                  <>
-                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', background: 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)' }}>
-                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                        <div>
-                          <div className="text-white fw-bold" style={{ fontSize: '11px' }}>Total leads</div>
-                          <small className="text-white" style={{ fontSize: '10px', opacity: 0.95 }}>{approvalSummary.total}</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #198754' }}>
-                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                        <div>
-                          <div className="fw-bold text-success" style={{ fontSize: '11px' }}>Accepted</div>
-                          <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.accepted}</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '45px', border: '1px solid #dc3545' }}>
-                      <div className="card-body p-1 text-center d-flex align-items-center justify-content-center h-100">
-                        <div>
-                          <div className="fw-bold text-danger" style={{ fontSize: '11px' }}>Rejected</div>
-                          <small className="text-muted" style={{ fontSize: '10px' }}>{approvalSummary.rejected}</small>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )
-              ) : mainTab === 'performance' ? (
-                loadingPerformanceSummary ? (
+            {/* <div className="mb-2">
+              <div className="text-muted text-uppercase fw-semibold mb-1" style={{ fontSize: '11px', letterSpacing: '0.04em' }}>Performance (approved)</div>
+              <div className="d-flex flex-wrap gap-2 align-items-center">
+                {loadingPerformanceSummary ? (
                   <>{[1,2,3,4,5].map(i => (
                     <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '100px', height: '45px' }}>
                       <div className="card-body d-flex align-items-center justify-content-center">
@@ -4197,7 +4375,7 @@ const B2BSales = () => {
                 ) : (
                   <>
                     {[
-                      { id: 'all', label: 'All', countKey: 'all', accent: '#FC2B5A' },
+                      { id: 'all', label: 'All', countKey: 'all', accent: '#ff4d7a' },
                       { id: 'hot', label: 'Hot', countKey: 'hot', accent: '#dc3545' },
                       { id: 'warm', label: 'Warm', countKey: 'warm', accent: '#fd7e14' },
                       { id: 'cold', label: 'Cold', countKey: 'cold', accent: '#6c757d' },
@@ -4210,8 +4388,12 @@ const B2BSales = () => {
                           key={id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setPerformanceTab(id)}
-                          onKeyDown={(e) => e.key === 'Enter' && setPerformanceTab(id)}
+                          onClick={() => { setPerformanceTab(id); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setPerformanceTab(id);
+                            }
+                          }}
                           className="card border-0 shadow-sm"
                           style={{ minWidth: '100px', height: '45px', cursor: 'pointer', border: selected ? `2px solid ${accent}` : '1px solid #dee2e6', background: selected ? `${accent}14` : '#fff' }}
                         >
@@ -4223,151 +4405,447 @@ const B2BSales = () => {
                       );
                     })}
                   </>
-                )
-              ) : loadingStatusCounts ? (
-                <>{[1,2,3,4].map(i => (
-                  <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
-                    <div className="card-body d-flex align-items-center justify-content-center">
-                      <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                )}
+              </div>
+            </div> */}
+
+            <div className="mb-3">
+              <div className="text-muted text-uppercase fw-semibold mb-2" style={{ fontSize: '10px', letterSpacing: '0.05em' }}>CRM Pipeline</div>
+              <div className="d-flex flex-wrap gap-1" style={{ alignItems: 'center' }}>
+                {loadingStatusCounts ? (
+                  <>{[1,2,3,4].map(i => (
+                    <div key={i} style={{ height: '32px', width: '90px', borderRadius: '20px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: '14px', height: '14px' }} />
                     </div>
-                  </div>
-                ))}</>
-              ) : (
-                <>
-                  <div
-                    className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
-                    style={{ minWidth: '110px', height: '45px', cursor: 'pointer', border: selectedStatusFilter === null ? '2px solid #FC2B5A' : '1px solid transparent' }}
-                    onClick={handleTotalCardClick}
-                    title="Click to view all leads"
-                  >
-                    <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                      <div className="d-flex align-items-center">
-                        <i className="fas fa-chart-line me-1" style={{ color: '#fff', fontSize: '12px' }}></i>
-                        <div>
-                          <h6 className="mb-0 fw-bold" style={{ color: '#fff', fontSize: '12px' }}>Total</h6>
-                          <small style={{ color: '#fff', fontSize: '10px' }}>{totalLeads} leads</small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {statusCounts.map((status, index) => {
-                    const isSelected = selectedStatusFilter === status.statusId;
-                    return (
-                      <div
-                        key={status.statusId || index}
-                        className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
-                        style={{ minWidth: '110px', height: '45px', cursor: 'pointer', border: isSelected ? '2px solid #FC2B5A' : '1px solid transparent', backgroundColor: isSelected ? '#fff0f3' : 'white' }}
-                        onClick={() => handleStatusCardClick(status.statusId)}
-                        title={`Click to view ${status.statusName} leads`}
-                      >
-                        <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                          <div className="d-flex align-items-center">
-                            <i className="fas fa-tag me-1" style={{ color: '#FC2B5A', fontSize: '12px' }}></i>
-                            <div>
-                              <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                              <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
+                  ))}</>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleTotalCardClick}
+                      title="View all leads"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        padding: '5px 11px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                        background: selectedStatusFilter === null ? 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)' : '#f1f5f9',
+                        color: selectedStatusFilter === null ? '#fff' : '#475569',
+                        fontSize: '12px', fontWeight: 600,
+                        boxShadow: selectedStatusFilter === null ? '0 2px 8px rgba(255,77,122,0.28)' : 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <i className="fas fa-chart-line" style={{ fontSize: '10px' }}></i>
+                      Total
+                      <span style={{ fontWeight: 700, marginLeft: '2px' }}>{totalLeads}</span>
+                    </button>
+                    {statusCounts.map((status, index) => {
+                      const isSelected = selectedStatusFilter === status.statusId;
+                      return (
+                        <button
+                          key={status.statusId || index}
+                          type="button"
+                          onClick={() => handleStatusCardClick(status.statusId)}
+                          title={`View ${status.statusName} leads`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '5px',
+                            padding: '5px 11px', borderRadius: '20px', cursor: 'pointer',
+                            border: isSelected ? '2px solid #ff4d7a' : '1.5px solid #e2e8f0',
+                            background: isSelected ? '#fef2f4' : '#fff',
+                            color: isSelected ? '#ff4d7a' : '#475569',
+                            fontSize: '12px', fontWeight: 600,
+                            boxShadow: isSelected ? '0 2px 8px rgba(255,77,122,0.15)' : 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <i className="fas fa-tag" style={{ fontSize: '10px', color: isSelected ? '#ff4d7a' : '#94a3b8' }}></i>
+                          {status.statusName}
+                          <span style={{ fontWeight: 700, color: isSelected ? '#ff4d7a' : '#64748b', marginLeft: '2px' }}>{status.count}</span>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
             </div>
 
-            {mainTab === 'lead' && (
-              <section className="mb-3">
+              <section id="b2b-section-lead" className="mb-3" style={{ scrollMarginTop: '96px' }}>
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
                   <div className="card-body">
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                      <div>
-                        <h6 className="mb-1 fw-bold">Lead Management</h6>
-                        <div className="text-muted" style={{ fontSize: '13px' }}>
-                          Add Lead → <b>Lead Status</b> (Hot / Warm / Cold / Prospect) is saved with the lead → Approval (Pending). After <b>Accept</b>, use the <b>Performance</b> tab to work leads by the same status.
-                        </div>
-                      </div>
-                      <div className="d-flex flex-wrap gap-2 align-items-center">
-                        {/* Add Lead button */}
-                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                          <>
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={handleOpenLeadModal}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
-                            >
-                              <i className="fas fa-plus" style={{ fontSize: '11px' }}></i>
-                              Add Lead
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-secondary"
-                              onClick={() => { setShowBulkInputs(true); setBulkMode('bulkupload'); setInput1Value(''); setShowBulkUploadModal(true); }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
-                            >
-                              <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
-                              Bulk Upload
-                            </button>
-                          </>
-                        )}
-                        {/* Day Visit Report */}
-                        <Link
-                          to="/institute/lrp"
-                          className="btn btn-sm btn-outline-secondary"
-                          style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px', textDecoration: 'none' }}
-                          title="Add Day Visit Report"
-                        >
-                          <i className="fas fa-clipboard-list" style={{ fontSize: '11px' }}></i>
-                          Day Visit Report
-                        </Link>
-                        {/* Refer All Leads */}
-                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={loadingLeads || leads.length === 0}
-                            onClick={() => { setShowBulkInputs(true); setBulkMode('bulkrefer'); setInput1Value(''); openRefferPanel(null, 'RefferAllLeads'); }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600', borderRadius: '8px', padding: '6px 14px' }}
-                          >
-                            <i className="fas fa-share-alt" style={{ fontSize: '11px' }}></i>
-                            Refer All
-                          </button>
-                        )}
-                        {/* Sub-tabs */}
-                        <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 4px' }}></div>
-                        <button className={`btn btn-sm ${leadTab === 'approval' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setLeadTab('approval')}>
-                          Approval
-                          <span className="badge bg-danger ms-2">{approvalSummary.pending ?? 0}</span>
-                        </button>
-                        <button className={`btn btn-sm ${leadTab === 'report' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setLeadTab('report')}>
-                          Lead Report
-                        </button>
-                      </div>
+                    <div className="mb-2">
+                      <h6 className="mb-1 fw-bold">Lead Management</h6>
+                     
                     </div>
 
-                    {leadTab === 'approval' && (
+                    {cardsView === 'performance' && (
                       <div className="mt-3">
-                        <div className="btn-group btn-group-sm mb-2 flex-wrap" role="group" aria-label="Approval tabs">
+                        {loadingPerformanceLeads ? (
+                          <div className="text-center py-5">
+                            <div className="spinner-border text-primary" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <p className="mt-3 text-muted">Loading approved leads...</p>
+                          </div>
+                        ) : performanceLeads.length === 0 ? (
+                          <div className="text-center text-muted py-4">
+                            {performanceTab !== 'all' ? `No approved leads in ${performanceTab}` : 'No approved leads yet'}
+                          </div>
+                        ) : (
+                          <div className="row g-2" style={{ rowGap: '18px' }}>
+                            {performanceLeads.map((lead, leadIndex) => (
+                              <div key={lead._id || leadIndex} className="col-12" style={{ position: 'relative', paddingTop: '10px' }}>
+                                {/* Floating badges */}
+                                <div style={{ position: 'absolute', top: '0px', left: '24px', display: 'flex', gap: '5px', zIndex: 3 }}>
+                                  {lead.leadCategory?.name && (
+                                    <span title="Lead Category" style={{ background: '#fff', border: '1.5px solid #ff4d7a', color: '#ff4d7a', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.2)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.leadCategory.name}
+                                    </span>
+                                  )}
+                                  {lead.typeOfB2B?.name && (
+                                    <span title="B2B Type" style={{ background: '#fff', border: '1.5px solid #c01855', color: '#c01855', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(192,24,85,0.18)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.typeOfB2B.name}
+                                    </span>
+                                  )}
+                                  {lead.leadStatus && (
+                                    <span title="Lead Status" style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.25)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`} style={{ marginBottom: 0 }}>
+                                  <div className="lead-header">
+                                    <div className="lead-title-section">
+                                      <span className="lead-contact-person">
+                                        <i className="fas fa-user" style={{ fontSize: '11px', color: '#ff4d7a' }}></i>
+                                        {lead.concernPersonName || '—'}
+                                      </span>
+                                      <div className="lead-contact-info">
+                                        {lead.email && (
+                                          <span className="lead-contact-item"><i className="fas fa-envelope"></i><span>{lead.email}</span></span>
+                                        )}
+                                        {lead.mobile && (
+                                          <span className="lead-contact-item mobile"><i className="fas fa-phone"></i><span>{lead.mobile}</span></span>
+                                        )}
+                                        {lead.designation && (
+                                          <span className="lead-contact-item"><i className="fas fa-id-badge"></i><span>{lead.designation}</span></span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-1">
+                                      {!!lead._id && (
+                                        <Link
+                                          to={`/institute/lrp?b2bLeadId=${encodeURIComponent(String(lead._id))}`}
+                                          className="btn btn-sm btn-light border"
+                                          title="Lead Report"
+                                          style={{ borderRadius: '999px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                        >
+                                          <i className="fas fa-clipboard-list" style={{ fontSize: '12px', color: '#c01855' }}></i>
+                                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Lead Report</span>
+                                        </Link>
+                                      )}
+                                      {!!lead._id && (
+                                        <button type="button" className="btn btn-sm btn-light border lead-collapse-btn" onClick={() => toggleLeadCardCollapsed(lead._id)} title={collapsedLeadCards.has(lead._id) ? 'Expand' : 'Collapse'} style={{ borderRadius: '999px', padding: '4px 8px' }}>
+                                          <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {!lead._id || !collapsedLeadCards.has(lead._id) ? (
+                                    <div className="lead-content">
+                                      <div className="status-section mb-2">
+                                        <div className="d-flex align-items-center justify-content-between">
+                                          <div className="d-flex align-items-center flex-wrap gap-1">
+                                            <i className="fas fa-tag text-primary me-1"></i>
+                                            <span className="fw-bold text-dark">CRM Status:</span>
+                                            <span className="ms-1 badge bg-primary">{lead.status?.title || lead.status?.name || 'No Status'}</span>
+                                            {getSubStatusTitle(lead) && (
+                                              <span className="badge bg-secondary">{getSubStatusTitle(lead)}</span>
+                                            )}
+                                          </div>
+                                          <div className="d-flex align-items-center gap-2">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <div style={{ minWidth: '92px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Age</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLeadAgeText(lead)}</div>
+                                              </div>
+                                              <div style={{ minWidth: '130px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Lock</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLockText(lead)}</div>
+                                              </div>
+                                            </div>
+                                            <button className="btn btn-sm btn-outline-primary" onClick={() => openPanelHome(lead)} title="Open panel">
+                                              <i className="fas fa-arrow-right me-1"></i>Open
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="compact-info-section">
+                                        <div className="compact-info-grid">
+                                          {lead.address && (
+                                            <div className="compact-info-item">
+                                              <i className="fas fa-map-marker-alt text-danger"></i>
+                                              <span className="compact-info-label">Address:</span>
+                                              <span className="compact-info-value">{lead.address}</span>
+                                            </div>
+                                          )}
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-shield text-warning"></i>
+                                            <span className="compact-info-label">Owner:</span>
+                                            <span className="compact-info-value">{getLeadOwnerName(lead)}</span>
+                                          </div>
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-plus text-info"></i>
+                                            <span className="compact-info-label">Added:</span>
+                                            <span className="compact-info-value">{getLeadAddedByName(lead)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {cardsView === 'followup' && (
+                      <div className="mt-3">
+                        
+
+                        <div className="row g-2 mt-3">
+                          {loadingFollowupLeads ? (
+                            <div className="col-12 text-center text-muted py-4">Loading followups...</div>
+                          ) : followupStatusFilteredLeads.length === 0 ? (
+                            <div className="col-12 text-center text-muted py-4">
+                              {selectedStatusFilter ? 'No leads found for selected status in this bucket.' : 'No followups in this bucket.'}
+                            </div>
+                          ) : (
+                            followupStatusFilteredLeads.map((lead, leadIndex) => (
+                              <div key={lead._id || leadIndex} className="col-12" style={{ position: 'relative', paddingTop: '10px' }}>
+                                {/* Floating badges */}
+                                <div style={{ position: 'absolute', top: '0px', left: '24px', display: 'flex', gap: '5px', zIndex: 3 }}>
+                                  {lead.leadCategory?.name && (
+                                    <span title="Lead Category" style={{ background: '#fff', border: '1.5px solid #ff4d7a', color: '#ff4d7a', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.2)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.leadCategory.name}
+                                    </span>
+                                  )}
+                                  {lead.typeOfB2B?.name && (
+                                    <span title="B2B Type" style={{ background: '#fff', border: '1.5px solid #c01855', color: '#c01855', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(192,24,85,0.18)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.typeOfB2B.name}
+                                    </span>
+                                  )}
+                                  {(() => {
+                                    const fu = lead && typeof lead.followUp === 'object' && lead.followUp !== null ? lead.followUp : null;
+                                    if (!fu || (!fu.status && !fu.scheduledDate)) return null;
+                                    const statusText = fu.status || 'Pending';
+                                    const dateText = fu.scheduledDate ? new Date(fu.scheduledDate).toLocaleString() : '';
+                                    return (
+                                      <span title={dateText ? `Followup: ${statusText} • ${dateText}` : `Followup: ${statusText}`} style={{ background: '#0dcaf0', color: '#212529', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                        FU: {statusText}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+
+                                <div className="lead-card" style={{ marginBottom: 0 }}>
+                                  <div className="lead-header">
+                                    <div className="lead-title-section">
+                                      <span className="lead-contact-person">
+                                        <i className="fas fa-user" style={{ fontSize: '11px', color: '#ff4d7a' }}></i>
+                                        {lead.concernPersonName || '—'}
+                                      </span>
+                                    </div>
+                                    {!!lead._id && (
+                                      <button type="button" className="btn btn-sm btn-light border lead-collapse-btn" onClick={() => toggleLeadCardCollapsed(lead._id)} title={collapsedLeadCards.has(lead._id) ? 'Expand' : 'Collapse'} style={{ borderRadius: '999px', padding: '4px 8px' }}>
+                                        <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {!lead._id || !collapsedLeadCards.has(lead._id) ? (
+                                    <div className="lead-content">
+                                      <div className="status-section mb-2">
+                                        <div className="d-flex align-items-center justify-content-between">
+                                          <div className="d-flex align-items-center flex-wrap gap-1">
+                                            <i className="fas fa-tag text-primary me-2"></i>
+                                            <span className="fw-bold text-dark">CRM Status:</span>
+                                            <span className="ms-2 badge bg-primary">{lead.status?.title || lead.status?.name || 'No Status'}</span>
+                                            {getSubStatusTitle(lead) && (
+                                              <span className="badge bg-secondary">{getSubStatusTitle(lead)}</span>
+                                            )}
+                                          </div>
+                                          <div className="d-flex align-items-center gap-2">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <div style={{ minWidth: '92px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Age</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLeadAgeText(lead)}</div>
+                                              </div>
+                                              <div style={{ minWidth: '130px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Lock</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLockText(lead)}</div>
+                                              </div>
+                                            </div>
+                                            <button className="btn btn-sm btn-outline-primary" onClick={() => openPanelHome(lead)} title="Open panel">
+                                              <i className="fas fa-arrow-right me-1"></i>Open
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="compact-info-section">
+                                        <div className="compact-info-grid">
+                                          {lead.address && (
+                                            <div className="compact-info-item">
+                                              <i className="fas fa-map-marker-alt text-danger"></i>
+                                              <span className="compact-info-label">Address:</span>
+                                              <span className="compact-info-value">{lead.address}</span>
+                                            </div>
+                                          )}
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-shield text-warning"></i>
+                                            <span className="compact-info-label">Owner:</span>
+                                            <span className="compact-info-value">{getLeadOwnerName(lead)}</span>
+                                          </div>
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-plus text-info"></i>
+                                            <span className="compact-info-label">Added:</span>
+                                            <span className="compact-info-value">{getLeadAddedByName(lead)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>Card collapsed. Click the chevron to expand.</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {cardsView === 'documents' && (
+                      <div className="mt-3">
+                        <p className="text-muted small mb-2 mb-md-3">
+                          Jahan CRM sub-status par &quot;attachment required&quot; hai, wahan ke leads yahan dikhenge.
+                        </p>
+                        {loadingLeads ? (
+                          <div className="text-center text-muted py-5">Loading leads…</div>
+                        ) : leadsNeedingDocuments.length === 0 ? (
+                          <div className="text-center text-muted py-4">No leads require documents at this stage.</div>
+                        ) : (
+                          <div className="row g-2" style={{ rowGap: '18px' }}>
+                            {leadsNeedingDocuments.map((lead, leadIndex) => (
+                              <div key={lead._id || leadIndex} className="col-12" style={{ position: 'relative', paddingTop: '10px' }}>
+                                <div style={{ position: 'absolute', top: '0px', left: '24px', display: 'flex', gap: '5px', zIndex: 3 }}>
+                                  {lead.leadCategory?.name && (
+                                    <span title="Lead Category" style={{ background: '#fff', border: '1.5px solid #ff4d7a', color: '#ff4d7a', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.2)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.leadCategory.name}
+                                    </span>
+                                  )}
+                                  {lead.typeOfB2B?.name && (
+                                    <span title="B2B Type" style={{ background: '#fff', border: '1.5px solid #c01855', color: '#c01855', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(192,24,85,0.18)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.typeOfB2B.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="lead-card" style={{ marginBottom: 0 }}>
+                                  <div className="lead-header">
+                                    <div className="lead-title-section">
+                                      <span className="lead-contact-person">
+                                        <i className="fas fa-user" style={{ fontSize: '11px', color: '#ff4d7a' }}></i>
+                                        {lead.concernPersonName || '—'}
+                                      </span>
+                                      {lead.mobile && (
+                                        <span className="lead-contact-item mobile"><i className="fas fa-phone"></i><span>{lead.mobile}</span></span>
+                                      )}
+                                    </div>
+                                    <button type="button" className="btn btn-sm btn-light" onClick={() => openPanelHome(lead)} style={{ borderRadius: '999px', padding: '4px 10px', fontSize: '12px' }}>
+                                      <i className="fas fa-arrow-right me-1"></i>Open
+                                    </button>
+                                  </div>
+                                  <div className="lead-content">
+                                    <div className="status-section mb-2">
+                                      <div className="d-flex align-items-center justify-content-between">
+                                        <div className="d-flex align-items-center flex-wrap gap-1">
+                                          <i className="fas fa-tag text-primary me-2"></i>
+                                          <span className="fw-bold text-dark">CRM Status:</span>
+                                          <span className="ms-2 badge bg-primary">{lead.status?.title || lead.status?.name || 'No Status'}</span>
+                                          {getSubStatusTitle(lead) && (
+                                            <span className="badge bg-secondary">{getSubStatusTitle(lead)}</span>
+                                          )}
+                                        </div>
+                                        <div className="d-flex align-items-center gap-2">
+                                          <div className="d-flex align-items-center gap-2">
+                                            <div style={{ minWidth: '92px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                              <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Age</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLeadAgeText(lead)}</div>
+                                            </div>
+                                            <div style={{ minWidth: '130px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                              <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Lock</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLockText(lead)}</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="compact-info-section">
+                                      <div className="compact-info-grid">
+                                        {lead.address && (
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-map-marker-alt text-danger"></i>
+                                            <span className="compact-info-label">Address:</span>
+                                            <span className="compact-info-value">{lead.address}</span>
+                                          </div>
+                                        )}
+                                        <div className="compact-info-item">
+                                          <i className="fas fa-user-shield text-warning"></i>
+                                          <span className="compact-info-label">Owner:</span>
+                                          <span className="compact-info-value">{getLeadOwnerName(lead)}</span>
+                                        </div>
+                                        <div className="compact-info-item">
+                                          <i className="fas fa-user-plus text-info"></i>
+                                          <span className="compact-info-label">Added:</span>
+                                          <span className="compact-info-value">{getLeadAddedByName(lead)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {cardsView === 'lead' && leadTab === 'approval' && (
+                      <div className="mt-3">
+                        {/* <div className="btn-group btn-group-sm mb-2 flex-wrap" role="group" aria-label="Approval tabs">
                           <button
                             type="button"
                             className={`btn ${leadApprovalTab === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
-                            onClick={() => setLeadApprovalTab('pending')}
+                            onClick={() => { setLeadApprovalTab('pending'); }}
                           >
                             Pending ({approvalSummary.pending ?? 0})
                           </button>
                           <button
                             type="button"
                             className={`btn ${leadApprovalTab === 'approved' ? 'btn-success' : 'btn-outline-success'}`}
-                            onClick={() => setLeadApprovalTab('approved')}
+                            onClick={() => { setLeadApprovalTab('approved'); }}
                           >
                             Accepted ({approvalSummary.accepted ?? 0})
                           </button>
                           <button
                             type="button"
                             className={`btn ${leadApprovalTab === 'rejected' ? 'btn-danger' : 'btn-outline-danger'}`}
-                            onClick={() => setLeadApprovalTab('rejected')}
+                            onClick={() => { setLeadApprovalTab('rejected'); }}
                           >
                             Rejected ({approvalSummary.rejected ?? 0})
                           </button>
-                        </div>
+                        </div> */}
 
                         <div className="d-flex justify-content-end mb-2">
                           <div className="btn-group btn-group-sm" role="group" aria-label="Approval view toggle">
@@ -4396,78 +4874,54 @@ const B2BSales = () => {
                         ) : approvalListLeads.length === 0 ? (
                           <div className="text-center text-muted py-3">No leads in this bucket yet.</div>
                         ) : leadApprovalView === 'cards' ? (
-                          <div className="row g-2">
+                          <div className="row g-2" style={{ rowGap: '18px' }}>
                             {approvalListLeads.map((lead, leadIndex) => (
-                              <div key={lead._id || leadIndex} className="col-12">
-                                <div className="lead-card">
+                              <div key={lead._id || leadIndex} className="col-12" style={{ position: 'relative', paddingTop: '10px' }}>
+                                <div style={{ position: 'absolute', top: '0px', left: '24px', display: 'flex', gap: '5px', zIndex: 3 }}>
+                                  {lead.leadCategory?.name && (
+                                    <span title="Lead Category" style={{ background: '#fff', border: '1.5px solid #ff4d7a', color: '#ff4d7a', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.2)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.leadCategory.name}
+                                    </span>
+                                  )}
+                                  {lead.typeOfB2B?.name && (
+                                    <span title="B2B Type" style={{ background: '#fff', border: '1.5px solid #c01855', color: '#c01855', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(192,24,85,0.18)', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {lead.typeOfB2B.name}
+                                    </span>
+                                  )}
+                                  {lead.leadStatus && (
+                                    <span title="Lead Status" style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                      {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="lead-card" style={{ marginBottom: 0 }}>
                                   <div className="lead-header">
                                     <div className="lead-title-section">
-                                      <h5 className="lead-business-name">
-                                        {lead.businessName || 'Business Name Not Available'}
-                                      </h5>
-                                      <p className="lead-contact-person">
-                                        <i className="fas fa-user me-2"></i>
-                                        {lead.concernPersonName || 'Contact Person Not Available'}
-                                      </p>
-
+                                      <span className="lead-contact-person">
+                                        <i className="fas fa-user" style={{ fontSize: '11px', color: '#ff4d7a' }}></i>
+                                        {lead.concernPersonName || '—'}
+                                      </span>
                                       <div className="lead-contact-info">
                                         {lead.email && (
-                                          <div className="lead-contact-item">
-                                            <i className="fas fa-envelope"></i>
-                                            <span>{lead.email}</span>
-                                          </div>
+                                          <span className="lead-contact-item"><i className="fas fa-envelope"></i><span>{lead.email}</span></span>
                                         )}
                                         {lead.mobile && (
-                                          <div className="lead-contact-item">
-                                            <i className="fas fa-phone"></i>
-                                            <span>{lead.mobile}</span>
-                                          </div>
+                                          <span className="lead-contact-item mobile"><i className="fas fa-phone"></i><span>{lead.mobile}</span></span>
                                         )}
                                       </div>
                                     </div>
-
-                                    <div className="lead-badges">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                      {leadApprovalTab === 'pending' && (
+                                        <div className="d-flex gap-1">
+                                          <button type="button" className="btn btn-sm btn-success" onClick={() => handleApprovalDecision(lead._id, 'Approved')} style={{ borderRadius: '999px', padding: '4px 10px', fontSize: '11px' }}>Approve</button>
+                                          <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => handleApprovalDecision(lead._id, 'Rejected')} style={{ borderRadius: '999px', padding: '4px 10px', fontSize: '11px' }}>Reject</button>
+                                        </div>
+                                      )}
                                       {!!lead._id && (
-                                        <button
-                                          type="button"
-                                          className="btn btn-sm btn-light border"
-                                          onClick={() => toggleLeadCardCollapsed(lead._id)}
-                                          title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
-                                          style={{ borderRadius: '999px', padding: '4px 8px', marginRight: '6px' }}
-                                        >
+                                        <button type="button" className="btn btn-sm btn-light border lead-collapse-btn" onClick={() => toggleLeadCardCollapsed(lead._id)} title={collapsedLeadCards.has(lead._id) ? 'Expand' : 'Collapse'} style={{ borderRadius: '999px', padding: '4px 8px' }}>
                                           <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
                                         </button>
-                                      )}
-
-                                      <span className="lead-badge" style={{ background: '#6c757d', color: '#fff' }} title="Lead status at add time">
-                                        {lead.leadStatus
-                                          ? ({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)
-                                          : '—'}
-                                      </span>
-
-                                      {lead.leadAddedBy?.name && (
-                                        <span className="lead-badge" style={{ background: '#0dcaf0', color: '#212529' }} title="Added by">
-                                          {lead.leadAddedBy.name}
-                                        </span>
-                                      )}
-
-                                      {leadApprovalTab === 'pending' && (
-                                        <div className="d-flex gap-1 ms-2">
-                                          <button
-                                            type="button"
-                                            className="btn btn-sm btn-success"
-                                            onClick={() => handleApprovalDecision(lead._id, 'Approved')}
-                                          >
-                                            Approve
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-danger"
-                                            onClick={() => handleApprovalDecision(lead._id, 'Rejected')}
-                                          >
-                                            Reject
-                                          </button>
-                                        </div>
                                       )}
                                     </div>
                                   </div>
@@ -4476,24 +4930,31 @@ const B2BSales = () => {
                                     <div className="lead-content">
                                       <div className="status-section mb-2">
                                         <div className="d-flex align-items-center justify-content-between">
-                                          <div className="d-flex align-items-center">
+                                          <div className="d-flex align-items-center flex-wrap gap-1">
                                             <i className="fas fa-tag text-primary me-2"></i>
                                             <span className="fw-bold text-dark">CRM Status:</span>
-                                            <span className="ms-2 badge bg-primary">
-                                              {lead.status?.title || lead.status?.name || 'No Status'}
-                                            </span>
+                                            <span className="ms-2 badge bg-primary">{lead.status?.title || lead.status?.name || 'No Status'}</span>
+                                            {getSubStatusTitle(lead) && (
+                                              <span className="badge bg-secondary">{getSubStatusTitle(lead)}</span>
+                                            )}
                                           </div>
-                                          <button
-                                            className="btn btn-sm btn-outline-primary"
-                                            onClick={() => openPanelHome(lead)}
-                                            title="Open panel"
-                                          >
-                                            <i className="fas fa-arrow-right me-1"></i>
-                                            Open
-                                          </button>
+                                          <div className="d-flex align-items-center gap-2">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <div style={{ minWidth: '92px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Age</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLeadAgeText(lead)}</div>
+                                              </div>
+                                              <div style={{ minWidth: '130px', textAlign: 'center', background: '#ffffff', border: '1px solid #e9ecef', borderRadius: '10px', padding: '6px 10px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>Lead Lock</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '2px', lineHeight: 1.1 }}>{getLockText(lead)}</div>
+                                              </div>
+                                            </div>
+                                            <button className="btn btn-sm btn-outline-primary" onClick={() => openPanelHome(lead)} title="Open panel">
+                                              <i className="fas fa-arrow-right me-1"></i>Open
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
-
                                       <div className="compact-info-section">
                                         <div className="compact-info-grid">
                                           {lead.address && (
@@ -4503,21 +4964,20 @@ const B2BSales = () => {
                                               <span className="compact-info-value">{lead.address}</span>
                                             </div>
                                           )}
-                                          {lead.leadOwner?.name && (
-                                            <div className="compact-info-item">
-                                              <i className="fas fa-user-tie text-warning"></i>
-                                              <span className="compact-info-label">Owner:</span>
-                                              <span className="compact-info-value">{lead.leadOwner.name}</span>
-                                            </div>
-                                          )}
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-shield text-warning"></i>
+                                            <span className="compact-info-label">Owner:</span>
+                                            <span className="compact-info-value">{getLeadOwnerName(lead)}</span>
+                                          </div>
+                                          <div className="compact-info-item">
+                                            <i className="fas fa-user-plus text-info"></i>
+                                            <span className="compact-info-label">Added:</span>
+                                            <span className="compact-info-value">{getLeadAddedByName(lead)}</span>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  ) : (
-                                    <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>
-                                      Card collapsed. Click the chevron to expand.
-                                    </div>
-                                  )}
+                                  ) : null}
                                 </div>
                               </div>
                             ))}
@@ -4578,744 +5038,214 @@ const B2BSales = () => {
                       </div>
                     )}
 
-                    {leadTab === 'report' && (
+                    {cardsView === 'lead' && leadTab === 'report' && (
                       <div className="mt-3">
-                        <div className="row g-2">
-                          <div className="col-md-4">
-                            <div className="card border-0 bg-light h-100">
-                              <div className="card-body">
-                                <div className="text-muted" style={{ fontSize: '13px' }}>Total Leads (current filters)</div>
-                                <div className="fs-4 fw-bold">{totalLeads || (leads?.length || 0)}</div>
-                              </div>
+                   
+                        <div className="mt-3">
+                          {loadingLeads ? (
+                            <div className="text-center text-muted py-4">Loading leads…</div>
+                          ) : (leads || []).length === 0 ? (
+                            <div className="text-center text-muted py-4">
+                              {selectedStatusFilter ? 'No leads found for selected pipeline status.' : 'No leads found.'}
                             </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="card border-0 bg-light h-100">
-                              <div className="card-body">
-                                <div className="text-muted" style={{ fontSize: '13px' }}>Pending Approval</div>
-                                <div className="fs-4 fw-bold text-warning">{approvalSummary.pending ?? 0}</div>
-                              </div>
+                          ) : (
+                            <div className="row g-2" style={{ rowGap: '18px' }}>
+                              {(leads || []).map((lead, leadIndex) => (
+                                <div key={lead._id || leadIndex} className="col-12" style={{ position: 'relative', paddingTop: '10px' }}>
+                                  {/* Floating badge chips above the card */}
+                                  <div style={{ position: 'absolute', top: '0px', left: '24px', display: 'flex', gap: '5px', zIndex: 3 }}>
+                                    {lead.leadCategory?.name && (
+                                      <span
+                                        title="Lead Category"
+                                        style={{ background: '#fff', border: '1.5px solid #ff4d7a', color: '#ff4d7a', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.2)', cursor: 'default', whiteSpace: 'nowrap' }}
+                                      >
+                                        {lead.leadCategory.name}
+                                      </span>
+                                    )}
+                                    {lead.typeOfB2B?.name && (
+                                      <span
+                                        title="B2B Type"
+                                        style={{ background: '#fff', border: '1.5px solid #c01855', color: '#c01855', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(192,24,85,0.18)', cursor: 'default', whiteSpace: 'nowrap' }}
+                                      >
+                                        {lead.typeOfB2B.name}
+                                      </span>
+                                    )}
+                                    {lead.leadStatus && (
+                                      <span
+                                        title="Lead Status"
+                                        style={{ background: 'linear-gradient(135deg, #ff4d7a 0%, #c01855 100%)', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', boxShadow: '0 2px 8px rgba(255,77,122,0.25)', cursor: 'default', whiteSpace: 'nowrap' }}
+                                      >
+                                        {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="lead-card" style={{ marginBottom: 0 }}>
+                                    <div className="lead-header">
+                                      {/* One line: name + email + phone */}
+                                      <div className="lead-title-section">
+                                        <span className="lead-contact-person">
+                                          <i className="fas fa-user" style={{ fontSize: '11px', color: '#ff4d7a' }}></i>
+                                          {lead.concernPersonName || '—'}
+                                        </span>
+                                        <div className="lead-contact-info">
+                                          {lead.email && (
+                                            <span className="lead-contact-item">
+                                              <i className="fas fa-envelope"></i>
+                                              <span>{lead.email}</span>
+                                            </span>
+                                          )}
+                                          {lead.mobile && (
+                                            <span className="lead-contact-item mobile">
+                                              <i className="fas fa-phone"></i>
+                                              <span>{lead.mobile}</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Right: lead report + collapse */}
+                                      <div className="d-flex align-items-center gap-1">
+                                        {!!lead._id && (
+                                          <Link
+                                            to={`/institute/lrp?b2bLeadId=${encodeURIComponent(String(lead._id))}`}
+                                            className="btn btn-sm btn-light border"
+                                            title="Lead Report"
+                                            style={{ borderRadius: '999px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                          >
+                                            <i className="fas fa-clipboard-list" style={{ fontSize: '12px', color: '#c01855' }}></i>
+                                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Lead Report</span>
+                                          </Link>
+                                        )}
+                                        {!!lead._id && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-light border lead-collapse-btn"
+                                            onClick={() => toggleLeadCardCollapsed(lead._id)}
+                                            title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
+                                            style={{ borderRadius: '999px', padding: '4px 8px' }}
+                                          >
+                                            <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {!lead._id || !collapsedLeadCards.has(lead._id) ? (
+                                      <div className="lead-content">
+                                        <div className="status-section mb-2">
+                                          <div className="d-flex align-items-center justify-content-between">
+                                          <div className="d-flex align-items-center flex-wrap gap-1">
+                                              <i className="fas fa-tag text-primary me-2"></i>
+                                              <span className="fw-bold text-dark">CRM Status:</span>
+                                              <span className="ms-2 badge bg-primary">{lead.status?.title || lead.status?.name || 'No Status'}</span>
+                                            {getSubStatusTitle(lead) && (
+                                              <span className="badge bg-secondary">{getSubStatusTitle(lead)}</span>
+                                            )}
+                                            </div>
+                                            <div className="d-flex align-items-center gap-2">
+                                              <button className="btn btn-sm btn-outline-primary" onClick={() => openPanelHome(lead)} title="Open panel">
+                                                <i className="fas fa-arrow-right me-1"></i>Open
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="compact-info-section">
+                                          <div className="row g-2 align-items-stretch">
+                                            {/* Left */}
+                                            <div className="col-12 col-md-4">
+                                              <div
+                                                className="h-100"
+                                                style={{
+                                                  background: '#f8fafc',
+                                                  border: '1px solid #e9ecef',
+                                                  borderRadius: '12px',
+                                                  padding: '10px',
+                                                }}
+                                              >
+                                                <div className="d-flex flex-column gap-2">
+                                                  <div
+                                                    style={{
+                                                      background: '#ffffff',
+                                                      border: '1px solid #e9ecef',
+                                                      borderRadius: '12px',
+                                                      padding: '10px',
+                                                      boxShadow: '0 1px 0 rgba(17, 24, 39, 0.04)',
+                                                    }}
+                                                  >
+                                                    <div className="d-flex align-items-center gap-2">
+                                                      <i className="fas fa-hourglass-half text-primary"></i>
+                                                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>
+                                                        Lead Age
+                                                      </div>
+                                                    </div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '4px', lineHeight: 1.1 }}>
+                                                      {getLeadAgeText(lead)}
+                                                    </div>
+                                                  </div>
+
+                                                  <div
+                                                    style={{
+                                                      background: '#ffffff',
+                                                      border: '1px solid #e9ecef',
+                                                      borderRadius: '12px',
+                                                      padding: '10px',
+                                                      boxShadow: '0 1px 0 rgba(17, 24, 39, 0.04)',
+                                                    }}
+                                                  >
+                                                    <div className="d-flex align-items-center gap-2">
+                                                      <i className="fas fa-lock text-warning"></i>
+                                                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#475569', lineHeight: 1.1 }}>
+                                                        Lead Lock
+                                                      </div>
+                                                    </div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 900, color: '#111827', marginTop: '4px', lineHeight: 1.1 }}>
+                                                      {getLockText(lead)}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Right */}
+                                            <div className="col-12 col-md-8">
+                                              <div className="compact-info-grid">
+                                                {lead.address && (
+                                                  <div className="compact-info-item">
+                                                    <i className="fas fa-map-marker-alt text-danger"></i>
+                                                    <span className="compact-info-label">Address:</span>
+                                                    <span className="compact-info-value">{lead.address}</span>
+                                                  </div>
+                                                )}
+                                                <div className="compact-info-item">
+                                                  <i className="fas fa-user-shield text-warning"></i>
+                                                  <span className="compact-info-label">Owner:</span>
+                                                  <span className="compact-info-value">{getLeadOwnerName(lead)}</span>
+                                                </div>
+                                                <div className="compact-info-item">
+                                                  <i className="fas fa-user-plus text-info"></i>
+                                                  <span className="compact-info-label">Added:</span>
+                                                  <span className="compact-info-value">{getLeadAddedByName(lead)}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="card border-0 bg-light h-100">
-                              <div className="card-body">
-                                <div className="text-muted" style={{ fontSize: '13px' }}>Approved</div>
-                                <div className="fs-4 fw-bold text-success">{approvalSummary.accepted ?? 0}</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-muted mt-2" style={{ fontSize: '12px' }}>
-                          Approval counts sync from the server (copy leads collection).
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               </section>
-            )}
 
-            {mainTab === 'performance' && (
-              <section className="list-view">
-
-              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: '12px' }}>
-                <div className="card-body py-3">
-                  <h6 className="mb-1 fw-bold">Performance</h6>
-                  <p className="text-muted mb-0" style={{ fontSize: '13px' }}>
-                    Approved leads only. Use <b>All, Hot, Warm, Cold, Prospect</b> in the bar above to switch lists (same Lead Status as at add time).
-                  </p>
-                </div>
-              </div>
-
-              {/* Bulk refer bar (shows above lead cards) */}
-              {showBulkInputs && bulkMode === 'bulkrefer' && (
-                <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
-                  <div className="card-body py-2">
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="fw-semibold text-dark" style={{ fontSize: '13px' }}>
-                          <i className="fas fa-layer-group me-1 text-secondary"></i>
-                          Bulk Select
-                        </span>
-                        <div style={{
-                          display: "flex",
-                          alignItems: "stretch",
-                          border: "1px solid #dee2e6",
-                          borderRadius: "8px",
-                          backgroundColor: "#fff",
-                          overflow: "hidden",
-                          width: "220px",
-                          height: "36px"
-                        }}>
-                          <input
-                            type="text"
-                            placeholder="Input 1"
-                            value={input1Value}
-                            onChange={(e) => {
-                              const maxValue = totalLeads || leads?.length || 0;
-                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
-                              if (inputValue === '') {
-                                setInput1Value('');
-                                return;
-                              }
-                              const numValue = parseInt(inputValue, 10);
-                              if (numValue < 1 || isNaN(numValue)) inputValue = '1';
-                              else if (numValue > maxValue) inputValue = maxValue.toString();
-                              setInput1Value(inputValue);
-                            }}
-                            onKeyDown={(e) => {
-                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
-                                e.preventDefault();
-                              }
-                            }}
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              borderRight: "1px solid #dee2e6",
-                              outline: "none",
-                              padding: "6px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box"
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Total"
-                            value={totalLeads || leads?.length || 0}
-                            readOnly
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              outline: "none",
-                              padding: "6px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box",
-                              cursor: "default"
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => {
-                            setInput1Value('');
-                            setSelectedProfiles([]);
-                          }}
-                          title="Clear selection"
-                          style={{ height: '36px' }}
-                        >
-                          Clear
-                        </button>
-                      </div>
-
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="text-muted" style={{ fontSize: '13px' }}>
-                          Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => {
-                            if (!selectedProfiles || selectedProfiles.length === 0) {
-                              alert('Please type a number in Input 1 to select leads first.');
-                              return;
-                            }
-                            openRefferPanel(null, 'RefferAllLeads');
-                          }}
-                          style={{ height: '36px', whiteSpace: 'nowrap' }}
-                        >
-                          <i className="fas fa-share me-1"></i>
-                          Refer
-                        </button>
-                      </div>
-                    </div>
-                    <small className="text-muted d-block mt-1" style={{ fontSize: '12px' }}>
-                      Tip: this selects the first N leads from your current filters/status and highlights them below.
-                    </small>
-                  </div>
-                </div>
-              )}
-
-            {/* followup/documents tabs are rendered below the performance section */}
-
-              {/* Loading State */}
-              {loadingLeads ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                  <p className="mt-3 text-muted">Loading B2B leads...</p>
-                </div>
-              ) : leads.length === 0 ? (
-                <div className="text-center py-5">
-                  <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                  <h5 className="mt-3 text-muted">
-                    {selectedStatusFilter ? 'No leads found for selected status' : 'No B2B Leads Found'}
-                  </h5>
-                  <p className="text-muted">
-                    {selectedStatusFilter ? 'Try selecting a different status or add new leads.' : 'Start by adding your first B2B lead using the "Add Lead" button.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="row g-2">
-                  {leads.map((lead, leadIndex) => (
-                    <div key={lead._id || leadIndex} className="col-12">
-                      <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
-                        {/* Card Header */}
-                        <div className="lead-header">
-                          <div className="lead-title-section">
-                            <h5 className="lead-business-name">
-                              {lead.businessName || 'Business Name Not Available'}
-                            </h5>
-                            <p className="lead-contact-person">
-                              <i className="fas fa-user me-2"></i>
-                              {lead.concernPersonName || 'Contact Person Not Available'}
-                            </p>
-
-                            {/* Compact Contact Info */}
-                            <div className="lead-contact-info">
-                              {lead.email && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-envelope"></i>
-                                  <span>{lead.email}</span>
-                                </div>
-                              )}
-                              {lead.designation && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-id-badge"></i>
-                                  <span>{lead.designation}</span>
-                                </div>
-                              )}
-                              {lead.mobile && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-phone"></i>
-                                  <span>{lead.mobile}</span>
-                                </div>
-                              )}
-                              {lead.whatsapp && (
-                                <div className="lead-contact-item">
-                                  <i className="fab fa-whatsapp"></i>
-                                  <span>{lead.whatsapp}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="lead-badges">
-                            {!!lead._id && (
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-light border"
-                                onClick={() => toggleLeadCardCollapsed(lead._id)}
-                                title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
-                                style={{ borderRadius: '999px', padding: '4px 8px', marginRight: '6px' }}
-                              >
-                                <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
-                              </button>
-                            )}
-                            {lead.leadCategory?.name && (
-                              <span className="lead-badge category">
-                                {lead.leadCategory.name}
-                              </span>
-                            )}
-                            {lead.typeOfB2B?.name && (
-                              <span className="lead-badge type">
-                                {lead.typeOfB2B.name}
-                              </span>
-                            )}
-                            {lead.leadStatus && (
-                              <span className="lead-badge" style={{ background: '#6f42c1', color: '#fff' }} title="Lead status at add time">
-                                {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Card Content */}
-                        {!lead._id || !collapsedLeadCards.has(lead._id) ? (
-                        <div className="lead-content">
-                          {/* Status Section */}
-                          <div className="status-section mb-2">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center">
-                                <i className="fas fa-tag text-primary me-2"></i>
-                                <span className="fw-bold text-dark">CRM Status:</span>
-                                <span className="ms-2 badge bg-primary">
-                                  {lead.status?.title || lead.status?.name || 'No Status'}
-                                </span>
-                                {lead.subStatus && (
-                                  <span className="ms-2 badge bg-secondary">
-                                    {(() => {
-                                      const substatus = lead.status?.substatuses?.find(sub => sub._id === lead.subStatus);
-                                      return substatus?.title || 'No Sub-Status';
-                                    })()}
-                                  </span>
-                                )}
-                              </div>
-                              <button
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => openPanelHome(lead)}
-                                title="Open panel"
-                              >
-                                <i className="fas fa-arrow-right me-1"></i>
-                                Open
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Compact Additional Info */}
-                          <div className="compact-info-section">
-                            <div className="compact-info-grid">
-                              {lead.address && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-map-marker-alt text-danger"></i>
-                                  <span className="compact-info-label">Address:</span>
-                                  <span className="compact-info-value">{lead.address}</span>
-                                </div>
-                              )}
-                              {lead.leadOwner?.name && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-user-tie text-warning"></i>
-                                  <span className="compact-info-label">Owner:</span>
-                                  <span className="compact-info-value">{lead.leadOwner.name}</span>
-                                </div>
-                              )}
-                              {lead.leadAddedBy?.name && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-user-plus text-info"></i>
-                                  <span className="compact-info-label">Added:</span>
-                                  <span className="compact-info-value">{lead.leadAddedBy.name}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        ) : (
-                          <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>
-                            Card collapsed. Click the chevron to expand.
-                          </div>
-                        )}
-
-                        {/* Card actions removed (use sidebar Actions menu) */}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Pagination */}
-              <nav aria-label="Page navigation" className="mt-2">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({leads.length} results)
-                  </small>
-                </div>
-
-                <ul className="pagination justify-content-center">
-                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      &laquo;
-                    </button>
-                  </li>
-
-                  {currentPage > 3 && (
-                    <>
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => handlePageChange(1)}>1</button>
-                      </li>
-                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                    </>
-                  )}
-
-                  {getPaginationPages().map((pageNumber) => (
-                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                      <button className="page-link" onClick={() => handlePageChange(pageNumber)}>
-                        {pageNumber}
-                      </button>
-                    </li>
-                  ))}
-
-                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
-                    <>
-                      {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>
-                      </li>
-                    </>
-                  )}
-
-                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      &raquo;
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            </section>
-            )}
-
-            {mainTab === 'followup' && (
-              <section className="mb-3">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-                  <div className="card-body">
-                    {/* <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                      <h6 className="mb-0 fw-bold">Followup</h6>
-                      <div className="d-flex flex-wrap gap-2 align-items-center">
-                        <div className="btn-group btn-group-sm" role="group" aria-label="Followup tabs">
-                          <button
-                            className={`btn ${followupTab === 'done' ? 'btn-success' : 'btn-outline-success'}`}
-                            onClick={() => setFollowupTab('done')}
-                          >
-                            Done
-                            <span className="ms-2 badge bg-success">
-                              {loadingFollowupLeads ? '—' : (followupBuckets.done.length || 0)}
-                            </span>
-                          </button>
-                          <button
-                            className={`btn ${followupTab === 'planned' ? 'btn-primary' : 'btn-outline-primary'}`}
-                            onClick={() => setFollowupTab('planned')}
-                          >
-                            Planned
-                            <span className="ms-2 badge bg-primary">
-                              {loadingFollowupLeads ? '—' : (followupBuckets.planned.length || 0)}
-                            </span>
-                          </button>
-                          <button
-                            className={`btn ${followupTab === 'scheduled' ? 'btn-info' : 'btn-outline-info'}`}
-                            onClick={() => setFollowupTab('scheduled')}
-                          >
-                            Scheduled
-                            <span className="ms-2 badge bg-info text-dark">
-                              {loadingFollowupLeads ? '—' : (followupBuckets.scheduled.length || 0)}
-                            </span>
-                          </button>
-                          <button
-                            className={`btn ${followupTab === 'missed' ? 'btn-danger' : 'btn-outline-danger'}`}
-                            onClick={() => setFollowupTab('missed')}
-                          >
-                            Missed
-                            <span className="ms-2 badge bg-danger">
-                              {loadingFollowupLeads ? '—' : (followupBuckets.missed.length || 0)}
-                            </span>
-                          </button>
-                        </div>
-                        {followupTab === 'scheduled' && (
-                          <select className="form-select form-select-sm" value={scheduledDays} onChange={(e) => setScheduledDays(e.target.value)} style={{ width: '140px' }}>
-                            {['1', '2', '3', '5', '7', '15', '30'].map((d) => (
-                              <option key={d} value={d}>{d} day</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div> */}
-
-                    {/* Followup summary cards (like Performance tab) */}
-                    {/* <div className="d-flex flex-wrap gap-2 align-items-center mt-3">
-                      {[
-                        { id: 'done', label: 'Done', count: followupBuckets.done.length || 0, border: '#198754', bg: '#eaf7f0', text: '#198754' },
-                        { id: 'planned', label: 'Planned', count: followupBuckets.planned.length || 0, border: '#0d6efd', bg: '#eef5ff', text: '#0d6efd' },
-                        { id: 'scheduled', label: 'Scheduled', count: followupBuckets.scheduled.length || 0, border: '#0dcaf0', bg: '#e8fbff', text: '#0dcaf0' },
-                        { id: 'missed', label: 'Missed', count: followupBuckets.missed.length || 0, border: '#dc3545', bg: '#fdecee', text: '#dc3545' },
-                      ].map((c) => {
-                        const selected = followupTab === c.id;
-                        return (
-                          <div
-                            key={c.id}
-                            role="button"
-                            tabIndex={0}
-                            className="card border-0 shadow-sm"
-                            onClick={() => setFollowupTab(c.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') setFollowupTab(c.id);
-                            }}
-                            style={{
-                              minWidth: '110px',
-                              height: '45px',
-                              cursor: 'pointer',
-                              border: selected ? `2px solid ${c.border}` : `1px solid ${c.border}`,
-                              backgroundColor: selected ? c.bg : '#fff',
-                            }}
-                            title={`Click to view ${c.label} followups`}
-                          >
-                            <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                              <div>
-                                <div className="fw-bold" style={{ fontSize: '11px', color: c.text }}>
-                                  {c.label}
-                                </div>
-                                <small className="text-muted" style={{ fontSize: '10px' }}>
-                                  {loadingFollowupLeads ? 'Loading…' : `${c.count} lead${c.count === 1 ? '' : 's'}`}
-                                </small>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div> */}
-
-                    {/* Lead cards (same content as Lead tab cards) */}
-                    <div className="row g-2 mt-3">
-                      {loadingLeads ? (
-                        <div className="col-12 text-center text-muted py-4">Loading leads...</div>
-                      ) : leads.length === 0 ? (
-                        <div className="col-12 text-center text-muted py-4">
-                          {selectedStatusFilter ? 'No leads found for selected status.' : 'No leads found.'}
-                        </div>
-                      ) : (
-                        leads.map((lead, leadIndex) => (
-                          <div key={lead._id || leadIndex} className="col-12">
-                            <div className="lead-card">
-                            
-                              <div className="lead-header">
-                                <div className="lead-title-section">
-                                  <h5 className="lead-business-name">
-                                    {lead.businessName || 'Business Name Not Available'}
-                                  </h5>
-                                  <p className="lead-contact-person">
-                                    <i className="fas fa-user me-2"></i>
-                                    {lead.concernPersonName || 'Contact Person Not Available'}
-                                  </p>
-
-                                 
-                                  <div className="lead-contact-info">
-                                    {lead.email && (
-                                      <div className="lead-contact-item">
-                                        <i className="fas fa-envelope"></i>
-                                        <span>{lead.email}</span>
-                                      </div>
-                                    )}
-                                    {lead.designation && (
-                                      <div className="lead-contact-item">
-                                        <i className="fas fa-id-badge"></i>
-                                        <span>{lead.designation}</span>
-                                      </div>
-                                    )}
-                                    {lead.mobile && (
-                                      <div className="lead-contact-item">
-                                        <i className="fas fa-phone"></i>
-                                        <span>{lead.mobile}</span>
-                                      </div>
-                                    )}
-                                    {lead.whatsapp && (
-                                      <div className="lead-contact-item">
-                                        <i className="fab fa-whatsapp"></i>
-                                        <span>{lead.whatsapp}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="lead-badges">
-                                  {!!lead._id && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-light border"
-                                      onClick={() => toggleLeadCardCollapsed(lead._id)}
-                                      title={collapsedLeadCards.has(lead._id) ? 'Expand card' : 'Collapse card'}
-                                      style={{ borderRadius: '999px', padding: '4px 8px', marginRight: '6px' }}
-                                    >
-                                      <i className={`fas fa-chevron-${collapsedLeadCards.has(lead._id) ? 'down' : 'up'}`}></i>
-                                    </button>
-                                  )}
-                                  {lead.leadCategory?.name && (
-                                    <span className="lead-badge category">
-                                      {lead.leadCategory.name}
-                                    </span>
-                                  )}
-                                  {lead.typeOfB2B?.name && (
-                                    <span className="lead-badge type">
-                                      {lead.typeOfB2B.name}
-                                    </span>
-                                  )}
-                                  {lead.leadStatus && (
-                                    <span className="lead-badge" style={{ background: '#6f42c1', color: '#fff' }} title="Lead status at add time">
-                                      {({ hot: 'Hot', warm: 'Warm', cold: 'Cold', prospect: 'Prospect' }[String(lead.leadStatus).toLowerCase()] || lead.leadStatus)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              
-                              {!lead._id || !collapsedLeadCards.has(lead._id) ? (
-                                <div className="lead-content">
-                                  
-                                  <div className="status-section mb-2">
-                                    <div className="d-flex align-items-center justify-content-between">
-                                      <div className="d-flex align-items-center">
-                                        <i className="fas fa-tag text-primary me-2"></i>
-                                        <span className="fw-bold text-dark">CRM Status:</span>
-                                        <span className="ms-2 badge bg-primary">
-                                          {lead.status?.title || lead.status?.name || 'No Status'}
-                                        </span>
-                                        {lead.subStatus && (
-                                          <span className="ms-2 badge bg-secondary">
-                                            {(() => {
-                                              const subId = typeof lead.subStatus === 'object' ? lead.subStatus?._id : lead.subStatus;
-                                              const substatus = lead.status?.substatuses?.find(sub => String(sub._id) === String(subId));
-                                              return substatus?.title || (typeof lead.subStatus === 'object' ? (lead.subStatus?.title || 'No Sub-Status') : 'No Sub-Status');
-                                            })()}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <button
-                                        className="btn btn-sm btn-outline-primary"
-                                        onClick={() => openPanelHome(lead)}
-                                        title="Open panel"
-                                      >
-                                        <i className="fas fa-arrow-right me-1"></i>
-                                        Open
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                 
-                                  <div className="compact-info-section">
-                                    <div className="compact-info-grid">
-                                      {lead.address && (
-                                        <div className="compact-info-item">
-                                          <i className="fas fa-map-marker-alt text-danger"></i>
-                                          <span className="compact-info-label">Address:</span>
-                                          <span className="compact-info-value">{lead.address}</span>
-                                        </div>
-                                      )}
-                                      {lead.leadOwner?.name && (
-                                        <div className="compact-info-item">
-                                          <i className="fas fa-user-tie text-warning"></i>
-                                          <span className="compact-info-label">Owner:</span>
-                                          <span className="compact-info-value">{lead.leadOwner.name}</span>
-                                        </div>
-                                      )}
-                                      {lead.leadAddedBy?.name && (
-                                        <div className="compact-info-item">
-                                          <i className="fas fa-user-plus text-info"></i>
-                                          <span className="compact-info-label">Added:</span>
-                                          <span className="compact-info-value">{lead.leadAddedBy.name}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="px-3 pb-3 text-muted" style={{ fontSize: '12px' }}>
-                                  Card collapsed. Click the chevron to expand.
-                                </div>
-                              )}
-
-                              
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {/* <div className="table-responsive mt-3">
-                      <table className="table table-sm align-middle">
-                        <thead>
-                          <tr>
-                            <th>Business</th>
-                            <th>Contact</th>
-                            <th>Followup Date</th>
-                            <th>Followup Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {loadingFollowupLeads ? (
-                            <tr>
-                              <td colSpan="4" className="text-center text-muted py-3">Loading followups...</td>
-                            </tr>
-                          ) : followupVisibleLeads.length === 0 ? (
-                            <tr>
-                              <td colSpan="4" className="text-center text-muted py-3">No followups found.</td>
-                            </tr>
-                          ) : (
-                            followupVisibleLeads.map((l) => {
-                              const fu =
-                                l && typeof l.followUp === 'object' && l.followUp !== null
-                                  ? l.followUp
-                                  : {};
-                              return (
-                                <tr key={l._id}>
-                                  <td className="fw-semibold">{l.businessName || '—'}</td>
-                                  <td>{l.concernPersonName || '—'}</td>
-                                  <td>{fu.scheduledDate ? new Date(fu.scheduledDate).toLocaleString() : '—'}</td>
-                                  <td>{fu.status || 'Pending'}</td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div> */}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {mainTab === 'documents' && (
-              <section className="mb-3">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-                  <div className="card-body">
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                      <h6 className="mb-0 fw-bold">Documents</h6>
-                      <div className="text-muted" style={{ fontSize: '12px' }}>
-                        Mandatory docs / Submitted docs counts + approval actions (UI)
-                      </div>
-                    </div>
-
-                    <div className="row g-2 mt-2">
-                      <div className="col-md-6">
-                        <div className="card border-0 bg-light h-100">
-                          <div className="card-body">
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <div className="text-muted" style={{ fontSize: '13px' }}>Mandatory Docs</div>
-                                <div className="fs-4 fw-bold">0</div>
-                              </div>
-                              <div className="d-flex gap-2">
-                                <button className="btn btn-sm btn-outline-warning" disabled>Pending</button>
-                                <button className="btn btn-sm btn-outline-success" disabled>Approve</button>
-                              </div>
-                            </div>
-                            <div className="text-muted mt-2" style={{ fontSize: '12px' }}>
-                              Hook this to your backend doc schema when available.
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="card border-0 bg-light h-100">
-                          <div className="card-body">
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <div className="text-muted" style={{ fontSize: '13px' }}>Submitted Docs</div>
-                                <div className="fs-4 fw-bold">0</div>
-                              </div>
-                              <div className="d-flex gap-2">
-                                <button className="btn btn-sm btn-outline-warning" disabled>Pending</button>
-                                <button className="btn btn-sm btn-outline-success" disabled>Approve</button>
-                              </div>
-                            </div>
-                            <div className="text-muted mt-2" style={{ fontSize: '12px' }}>
-                              You can re-use existing upload modal once docs fields are finalized.
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
+              
           </div>
 
         </div >
@@ -5670,6 +5600,22 @@ const B2BSales = () => {
                     {/* Manual Location Fields */}
                     <div className="col-md-4">
                       <label className="form-label fw-bold">
+                        <i className="fas fa-map text-primary me-1"></i>
+                        State
+                      </label>
+                      <input
+                        ref={stateInputRef}
+                        type="text"
+                        className="form-control"
+                        name="state"
+                        value={leadFormData.state}
+                        onChange={handleLeadInputChange}
+                        placeholder="Start typing state name..."
+                      />
+                    </div>
+
+                    <div className="col-md-4">
+                      <label className="form-label fw-bold">
                         <i className="fas fa-city text-primary me-1"></i>
                         City
                       </label>
@@ -5686,17 +5632,16 @@ const B2BSales = () => {
 
                     <div className="col-md-4">
                       <label className="form-label fw-bold">
-                        <i className="fas fa-map text-primary me-1"></i>
-                        State
+                        <i className="fas fa-location-arrow text-primary me-1"></i>
+                        Block
                       </label>
                       <input
-                        ref={stateInputRef}
                         type="text"
                         className="form-control"
-                        name="state"
-                        value={leadFormData.state}
+                        name="block"
+                        value={leadFormData.block}
                         onChange={handleLeadInputChange}
-                        placeholder="Start typing state name..."
+                        placeholder="Enter block name"
                       />
                     </div>
 
@@ -6130,7 +6075,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
   
   .modal .pac-item-selected {
-    background-color: #FC2B5A;
+    background-color: #ff4d7a;
     color: white;
   }
 
@@ -6152,71 +6097,93 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   /* Bulk selection highlight */
   .lead-card.bulk-selected {
-    outline: 2px solid #FC2B5A;
-    box-shadow: 0 8px 25px rgba(252, 43, 90, 0.25);
+    outline: 2px solid #ff4d7a;
+    box-shadow: 0 8px 25px rgba(255, 77, 122, 0.25);
   }
 
   /* Header Section */
   .lead-header {
-    background: linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%);
-    color: white;
-    padding: 1rem;
+    background: #ff4d7a;
+    /* background: linear-gradient(135deg, rgba(255,77,122,0.12) 0%, rgba(192,24,85,0.18) 100%); */
+    border-bottom: 1px solid rgba(255,77,122,0.15);
+    color: #1e293b;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
     position: relative;
     overflow: hidden;
+    border-radius: 16px 16px 0 0;
   }
 
   .lead-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 100px;
-    height: 100px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-    transform: translate(30px, -30px);
+    display: none;
   }
 
   .lead-title-section {
     position: relative;
     z-index: 2;
-  }
-
-  .lead-business-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem 0;
-    color: white;
-    line-height: 1.2;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
   }
 
   .lead-contact-person {
-    font-size: 0.85rem;
-    margin: 0 0 0.5rem 0;
-    opacity: 0.9;
+    font-size: 13px;
+    font-weight: 800;
+    margin: 0;
+    color: #fff;
     display: flex;
     align-items: center;
+    gap: 5px;
+    white-space: nowrap;
   }
 
   .lead-contact-info {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 10px;
   }
 
   .lead-contact-item {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.7rem;
-    opacity: 0.9;
-    max-width: 200px;
+    gap: 4px;
+    font-size: 12px;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .lead-contact-item.mobile {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .lead-badges {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .lead-collapse-btn {
+    z-index: 6;
+    pointer-events: auto;
+    flex-shrink: 0;
   }
 
   .lead-contact-item i {
-    font-size: 0.65rem;
-    width: 10px;
+    font-size: 10px;
     flex-shrink: 0;
   }
 
@@ -6262,15 +6229,6 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     color: #212529;
     flex: 1;
     word-break: break-word;
-  }
-
-  .lead-badges {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    display: flex;
-    gap: 0.5rem;
-    z-index: 2;
   }
 
   .lead-badge {
@@ -6351,7 +6309,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .contact-icon.added-by {
-    background: linear-gradient(135deg, #6f42c1, #5a32a3);
+    background: linear-gradient(135deg, #ff4d7a, #c01855);
   }
 
   .contact-details {
@@ -6378,13 +6336,13 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .contact-link {
-    color: #FC2B5A;
+    color: #ff4d7a;
     text-decoration: none;
     font-weight: 600;
   }
 
   .contact-link:hover {
-    color: #a5003a;
+    color: #c01855;
     text-decoration: underline;
   }
 
@@ -6433,7 +6391,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .action-btn.view {
-    background: linear-gradient(135deg, #FC2B5A, #a5003a);
+    background: linear-gradient(135deg, #ff4d7a, #c01855);
   }
 
   .action-btn.refer {
@@ -6596,7 +6554,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   /* Status-specific colors */
   .status-count-card.total {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #ff4d7a 0%, #c01855 100%);
     color: white;
   }
 
@@ -6612,18 +6570,18 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .status-count-card.status:hover {
-    border-color: #007bff;
+    border-color: #ff4d7a;
   }
 
   .status-count-card.selected {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
-    border: 2px solid #007bff !important;
-    background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+    box-shadow: 0 8px 25px rgba(255, 77, 122, 0.28);
+    border: 2px solid #ff4d7a !important;
+    background: linear-gradient(135deg, #fff5f8 0%, #ffe0ea 100%);
   }
 
   .status-count-card.selected.total {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, #ff4d7a 0%, #c01855 100%);
   }
 
   /* Status Section Styles */
@@ -6663,8 +6621,8 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   .filter-panel .form-control:focus,
   .filter-panel .form-select:focus {
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(255, 77, 122, 0.18);
+    border-color: #ff4d7a;
   }
 
   .filter-panel .btn {
@@ -6687,8 +6645,8 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   .form-control:focus, .form-select:focus {
     color: #212529 !important;
     background-color: #ffffff !important;
-    border-color: #007bff !important;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+    border-color: #ff4d7a !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 77, 122, 0.18) !important;
   }
 
   .btn {
@@ -6704,7 +6662,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .text-primary {
-    color: #007bff !important;
+    color: #ff4d7a !important;
   }
 
   .text-success {
@@ -6843,32 +6801,32 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 <style>{`
   /* B2B Brand Color Overrides */
   .btn-primary {
-    background-color: #FC2B5A !important;
-    border-color: #FC2B5A !important;
+    background-color: #ff4d7a !important;
+    border-color: #ff4d7a !important;
   }
   .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
-    background-color: #a5003a !important;
-    border-color: #a5003a !important;
+    background-color: #c01855 !important;
+    border-color: #c01855 !important;
   }
   .btn-outline-primary {
-    color: #FC2B5A !important;
-    border-color: #FC2B5A !important;
+    color: #ff4d7a !important;
+    border-color: #ff4d7a !important;
   }
   .btn-outline-primary:hover, .btn-outline-primary.active {
-    background-color: #FC2B5A !important;
-    border-color: #FC2B5A !important;
+    background-color: #ff4d7a !important;
+    border-color: #ff4d7a !important;
     color: #fff !important;
   }
-  .badge.bg-primary { background-color: #FC2B5A !important; }
-  .text-primary { color: #FC2B5A !important; }
+  .badge.bg-primary { background-color: #ff4d7a !important; }
+  .text-primary { color: #ff4d7a !important; }
   .page-item.active .page-link {
-    background-color: #FC2B5A !important;
-    border-color: #FC2B5A !important;
+    background-color: #ff4d7a !important;
+    border-color: #ff4d7a !important;
   }
-  .page-link { color: #FC2B5A !important; }
-  .page-link:hover { color: #a5003a !important; }
-  .spinner-border.text-primary { color: #FC2B5A !important; }
-  .form-check-input:checked { background-color: #FC2B5A !important; border-color: #FC2B5A !important; }
+  .page-link { color: #ff4d7a !important; }
+  .page-link:hover { color: #c01855 !important; }
+  .spinner-border.text-primary { color: #ff4d7a !important; }
+  .form-check-input:checked { background-color: #ff4d7a !important; border-color: #ff4d7a !important; }
 `}
 </style>
     </div >
@@ -6876,6 +6834,3 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 };
 
 export default B2BSales;
-
-
-

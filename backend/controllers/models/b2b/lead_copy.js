@@ -12,6 +12,7 @@ const B2BLeadCopySchema = new mongoose.Schema({
   address: { type: String },
   city: { type: String },
   state: { type: String },
+  block: { type: String },
   coordinates: {
     type: { type: String, default: 'Point' },
     coordinates: { type: [Number], default: [0, 0] },
@@ -67,6 +68,22 @@ const B2BLeadCopySchema = new mongoose.Schema({
   },
   followUp: { type: ObjectId, ref: 'FollowUp' },
   updatedBy: { type: ObjectId, ref: 'User' },
+
+  /** Sales copy: files attached to lead with institute review status */
+  documents: [
+    {
+      name: { type: String, trim: true, default: 'Document' },
+      fileUrl: { type: String, trim: true },
+      approvalStatus: {
+        type: String,
+        enum: ['Pending', 'Approved', 'Rejected'],
+        default: 'Pending',
+      },
+      uploadedAt: { type: Date, default: Date.now },
+      reviewedAt: { type: Date },
+      reviewedBy: { type: ObjectId, ref: 'User' },
+    },
+  ],
 }, {
   timestamps: true,
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const PARTNER_TYPES = ["LRP", "Channel Partner"];
 const STATES = ["Punjab", "Haryana"];
@@ -237,6 +238,9 @@ const WizardFooter = ({ isLast, step, submitting, onBack, onNext }) => (
 );
 
 function Lrp() {
+  const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location?.search || ""), [location?.search]);
+  const isEmbedded = searchParams.get("embedded") === "1";
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => createInitialForm());
   const [touched, setTouched] = useState({});
@@ -307,6 +311,18 @@ function Lrp() {
     };
     loadB2BOptions();
   }, []);
+
+
+  useEffect(() => {
+    try {
+      const b2bLeadId = searchParams.get("b2bLeadId") || searchParams.get("leadId") || "";
+      if (b2bLeadId) {
+        setForm((prev) => ({ ...prev, b2bLeadId }));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [searchParams]);
 
   const fldStyle = {
     width: "100%",
@@ -475,7 +491,10 @@ function Lrp() {
           `LRP saved.${data.b2b?.message ? `\n${data.b2b.message}` : ""}`
         );
       }
-      setForm(createInitialForm());
+      setForm((prev) => ({
+        ...createInitialForm(),
+        b2bLeadId: prev.b2bLeadId || searchParams.get("b2bLeadId") || searchParams.get("leadId") || "",
+      }));
       setTouched({});
       setStep(1);
     } catch (err) {
@@ -497,31 +516,59 @@ function Lrp() {
   };
 
   return (
-    <div style={{ background: "#f1f5f9", minHeight: "100vh", padding: "20px" }}>
-      <div
-        style={{
-          background: "linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)",
-          borderRadius: "16px",
-          padding: "24px 32px",
-          marginBottom: "24px",
-          color: "white",
-          display: "flex",
-          alignItems: "center",
-          gap: "16px",
-          boxShadow: "0 10px 25px rgba(252,43,90,0.35)",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "12px", padding: "10px 14px" }}>
-          <i className="fa fa-handshake-o" style={{ fontSize: "20px" }} />
+    <div style={{ background: isEmbedded ? "#ffffff" : "#f1f5f9", minHeight: isEmbedded ? "auto" : "100vh", padding: isEmbedded ? "16px" : "20px" }}>
+      {!isEmbedded && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)",
+            borderRadius: "16px",
+            padding: "24px 32px",
+            marginBottom: "24px",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            boxShadow: "0 10px 25px rgba(252,43,90,0.35)",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "12px", padding: "10px 14px" }}>
+            <i className="fa fa-handshake-o" style={{ fontSize: "20px" }} />
+          </div>
+          <div style={{ flex: "1 1 auto" }}>
+            <h2 style={{ margin: 0, fontWeight: 800, fontSize: "22px" }}>Lead Report</h2>
+            <p style={{ margin: "4px 0 0", opacity: 0.85, fontSize: "13px" }}>
+              Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8, opacity: 0.9 }}>(Fix required fields)</span>}
+            </p>
+          </div>
         </div>
-        <div style={{ flex: "1 1 auto" }}>
-          <h2 style={{ margin: 0, fontWeight: 800, fontSize: "22px" }}>Daily Visit Report</h2>
-          <p style={{ margin: "4px 0 0", opacity: 0.85, fontSize: "13px" }}>
-            Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8, opacity: 0.9 }}>(Fix required fields)</span>}
-          </p>
+      )}
+
+      {isEmbedded && (
+        <div
+          style={{
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
+            padding: "0 2px",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontWeight: 800, fontSize: "20px", color: "#881337" }}>Lead Report</h2>
+            <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "13px" }}>
+              Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8 }}>(Fix required fields)</span>}
+            </p>
+          </div>
+          {form.b2bLeadId && (
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#9f1239", background: "#fff1f5", border: "1px solid #fbcfe8", borderRadius: "999px", padding: "6px 10px" }}>
+              Linked lead: {form.b2bLeadId}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       <form onSubmit={onSubmit}>
         {step === 1 && (

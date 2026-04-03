@@ -197,14 +197,24 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
         .populate('followUp', 'scheduledDate status')
         .populate('leadAddedBy', 'name email')
         .populate('leadOwner', 'name email')
+        .populate('documents.reviewedBy', 'name email')
         .sort(sortOptions)
         .skip(skip)
         .limit(Number(limit));
 
+      const seenIds = new Set();
+      const uniqueLeads = leads.filter((doc) => {
+        const id = doc?._id != null ? String(doc._id) : '';
+        if (!id) return true;
+        if (seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
+
       return res.json({
         status: true,
         data: {
-          leads,
+          leads: uniqueLeads,
           pagination: {
             currentPage: parseInt(page, 10),
             totalPages,
@@ -268,6 +278,120 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
       return res.status(500).json({
         status: false,
         message: 'Failed to update approval',
+        error: error.message,
+      });
+    }
+  });
+
+  const populateLeadCopyForResponse = (query) =>
+    query
+      .populate('leadCategory', 'name')
+      .populate('typeOfB2B', 'name')
+      .populate('status', 'name title substatuses')
+      .populate('followUp', 'scheduledDate status')
+      .populate('leadAddedBy', 'name email')
+      .populate('leadOwner', 'name email')
+      .populate('documents.reviewedBy', 'name email');
+
+  const canAccessLeadCopy = async (lead, req) => {
+    const isAdmin = req.user.permissions?.permission_type === 'Admin';
+    if (isAdmin) return true;
+    const teamMembers = await getAllTeamMembers(req.user._id);
+    const addedBy = lead.leadAddedBy ? String(lead.leadAddedBy) : '';
+    const owner = lead.leadOwner ? String(lead.leadOwner) : '';
+    return teamMembers.some((m) => String(m) === addedBy || String(m) === owner);
+  };
+
+  /** Add a document row (client provides file URL after upload or external link) */
+  router.post('/leads/:id/documents', isCollege, async (req, res) => {
+    try {
+      const { name, fileUrl } = req.body || {};
+      if (!name || !String(name).trim() || !fileUrl || !String(fileUrl).trim()) {
+        return res.status(400).json({
+          status: false,
+          message: 'name and fileUrl are required',
+        });
+      }
+
+      const lead = await LeadCopy.findById(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ status: false, message: 'Lead not found' });
+      }
+
+      if (!(await canAccessLeadCopy(lead, req))) {
+        return res.status(403).json({ status: false, message: 'Forbidden' });
+      }
+
+      if (!lead.documents) {
+        lead.documents = [];
+      }
+      lead.documents.push({
+        name: String(name).trim(),
+        fileUrl: String(fileUrl).trim(),
+        approvalStatus: 'Pending',
+        uploadedAt: new Date(),
+      });
+      await lead.save();
+
+      const fresh = await populateLeadCopyForResponse(LeadCopy.findById(lead._id));
+
+      return res.status(201).json({
+        status: true,
+        data: fresh,
+        message: 'Document added',
+      });
+    } catch (error) {
+      console.error('[b2b_copy] POST /leads/:id/documents:', error);
+      return res.status(500).json({
+        status: false,
+        message: 'Failed to add document',
+        error: error.message,
+      });
+    }
+  });
+
+  /** Approve or reject one document on a lead */
+  router.patch('/leads/:id/documents/:docId/approval', isCollege, async (req, res) => {
+    try {
+      const { decision } = req.body || {};
+      if (!['Approved', 'Rejected'].includes(decision)) {
+        return res.status(400).json({
+          status: false,
+          message: 'decision must be Approved or Rejected',
+        });
+      }
+
+      const lead = await LeadCopy.findById(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ status: false, message: 'Lead not found' });
+      }
+
+      if (!(await canAccessLeadCopy(lead, req))) {
+        return res.status(403).json({ status: false, message: 'Forbidden' });
+      }
+
+      const doc = lead.documents.id(req.params.docId);
+      if (!doc) {
+        return res.status(404).json({ status: false, message: 'Document not found' });
+      }
+
+      doc.approvalStatus = decision;
+      doc.reviewedAt = new Date();
+      doc.reviewedBy = req.user._id;
+      await lead.save();
+
+      const fresh = await populateLeadCopyForResponse(LeadCopy.findById(lead._id));
+
+      return res.json({
+        status: true,
+        data: fresh,
+        message: `Document ${decision.toLowerCase()}`,
+      });
+    } catch (error) {
+      console.error('[b2b_copy] PATCH /leads/:id/documents/:docId/approval:', error);
+      return res.status(500).json({
+        status: false,
+        message: 'Failed to update document approval',
         error: error.message,
       });
     }
