@@ -194,7 +194,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
         .populate('leadCategory', 'name')
         .populate('typeOfB2B', 'name')
         .populate('status', 'name title substatuses')
-        .populate('followUp', 'scheduledDate status')
+        .populate('followUp', 'followUpType scheduledDate status')
         .populate('leadAddedBy', 'name email')
         .populate('leadOwner', 'name email')
         .populate('documents.reviewedBy', 'name email')
@@ -288,7 +288,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
       .populate('leadCategory', 'name')
       .populate('typeOfB2B', 'name')
       .populate('status', 'name title substatuses')
-      .populate('followUp', 'scheduledDate status')
+      .populate('followUp', 'followUpType scheduledDate status')
       .populate('leadAddedBy', 'name email')
       .populate('leadOwner', 'name email')
       .populate('documents.reviewedBy', 'name email');

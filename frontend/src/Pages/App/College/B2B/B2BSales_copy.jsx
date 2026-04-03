@@ -386,6 +386,7 @@ const B2BSales = () => {
   const [leadApprovalTab, setLeadApprovalTab] = useState('pending'); // pending | approved | rejected
   const [leadApprovalView, setLeadApprovalView] = useState('cards'); // cards | table
   const [performanceTab, setPerformanceTab] = useState('all'); // all | hot | warm | cold | prospect (approved leads)
+  const [followupChannelTab, setFollowupChannelTab] = useState('calls'); // calls | meeting
   const [followupTab, setFollowupTab] = useState('pending'); // done | pending | scheduled | missed
   /** Single "Followup & documents" card: which inner list to show */
   const [activitySectionView, setActivitySectionView] = useState('followup'); // followup | documents
@@ -393,6 +394,8 @@ const B2BSales = () => {
   const [cardsView, setCardsView] = useState('lead'); // lead | performance | followup | documents
   /** Topbar: visible tabs with dropdowns */
   const [topbarMenuOpen, setTopbarMenuOpen] = useState(null); // 'lead' | 'performance' | 'followup' | 'documents' | null
+  const [followupHoverChannel, setFollowupHoverChannel] = useState(null);
+  const [followupHoverSubItem, setFollowupHoverSubItem] = useState(null);
   const topbarMenuRef = useRef(null);
   const topbarMenuCloseTimerRef = useRef(null);
   const [scheduledDays, setScheduledDays] = useState('1'); // for scheduled dropdown (days)
@@ -622,6 +625,7 @@ const B2BSales = () => {
     setFollowupFormData({
       followupDate: '',
       followupTime: '',
+      followupType: followupChannelTab === 'meeting' ? 'Meeting' : 'Call',
       remarks: '',
       additionalRemarks: '',
       selectedProfile: null,
@@ -666,6 +670,7 @@ const B2BSales = () => {
         if (hasFollowupData) {
           statusData.followUpDate = followupDateValue;
           statusData.followUpTime = followupFormData.followupTime;
+          statusData.followUpType = followupFormData.followupType || (followupChannelTab === 'meeting' ? 'Meeting' : 'Call');
           statusData.googleCalendarEvent = true;
         }
 
@@ -683,6 +688,7 @@ const B2BSales = () => {
         await axios.post(
           `${backendUrl}/college/b2b_copy/leads/${selectedProfile._id}/followup`,
           {
+            followUpType: followupFormData.followupType || (followupChannelTab === 'meeting' ? 'Meeting' : 'Call'),
             scheduledDate: followupDateValue,
             scheduledTime: followupFormData.followupTime,
             remarks: followupFormData.remarks || '',
@@ -1190,6 +1196,13 @@ const B2BSales = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    setFollowupFormData((prev) => ({
+      ...prev,
+      followupType: followupChannelTab === 'meeting' ? 'Meeting' : 'Call',
+    }));
+  }, [followupChannelTab]);
+
   // Open the "Next X days" select when user switches into Scheduled (not on every re-render)
   useEffect(() => {
     const prev = prevFollowupTabRef.current;
@@ -1218,11 +1231,61 @@ const B2BSales = () => {
     const close = (e) => {
       if (topbarMenuRef.current && !topbarMenuRef.current.contains(e.target)) {
         setTopbarMenuOpen(null);
+        setFollowupHoverChannel(null);
       }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [topbarMenuOpen]);
+
+  useEffect(() => {
+    if (topbarMenuOpen !== 'followup') {
+      setFollowupHoverChannel(null);
+    }
+  }, [topbarMenuOpen]);
+
+  useEffect(() => {
+    if (!topbarMenuOpen || !topbarMenuRef.current) return;
+
+    const colorMapByMenu = {
+      performance: {
+        All: { background: '#6b7280', color: '#fff' },
+        Hot: { background: '#dc3545', color: '#fff' },
+        Warm: { background: '#f59e0b', color: '#111827' },
+        Cold: { background: '#0ea5e9', color: '#fff' },
+        Prospect: { background: '#198754', color: '#fff' },
+      },
+      followup: {
+        Done: { background: '#198754', color: '#fff' },
+        Pending: { background: '#f59e0b', color: '#111827' },
+        Scheduled: { background: '#0ea5e9', color: '#fff' },
+        Missed: { background: '#dc3545', color: '#fff' },
+      },
+    };
+
+    const colorMap = colorMapByMenu[topbarMenuOpen];
+    if (!colorMap) return;
+
+    const menuItems = topbarMenuRef.current.querySelectorAll('[role="menuitem"]');
+    menuItems.forEach((item) => {
+      const spans = item.querySelectorAll('span');
+      if (spans.length < 2) return;
+
+      const label = spans[0]?.textContent?.trim();
+      const badge = spans[1];
+      const style = colorMap[label];
+      if (!badge || !style) return;
+
+      badge.style.background = style.background;
+      badge.style.color = style.color;
+    });
+  }, [
+    topbarMenuOpen,
+    loadingPerformanceSummary,
+    performanceSummary,
+    loadingFollowupLeads,
+    followupLeadsData,
+  ]);
 
   const fetchPerformanceSummary = async () => {
     if (!token) return;
@@ -2191,6 +2254,7 @@ const B2BSales = () => {
   const [followupFormData, setFollowupFormData] = useState({
     followupDate: '',
     followupTime: '',
+    followupType: 'Call',
     remarks: '',
     selectedProfile: null,
     selectedConcernPerson: null,
@@ -2874,6 +2938,40 @@ const B2BSales = () => {
               {seletectedSubStatus?.hasFollowup && (
                 <div style={{ marginBottom: '16px', padding: '14px', background: '#fef2f4', borderRadius: '12px', border: '1px solid #fecdd3' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#ff4d7a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>Follow-up Details</div>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                    {[
+                      { id: 'Call', label: 'Follow-up Call', icon: 'fas fa-phone-alt', bg: '#eef6ff', border: '#93c5fd', color: '#1d4ed8' },
+                      { id: 'Meeting', label: 'Follow-up Meeting', icon: 'fas fa-handshake', bg: '#fff1f2', border: '#fda4af', color: '#be123c' },
+                    ].map((item) => {
+                      const active = (followupFormData.followupType || 'Call') === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setFollowupFormData((prev) => ({ ...prev, followupType: item.id }))}
+                          style={{
+                            flex: 1,
+                            borderRadius: '12px',
+                            border: `1.5px solid ${active ? item.border : '#e2e8f0'}`,
+                            background: active ? item.bg : '#fff',
+                            color: active ? item.color : '#64748b',
+                            padding: '10px 12px',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            boxShadow: active ? `0 6px 16px ${item.border}33` : 'none',
+                          }}
+                        >
+                          <i className={item.icon}></i>
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label style={panelLabelStyle}>Date <span style={{ color: '#ff4d7a' }}>*</span></label>
@@ -3009,6 +3107,44 @@ const B2BSales = () => {
         <div style={{ padding: '20px 18px' }}>
           {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={panelLabelStyle}>Follow-up Type</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {[
+                    { id: 'Call', label: 'Follow-up Call', icon: 'fas fa-phone-alt', bg: '#eef6ff', border: '#93c5fd', color: '#1d4ed8' },
+                    { id: 'Meeting', label: 'Follow-up Meeting', icon: 'fas fa-handshake', bg: '#fff1f2', border: '#fda4af', color: '#be123c' },
+                  ].map((item) => {
+                    const active = (followupFormData.followupType || 'Call') === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setFollowupFormData((prev) => ({ ...prev, followupType: item.id }))}
+                        style={{
+                          flex: 1,
+                          borderRadius: '12px',
+                          border: `1.5px solid ${active ? item.border : '#e2e8f0'}`,
+                          background: active ? item.bg : '#fff',
+                          color: active ? item.color : '#64748b',
+                          padding: '10px 12px',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          boxShadow: active ? `0 6px 16px ${item.border}33` : 'none',
+                        }}
+                      >
+                        <i className={item.icon}></i>
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <label style={panelLabelStyle}>Follow-up Date <span style={{ color: '#ff4d7a' }}>*</span></label>
@@ -3557,7 +3693,18 @@ const B2BSales = () => {
   // ===== Derived data for redesigned tabs =====
   const nowTs = Date.now();
   const followupSourceLeads = followupLeadsData;
-  const followupLeads = (followupSourceLeads || []).filter((l) => !!l?.followUp);
+  const getFollowupTypeKey = useCallback((followUp) => {
+    const rawType = String(followUp?.followUpType || '').toLowerCase();
+    if (rawType.includes('meeting')) return 'meeting';
+    return 'calls';
+  }, []);
+
+  const followupLeads = useMemo(() => {
+    return (followupSourceLeads || []).filter((l) => {
+      if (!l?.followUp || typeof l.followUp !== 'object' || l.followUp === null) return false;
+      return getFollowupTypeKey(l.followUp) === followupChannelTab;
+    });
+  }, [followupSourceLeads, followupChannelTab, getFollowupTypeKey]);
   const followupBuckets = followupLeads.reduce(
     (acc, l) => {
       // `followUp` can be populated object OR just an ObjectId string.
@@ -3623,6 +3770,54 @@ const B2BSales = () => {
       return String(statusId) === String(selectedStatusFilter);
     });
   }, [followupVisibleLeads, selectedStatusFilter]);
+
+  const followupBucketsByChannel = useMemo(() => {
+    const seed = {
+      calls: { done: [], pending: [], scheduled: [], missed: [] },
+      meeting: { done: [], pending: [], scheduled: [], missed: [] },
+    };
+
+    return (followupSourceLeads || []).reduce((acc, l) => {
+      const fu =
+        l && typeof l.followUp === 'object' && l.followUp !== null
+          ? l.followUp
+          : {};
+      const channel = getFollowupTypeKey(fu);
+      const status = (fu.status || '').toLowerCase();
+      const scheduledTs = fu.scheduledDate ? new Date(fu.scheduledDate).getTime() : NaN;
+      const hasSchedule = Number.isFinite(scheduledTs);
+
+      if (status === 'completed') {
+        acc[channel].done.push(l);
+        return acc;
+      }
+
+      if (hasSchedule && scheduledTs < nowTs) {
+        acc[channel].missed.push(l);
+        return acc;
+      }
+
+      if (hasSchedule && scheduledTs >= nowTs) {
+        acc[channel].scheduled.push(l);
+        return acc;
+      }
+
+      acc[channel].pending.push(l);
+      return acc;
+    }, seed);
+  }, [followupSourceLeads, getFollowupTypeKey, nowTs]);
+
+  const followupChannelCounts = useMemo(() => {
+    return (followupSourceLeads || []).reduce(
+      (acc, lead) => {
+        if (!lead?.followUp || typeof lead.followUp !== 'object' || lead.followUp === null) return acc;
+        const key = getFollowupTypeKey(lead.followUp);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      { calls: 0, meeting: 0 }
+    );
+  }, [followupSourceLeads, getFollowupTypeKey]);
 
   /** CRM sub-status has `hasAttachment` → lead needs documents at this stage */
   const leadsNeedingDocuments = useMemo(() => {
@@ -4125,41 +4320,40 @@ const B2BSales = () => {
               <div className="card-body py-2 px-3">
                 <div className="d-flex flex-wrap align-items-center gap-1">
 
-                  <div className="d-flex flex-wrap gap-1 align-items-center flex-grow-1 justify-content-sm-end">
-                    {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                      <>
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={handleOpenLeadModal}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
-                        >
-                          <i className="fas fa-plus" style={{ fontSize: '10px' }}></i>
-                          Add Lead
-                        </button>
+                  <div className="d-flex flex-wrap gap-1 align-items-center flex-grow-1 justify-content-sm-end position-relative" ref={topbarMenuRef}>
+                    <div className="d-flex flex-wrap gap-1 align-items-center">
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={handleOpenLeadModal}
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
+                          >
+                            <i className="fas fa-plus" style={{ fontSize: '10px' }}></i>
+                            Add Lead
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => { setShowBulkInputs(true); setBulkMode('bulkupload'); setInput1Value(''); setShowBulkUploadModal(true); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
+                          >
+                            <i className="fas fa-file-upload" style={{ fontSize: '10px' }}></i>
+                            Bulk Upload
+                          </button>
+                        </>
+                      )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                         <button
                           className="btn btn-sm btn-outline-secondary"
-                          onClick={() => { setShowBulkInputs(true); setBulkMode('bulkupload'); setInput1Value(''); setShowBulkUploadModal(true); }}
+                          disabled={loadingPerformanceLeads || performanceLeads.length === 0}
+                          onClick={() => { setShowBulkInputs(true); setBulkMode('bulkrefer'); setInput1Value(''); openRefferPanel(null, 'RefferAllLeads'); }}
                           style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
                         >
-                          <i className="fas fa-file-upload" style={{ fontSize: '10px' }}></i>
-                          Bulk Upload
+                          <i className="fas fa-share-alt" style={{ fontSize: '10px' }}></i>
+                          Refer All
                         </button>
-                      </>
-                    )}
-                    {/* Lead Report moved into each lead card */}
-                    {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        disabled={loadingPerformanceLeads || performanceLeads.length === 0}
-                        onClick={() => { setShowBulkInputs(true); setBulkMode('bulkrefer'); setInput1Value(''); openRefferPanel(null, 'RefferAllLeads'); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', borderRadius: '20px', padding: '5px 12px', fontSize: '12px' }}
-                      >
-                        <i className="fas fa-share-alt" style={{ fontSize: '10px' }}></i>
-                        Refer All
-                      </button>
-                    )}
-                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
-                    <div className="d-flex flex-wrap gap-1 align-items-center position-relative" ref={topbarMenuRef}>
+                      )}
+
                       {/* Lead tab + dropdown */}
                       <div
                         className="position-relative"
@@ -4208,7 +4402,18 @@ const B2BSales = () => {
                           </ul>
                         )}
                       </div>
+                      <button
+                        className={`btn btn-sm ${leadTab === 'report' ? 'btn-primary' : 'btn-outline-primary'}`}
+                        onClick={() => { setCardsView('lead'); setLeadTab('report'); setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0); }}
+                        style={{ borderRadius: '20px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' }}
+                      >
+                        Lead Report
+                      </button>
+                    </div>
 
+                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
+
+                    <div className="d-flex flex-wrap gap-1 align-items-center">
                       {/* Performance tab + dropdown */}
                       <div
                         className="position-relative"
@@ -4230,12 +4435,12 @@ const B2BSales = () => {
                         {topbarMenuOpen === 'performance' && (
                           <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '220px', left: 0 }} role="menu">
                             {[
-                              { id: 'all', label: 'All' },
-                              { id: 'hot', label: 'Hot' },
-                              { id: 'warm', label: 'Warm' },
-                              { id: 'cold', label: 'Cold' },
-                              { id: 'prospect', label: 'Prospect' },
-                            ].map(({ id, label }) => (
+                              { id: 'all',      label: 'All',      dot: '#64748b', bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
+                              { id: 'hot',      label: 'Hot',      dot: '#ef4444', bg: '#fef2f2', color: '#b91c1c', border: '#fca5a5' },
+                              { id: 'warm',     label: 'Warm',     dot: '#f59e0b', bg: '#fffbeb', color: '#b45309', border: '#fcd34d' },
+                              { id: 'cold',     label: 'Cold',     dot: '#3b82f6', bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },
+                              { id: 'prospect', label: 'Prospect', dot: '#8b5cf6', bg: '#f5f3ff', color: '#6d28d9', border: '#c4b5fd' },
+                            ].map(({ id, label, dot, bg, color, border }) => (
                               <li key={id} role="none">
                                 <button
                                   type="button"
@@ -4249,15 +4454,24 @@ const B2BSales = () => {
                                     setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
                                   }}
                                 >
-                                  <span>{label}</span>
-                                  <span className="badge bg-secondary">{loadingPerformanceSummary ? '—' : (performanceSummary[id] ?? 0)}</span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot, flexShrink: 0, display: 'inline-block' }}></span>
+                                    <span style={{ color: '#334155', fontWeight: 500 }}>{label}</span>
+                                  </span>
+                                  <span className="badge" style={{ background: bg, color, border: `1px solid ${border}`, minWidth: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {loadingPerformanceSummary ? '—' : (performanceSummary[id] ?? 0)}
+                                  </span>
                                 </button>
                               </li>
                             ))}
                           </ul>
                         )}
                       </div>
+                    </div>
 
+                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
+
+                    <div className="d-flex flex-wrap gap-1 align-items-center">
                       {/* Followup tab + dropdown */}
                       <div
                         className="position-relative"
@@ -4277,6 +4491,99 @@ const B2BSales = () => {
                           <i className="fas fa-chevron-down ms-1" style={{ fontSize: '8px', opacity: 0.75 }} aria-hidden />
                         </button>
                         {topbarMenuOpen === 'followup' && (
+                          <div
+                            className="position-absolute bg-white border rounded shadow-sm mt-1"
+                            style={{ zIndex: 1051, minWidth: '220px', left: 0 }}
+                            role="menu"
+                          >
+                            <ul className="list-unstyled py-1 mb-0" style={{display: 'flex', flexDirection: 'column'}}>
+                              {[
+                                { id: 'calls', label: 'Followup Call', icon: 'fas fa-phone-alt', bg: '#eef6ff', border: '#93c5fd', color: '#1d4ed8', count: followupChannelCounts.calls },
+                                { id: 'meeting', label: 'Followup Meeting', icon: 'fas fa-handshake', bg: '#fff1f2', border: '#fda4af', color: '#be123c', count: followupChannelCounts.meeting },
+                              ].map((item) => (
+                                <li
+                                  key={item.id}
+                                  role="none"
+                                  className="position-relative"
+                                  onMouseEnter={() => setFollowupHoverChannel(item.id)}
+                                  onMouseLeave={() => setFollowupHoverChannel(null)}
+                                >
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="border-0 bg-transparent w-100 text-start"
+                                    style={{ fontSize: '13px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: '12px', width: '100%', padding: '10px 14px', background: followupHoverChannel === item.id ? '#f8fafc' : '#fff', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s' }}
+                                    onClick={() => {
+                                      setCardsView('followup');
+                                      setActivitySectionView('followup');
+                                      setFollowupChannelTab(item.id);
+                                      setTopbarMenuOpen(null);
+                                      setFollowupHoverChannel(null);
+                                      setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                    }}
+                                  >
+                                    <span style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                      <i className={item.icon} style={{ color: item.color, fontSize: '11px', width: '12px', flexShrink: 0 }}></i>
+                                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#334155', fontWeight: 500 }}>{item.label}</span>
+                                    </span>
+                                    <span style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                      <span className="badge" style={{ background: item.bg, color: item.color, border: `1px solid ${item.border}`, minWidth: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {loadingFollowupLeads ? '—' : item.count}
+                                      </span>
+                                      <i className={`fas fa-chevron-${followupHoverChannel === item.id ? 'down' : 'right'}`} style={{ fontSize: '10px', color: '#94a3b8', flexShrink: 0, transition: 'transform 0.15s' }}></i>
+                                    </span>
+                                  </button>
+                                  {followupHoverChannel === item.id && (
+                                    <ul
+                                      className="list-unstyled bg-white border rounded shadow-sm py-1 mb-0"
+                                      style={{ minWidth: '100%', marginTop: '2px', borderTop: '1px solid #e2e8f0' }}
+                                      role="menu"
+                                    >
+                                      {[
+                                        { sub: 'done',      label: 'Done',      count: followupBucketsByChannel[item.id].done.length,      dot: '#22c55e', bg: '#f0fdf4', color: '#15803d', border: '#86efac' },
+                                        { sub: 'pending',   label: 'Pending',   count: followupBucketsByChannel[item.id].pending.length,   dot: '#f59e0b', bg: '#fffbeb', color: '#b45309', border: '#fcd34d' },
+                                        { sub: 'scheduled', label: 'Scheduled', count: followupBucketsByChannel[item.id].scheduled.length, dot: '#3b82f6', bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },
+                                        { sub: 'missed',    label: 'Missed',    count: followupBucketsByChannel[item.id].missed.length,    dot: '#ef4444', bg: '#fef2f2', color: '#b91c1c', border: '#fca5a5' },
+                                      ].map(({ sub, label, count, dot, bg, color, border }) => (
+                                        <li
+                                          key={`${item.id}-${sub}`}
+                                          role="none"
+                                          className="position-relative"
+                                        >
+                                          <button
+                                            type="button"
+                                            role="menuitem"
+                                            className="dropdown-item d-flex align-items-center justify-content-between gap-2 py-2 px-3 border-0 bg-transparent w-100 text-start"
+                                            style={{ fontSize: '13px' }}
+                                            onClick={() => {
+                                              setTopbarMenuOpen(null);
+                                              setFollowupHoverChannel(null);
+                                              setFollowupHoverSubItem(null);
+                                              setCardsView('followup');
+                                              setActivitySectionView('followup');
+                                              setFollowupChannelTab(item.id);
+                                              setFollowupTab(sub);
+                                              setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0);
+                                            }}
+                                          >
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot, flexShrink: 0, display: 'inline-block' }}></span>
+                                              <span style={{ color: '#334155', fontWeight: 500 }}>{label}</span>
+                                            </span>
+                                            <span className="badge" style={{ background: bg, color, border: `1px solid ${border}`, minWidth: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                              {loadingFollowupLeads ? '—' : count}
+                                            </span>
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {false && topbarMenuOpen === 'followup' && (
                           <ul className="list-unstyled position-absolute bg-white border rounded shadow-sm py-1 mt-1 mb-0" style={{ zIndex: 1050, minWidth: '220px', left: 0 }} role="menu">
                             {[
                               { sub: 'done', label: 'Done', count: followupBuckets.done.length },
@@ -4306,7 +4613,11 @@ const B2BSales = () => {
                           </ul>
                         )}
                       </div>
+                    </div>
 
+                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
+
+                    <div className="d-flex flex-wrap gap-1 align-items-center">
                       {/* Documents tab + dropdown */}
                       <div
                         className="position-relative"
@@ -4348,14 +4659,6 @@ const B2BSales = () => {
                         )}
                       </div>
                     </div>
-                    <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 2px' }} aria-hidden="true"></div>
-                    <button
-                      className={`btn btn-sm ${leadTab === 'report' ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => { setCardsView('lead'); setLeadTab('report'); setTimeout(() => scrollToB2bSection('b2b-section-lead'), 0); }}
-                      style={{ borderRadius: '20px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' }}
-                    >
-                      Lead Report
-                    </button>
                   </div>
                 </div>
               </div>
@@ -4642,10 +4945,19 @@ const B2BSales = () => {
                                     if (!fu || (!fu.status && !fu.scheduledDate)) return null;
                                     const statusText = fu.status || 'Pending';
                                     const dateText = fu.scheduledDate ? new Date(fu.scheduledDate).toLocaleString() : '';
+                                    const typeKey = getFollowupTypeKey(fu);
+                                    const typeStyle = typeKey === 'meeting'
+                                      ? { background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3' }
+                                      : { background: '#eef6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
                                     return (
-                                      <span title={dateText ? `Followup: ${statusText} • ${dateText}` : `Followup: ${statusText}`} style={{ background: '#0dcaf0', color: '#212529', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', cursor: 'default', whiteSpace: 'nowrap' }}>
-                                        FU: {statusText}
-                                      </span>
+                                      <>
+                                        <span title={`Type: ${typeKey === 'meeting' ? 'Meeting' : 'Call'}`} style={{ ...typeStyle, fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                          {typeKey === 'meeting' ? 'Meeting' : 'Call'}
+                                        </span>
+                                        <span title={dateText ? `Followup: ${statusText} • ${dateText}` : `Followup: ${statusText}`} style={{ background: '#0dcaf0', color: '#212529', fontSize: '10px', fontWeight: 700, borderRadius: '999px', padding: '2px 9px', cursor: 'default', whiteSpace: 'nowrap' }}>
+                                          FU: {statusText}
+                                        </span>
+                                      </>
                                     );
                                   })()}
                                 </div>
