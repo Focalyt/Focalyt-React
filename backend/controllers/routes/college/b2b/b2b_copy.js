@@ -35,7 +35,15 @@ router.post('/add-lead', isCollege, async (req, res) => {
     } = req.body;
 
     const days = lockLeadDays != null && lockLeadDays !== '' ? Number(lockLeadDays) : NaN;
-    const requiredFields = [leadCategory, typeOfB2B, businessName, concernPersonName, mobile, leadStatus];
+    const addLeadStatuses = ['hot', 'warm', 'cold', 'prospect'];
+    const leadStatusNorm = leadStatus != null ? String(leadStatus).toLowerCase().trim() : '';
+    if (!addLeadStatuses.includes(leadStatusNorm)) {
+      return res.status(400).json({
+        status: false,
+        message: 'leadStatus must be one of: hot, warm, cold, prospect',
+      });
+    }
+    const requiredFields = [leadCategory, typeOfB2B, businessName, concernPersonName, mobile, leadStatusNorm];
     if (!Number.isFinite(days) || days < 1 || days > 60) {
       return res.status(400).json({
         status: false,
@@ -115,7 +123,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
       leadAddedBy: req.user._id,
       remark,
       landlineNumber,
-      leadStatus,
+      leadStatus: leadStatusNorm,
       lockLeadDays: days,
       approvalStatus: 'Pending',
     };

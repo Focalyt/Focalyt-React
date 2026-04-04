@@ -35,8 +35,8 @@ const B2BLeadCopySchema = new mongoose.Schema({
   },
   approvedBy: { type: ObjectId, ref: 'User' },
   approvedAt: { type: Date },
-  leadStatus: { type: String, enum: ['hot', 'warm', 'cold', 'prospect'] },
-  /** Lock duration in days (1–60); lead owner is set to submitter when set. */
+  leadStatus: { type: String, enum: ['hot', 'warm', 'cold', 'prospect', 'won'] },
+
   lockLeadDays: { type: Number, min: 1, max: 60 },
 
   remark: { type: String },
