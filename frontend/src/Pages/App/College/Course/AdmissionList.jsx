@@ -282,13 +282,13 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   const candidateRef = useRef();
 
-  // const fetchProfile = (id) => {
-  //   if (candidateRef.current) {
-  //     console.log('start fetching', id)
-  //     candidateRef.current.fetchProfile(id);
-  //     fetchProfileData();
-  //   }
-  // };
+  const fetchProfile = (id) => {
+    if (candidateRef.current) {
+      console.log('start fetching', id);
+      candidateRef.current.fetchProfile(id);
+      fetchProfileData();
+    }
+  };
 
 
   // const handleSaveCV = async () => {
@@ -1527,6 +1527,13 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setSelectedProfile(profile)
     setOpenModalId(profile._id);
   }
+
+  useEffect(() => {
+    // console.log('useeffect', selectedProfile);
+    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+      fetchProfile(selectedProfile._candidate._id);
+    }
+  }, [selectedProfile]);
 
 
 
