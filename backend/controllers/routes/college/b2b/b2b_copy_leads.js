@@ -8,13 +8,62 @@ const { getAllTeamMembers } = require('../../../../helpers');
 const VALID_APPROVAL = ['Pending', 'Approved', 'Rejected'];
 const VALID_LEAD_STATUS = ['hot', 'warm', 'cold', 'prospect', 'won'];
 
+
+function splitCsvIds(val) {
+  if (val == null || val === '') return [];
+  return String(val)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function mapIdsToObjectIds(parts, convertToObjectId) {
+  return parts.map((id) => convertToObjectId(id)).filter(Boolean);
+}
+
+function buildLeadCategoryBlocks(leadCategory, convertToObjectId) {
+  const parts = splitCsvIds(leadCategory);
+  if (parts.length === 0) return [];
+  if (parts.length === 1) return [{ leadCategory: convertToObjectId(parts[0]) }];
+  const ids = mapIdsToObjectIds(parts, convertToObjectId);
+  return ids.length ? [{ leadCategory: { $in: ids } }] : [];
+}
+
+function buildTypeOfB2BBlocks(typeOfB2B, convertToObjectId) {
+  const parts = splitCsvIds(typeOfB2B);
+  if (parts.length === 0) return [];
+  if (parts.length === 1) return [{ typeOfB2B: convertToObjectId(parts[0]) }];
+  const ids = mapIdsToObjectIds(parts, convertToObjectId);
+  return ids.length ? [{ typeOfB2B: { $in: ids } }] : [];
+}
+
+function buildSubStatusBlocks(subStatus, convertToObjectId) {
+  const parts = splitCsvIds(subStatus);
+  if (parts.length === 0) return [];
+  if (parts.length === 1) return [{ subStatus: convertToObjectId(parts[0]) }];
+  const ids = mapIdsToObjectIds(parts, convertToObjectId);
+  return ids.length ? [{ subStatus: { $in: ids } }] : [];
+}
+
+function buildLeadOwnerBlocks(leadOwner, convertToObjectId) {
+  const parts = splitCsvIds(leadOwner);
+  if (parts.length === 0) return [];
+  const ids = mapIdsToObjectIds(parts, convertToObjectId);
+  if (!ids.length) return [];
+  return [
+    {
+      $or: [{ leadOwner: { $in: ids } }, { leadAddedBy: { $in: ids } }],
+    },
+  ];
+}
+
 /**
  * @param {import('express').Router} router
  * @param {import('mongoose').Model} LeadCopy
  * @param {function} isCollege
  */
 function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
-  /** Counts for Lead tab (not CRM pipeline cards): total + approval buckets */
+
   router.get('/leads/approval-summary', isCollege, async (req, res) => {
     try {
       const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
@@ -48,7 +97,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
     }
   });
 
-  /** Approved leads only, counts by add-time Lead Status (Performance tab — not CRM pipeline). */
+
   router.get('/leads/performance-summary', isCollege, async (req, res) => {
     try {
       const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
@@ -161,9 +210,9 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
               ]
             : []),
           ...(status && !statusIn ? [{ status: convertToObjectId(status) }] : []),
-          ...(leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
-          ...(typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
-          ...(subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+          ...buildLeadCategoryBlocks(leadCategory, convertToObjectId),
+          ...buildTypeOfB2BBlocks(typeOfB2B, convertToObjectId),
+          ...buildSubStatusBlocks(subStatus, convertToObjectId),
           ...(String(hasFollowUp).toLowerCase() === 'true'
             ? [{ followUp: { $exists: true, $ne: null } }]
             : []),
@@ -177,16 +226,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
                 },
               ]
             : []),
-          ...(leadOwner
-            ? [
-                {
-                  $or: [
-                    { leadOwner: convertToObjectId(leadOwner) },
-                    { leadAddedBy: convertToObjectId(leadOwner) },
-                  ],
-                },
-              ]
-            : []),
+          ...buildLeadOwnerBlocks(leadOwner, convertToObjectId),
           ...(approvalOk ? [{ approvalStatus: String(approvalStatus) }] : []),
           ...(bucket ? [{ leadStatus: bucket }] : []),
           { leadAddedBy: { $exists: true, $ne: null } },
@@ -359,9 +399,9 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
         : {};
 
       const filterConditions = [];
-      if (leadCategory) filterConditions.push({ leadCategory: convertToObjectId(leadCategory) });
-      if (typeOfB2B) filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
-      if (subStatus) filterConditions.push({ subStatus: convertToObjectId(subStatus) });
+      buildLeadCategoryBlocks(leadCategory, convertToObjectId).forEach((c) => filterConditions.push(c));
+      buildTypeOfB2BBlocks(typeOfB2B, convertToObjectId).forEach((c) => filterConditions.push(c));
+      buildSubStatusBlocks(subStatus, convertToObjectId).forEach((c) => filterConditions.push(c));
       if (startDate || endDate) {
         filterConditions.push({
           createdAt: {
@@ -370,14 +410,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
           },
         });
       }
-      if (leadOwner) {
-        filterConditions.push({
-          $or: [
-            { leadOwner: convertToObjectId(leadOwner) },
-            { leadAddedBy: convertToObjectId(leadOwner) },
-          ],
-        });
-      }
+      buildLeadOwnerBlocks(leadOwner, convertToObjectId).forEach((c) => filterConditions.push(c));
       const approvalOk = approvalStatus && VALID_APPROVAL.includes(String(approvalStatus));
       if (approvalOk) filterConditions.push({ approvalStatus: String(approvalStatus) });
 
@@ -536,9 +569,9 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
               ]
             : []),
           ...(status && !statusIn ? [{ status: convertToObjectId(status) }] : []),
-          ...(leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
-          ...(typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
-          ...(subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+          ...buildLeadCategoryBlocks(leadCategory, convertToObjectId),
+          ...buildTypeOfB2BBlocks(typeOfB2B, convertToObjectId),
+          ...buildSubStatusBlocks(subStatus, convertToObjectId),
           ...(String(hasFollowUp).toLowerCase() === 'true'
             ? [{ followUp: { $exists: true, $ne: null } }]
             : []),
@@ -552,16 +585,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
                 },
               ]
             : []),
-          ...(leadOwner
-            ? [
-                {
-                  $or: [
-                    { leadOwner: convertToObjectId(leadOwner) },
-                    { leadAddedBy: convertToObjectId(leadOwner) },
-                  ],
-                },
-              ]
-            : []),
+          ...buildLeadOwnerBlocks(leadOwner, convertToObjectId),
           ...(approvalOk ? [{ approvalStatus: String(approvalStatus) }] : []),
           ...(bucket ? [{ leadStatus: bucket }] : []),
         ],

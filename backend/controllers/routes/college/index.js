@@ -9950,6 +9950,34 @@ router.get("/lead-history/:leadId", isCollege, async (req, res) => {
 // Get admission list
 // Verify document and update KYC status
 
+function getMandatoryKycFailures(course, uploadedDocsList) {
+	const required = (course?.docsRequired || []).filter(
+		(d) => d.mandatory === true && d.status !== false
+	);
+	const failures = [];
+	for (const reqDoc of required) {
+		const rid = reqDoc._id.toString();
+		const matching = (uploadedDocsList || []).filter(
+			(u) => u.docsId && u.docsId.toString() === rid
+		);
+		const latest = matching.length ? matching[matching.length - 1] : null;
+		const name = reqDoc.Name || reqDoc.name || "(unnamed)";
+		if (!latest) {
+			failures.push({ docsId: rid, name, reason: "missing" });
+		} else if (latest.status !== "Verified") {
+			failures.push({
+				docsId: rid,
+				name,
+				reason: "not_verified",
+				status: latest.status,
+				uploadSubDocId: latest._id ? latest._id.toString() : undefined,
+				uploadCountForThisDocType: matching.length,
+			});
+		}
+	}
+	return failures;
+}
+
 function mandatoryDocsFullyVerified(course, uploadedDocsList) {
 	const required = (course?.docsRequired || []).filter(
 		(d) => d.mandatory === true && d.status !== false
@@ -10243,20 +10271,19 @@ router.post("/kycDone/:profileId", isCollege, async (req, res) => {
 		const mandatoryDocs = course.docsRequired.filter(
 			(d) => d.mandatory === true && d.status !== false
 		);
-		const mandatoryDocIds = mandatoryDocs.map((d) => d._id.toString());
 		const uploadedDocs = appliedCourse.uploadedDocs || [];
-		for (const docId of mandatoryDocIds) {
-			const uploaded = uploadedDocs.find(
-				(u) => u.docsId && u.docsId.toString() === docId
-			);
-			if (!uploaded || uploaded.status !== "Verified") {
-				return res.status(400).json({
-					success: false,
-					message: "All mandatory documents must be verified before marking KYC done",
-					missingOrUnverifiedMandatory: true
-				});
-			}
+		const failures = getMandatoryKycFailures(course, uploadedDocs);
+	
+		if (failures.length) {
+			
+			return res.status(400).json({
+				success: false,
+				message: "All mandatory documents must be verified before marking KYC done",
+				missingOrUnverifiedMandatory: true,
+				failingMandatoryDocs: failures,
+			});
 		}
+		
 		appliedCourse.kyc = true;
 		appliedCourse.kycDoneAt = new Date();
 		appliedCourse.kycDoneBy = userId;

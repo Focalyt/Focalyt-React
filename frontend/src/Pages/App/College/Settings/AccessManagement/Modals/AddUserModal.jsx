@@ -511,6 +511,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_add_leads_b2b: '➕ Add New Leads',
                       can_edit_leads_b2b: '✏️ Edit Leads',
                       can_assign_leads_b2b: '🔄 Assign Leads',
+                      can_approve_leads_b2b: '🔄 Approve Leads',
                       can_delete_leads_b2b: '🗑️ Delete Leads'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">
@@ -545,6 +546,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_add_leads: '➕ Add New Leads',
                       can_edit_leads: '✏️ Edit Leads',
                       can_assign_leads: '🔄 Assign Leads',
+                      can_approve_leads: '🔄 Approve Leads',
                       can_delete_leads: '🗑️ Delete Leads'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">

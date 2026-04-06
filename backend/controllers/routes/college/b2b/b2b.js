@@ -229,11 +229,18 @@ router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 // Delete Type of B2B (soft delete)
 router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
-		const deletedType = await TypeOfB2B.findByIdAndUpdate(
-			req.params.id,
-			{ isActive: false },
-			{ new: true }
-		);
+		const typeId = req.params.id;
+
+		const linkedLeadsCount = await Lead.countDocuments({ typeOfB2B: typeId });
+
+		if (linkedLeadsCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This B2B type is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedType = await TypeOfB2B.findByIdAndDelete(typeId);
 
 		if (!deletedType) {
 			return res.status(404).json({
@@ -409,11 +416,18 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 // Delete Lead Category (soft delete)
 router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
-		const deletedCategory = await LeadCategory.findByIdAndUpdate(
-			req.params.id,
-			{ isActive: false },
-			{ new: true }
-		);
+		const categoryId = req.params.id;
+
+		const linkedLeadsCount = await Lead.countDocuments({ leadCategory: categoryId });
+
+		if (linkedLeadsCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This category is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedCategory = await LeadCategory.findByIdAndDelete(categoryId);
 
 		if (!deletedCategory) {
 			return res.status(404).json({

@@ -1438,6 +1438,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
     setKycMarkingProfileId(profile._id);
     try {
+      const course = profile._course;
+      const mandatoryFromCourse = (course?.docsRequired || []).filter(
+        (d) => d.mandatory === true && d.status !== false
+      );
+      const rawUploads = profile.uploadedDocs || [];
+
       const response = await axios.post(
         `${backendUrl}/college/kycDone/${profile._id}`,
         {},
@@ -1447,10 +1453,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         alert('KYC marked as done successfully.');
         await fetchProfileData();
       } else {
+        // console.warn('[KYC mark done] success:false', response.data);
         alert(response.data.message || 'Failed to mark KYC done');
       }
     } catch (error) {
-      const msg = error.response?.data?.message || error.message || 'Failed to mark KYC done';
+      const errData = error.response?.data;
+      const msg = errData?.message || error.message || 'Failed to mark KYC done';
+           
       alert(msg);
     } finally {
       setKycMarkingProfileId(null);

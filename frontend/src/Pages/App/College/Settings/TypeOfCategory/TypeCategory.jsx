@@ -130,6 +130,44 @@ function TypeCategory() {
         }
     };
 
+    // Handle delete
+    const handleDelete = async (categoryId, categoryName) => {
+        const confirmed = window.confirm(`Are you sure you want to delete "${categoryName}"?`);
+
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+
+            const response = await fetch(`${backendUrl}/college/b2b/lead-categories/${categoryId}`, {
+                method: 'DELETE',
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status) {
+                setCategories(prev => prev.filter(category => category._id !== categoryId));
+
+                if (editingId === categoryId) {
+                    resetForm();
+                }
+
+                showAlert('Category deleted successfully!', 'success');
+            } else {
+                showAlert(data.message || 'Failed to delete category', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting category:', error);
+            showAlert('Failed to delete category', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Handle edit button click
     const handleEdit = (category) => {
         setFormData({
@@ -327,14 +365,26 @@ function TypeCategory() {
                                                                     </div>
                                                                 </td>
                                                                 <td>
-                                                                    <button
-                                                                        className="btn btn-sm btn-outline-primary"
-                                                                        onClick={() => handleEdit(category)}
-                                                                        title="Edit Category"
-                                                                    >
-                                                                        <i className="fas fa-edit me-1"></i>
-                                                                        Edit
-                                                                    </button>
+                                                                    <div className="d-flex gap-2">
+                                                                        <button
+                                                                            className="btn btn-sm btn-outline-primary"
+                                                                            onClick={() => handleEdit(category)}
+                                                                            title="Edit Category"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <i className="fas fa-edit me-1"></i>
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                            onClick={() => handleDelete(category._id, category.name)}
+                                                                            title="Delete Category"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <i className="fas fa-trash me-1"></i>
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))
