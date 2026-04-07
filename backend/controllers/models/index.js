@@ -116,15 +116,15 @@ module.exports.Placement = require("./Placement");
 module.exports.JobOffer = require("./jobOffer");
 module.exports.UploadCandidates = require("./uploadCandidates");
 module.exports.RewardClaim = require("./RewardClaim");
-<<<<<<< HEAD
+
 
 // Live Class Models
 module.exports.LiveClass = require("./liveClass");
 module.exports.ClassAttendance = require("./classAttendance");
 module.exports.ClassRecording = require("./classRecording");
 module.exports.ClassChatMessage = require("./classChatMessage");
-=======
+
 module.exports.ReferralShareOffer = require("./referralShareOffer");
 module.exports.BotTraining = require("./botTraining");
 module.exports.BotTrainingRule = require("./botTrainingRule");
->>>>>>> c582cfa409b087ea8145b21447965322670fe93e
+
