@@ -4,7 +4,7 @@ import { initReactI18next } from "react-i18next";
 import en from "./en.json";
 import hi from "./hi.json";
 import pa from "./pa.json";
-import fr from "./fr.json";
+// import fr from "./fr.json";
 i18n
   .use(initReactI18next)
   .init({
@@ -12,7 +12,7 @@ i18n
       en: { translation: en },
       hi: { translation: hi },
       pa: { translation: pa },
-      fr: { translation: fr },
+      // fr: { translation: fr },
     },
     lng: localStorage.getItem("lang") || "en",
     fallbackLng: "en",

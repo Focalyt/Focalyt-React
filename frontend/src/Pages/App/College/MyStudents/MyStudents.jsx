@@ -239,6 +239,214 @@ const MyStudents = () => {
           </div>
         </div>
       </section>
+
+      <style>{`
+        #personal-info {
+          --students-primary: #fc2b5a;
+          --students-primary-dark: #a5003a;
+          --students-ink: #172033;
+          --students-muted: #667085;
+          --students-border: #e6eaf2;
+          --students-soft: #f8fafc;
+        }
+
+        .content-header.row {
+          margin-bottom: 10px;
+        }
+
+        .content-header .breadcrumbs-top {
+          align-items: center;
+        }
+
+        .content-header .content-header-title {
+          color: var(--students-ink);
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          font-size: 2rem;
+          line-height: 1.1;
+          margin-right: 0 !important;
+          padding-bottom: 0 !important;
+        }
+
+        .breadcrumb-wrapper {
+          display: none;
+        }
+
+        .breadcrumb {
+          background: transparent;
+          margin-bottom: 0;
+        }
+
+        .breadcrumb-item a {
+          color: var(--students-primary);
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        #personal-info .card {
+          border: 1px solid var(--students-border);
+          border-radius: 22px;
+          overflow: hidden;
+          box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+          background: #fff;
+          transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+
+        #personal-info .card:hover {
+          box-shadow: 0 14px 34px rgba(16, 24, 40, 0.08);
+        }
+
+        #personal-info .card-header {
+          background: #fff;
+          border-bottom: 1px solid var(--students-border) !important;
+          padding: 18px 22px;
+        }
+
+        #personal-info .card-title {
+          margin: 0;
+          color: var(--students-ink);
+          font-size: 1.1rem;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+        }
+
+        #personal-info .card-body {
+          padding: 20px 22px 16px;
+        }
+
+        #msg {
+          margin: 14px 18px 0 !important;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid #fecdd3;
+          background: #fff1f4;
+          color: #be123c !important;
+          font-size: 0.9rem;
+          font-weight: 600;
+        }
+
+        #personal-info .table-responsive {
+          border: 1px solid var(--students-border);
+          border-radius: 18px;
+          background: #fff;
+          overflow: hidden;
+        }
+
+        #tblexportData {
+          margin-bottom: 0 !important;
+        }
+
+        #tblexportData thead th {
+          background: var(--students-soft);
+          color: #475467;
+          border-bottom: 1px solid var(--students-border);
+          font-size: 0.76rem;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          padding: 15px 16px;
+          white-space: nowrap;
+        }
+
+        #tblexportData tbody td {
+          padding: 15px 16px;
+          border-top: 1px solid #edf1f7;
+          color: #344054;
+          font-size: 0.92rem;
+          vertical-align: middle;
+        }
+
+        #tblexportData tbody tr {
+          transition: background-color 0.18s ease;
+        }
+
+        #tblexportData.table-hover tbody tr:hover {
+          background: #fff7f9;
+        }
+
+        #tblexportData tbody td[colspan="5"] {
+          text-align: center;
+          background: #fff;
+          color: var(--students-muted);
+          font-size: 0.95rem;
+          font-weight: 600;
+          padding: 28px 16px;
+          border-top: none;
+        }
+
+        #tblexportData tbody td a {
+          color: var(--students-primary);
+          font-weight: 700;
+          text-decoration: none;
+          transition: color 0.18s ease;
+        }
+
+        #tblexportData tbody td a:hover {
+          color: var(--students-primary-dark);
+          text-decoration: underline;
+        }
+
+        .pagination {
+          padding: 14px 14px 2px;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .pagination .page-item {
+          margin: 0;
+        }
+
+        .pagination .page-link {
+          border: 1px solid var(--students-border);
+          border-radius: 10px !important;
+          color: #475467;
+          background: #fff;
+          min-width: 38px;
+          text-align: center;
+          padding: 8px 12px;
+          font-size: 0.88rem;
+          font-weight: 600;
+          box-shadow: none;
+          transition: all 0.18s ease;
+        }
+
+        .pagination .page-link:hover {
+          border-color: rgba(252, 43, 90, 0.24);
+          background: #fff7f9;
+          color: var(--students-primary);
+        }
+
+        .pagination .page-item.active .page-link {
+          border-color: transparent;
+          background: linear-gradient(135deg, rgb(252, 43, 90) 0%, rgb(165, 0, 58) 100%);
+          color: #fff;
+          box-shadow: 0 10px 20px rgba(165, 0, 58, 0.16);
+        }
+
+        @media (max-width: 768px) {
+          .content-header .content-header-title {
+            font-size: 1.6rem;
+          }
+
+          #personal-info .card-header,
+          #personal-info .card-body {
+            padding-left: 16px;
+            padding-right: 16px;
+          }
+
+          #tblexportData thead th,
+          #tblexportData tbody td {
+            padding: 13px 12px;
+            font-size: 0.86rem;
+          }
+
+          .pagination {
+            justify-content: center !important;
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+        }
+      `}</style>
     </>
   );
 };

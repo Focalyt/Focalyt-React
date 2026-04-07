@@ -252,10 +252,10 @@ async function run() {
     __dirname,
     "../../frontend/src/i18n/pa.json"
   );
-  const frPath = path.resolve(
-    __dirname,
-    "../../frontend/src/i18n/fr.json"
-  );
+  // const frPath = path.resolve(
+  //   __dirname,
+  //   "../../frontend/src/i18n/fr.json"
+  // );
 
   // console.log("i18n target (hi) path:", hiPath);
   // console.log("i18n target (pa) path:", paPath);
@@ -267,8 +267,8 @@ async function run() {
   // console.log("Translating to Punjabi...");
   await translateJson("Punjabi", paPath);
 
-  console.log("Translating to French...");
-  await translateJson("French", frPath);
+  // console.log("Translating to French...");
+  // await translateJson("French", frPath);
 
   // console.log("Translation complete.", frPath);
 }

@@ -82,6 +82,9 @@ const TrainerLogin = () => {
                     setSuccessMessage('Password verified');
                     sessionStorage.setItem("token", JSON.stringify(verifyRes.data.token));
                     sessionStorage.setItem("role", JSON.stringify(verifyRes.data.role));
+                    if (verifyRes.data.userData) {
+                        sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    }
                     if (returnUrl) {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
@@ -113,6 +116,7 @@ const TrainerLogin = () => {
                     setSuccessMessage('OTP verified');
                     sessionStorage.setItem("token", JSON.stringify(verifyRes.data.userData.token));
                     sessionStorage.setItem("role", JSON.stringify(verifyRes.data.userData.role));
+                    sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
                     if (verifyRes.data.userData?.token) {
                         axios.defaults.headers.common['x-auth'] = verifyRes.data.userData.token;
                     }

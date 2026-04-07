@@ -610,6 +610,198 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const batchMinEndDate = formData.startDate ? addDays(formData.startDate, 7) : null;
   const batchMinStartDate = formData.zeroPeriodEndDate ? addDays(formData.zeroPeriodEndDate, 1) : today;
   const [batches, setBatches] = useState([]);
+ 
+  const [monitoringTasks, setMonitoringTasks] = useState([]);
+  const [showMonitoringModal, setShowMonitoringModal] = useState(false);
+  const [monitoringQuickFilter, setMonitoringQuickFilter] = useState('All');
+  const [monitoringForm, setMonitoringForm] = useState({
+    component: '',
+    task: '',
+    batchId: '',
+    batchName: '',
+    owner: '',
+    support: '',
+    level: 'Critical',
+    status: 'Pending',
+    remarks: ''
+  });
+
+  const fetchBatchMonitoringTasks = async () => {
+    try {
+      const response = await axios.get(
+        `${backendUrl}/college/getBatchTaskDetail`,
+        {
+          headers: { 'x-auth': token }
+        }
+      );
+
+      if (response?.data?.status && Array.isArray(response?.data?.data)) {
+        setMonitoringTasks(response.data.data);
+      }
+    } catch (error) {
+      console.warn('Error fetching batch monitoring tasks:', error?.message || error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBatchMonitoringTasks();
+  }, []);
+
+
+
+  const filteredMonitoringTasks = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+
+    return monitoringTasks.filter((task) => {
+      const haystack = [
+        task.component,
+        task.task,
+        task.batchName,
+        task.owner,
+        task.support,
+        task.level,
+        task.status,
+        task.remarks
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !q || haystack.includes(q);
+      const matchesQuickFilter =
+        monitoringQuickFilter === 'All' ||
+        task.level === monitoringQuickFilter ||
+        task.status === monitoringQuickFilter;
+
+      return matchesSearch && matchesQuickFilter;
+    });
+  }, [monitoringTasks, searchQuery, monitoringQuickFilter]);
+
+  const metricBorderColors = {
+    primary: '#0d6efd',
+    success: '#198754',
+    danger: '#dc3545',
+    warning: '#f59f00'
+  };
+
+  const monitoringSummaryCards = [
+    { title: 'Total Tasks', value: monitoringTasks.length, icon: 'bi-list-check', color: 'primary' },
+    { title: 'Done Tasks', value: monitoringTasks.filter(task => task.status === 'Done').length, icon: 'bi-check-circle', color: 'success' },
+    { title: 'Pending Tasks', value: monitoringTasks.filter(task => task.status === 'Pending').length, icon: 'bi-hourglass-split', color: 'danger' },
+    {
+      title: 'Critical Pending',
+      value: monitoringTasks.filter(task => task.level === 'Critical' && task.status === 'Pending').length,
+      icon: 'bi-exclamation-triangle',
+      color: 'warning'
+    }
+  ];
+
+  const monitoringQuickFilters = [
+    { label: 'All', type: 'all', value: 'All', activeBg: '#212529', activeColor: '#ffffff', softBg: '#f3f4f6', softColor: '#495057' },
+    { label: 'Critical', type: 'level', value: 'Critical', activeBg: '#ef4444', activeColor: '#ffffff', softBg: '#fee2e2', softColor: '#dc2626' },
+    { label: 'Medium', type: 'level', value: 'Medium', activeBg: '#f59e0b', activeColor: '#ffffff', softBg: '#fef3c7', softColor: '#d97706' },
+    { label: 'Normal', type: 'level', value: 'Normal', activeBg: '#0ea5e9', activeColor: '#ffffff', softBg: '#dbeafe', softColor: '#0284c7' },
+    { label: 'Done', type: 'status', value: 'Done', activeBg: '#198754', activeColor: '#ffffff', softBg: '#d1fae5', softColor: '#047857' },
+    { label: 'Pending', type: 'status', value: 'Pending', activeBg: '#dc3545', activeColor: '#ffffff', softBg: '#fee2e2', softColor: '#dc2626' }
+  ];
+
+  const handleExportMonitoring = () => {
+    if (!filteredMonitoringTasks || filteredMonitoringTasks.length === 0) {
+      showAlert('No monitoring tasks to export', 'warning');
+      return;
+    }
+
+    const headers = ['Component', 'Task', 'Batch', 'Owner', 'Support', 'Level', 'Status', 'Remarks'];
+    const csvEscape = (value) => {
+      const str = value === null || value === undefined ? '' : String(value);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const csvRows = [
+      headers.map(csvEscape).join(','),
+      ...filteredMonitoringTasks.map((task) =>
+        [task.component, task.task, task.batchName, task.owner, task.support, task.level, task.status, task.remarks]
+          .map(csvEscape)
+          .join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([`\uFEFF${csvRows}`], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `batch-monitoring-${Date.now()}.csv`;
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showAlert('Monitoring exported successfully', 'success');
+  };
+
+  const resetMonitoringForm = () => {
+    setMonitoringForm({
+      component: '',
+      task: '',
+      batchId: '',
+      batchName: '',
+      owner: '',
+      support: '',
+      level: 'Critical',
+      status: 'Pending',
+      remarks: ''
+    });
+  };
+
+  const handleMonitoringInputChange = (e) => {
+    const { name, value } = e.target;
+    setMonitoringForm(prev => {
+      if (name === 'batchId') {
+        const selectedBatch = batches.find((batch) => String(batch._id) === String(value));
+        return {
+          ...prev,
+          batchId: value,
+          batchName: selectedBatch?.name || ''
+        };
+      }
+
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
+  };
+
+  const handleAddMonitoringTask = () => {
+    if (!monitoringForm.batchId.trim()) {
+      showAlert('Please fill  batch name');
+      return;
+    }
+
+    
+    axios.post(`${backendUrl}/college/addBatchTask`,
+      { ...monitoringForm },
+      {
+        headers: { 'x-auth': token }
+      }
+    )
+      .then((response) => {
+        if (response?.data?.status) {
+          fetchBatchMonitoringTasks();
+        }
+      })
+      .catch((error) => {
+        console.warn('Batch monitoring add API hit failed/may have no response yet:', error?.message || error);
+      });
+
+    setShowMonitoringModal(false);
+    resetMonitoringForm();
+    showAlert('Monitoring task added successfully', 'success');
+  };
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, mainContentClass, mainTab]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
@@ -1821,7 +2013,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
           {/* Main Tabs */}
           <div className="d-block justify-content-between mb-3" ref={navRef}>
             <ul className="nav nav-pills mb-3">
-              {['Batches', 'All Admissions'].map(tab => (
+              {['Batches', 'All Admissions', 'Batch Monitoring'].map(tab => (
                 <li className="nav-item" key={tab}>
                   <button
                     className={`nav-link ${mainTab === tab ? 'active' : ''}`}
@@ -1847,7 +2039,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       </button>
                     </li>
                   ))
-                  : ['Batch Assigned', 'Pending for Batch Assigned', 'All List'].map(tab => (
+                  : mainTab === 'All Admissions' ? ['Batch Assigned', 'Pending for Batch Assigned', 'All List'].map(tab => (
                     <li className="nav-item" key={tab}>
                       <button
                         className={`nav-link ${admissionSubTab === tab ? 'active' : ''}`}
@@ -1856,10 +2048,19 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                         {tab}
                       </button>
                     </li>
+                    )) : ['Overview'].map(tab => (
+                    <li className="nav-item" key={tab}>
+                      <button
+                        className={`nav-link navBTn ${tab === 'Overview' ? 'active' : ''}`}
+                        type="button"
+                      >
+                        {tab}
+                      </button>
+                    </li>
                   ))
                 }
               </ul>
-              <div className="input-group" style={{ maxWidth: '300px' }}>
+              <div className="input-group" style={{ maxWidth: '300px', maxHeight: 'fit-content'  }}>
                 <input
                   type="text"
                   className="form-control w-25"
@@ -1881,7 +2082,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   </button>
                 )}
                 <button
-                  onClick={() => fetchAdmissionsData()}
+                  onClick={() => {
+                    if (mainTab === 'All Admissions') {
+                      fetchAdmissionsData();
+                    }
+                  }}
                   className={`btn btn-outline-primary`}
                   style={{ whiteSpace: 'nowrap' }}
                 >
@@ -2020,6 +2225,330 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   </div>
                 );
               })}
+            </div>
+          ) : mainTab === 'Batch Monitoring' ? (
+            <div className="row g-3">
+              <div className="col-12">
+                <div
+                  className="card border-0 shadow-sm"
+                  style={{ borderRadius: 18, overflow: 'hidden', background: '#fff' }}
+                >
+                 
+                  <div className="card-body">
+                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                      <div>
+                        <h4 className="mb-1" style={{ letterSpacing: 0.2 }}>
+                          <i className="bi bi-kanban me-2 text-primary"></i>
+                          Batch Monitoring
+                        </h4>
+                        <p className="text-muted mb-0">Batch structure for task tracking, priority, and monitoring flow.</p>
+                      </div>
+                      <div className="d-flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-warning"
+                          onClick={() => setShowMonitoringModal(true)}
+                        >
+                          <i className="bi bi-plus-circle me-1"></i>
+                          Add Task
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={handleExportMonitoring}
+                          disabled={filteredMonitoringTasks.length === 0}
+                          title={filteredMonitoringTasks.length === 0 ? 'Add tasks to export' : 'Export monitoring tasks'}
+                          style={filteredMonitoringTasks.length === 0 ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
+                        >
+                          <i className="bi bi-download me-1"></i>
+                          Export
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {monitoringSummaryCards.map((card) => (
+                <div className="col-md-6 col-xl-3" key={card.title}>
+                  <div
+                    className="card shadow-sm h-100"
+                    style={{
+                      borderRadius: 16,
+                      border: `2px solid ${metricBorderColors[card.color] || '#adb5bd'}`,
+                      background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)'
+                    }}
+                  >
+                    <div className="card-body">
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div>
+                          <p className="text-muted mb-1">{card.title}</p>
+                          <h3 className="mb-0">{card.value}</h3>
+                        </div>
+                        <span style={{ color: metricBorderColors[card.color] || '#adb5bd' }} className="fs-4">
+                          <i className={`bi ${card.icon}`}></i>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="col-12">
+                <div
+                  className="card border-0 shadow-sm"
+                  style={{ borderRadius: 18, overflow: 'hidden', background: '#fff' }}
+                >
+                  <div className="card-body">
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      {monitoringQuickFilters.map((filter) => {
+                        const isActive = monitoringQuickFilter === filter.value;
+                        return (
+                          <button
+                            key={filter.value}
+                            type="button"
+                            className="border-0"
+                            onClick={() => setMonitoringQuickFilter(filter.value)}
+                            style={{
+                              background: isActive ? filter.activeBg : filter.softBg,
+                              color: isActive ? filter.activeColor : filter.softColor,
+                              borderRadius: '999px',
+                              padding: '8px 16px',
+                              fontWeight: 700,
+                              fontSize: '0.9rem',
+                              lineHeight: 1,
+                              boxShadow: isActive ? `0 10px 24px ${filter.activeBg}33` : 'none',
+                              transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {filter.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-hover align-middle mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Component</th>
+                            <th>Task</th>
+                            <th>Batch</th>
+                            <th>Owner</th>
+                            <th>Support</th>
+                            <th>Level</th>
+                            <th>Status</th>
+                            <th>Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredMonitoringTasks.length === 0 ? (
+                            <tr>
+                              <td colSpan="9" className="text-center text-muted py-4">
+                                No monitoring tasks found
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredMonitoringTasks.map((task) => (
+                              <tr key={task.id}>
+                                <td>{task.component}</td>
+                                <td>{task.task}</td>
+                                <td>{task.batchName}</td>
+                                <td>{task.owner}</td>
+                                <td>{task.support}</td>
+                                <td>
+                                  <span className={`badge ${
+                                    task.level === 'Critical'
+                                      ? 'bg-danger'
+                                      : task.level === 'Medium'
+                                        ? 'bg-warning text-dark'
+                                        : 'bg-info text-dark'
+                                  }`}>
+                                    {task.level}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className={`badge ${task.status === 'Done' ? 'bg-success' : 'bg-danger'}`}>
+                                    {task.status}
+                                  </span>
+                                </td>
+                                <td>{task.remarks}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {showMonitoringModal && (
+                <div
+                  className="modal show fade"
+                  tabIndex="-1"
+                  role="dialog"
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <div
+                    className="modal-dialog modal-dialog-centered justify-content-center modal-lg"
+                    role="document"
+                    style={{ margin: 0 }}
+                  >
+                    <div className="modal-content">
+                      <div
+                        className="modal-header"
+                        style={{
+                          backgroundColor: '#fc2b5a',
+                          color: '#fff',
+                          borderBottom: 'none'
+                        }}
+                      >
+                        <h5 className="modal-title">Add Monitoring Task</h5>
+                        <button
+                          type="button"
+                          className="btn-close"
+                          style={{ filter: 'invert(1)' }}
+                          onClick={() => {
+                            setShowMonitoringModal(false);
+                            resetMonitoringForm();
+                          }}
+                        ></button>
+                      </div>
+                      <div className="modal-body">
+                        <div className="row g-3">
+                          <div className="col-md-6">
+                            <label className="form-label">Component</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="component"
+                              value={monitoringForm.component}
+                              onChange={handleMonitoringInputChange}
+                              placeholder="Enter component"
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label">Batch Name</label>
+                            <select
+                              className="form-select"
+                              name="batchId"
+                              value={monitoringForm.batchId}
+                              onChange={handleMonitoringInputChange}
+                            >
+                              <option value="">Select batch</option>
+                              {batches.map((batch) => (
+                                <option key={batch._id || batch.id || batch.code} value={batch._id || ''}>
+                                  {batch.code ? `${batch.code} - ${batch.name}` : batch.name}
+                                </option>
+                              ))}
+                            </select>
+                            {batches.length === 0 && (
+                              <small className="text-muted d-block mt-1">
+                                No created batches available right now.
+                              </small>
+                            )}
+                          </div>
+                          <div className="col-12">
+                            <label className="form-label">Task</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="task"
+                              value={monitoringForm.task}
+                              onChange={handleMonitoringInputChange}
+                              placeholder="Enter task title"
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label">Owner</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="owner"
+                              value={monitoringForm.owner}
+                              onChange={handleMonitoringInputChange}
+                              placeholder="Enter owner name"
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label">Support</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              name="support"
+                              value={monitoringForm.support}
+                              onChange={handleMonitoringInputChange}
+                              placeholder="Enter support team"
+                            />
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label">Level</label>
+                            <select
+                              className="form-select"
+                              name="level"
+                              value={monitoringForm.level}
+                              onChange={handleMonitoringInputChange}
+                            >
+                              <option value="Critical">Critical</option>
+                              <option value="Medium">Medium</option>
+                              <option value="Normal">Normal</option>
+                            </select>
+                          </div>
+                          <div className="col-md-6">
+                            <label className="form-label">Status</label>
+                            <select
+                              className="form-select"
+                              name="status"
+                              value={monitoringForm.status}
+                              onChange={handleMonitoringInputChange}
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="Done">Done</option>
+                            </select>
+                          </div>
+                          <div className="col-12">
+                            <label className="form-label">Remarks</label>
+                            <textarea
+                              className="form-control"
+                              rows="3"
+                              name="remarks"
+                              value={monitoringForm.remarks}
+                              onChange={handleMonitoringInputChange}
+                              placeholder="Enter remarks"
+                            ></textarea>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="modal-footer">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setShowMonitoringModal(false);
+                            resetMonitoringForm();
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-warning"
+                          onClick={handleAddMonitoringTask}
+                        >
+                          Save Task
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             // Admissions Content - EXACT SAME as CRM Dashboard
@@ -4993,7 +5522,6 @@ height: min-content !important;
     max-height: 90vh;
     width: 80%;
     overflow-y: auto;
-    padding: 20px;
     border-radius: 8px;
 }
 

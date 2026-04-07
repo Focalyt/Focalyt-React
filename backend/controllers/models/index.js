@@ -110,6 +110,7 @@ module.exports.TypeOfB2B = require("./b2b/typeOfB2B");
 module.exports.LeadCategory = require("./b2b/leadCategory");
 module.exports.FollowUp = require("./b2b/followUp");
 module.exports.Lead = require("./b2b/lead");
+module.exports.LeadCopy = require("./b2b/lead_copy");
 module.exports.Source = require("./source");
 module.exports.PlacementStatus = require("./PlacementStatus");
 module.exports.Placement = require("./Placement");
@@ -127,4 +128,3 @@ module.exports.ClassChatMessage = require("./classChatMessage");
 module.exports.ReferralShareOffer = require("./referralShareOffer");
 module.exports.BotTraining = require("./botTraining");
 module.exports.BotTrainingRule = require("./botTrainingRule");
-

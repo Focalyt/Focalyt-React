@@ -10,6 +10,7 @@ const B2cFollowupSchema = new Schema({
   updatedBy: { type: Types.ObjectId, ref: 'User' },
   statusUpdatedAt: { type: Date },
   counsellorId: { type: Types.ObjectId, ref: 'User' },
+  googleCalendarEventId: { type: String },
   remarks : { type: String },
   createdBy: { type: Types.ObjectId, ref: 'User' },
 }, { timestamps: true });

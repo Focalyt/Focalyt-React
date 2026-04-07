@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
-import { Calendar, Clock, MapPin, Phone, Mail, User, Building, Filter, Search, Plus, RefreshCw, AlertCircle, CheckCircle, XCircle, CalendarDays, ChevronLeft, ChevronRight, Grid, List } from 'lucide-react';
+import { Calendar, Clock, MapPin, Phone, Mail, User, Building, Filter, Search, Plus, RefreshCw, AlertCircle, CheckCircle, XCircle, CalendarDays, ChevronLeft, ChevronRight, Grid, List, Bell } from 'lucide-react';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 const CalenderFolowupB2C = () => {
@@ -8,33 +8,52 @@ const CalenderFolowupB2C = () => {
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
 
+  // Same session as Registrations — if Google was connected there, it appears here
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const u = JSON.parse(sessionStorage.getItem("user") || "{}");
+        setUserData(u);
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    syncUser();
+    window.addEventListener("focus", syncUser);
+    return () => window.removeEventListener("focus", syncUser);
+  }, []);
+
   // State management
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoginLoading, setIsGoogleLoginLoading] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
 
-  // Initialize date range based on view mode
-  const getInitialDateRange = () => {
+  const getInitialMonthRange = () => {
     const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-
     return {
-      start: startOfDay,
-      end: endOfDay
+      start: new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0),
+      end: new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
     };
   };
 
-  const [selectedDateRange, setSelectedDateRange] = useState(getInitialDateRange());
+  const [selectedDateRange, setSelectedDateRange] = useState(() => getInitialMonthRange());
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // Single date input
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, upcoming, completed, overdue
   const [showFilters, setShowFilters] = useState(true); // Set to true to show filters by default
   const [currentPage, setCurrentPage] = useState(1);
   const [eventsPerPage] = useState(10);
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [viewMode, setViewMode] = useState('calendar'); // 'list' | 'calendar' (default: Google-style month grid)
+  const [calendarLayout, setCalendarLayout] = useState('month'); // 'month' | 'week'
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [weekStart, setWeekStart] = useState(() => {
+    const t = new Date();
+    const s = new Date(t);
+    s.setDate(t.getDate() - t.getDay());
+    s.setHours(0, 0, 0, 0);
+    return s;
+  });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -54,27 +73,27 @@ const CalenderFolowupB2C = () => {
   // Handle view mode changes and update date range accordingly
   const handleViewModeChange = (newViewMode) => {
     setViewMode(newViewMode);
+    const today = new Date();
 
     if (newViewMode === 'calendar') {
-      // For calendar view, show current month
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-
-      setSelectedDateRange({
-        start: startOfMonth,
-        end: endOfMonth
-      });
+      if (calendarLayout === 'week') {
+        const ws = new Date(today);
+        ws.setDate(today.getDate() - today.getDay());
+        ws.setHours(0, 0, 0, 0);
+        setWeekStart(ws);
+        const end = new Date(ws);
+        end.setDate(ws.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        setSelectedDateRange({ start: new Date(ws), end });
+      } else {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+        setSelectedDateRange({ start: startOfMonth, end: endOfMonth });
+      }
     } else {
-      // For list view, show today's events
-      const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-
-      setSelectedDateRange({
-        start: startOfDay,
-        end: endOfDay
-      });
+      setSelectedDateRange({ start: startOfDay, end: endOfDay });
     }
   };
 
@@ -112,58 +131,55 @@ const CalenderFolowupB2C = () => {
     const today = new Date();
     setCurrentMonth(today);
     setSelectedDate(today.toISOString().split('T')[0]);
+    const ws = new Date(today);
+    ws.setDate(today.getDate() - today.getDay());
+    ws.setHours(0, 0, 0, 0);
+    setWeekStart(ws);
 
     if (viewMode === 'calendar') {
-      // For calendar view, show current month
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-      setSelectedDateRange({ start: startOfMonth, end: endOfMonth });
+      if (calendarLayout === 'week') {
+        const start = new Date(ws);
+        const end = new Date(ws);
+        end.setDate(ws.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        setSelectedDateRange({ start, end });
+      } else {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+        setSelectedDateRange({ start: startOfMonth, end: endOfMonth });
+      }
     } else {
-      // For list view, show today's events
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
       setSelectedDateRange({ start: startOfDay, end: endOfDay });
     }
   };
 
-  // Handle Google Login
+  /** Same flow as Registrations.jsx — tokens stored on `user` in sessionStorage */
   const handleGoogleLogin = async () => {
     try {
       setIsGoogleLoginLoading(true);
-      console.log('🚀 Starting Google login for calendar access...');
-
       const result = await getGoogleAuthCode({
         scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
-        user: userData
+        user: userData,
       });
-
-      console.log('✅ Login successful:', result);
-
       const refreshToken = await getGoogleRefreshToken({
         code: result,
-        user: userData
+        user: userData,
       });
-
-      console.log('✅ Refresh token successful:', refreshToken.data);
-
       const user = {
         ...userData,
-        googleAuthToken: refreshToken.data
+        googleAuthToken: refreshToken.data,
       };
       sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
       sessionStorage.setItem('user', JSON.stringify(user));
-
       setUserData(user);
-
-      // Fetch calendar events after successful login
       await fetchCalendarEvents();
-
     } catch (error) {
-      console.error('❌ Login failed:', error);
-
-      if (error.message.includes('Popup blocked')) {
+      console.error('Google login failed:', error);
+      if (error.message?.includes('Popup blocked')) {
         alert('Please allow popups for this site and try again.');
-      } else if (error.message.includes('closed by user')) {
+      } else if (error.message?.includes('closed by user')) {
         alert('Login cancelled by user.');
       } else {
         alert('Login failed: ' + error.message);
@@ -173,33 +189,72 @@ const CalenderFolowupB2C = () => {
     }
   };
 
-  // Fetch calendar events from Google Calendar
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+      sessionStorage.removeItem('googleAuthToken');
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+      fetchCalendarEvents();
+    } catch (err) {
+      console.error('Error disconnecting Google Calendar:', err);
+    }
+  };
+
+  const isLikelyB2bGoogleEvent = (ge) => {
+    const summary = (ge.summary || '').toLowerCase();
+    const description = (ge.description || '').toLowerCase();
+    return summary.includes('b2b') || description.includes('b2b');
+  };
+
+  // B2C CRM follow-ups only (no centre visits, no B2B-tagged Google events); + other Google primary events when connected
   const fetchCalendarEvents = async () => {
     try {
       setIsLoading(true);
+      const auth = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
 
       const response = await axios.get(`${backendUrl}/college/candidate/calendar-visit-data`, {
         params: {
           startDate: selectedDateRange.start.toISOString(),
-          endDate: selectedDateRange.end.toISOString()
+          endDate: selectedDateRange.end.toISOString(),
         },
         headers: {
-          'x-auth': token
-        }
+          'x-auth': auth,
+        },
       });
 
-      if (response.data.status) {
-        // Transform data for calendar
-        const visitEvents = response.data.data.map(visit => ({
-          id: `visit-${visit.id}`,
+      if (!response.data.status) {
+        console.error('Failed to fetch visit calendar data:', response.data.message);
+        setIsLoading(false);
+        return;
+      }
+
+      const raw = response.data.data || [];
+      const dedup = new Map();
+      raw.forEach((row) => {
+        const k = `${row.sourceType}-${String(row.id)}`;
+        if (!dedup.has(k)) dedup.set(k, row);
+      });
+      const rows = Array.from(dedup.values()).filter((r) => r.sourceType === 'b2c_followup');
+
+      const visitEvents = rows.map((visit) => {
+        const prefix = 'b2c';
+        return {
+          id: `${prefix}-${visit.id}`,
           summary: visit.title,
           start: {
             dateTime: visit.start,
-            date: visit.start
+            date: visit.start,
           },
           end: {
             dateTime: visit.end,
-            date: visit.end
+            date: visit.end,
           },
           description: `Visit Type: ${visit.visitType}\nCandidate: ${visit.candidateName}\nMobile: ${visit.candidateMobile}\nCourse: ${visit.courseName}\nCenter: ${visit.centerName}\nStatus: ${visit.status}`,
           location: visit.centerName,
@@ -215,28 +270,76 @@ const CalenderFolowupB2C = () => {
           courseName: visit.courseName,
           centerName: visit.centerName,
           status: visit.status,
-          backgroundColor: getVisitTypeColor(visit.visitType),
-          borderColor: getVisitTypeColor(visit.visitType),
+          backgroundColor: getVisitTypeColor(visit.visitType, true),
+          borderColor: getVisitTypeColor(visit.visitType, true),
           extendedProps: {
-            type: 'visit',
+            type: 'b2c_followup',
             visitType: visit.visitType,
             candidateName: visit.candidateName,
             candidateMobile: visit.candidateMobile,
             candidateEmail: visit.candidateEmail,
             courseName: visit.courseName,
             centerName: visit.centerName,
-          }
-        }));
-        // console.log("visitEvents", visitEvents)
-        // Merge with existing calendar events
-        setCalendarEvents(prev => {
-          const existingEvents = prev.filter(event => event.extendedProps?.type !== 'visit');
-          return [...existingEvents, ...visitEvents];
-        });
+            followupStatus: visit.followupStatus,
+            googleCalendarEventId: visit.googleCalendarEventId || null,
+          },
+        };
+      });
 
-      } else {
-        console.error('Failed to fetch visit calendar data:', response.data.message);
+      const linkedGoogleIds = new Set(
+        rows.filter((r) => r.googleCalendarEventId).map((r) => String(r.googleCalendarEventId))
+      );
+
+      let merged = [...visitEvents];
+      const freshUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+      if (freshUser.googleAuthToken?.accessToken) {
+        try {
+          const gres = await axios.post(`${backendUrl}/api/getgooglecalendarevents`, {
+            user: freshUser,
+            accessToken: freshUser.googleAuthToken.accessToken,
+            startDate: selectedDateRange.start.toISOString(),
+            endDate: selectedDateRange.end.toISOString(),
+          });
+          const payload = gres.data?.data;
+          const gList = payload?.events || [];
+          const googleMapped = gList
+            .filter(
+              (ge) =>
+                ge?.id &&
+                !linkedGoogleIds.has(String(ge.id)) &&
+                !isLikelyB2bGoogleEvent(ge)
+            )
+            .map((ge) => {
+              const s = ge.start?.dateTime || ge.start?.date;
+              const e = ge.end?.dateTime || ge.end?.date || s;
+              return {
+                id: `gcal-${ge.id}`,
+                summary: ge.summary || 'Google Calendar',
+                htmlLink: ge.htmlLink,
+                start: { dateTime: s, date: s },
+                end: { dateTime: e, date: e },
+                description: ge.description || '',
+                location: ge.location || '',
+                backgroundColor: '#fbbc04',
+                borderColor: '#f59e0b',
+                extendedProps: {
+                  type: 'google',
+                  googleEventId: ge.id,
+                },
+              };
+            });
+          merged = [...merged, ...googleMapped];
+        } catch (ge) {
+          console.warn('Google Calendar list failed:', ge?.response?.data || ge?.message);
+        }
       }
+
+      const seen = new Map();
+      merged.forEach((ev) => {
+        if (!seen.has(ev.id)) seen.set(ev.id, ev);
+      });
+      setCalendarEvents(Array.from(seen.values()));
+      window.dispatchEvent(new CustomEvent('b2c-calendar-updated'));
     } catch (error) {
       console.error('Error fetching visit calendar data:', error);
     } finally {
@@ -244,16 +347,19 @@ const CalenderFolowupB2C = () => {
     }
   };
 
-  const getVisitTypeColor = (visitType) => {
+  const getVisitTypeColor = (visitType, isB2cFollowup) => {
+    if (isB2cFollowup) return '#6f42c1'; // purple — CRM follow-up
     switch (visitType) {
       case 'Visit':
-        return '#007bff'; // Blue
+        return '#1a73e8'; // Google-blue
       case 'Joining':
-        return '#28a745'; // Green
+        return '#188038';
       case 'Both':
-        return '#17a2b8'; // Cyan
+        return '#00838f';
+      case 'Follow-up':
+        return '#6f42c1';
       default:
-        return '#6c757d'; // Gray
+        return '#5f6368';
     }
   };
   // Filter events based on search term and status
@@ -285,6 +391,13 @@ const CalenderFolowupB2C = () => {
           return eventStart > now;
         });
         break;
+      case 'ongoing':
+        filtered = filtered.filter(event => {
+          const eventStart = new Date(event.start.dateTime || event.start.date);
+          const eventEnd = new Date(event.end.dateTime || event.end.date);
+          return eventStart <= now && eventEnd >= now;
+        });
+        break;
       case 'completed':
         filtered = filtered.filter(event => {
           const eventEnd = new Date(event.end.dateTime || event.end.date);
@@ -298,7 +411,6 @@ const CalenderFolowupB2C = () => {
         });
         break;
       default:
-        // 'all' - no additional filtering
         break;
     }
 
@@ -433,37 +545,36 @@ const CalenderFolowupB2C = () => {
     return days;
   };
 
+  const localDateKey = (d) => {
+    const x = new Date(d);
+    if (Number.isNaN(x.getTime())) return '';
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  };
+
   const getEventsForDate = (date) => {
-    return filteredEvents.filter(event => {
+    const key = localDateKey(date);
+    return filteredEvents.filter((event) => {
       const eventDate = new Date(event.start.dateTime || event.start.date);
-      return eventDate.toDateString() === date.toDateString();
+      return localDateKey(eventDate) === key;
     });
   };
 
-  // Fetch events when date range changes
+  // Keep week view date range in sync (Sun–Sat) for API fetch
   useEffect(() => {
-    if (userData.googleAuthToken?.accessToken) {
-      fetchCalendarEvents();// Add this line
-    }
-  }, [selectedDateRange]);
+    if (viewMode !== 'calendar' || calendarLayout !== 'week') return;
+    const start = new Date(weekStart);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(weekStart);
+    end.setDate(weekStart.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    setSelectedDateRange({ start, end });
+  }, [viewMode, calendarLayout, weekStart]);
 
-  // Initialize date range and fetch events on component mount
+  // Load B2C visits + follow-ups when range changes (logged-in college user)
   useEffect(() => {
-    if (userData.googleAuthToken?.accessToken) {
-      // Set initial date range based on current view mode
-      if (viewMode === 'calendar') {
-        const today = new Date();
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-        setSelectedDateRange({ start: startOfMonth, end: endOfMonth });
-      } else {
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        setSelectedDateRange({ start: startOfDay, end: endOfDay });
-      }
-    }
-  }, [userData.googleAuthToken?.accessToken, viewMode]);
+    if (!token || !backendUrl) return;
+    fetchCalendarEvents();
+  }, [selectedDateRange, token, backendUrl]);
 
   // Handle event click
   const handleEventClick = (event) => {
@@ -480,8 +591,7 @@ const CalenderFolowupB2C = () => {
   // Mark event as completed
   const handleMarkAsCompleted = async (event, status) => {
     try {
-      const eventId = event.id.split("-")[1];
-      console.log("eventId", eventId)
+      const eventId = String(event.id).replace(/^(visit|b2c)-/, '');
       let remarks = '';
       if (status === 'cancelled') {
         remarks = window.prompt("Enter the reason for cancellation");
@@ -506,8 +616,9 @@ const CalenderFolowupB2C = () => {
         }
       );
 
-
-      console.log('response', response);
+      if (response.data?.status) {
+        await fetchCalendarEvents();
+      }
     } catch (err) {
       console.error("Error marking event as completed", err.response?.data || err.message);
     }
@@ -597,51 +708,156 @@ const CalenderFolowupB2C = () => {
   //   }
   // };
 
-  // Calendar view component
-  const CalendarView = () => {
-    const days = getDaysInMonth(currentMonth);
-    const monthName = currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const shiftWeek = (direction) => {
+    setWeekStart((prev) => {
+      const n = new Date(prev);
+      n.setDate(prev.getDate() + direction * 7);
+      return n;
+    });
+  };
+
+  const switchCalendarLayout = (layout) => {
+    setCalendarLayout(layout);
+    const today = new Date();
+    if (layout === 'month') {
+      const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1, 0, 0, 0);
+      const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59);
+      setSelectedDateRange({ start: startOfMonth, end: endOfMonth });
+    } else {
+      const ws = new Date(today);
+      ws.setDate(today.getDate() - today.getDay());
+      ws.setHours(0, 0, 0, 0);
+      setWeekStart(ws);
+    }
+  };
+
+  const renderEventChip = (event, eventIndex) => {
+    const status = getEventStatus(event);
+    const t = event.extendedProps?.type;
+    const isVisitEvent = t === 'visit';
+    const isB2c = t === 'b2c_followup';
+    const isGoogle = t === 'google';
+    const rawStart = event.start?.dateTime || event.start?.date;
+    const startStr = rawStart != null ? String(rawStart) : '';
+    const isDateOnly =
+      isGoogle && startStr.length <= 10 && !startStr.includes('T');
 
     return (
-      <div className="calendar-container">
-        {/* Calendar Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div className="d-flex align-items-center gap-3">
+      <div
+        key={eventIndex}
+        className={`calendar-event ${getStatusColor(status)} ${isVisitEvent || isB2c || isGoogle ? 'visit-event' : ''}`}
+        title={event.summary}
+        onClick={() => handleEventClick(event)}
+        style={{
+          backgroundColor: event.backgroundColor || '#e8f0fe',
+          borderLeft: `3px solid ${event.borderColor || '#1a73e8'}`,
+        }}
+      >
+        <div className="event-time">
+          {isDateOnly
+            ? 'All day'
+            : new Date(rawStart).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+        </div>
+        {(isVisitEvent || isB2c) && event.extendedProps.candidateName && (
+          <div className="event-candidate-name">
+            <small className="text-white fw-bold text-truncate d-block" style={{ maxWidth: '100%' }}>
+              {event.extendedProps.candidateName}
+            </small>
+          </div>
+        )}
+        {isGoogle && (
+          <div className="event-candidate-name">
+            <small className="text-dark fw-semibold text-truncate d-block" style={{ maxWidth: '100%' }}>
+              {event.summary}
+            </small>
+          </div>
+        )}
+        <div className="event-visit-type">
+          <span
+            className={`badge badge-sm ${isB2c ? 'bg-purple' : isGoogle ? 'bg-warning text-dark' : 'bg-primary'}`}
+            style={isB2c ? { background: '#6f42c1' } : {}}
+          >
+            {isGoogle ? 'Google' : isB2c ? 'Follow-up' : event.extendedProps.visitType}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // Calendar view: Google-style month or week
+  const CalendarView = () => {
+    const days =
+      calendarLayout === 'week'
+        ? Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(weekStart);
+            d.setDate(weekStart.getDate() + i);
+            return { date: d, isCurrentMonth: true };
+          })
+        : getDaysInMonth(currentMonth);
+
+    const monthName = currentMonth.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekLabel = `${weekStart.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+    return (
+      <div className="calendar-container shadow-sm bg-white rounded-3 p-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
             <button
+              type="button"
               className="btn btn-outline-secondary btn-sm"
-              onClick={() => handleMonthChange(-1)}
+              onClick={() => (calendarLayout === 'week' ? shiftWeek(-1) : handleMonthChange(-1))}
+              aria-label="Previous"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={18} />
             </button>
-            <h4 className="mb-0">{monthName}</h4>
+            <h4 className="mb-0 fs-5">{calendarLayout === 'week' ? weekLabel : monthName}</h4>
             <button
+              type="button"
               className="btn btn-outline-secondary btn-sm"
-              onClick={() => handleMonthChange(1)}
+              onClick={() => (calendarLayout === 'week' ? shiftWeek(1) : handleMonthChange(1))}
+              aria-label="Next"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={18} />
             </button>
           </div>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={goToToday}
-          >
-            Today
-          </button>
+          <div className="d-flex flex-wrap gap-2 align-items-center">
+            <div className="btn-group btn-group-sm" role="group">
+              <button
+                type="button"
+                className={`btn btn-outline-secondary ${calendarLayout === 'month' ? 'active' : ''}`}
+                onClick={() => switchCalendarLayout('month')}
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                className={`btn btn-outline-secondary ${calendarLayout === 'week' ? 'active' : ''}`}
+                onClick={() => switchCalendarLayout('week')}
+              >
+                Week
+              </button>
+            </div>
+            <button type="button" className="btn btn-primary btn-sm" onClick={goToToday}>
+              Today
+            </button>
+          </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="calendar-grid">
-          {/* Day Headers */}
+        <div className={`calendar-grid ${calendarLayout === 'week' ? 'calendar-week-mode' : ''}`}>
           <div className="calendar-header">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
               <div key={day} className="calendar-day-header">
                 {day}
               </div>
             ))}
           </div>
 
-          {/* Calendar Days */}
-          <div className="calendar-body">
+          <div className={`calendar-body ${calendarLayout === 'week' ? 'calendar-week-row' : ''}`}>
             {days.map((day, index) => {
               const events = getEventsForDate(day.date);
               const isToday = day.date.toDateString() === new Date().toDateString();
@@ -653,46 +869,10 @@ const CalenderFolowupB2C = () => {
                 >
                   <div className="day-number">{day.date.getDate()}</div>
                   <div className="day-events">
-                    {events.slice(0, 3).map((event, eventIndex) => {
-                      const status = getEventStatus(event);
-                      const isVisitEvent = event.extendedProps?.type === 'visit';
-
-                      return (
-                        <div
-                          key={eventIndex}
-                          className={`calendar-event ${getStatusColor(status)} ${isVisitEvent ? 'visit-event' : ''}`}
-                          title={event.summary}
-                          onClick={() => handleEventClick(event)}
-                          style={{
-                            backgroundColor: event.backgroundColor || '#e3f2fd',
-                            borderLeftColor: event.borderColor || '#007bff'
-                          }}
-                        >
-                          <div className="event-time">
-                            {new Date(event.start.dateTime || event.start.date).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                          {/* Show candidate name for visit events */}
-                          {isVisitEvent && event.extendedProps.candidateName && (
-                            <div className="event-candidate-name">
-                              <small className="text-white fw-bold">
-                                {event.extendedProps.candidateName}
-                              </small>
-                            </div>
-                          )}
-                          {isVisitEvent && (
-                            <div className="event-visit-type">
-                              <span className="badge bg-primary badge-sm">
-                                {event.extendedProps.visitType}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
+                    {events.slice(0, calendarLayout === 'week' ? 12 : 3).map((event, eventIndex) => renderEventChip(event, eventIndex))}
+                    {events.length > (calendarLayout === 'week' ? 12 : 3) && (
+                      <div className="more-events text-muted small">+{events.length - (calendarLayout === 'week' ? 12 : 3)} more</div>
+                    )}
                   </div>
                 </div>
               );
@@ -710,70 +890,77 @@ const CalenderFolowupB2C = () => {
         <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
           <div className="flex-grow-1">
             <h1 className="display-6 display-lg-5 fw-bold text-dark mb-2">B2C Follow-up Calendar</h1>
-            <p className="text-muted mb-0">Manage and track your B2C follow-up events from Google Calendar</p>
+            <p className="text-muted mb-0">
+              CRM follow-ups (Admission / Registrations) and your <strong>Google Calendar</strong> in one place. Connect Google once — same link as Registrations — to see events created when you save a follow-up.
+            </p>
           </div>
-          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
+          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto align-items-stretch">
+            <div className="btn-group w-100 w-sm-auto" role="group">
+              <button
+                type="button"
+                className={`btn btn-outline-secondary ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => handleViewModeChange('list')}
+                disabled={!token}
+              >
+                <List className="me-1" size={16} />
+                <span className="d-none d-sm-inline">List</span>
+              </button>
+              <button
+                type="button"
+                className={`btn btn-outline-secondary ${viewMode === 'calendar' ? 'active' : ''}`}
+                onClick={() => handleViewModeChange('calendar')}
+                disabled={!token}
+              >
+                <Grid className="me-1" size={16} />
+                <span className="d-none d-sm-inline">Calendar</span>
+              </button>
+            </div>
+            <button
+              className="btn btn-outline-primary w-100 w-sm-auto"
+              onClick={fetchCalendarEvents}
+              disabled={isLoading || !token}
+            >
+              {isLoading ? (
+                <>
+                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <span className="d-none d-sm-inline">Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="me-2" size={20} />
+                  <span className="d-none d-sm-inline">Refresh</span>
+                </>
+              )}
+            </button>
             {!userData.googleAuthToken?.accessToken ? (
               <button
-                className="btn btn-primary"
+                type="button"
+                className="btn btn-outline-secondary w-100 w-sm-auto"
                 onClick={handleGoogleLogin}
-                disabled={isGoogleLoginLoading}
+                disabled={isGoogleLoginLoading || !token}
+                title="Connect Google Calendar (same as Registrations)"
               >
                 {isGoogleLoginLoading ? (
-                  <>
-                    <div className="spinner-border spinner-border-sm me-2" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    Connecting...
-                  </>
+                  <span className="spinner-border spinner-border-sm" role="status" />
                 ) : (
                   <>
-                    <Calendar className="me-2" size={20} />
-                    <span className="d-none d-sm-inline">Connect Google Calendar</span>
-                    <span className="d-sm-none">Connect</span>
+                    <Calendar className="me-2" size={18} />
+                    <span className="d-none d-sm-inline">Connect Google</span>
                   </>
                 )}
               </button>
             ) : (
-              <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
-                <div className="btn-group w-100 w-sm-auto" role="group">
-                  <button
-                    type="button"
-                    className={`btn btn-outline-secondary ${viewMode === 'list' ? 'active' : ''}`}
-                    onClick={() => handleViewModeChange('list')}
-                  >
-                    <List className="me-1" size={16} />
-                    <span className="d-none d-sm-inline">List</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-outline-secondary ${viewMode === 'calendar' ? 'active' : ''}`}
-                    onClick={() => handleViewModeChange('calendar')}
-                  >
-                    <Grid className="me-1" size={16} />
-                    <span className="d-none d-sm-inline">Calendar</span>
-                  </button>
-                </div>
+              <div className="d-flex flex-column flex-sm-row gap-1 align-items-stretch">
+                <span className="align-self-center small text-success px-1 d-none d-sm-inline">Google linked</span>
                 <button
-                  className="btn btn-outline-primary w-100 w-sm-auto"
-                  onClick={fetchCalendarEvents}
-                  disabled={isLoading}
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleGoogleLogout}
+                  title="Disconnect Google Calendar on this browser"
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="spinner-border spinner-border-sm me-2" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <span className="d-none d-sm-inline">Refreshing...</span>
-                      <span className="d-sm-none">Refresh</span>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="me-2" size={20} />
-                      <span className="d-none d-sm-inline">Refresh Events</span>
-                      <span className="d-sm-none">Refresh</span>
-                    </>
-                  )}
+                  Disconnect
                 </button>
               </div>
             )}
@@ -781,20 +968,14 @@ const CalenderFolowupB2C = () => {
         </div>
       </div>
 
-      {/* Google Calendar Connection Status */}
-      {!userData.googleAuthToken?.accessToken && (
-        <div className="alert alert-info d-flex align-items-center" role="alert">
-          <Calendar className="me-2" size={20} />
-          <div>
-            <strong>Connect to Google Calendar</strong>
-            <br />
-            <small>Connect your Google Calendar to view and manage B2C follow-up events.</small>
-          </div>
+      {!token && (
+        <div className="alert alert-warning" role="alert">
+          Sign in with your institute account to load visits and B2C follow-ups.
         </div>
       )}
 
       {/* Filters and Search */}
-      {userData.googleAuthToken?.accessToken && (
+      {token && (
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="row g-3">
@@ -924,7 +1105,7 @@ const CalenderFolowupB2C = () => {
       )}
 
       {/* Content */}
-      {userData.googleAuthToken?.accessToken && (
+      {token && (
         <div className="row">
           <div className="col-12">
             {isLoading ? (
@@ -1285,6 +1466,10 @@ const CalenderFolowupB2C = () => {
           grid-template-rows: repeat(6, 1fr);
         }
 
+        .calendar-body.calendar-week-row {
+          grid-template-rows: minmax(280px, auto);
+        }
+
         .calendar-day {
           min-height: 120px;
           border-right: 1px solid #e9ecef;
@@ -1585,45 +1770,60 @@ const CalenderFolowupB2C = () => {
                   <div className="col-lg-4">
                     {/* Action Buttons */}
                     <div className="d-flex flex-column gap-2 mb-3">
-                      <button className="btn btn-primary btn-sm">
-                        <Phone className="me-2" size={16} />
-                        Call Contact
-                      </button>
-                      <button className="btn btn-success btn-sm">
-                        <Mail className="me-2" size={16} />
-                        Send Email
-                      </button>
-                      <button
-                        className="btn btn-info btn-sm"
-                        onClick={handleReschedule}
-                      >
-                        <Calendar className="me-2" size={16} />
-                        Reschedule
-                      </button>
-                      <button
-                        className="btn btn-warning btn-sm"
-                        onClick={() => handleMarkAsCompleted(selectedEvent)}
-                      >
-                        <AlertCircle className="me-2" size={16} />
-                        Mark as Completed
-                      </button>
-                      <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMarkAsCompleted(selectedEvent, 'cancelled')}>Cancel</button>
-                      <button className="btn btn-outline-secondary btn-sm">
-                        <CalendarDays className="me-2" size={16} />
-                        View in Google Calendar
-                      </button>
+                      {selectedEvent.extendedProps?.type !== 'google' && (
+                        <>
+                          <button className="btn btn-primary btn-sm">
+                            <Phone className="me-2" size={16} />
+                            Call Contact
+                          </button>
+                          <button className="btn btn-success btn-sm">
+                            <Mail className="me-2" size={16} />
+                            Send Email
+                          </button>
+                          <button
+                            className="btn btn-info btn-sm"
+                            onClick={handleReschedule}
+                          >
+                            <Calendar className="me-2" size={16} />
+                            Reschedule
+                          </button>
+                          <button
+                            className="btn btn-warning btn-sm"
+                            onClick={() => handleMarkAsCompleted(selectedEvent)}
+                          >
+                            <AlertCircle className="me-2" size={16} />
+                            Mark as Completed
+                          </button>
+                          <button className="btn btn-outline-secondary btn-sm" onClick={() => handleMarkAsCompleted(selectedEvent, 'cancelled')}>Cancel</button>
+                        </>
+                      )}
+                      {selectedEvent.htmlLink && (
+                        <a
+                          className="btn btn-outline-primary btn-sm"
+                          href={selectedEvent.htmlLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <CalendarDays className="me-2" size={16} />
+                          Open in Google Calendar
+                        </a>
+                      )}
                     </div>
 
                     {/* Event Metadata */}
                     <div className="p-3 bg-light rounded">
                       <h6 className="mb-3">Event Details</h6>
                       <div className="small text-muted">
+                        {selectedEvent.createdAt && (
                         <div className="mb-1">
                           <strong>Created:</strong> {new Date(selectedEvent.createdAt).toLocaleString()}
                         </div>
+                        )}
+                        {selectedEvent.updatedAt && (
                         <div className="mb-1">
                           <strong>Last Updated:</strong> {new Date(selectedEvent.updatedAt).toLocaleString()}
                         </div>
+                        )}
                         <div className="mb-1">
                           <strong>Event ID:</strong>
                           <div className="text-break font-monospace small">{selectedEvent.id}</div>

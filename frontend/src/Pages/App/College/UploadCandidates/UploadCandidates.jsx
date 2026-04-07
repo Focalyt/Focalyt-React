@@ -796,496 +796,1127 @@ const UploadCandidates = () => {
     );
   };
 
+  const totalActiveFilters =
+    filterData.course.values.length +
+    filterData.year.values.length +
+    filterData.session.values.length;
+
+  const tabConfig = {
+    imports: {
+      title: 'Import History',
+      subtitle: 'Review previous uploads, status updates, and processed record counts.',
+      icon: 'fas fa-clock-rotate-left',
+      count: imports.length
+    },
+    candidates: {
+      title: 'Uploaded Candidates',
+      subtitle: 'Browse every imported candidate with search and academic filters.',
+      icon: 'fas fa-user-graduate',
+      count: uploadedCandidates.length
+    },
+    active: {
+      title: 'Active Candidates',
+      subtitle: 'Track candidates currently active in the placement pipeline.',
+      icon: 'fas fa-circle-check',
+      count: activeCandidates.length
+    },
+    inactive: {
+      title: 'Inactive Candidates',
+      subtitle: 'Review profiles that are currently inactive or paused.',
+      icon: 'fas fa-user-clock',
+      count: inactiveCandidates.length
+    }
+  };
+
+  const currentTabConfig = tabConfig[activeTab];
+
   return (
     <>
+      <div className="upload-candidates-page">
+        <section className="upload-header-shell">
+          <div className="page-title-card">
+            <div className="upload-hero-copy">
+              <span className="upload-hero-badge">
+                <i className="fas fa-file-arrow-up"></i>
+                Candidate Pipeline
+              </span>
+              <h1>Upload Candidates</h1>
+              <p>
+                Import candidate spreadsheets, review upload history, and manage candidate records from one organized workspace.
+              </p>
+            </div>
+            {/* <div className="upload-hero-metrics compact">
+              <div className="upload-metric-card">
+                <span className="metric-label">Current View</span>
+                <strong>{currentTabConfig.title}</strong>
+              </div>
+              <div className="upload-metric-card">
+                <span className="metric-label">Applied Filters</span>
+                <strong>{totalActiveFilters}</strong>
+              </div>
+              <div className="upload-metric-card">
+                <span className="metric-label">Search</span>
+                <strong>{appliedSearchTerm ? 'Active' : 'All Records'}</strong>
+              </div>
+            </div> */}
+          </div>
 
-        <div className="content-header row">
-          <div className="col-12 mb-2">
-            <div className="row breadcrumbs-top justify-content-between align-items-center flex-wrap" style={{ flexWrap: 'nowrap' }}>
-              <div className="col-12 col-sm-auto text-center text-sm-left">
-                <h4 className="content-header-title mb-0 mx-3 text-upload">Upload Candidates</h4>
-              </div>
-              <div className="col-12 col-sm-auto text-center">
-                <div className="d-flex gap-2 align-items-center" style={{ flexWrap: 'nowrap' }}>
-                  <div className="input-group" style={{ minWidth: '250px', flex: '1 1 auto' }}>
-                    <span className="input-group-text bg-light border-end-0">
-                      <i className="fas fa-search text-muted"></i>
-                    </span>
-                    <input
-                      type="text"
-                      className="form-control border-start-0"
-                      placeholder="Search by name, email, or contact number..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSearch();
-                        }
-                      }}
-                      style={{ 
-                        outline: 'none',
-                        boxShadow: 'none',
-                        borderColor: '#dee2e6'
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = '#dee2e6'}
-                      onBlur={(e) => e.target.style.borderColor = '#dee2e6'}
-                    />
-                    <button
-                      className="btn btn-primary border-start-0"
-                      type="button"
-                      onClick={handleSearch}
-                      style={{ borderColor: '#0d6efd' }}
-                    >
-                      <i className="fas fa-search"></i>
-                    </button>
-                    {(searchTerm || appliedSearchTerm) && (
-                      <button
-                        className="btn btn-outline-secondary border-start-0"
-                        type="button"
-                        onClick={handleClearSearch}
-                        style={{ borderColor: '#dee2e6' }}
-                      >
-                        <i className="fas fa-times"></i>
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    className="btn btn-outline-primary d-flex align-items-center"
-                    onClick={() => setShowFilterModal(true)}
-                    style={{ 
-                      whiteSpace: 'nowrap',
-                      borderColor: '#0d6efd',
-                      outline: 'none',
-                      flexShrink: 0
-                    }}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    <i className="fas fa-filter me-2"></i>
-                    {(filterData.course.values.length > 0 || 
-                      filterData.year.values.length > 0 || 
-                      filterData.session.values.length > 0) && (
-                      <span className="badge bg-primary ms-2 rounded-pill">
-                        {filterData.course.values.length + 
-                         filterData.year.values.length + 
-                         filterData.session.values.length}
-                      </span>
-                    )}
-                  </button>
-                  <button 
-                    onClick={downloadSample} 
-                    className="btn btn-success lovepreet"
-                    style={{ whiteSpace: 'nowrap', outline: 'none', flexShrink: 0 }}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    Download Sample
-                  </button>
-                </div>
-              </div>
+          <div className="upload-toolbar-card">
+            <label className="toolbar-label">Quick Search</label>
+            <div className="search-shell">
+              <i className="fas fa-search"></i>
+              <input
+                type="text"
+                placeholder="Search by name, email, or contact number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+              />
+              <button type="button" className="toolbar-btn toolbar-btn-primary" onClick={handleSearch}>
+                Search
+              </button>
+              {(searchTerm || appliedSearchTerm) && (
+                <button type="button" className="toolbar-btn toolbar-btn-ghost" onClick={handleClearSearch}>
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="toolbar-actions-row">
+              {/* <button
+                type="button"
+                className="toolbar-action-pill"
+                onClick={() => setShowFilterModal(true)}
+              >
+                <i className="fas fa-sliders"></i>
+                Filters
+                {totalActiveFilters > 0 && <span className="toolbar-count">{totalActiveFilters}</span>}
+              </button> */}
+
+              <button
+                type="button"
+                className="toolbar-action-pill success"
+                onClick={downloadSample}
+              >
+                <i className="fas fa-download"></i>
+                Download Sample
+              </button>
             </div>
           </div>
-        </div>
+        </section>
 
         {loading && <div id="preloader">Loading...</div>}
-        
-        <div className="content-body">
+
+        <div className="content-body upload-page-body">
           {message && (
-            <div className={`alert ${message.includes('successfully') || message.includes('inserted') ? 'alert-success' : 'alert-danger'}`} role="alert">
+            <div
+              className={`upload-status-banner ${message.includes('successfully') || message.includes('inserted') ? 'success' : 'error'}`}
+              role="alert"
+            >
+              <i className={`fas ${message.includes('successfully') || message.includes('inserted') ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
               {message}
             </div>
           )}
-          
-          <section>
-            <div className="container">
-              <div className="row">
-                <div className="custom-bulk-align card mb-0">
-                  <div className="content-header row d-xl-block d-lg-block d-md-block d-sm-block d-block">
-                    <div className="col-12 rounded equal-height-2 coloumn-2">
-                      <div className="content-header-left col-md-12 col-12">
-                        <div className="row breadcrumbs-top p-1">
-                          <div className="col-12">
-                            <form onSubmit={handleSubmit} id="candidateUpload" encType="multipart/form-data">
-                              <input 
-                                style={{ display: 'block' }} 
-                                type="file" 
-                                id="myFile" 
-                                name="filename"
-                                onChange={handleFileChange}
-                              />
-                              <div className="custom-bulkupload-btn-block" style={{ display: 'block' }}>
-                                <button 
-                                  type="submit" 
-                                  className="btn btn-success my-1 mt-2"
-                                  id="submitBtn"
-                                  disabled={loading}
-                                >
-                                  Submit
-                                </button>
-                              </div>
-                            </form>
-                          </div>
-                          
-                                                  {/* Tabs */}
-                          <div className="col-12 mb-3">
-                            <ul className="nav nav-tabs" role="tablist">
-                              <li className="nav-item">
-                                <button
-                                  className={`nav-link ${activeTab === 'imports' ? 'active' : ''}`}
-                                  onClick={() => setActiveTab('imports')}
-                                  type="button"
-                                >
-                                  Import History
-                                </button>
-                              </li>
-                              <li className="nav-item">
-                                <button
-                                  className={`nav-link ${activeTab === 'candidates' ? 'active' : ''}`}
-                                  onClick={() => setActiveTab('candidates')}
-                                  type="button"
-                                >
-                                  Uploaded Candidates
-                                </button>
-                              </li>
-                              <li className="nav-item">
-                                <button
-                                  className={`nav-link ${activeTab === 'active' ? 'active' : ''}`}
-                                  onClick={() => setActiveTab('active')}
-                                  type="button"
-                                >
-                                  Active Candidate
-                                </button>
-                              </li>
-                              <li className="nav-item">
-                                <button
-                                  className={`nav-link ${activeTab === 'inactive' ? 'active' : ''}`}
-                                  onClick={() => setActiveTab('inactive')}
-                                  type="button"
-                                >
-                                  Inactive Candidate
-                                </button>
-                              </li>
-                            </ul>
-                          </div>
-                          
-                          {/* Tab Content */}
-                          <div className="col-12">
-                            {activeTab === 'imports' ? (
-                              <div className="card-content">
-                                <div className="table-responsive">
-                                  {imports && imports.length > 0 ? (
-                                    <table className="table table-hover-animation mb-0">
-                                      <thead>
-                                        <tr>
-                                          <th>FILE NAME</th>
-                                          <th>MESSAGE</th>
-                                          <th>STATUS</th>
-                                          <th>RECORDS INSERTED</th>
-                                          <th>UPLOAD DATE</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {imports.map((item, index) => (
-                                          <tr key={item._id}>
-                                            <td className="text-capitalize">{item.name}</td>
-                                            <td>
-                                              <div style={{ maxHeight: '200px', overflow: 'auto' }}>
-                                                {item.message ? (
-                                                  <div dangerouslySetInnerHTML={{ __html: item.message }}></div>
-                                                ) : (
-                                                  <span>N/A</span>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td>{item.status}</td>
-                                            <td>{item.record}</td>
-                                            <td>{moment(item.createdAt).format('Do MMMM, YYYY HH:mm')}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  ) : (
-                                    <p className="text-center mt-3">No import history found</p>
-                                  )}
-                                </div>
-                                {renderPagination()}
-                              </div>
-                            ) : activeTab === 'candidates' ? (
-                              <div className="card-content">
-                                {candidatesLoading ? (
-                                  <div className="text-center mt-3">
-                                    <div className="spinner-border" role="status">
-                                      <span className="sr-only">Loading...</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="table-responsive">
-                                    {uploadedCandidates && uploadedCandidates.length > 0 ? (
-                                      <table className="table table-hover-animation mb-0">
-                                        <thead>
-                                          <tr>
-                                            <th>Sr. No.</th>
-                                            <th>Candidate Name</th>
-                                            <th>Father Name</th>
-                                            <th>Course</th>
-                                            <th>Year (1st/2nd/3rd/4th)</th>
-                                            <th>Contact Number</th>
-                                            <th>Email</th>
-                                            <th>Gender</th>
-                                            <th>DOB</th>
-                                            <th>Session/Semester</th>
-                                            <th>Upload Date</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {uploadedCandidates.map((candidate, index) => (
-                                            <tr key={candidate._id}>
-                                              <td>{(candidatesPage - 1) * 50 + index + 1}</td>
-                                              <td className="text-capitalize">{candidate.name || 'N/A'}</td>
-                                              <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
-                                              <td>{candidate.course || 'N/A'}</td>
-                                              <td>{candidate.year || 'N/A'}</td>
-                                              <td>{candidate.contactNumber || 'N/A'}</td>
-                                              <td>{candidate.email || 'N/A'}</td>
-                                              <td>{candidate.gender || 'N/A'}</td>
-                                              <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
-                                              <td>{candidate.session || 'N/A'}</td>
-                                              <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    ) : (
-                                      <p className="text-center mt-3">No uploaded candidates found</p>
-                                    )}
-                                  </div>
-                                )}
-                                {renderCandidatesPagination()}
-                              </div>
-                            ) : activeTab === 'active' ? (
-                              <div className="card-content">
-                                {activeLoading ? (
-                                  <div className="text-center mt-3">
-                                    <div className="spinner-border" role="status">
-                                      <span className="sr-only">Loading...</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="table-responsive">
-                                    {activeCandidates && activeCandidates.length > 0 ? (
-                                      <table className="table table-hover-animation mb-0">
-                                        <thead>
-                                          <tr>
-                                            <th>Sr. No.</th>
-                                            <th>Candidate Name</th>
-                                            <th>Father Name</th>
-                                            <th>Contact Number</th>
-                                            <th>Email</th>
-                                            <th>Gender</th>
-                                            <th>DOB</th>
-                                            <th>Course</th>
-                                            <th>Year (1st/2nd/3rd/4th)</th>
-                                            <th>Session/Semester</th>
-                                            <th>Upload Date</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {activeCandidates.map((candidate, index) => (
-                                            <tr key={candidate._id}>
-                                              <td>{(activePage - 1) * 50 + index + 1}</td>
-                                              <td className="text-capitalize">{candidate.name || 'N/A'}</td>
-                                              <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
-                                              <td>{candidate.contactNumber || 'N/A'}</td>
-                                              <td>{candidate.email || 'N/A'}</td>
-                                              <td>{candidate.gender || 'N/A'}</td>
-                                              <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
-                                              <td>{candidate.course || 'N/A'}</td>
-                                              <td>{candidate.year || 'N/A'}</td>
-                                              <td>{candidate.session || 'N/A'}</td>
-                                              <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    ) : (
-                                      <p className="text-center mt-3">No active candidates found</p>
-                                    )}
-                                  </div>
-                                )}
-                                {renderActivePagination()}
-                              </div>
-                            ) : (
-                              <div className="card-content">
-                                {inactiveLoading ? (
-                                  <div className="text-center mt-3">
-                                    <div className="spinner-border" role="status">
-                                      <span className="sr-only">Loading...</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="table-responsive">
-                                    {inactiveCandidates && inactiveCandidates.length > 0 ? (
-                                      <table className="table table-hover-animation mb-0">
-                                        <thead>
-                                          <tr>
-                                            <th>Sr. No.</th>
-                                            <th>Candidate Name</th>
-                                            <th>Father Name</th>
-                                            <th>Contact Number</th>
-                                            <th>Email</th>
-                                            <th>Gender</th>
-                                            <th>DOB</th>
-                                            <th>Course</th>
-                                            <th>Year (1st/2nd/3rd/4th)</th>
-                                            <th>Session/Semester</th>
-                                            <th>Upload Date</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {inactiveCandidates.map((candidate, index) => (
-                                            <tr key={candidate._id}>
-                                              <td>{(inactivePage - 1) * 50 + index + 1}</td>
-                                              <td className="text-capitalize">{candidate.name || 'N/A'}</td>
-                                              <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
-                                              <td>{candidate.contactNumber || 'N/A'}</td>
-                                              <td>{candidate.email || 'N/A'}</td>
-                                              <td>{candidate.gender || 'N/A'}</td>
-                                              <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
-                                              <td>{candidate.course || 'N/A'}</td>
-                                              <td>{candidate.year || 'N/A'}</td>
-                                              <td>{candidate.session || 'N/A'}</td>
-                                              <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    ) : (
-                                      <p className="text-center mt-3">No inactive candidates found</p>
-                                    )}
-                                  </div>
-                                )}
-                                {renderInactivePagination()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+
+          <section className="upload-shell">
+            <div className="upload-stack">
+              <div className="upload-panel card-like upload-panel-wide">
+                <div className="section-head upload-panel-head">
+                  <div>
+                    <span className="section-kicker">Bulk Upload</span>
+                    <h3>Import candidate spreadsheet</h3>
+                    <p>Accepted formats: `.xlsx`, `.xls`, `.csv` up to 10MB. Use the sample file to keep columns aligned.</p>
+                  </div>
+                  <span className="soft-badge">
+                    <i className="fas fa-shield-check"></i>
+                    Secure upload
+                  </span>
+                </div>
+
+                <form onSubmit={handleSubmit} id="candidateUpload" encType="multipart/form-data" className="upload-form-shell upload-form-row">
+                  <div className="file-drop-shell compact">
+                    <div className="file-drop-icon">
+                      <i className="fas fa-file-import"></i>
+                    </div>
+                    <div className="file-drop-copy">
+                      <h4>{file ? file.name : 'Choose candidate file'}</h4>
+                      <p>{file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB selected` : 'Browse and upload your source sheet.'}</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="myFile"
+                      name="filename"
+                      onChange={handleFileChange}
+                      className="stylish-file-input"
+                    />
+                  </div>
+
+                  <div className="upload-side-actions">
+                    <div className="upload-hints">
+                      <span><i className="fas fa-circle-info"></i> Keep headers aligned with the sample file.</span>
+                      <span><i className="fas fa-bolt"></i> Import history refreshes automatically after upload.</span>
+                    </div>
+                    <button
+                      type="submit"
+                      className="primary-gradient-btn upload-submit-btn"
+                      id="submitBtn"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="mini-spinner"></span>
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-cloud-arrow-up"></i>
+                          Upload File
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="records-panel card-like">
+                <div className="records-panel-top">
+                  <div className="section-head compact">
+                    <div>
+                      <span className="section-kicker">Records</span>
+                      <h3>{currentTabConfig.title}</h3>
+                      <p>{currentTabConfig.subtitle}</p>
                     </div>
                   </div>
+                  <div className="records-summary-chip">
+                    <i className={currentTabConfig.icon}></i>
+                    <span>{currentTabConfig.count} visible</span>
+                  </div>
+                </div>
+
+                <div className="tab-pill-row" role="tablist" aria-label="Candidate views">
+                  <button className={`tab-pill ${activeTab === 'imports' ? 'active' : ''}`} onClick={() => setActiveTab('imports')} type="button">
+                    <i className="fas fa-clock-rotate-left"></i>
+                    Import History
+                  </button>
+                  <button className={`tab-pill ${activeTab === 'candidates' ? 'active' : ''}`} onClick={() => setActiveTab('candidates')} type="button">
+                    <i className="fas fa-user-graduate"></i>
+                    Uploaded
+                  </button>
+                  <button className={`tab-pill ${activeTab === 'active' ? 'active' : ''}`} onClick={() => setActiveTab('active')} type="button">
+                    <i className="fas fa-circle-check"></i>
+                    Active
+                  </button>
+                  <button className={`tab-pill ${activeTab === 'inactive' ? 'active' : ''}`} onClick={() => setActiveTab('inactive')} type="button">
+                    <i className="fas fa-user-clock"></i>
+                    Inactive
+                  </button>
+                </div>
+
+                <div className="table-card-shell">
+                  {activeTab === 'imports' ? (
+                    <div className="card-content">
+                      <div className="table-responsive modern-table-wrap">
+                        {imports && imports.length > 0 ? (
+                          <table className="table table-hover-animation mb-0 modern-data-table">
+                            <thead>
+                              <tr>
+                                <th>File Name</th>
+                                <th>Message</th>
+                                <th>Status</th>
+                                <th>Records Inserted</th>
+                                <th>Upload Date</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {imports.map((item) => (
+                                <tr key={item._id}>
+                                  <td className="text-capitalize fw-semibold">{item.name}</td>
+                                  <td>
+                                    <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                                      {item.message ? (
+                                        <div dangerouslySetInnerHTML={{ __html: item.message }}></div>
+                                      ) : (
+                                        <span>N/A</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>{item.status}</td>
+                                  <td>{item.record}</td>
+                                  <td>{moment(item.createdAt).format('Do MMMM, YYYY HH:mm')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div className="empty-state-shell">
+                            <i className="fas fa-inbox"></i>
+                            <p>No import history found</p>
+                          </div>
+                        )}
+                      </div>
+                      {renderPagination()}
+                    </div>
+                  ) : activeTab === 'candidates' ? (
+                    <div className="card-content">
+                      {candidatesLoading ? (
+                        <div className="table-loading-shell">
+                          <div className="spinner-border" role="status">
+                            <span className="sr-only">Loading...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="table-responsive modern-table-wrap">
+                          {uploadedCandidates && uploadedCandidates.length > 0 ? (
+                            <table className="table table-hover-animation mb-0 modern-data-table">
+                              <thead>
+                                <tr>
+                                  <th>Sr. No.</th>
+                                  <th>Candidate Name</th>
+                                  <th>Father Name</th>
+                                  <th>Course</th>
+                                  <th>Year</th>
+                                  <th>Contact Number</th>
+                                  <th>Email</th>
+                                  <th>Gender</th>
+                                  <th>DOB</th>
+                                  <th>Session/Semester</th>
+                                  <th>Upload Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {uploadedCandidates.map((candidate, index) => (
+                                  <tr key={candidate._id}>
+                                    <td>{(candidatesPage - 1) * 50 + index + 1}</td>
+                                    <td className="text-capitalize fw-semibold">{candidate.name || 'N/A'}</td>
+                                    <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
+                                    <td>{candidate.course || 'N/A'}</td>
+                                    <td>{candidate.year || 'N/A'}</td>
+                                    <td>{candidate.contactNumber || 'N/A'}</td>
+                                    <td>{candidate.email || 'N/A'}</td>
+                                    <td>{candidate.gender || 'N/A'}</td>
+                                    <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
+                                    <td>{candidate.session || 'N/A'}</td>
+                                    <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="empty-state-shell">
+                              <i className="fas fa-users-slash"></i>
+                              <p>No uploaded candidates found</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {renderCandidatesPagination()}
+                    </div>
+                  ) : activeTab === 'active' ? (
+                    <div className="card-content">
+                      {activeLoading ? (
+                        <div className="table-loading-shell">
+                          <div className="spinner-border" role="status">
+                            <span className="sr-only">Loading...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="table-responsive modern-table-wrap">
+                          {activeCandidates && activeCandidates.length > 0 ? (
+                            <table className="table table-hover-animation mb-0 modern-data-table">
+                              <thead>
+                                <tr>
+                                  <th>Sr. No.</th>
+                                  <th>Candidate Name</th>
+                                  <th>Father Name</th>
+                                  <th>Contact Number</th>
+                                  <th>Email</th>
+                                  <th>Gender</th>
+                                  <th>DOB</th>
+                                  <th>Course</th>
+                                  <th>Year</th>
+                                  <th>Session/Semester</th>
+                                  <th>Upload Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activeCandidates.map((candidate, index) => (
+                                  <tr key={candidate._id}>
+                                    <td>{(activePage - 1) * 50 + index + 1}</td>
+                                    <td className="text-capitalize fw-semibold">{candidate.name || 'N/A'}</td>
+                                    <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
+                                    <td>{candidate.contactNumber || 'N/A'}</td>
+                                    <td>{candidate.email || 'N/A'}</td>
+                                    <td>{candidate.gender || 'N/A'}</td>
+                                    <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
+                                    <td>{candidate.course || 'N/A'}</td>
+                                    <td>{candidate.year || 'N/A'}</td>
+                                    <td>{candidate.session || 'N/A'}</td>
+                                    <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="empty-state-shell">
+                              <i className="fas fa-user-check"></i>
+                              <p>No active candidates found</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {renderActivePagination()}
+                    </div>
+                  ) : (
+                    <div className="card-content">
+                      {inactiveLoading ? (
+                        <div className="table-loading-shell">
+                          <div className="spinner-border" role="status">
+                            <span className="sr-only">Loading...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="table-responsive modern-table-wrap">
+                          {inactiveCandidates && inactiveCandidates.length > 0 ? (
+                            <table className="table table-hover-animation mb-0 modern-data-table">
+                              <thead>
+                                <tr>
+                                  <th>Sr. No.</th>
+                                  <th>Candidate Name</th>
+                                  <th>Father Name</th>
+                                  <th>Contact Number</th>
+                                  <th>Email</th>
+                                  <th>Gender</th>
+                                  <th>DOB</th>
+                                  <th>Course</th>
+                                  <th>Year</th>
+                                  <th>Session/Semester</th>
+                                  <th>Upload Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {inactiveCandidates.map((candidate, index) => (
+                                  <tr key={candidate._id}>
+                                    <td>{(inactivePage - 1) * 50 + index + 1}</td>
+                                    <td className="text-capitalize fw-semibold">{candidate.name || 'N/A'}</td>
+                                    <td className="text-capitalize">{candidate.fatherName || 'N/A'}</td>
+                                    <td>{candidate.contactNumber || 'N/A'}</td>
+                                    <td>{candidate.email || 'N/A'}</td>
+                                    <td>{candidate.gender || 'N/A'}</td>
+                                    <td>{candidate.dob ? moment(candidate.dob).format('Do MMMM, YYYY') : 'N/A'}</td>
+                                    <td>{candidate.course || 'N/A'}</td>
+                                    <td>{candidate.year || 'N/A'}</td>
+                                    <td>{candidate.session || 'N/A'}</td>
+                                    <td>{candidate.createdAt ? moment(candidate.createdAt).format('Do MMMM, YYYY HH:mm') : 'N/A'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="empty-state-shell">
+                              <i className="fas fa-user-xmark"></i>
+                              <p>No inactive candidates found</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {renderInactivePagination()}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </section>
         </div>
+      </div>
 
-        {/* Filter Modal */}
-        {showFilterModal && (
-          <div 
-            className="modal show d-block" 
-            tabIndex="-1" 
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-            onClick={(e) => {
-              // Close modal when clicking on backdrop
-              if (e.target.classList.contains('modal')) {
-                setShowFilterModal(false);
-              }
-            }}
-          >
-            <div className="modal-dialog modal-lg modal-dialog-centered">
-              <div 
-                className="modal-content"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="modal-header">
+      {showFilterModal && (
+        <div
+          className="modal show d-block filter-modal-shell"
+          tabIndex="-1"
+          style={{ backgroundColor: 'rgba(15,23,42,0.55)' }}
+          onClick={(e) => {
+            if (e.target.classList.contains('modal')) {
+              setShowFilterModal(false);
+            }
+          }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content modern-filter-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header modern-modal-header">
+                <div>
                   <h5 className="modal-title">
                     <i className="fas fa-filter me-2"></i>
-                    Filters
+                    Refine Candidate Results
                   </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => setShowFilterModal(false)}
-                  ></button>
+                  <p className="modal-subtitle mb-0">Mix course, year, and session filters to narrow the current table instantly.</p>
                 </div>
-                <div className="modal-body">
-                  <div className="row g-3">
-                    <div className="col-md-4">
-                      <MultiSelectCheckbox
-                        title="Course"
-                        options={courseOptions}
-                        selectedValues={filterData.course.values}
-                        onChange={(values) => handleCriteriaChange('course', values)}
-                        icon="fas fa-graduation-cap"
-                        isOpen={dropdownStates.course}
-                        onToggle={() => toggleDropdown('course')}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <MultiSelectCheckbox
-                        title="Year"
-                        options={yearOptions}
-                        selectedValues={filterData.year.values}
-                        onChange={(values) => handleCriteriaChange('year', values)}
-                        icon="fas fa-calendar-alt"
-                        isOpen={dropdownStates.year}
-                        onToggle={() => toggleDropdown('year')}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <MultiSelectCheckbox
-                        title="Session/Semester"
-                        options={sessionOptions}
-                        selectedValues={filterData.session.values}
-                        onChange={(values) => handleCriteriaChange('session', values)}
-                        icon="fas fa-calendar"
-                        isOpen={dropdownStates.session}
-                        onToggle={() => toggleDropdown('session')}
-                      />
-                    </div>
-                    {/* <div className="col-md-4">
-                      <MultiSelectCheckbox
-                        title="Status"
-                        options={statusOptions}
-                        selectedValues={filterData.status.values}
-                        onChange={(values) => handleCriteriaChange('status', values)}
-                        icon="fas fa-check-circle"
-                        isOpen={dropdownStates.status}
-                        onToggle={() => toggleDropdown('status')}
-                      />
-                    </div>*/}
-                  </div> 
+                <button type="button" className="btn-close" onClick={() => setShowFilterModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-md-4">
+                    <MultiSelectCheckbox
+                      title="Course"
+                      options={courseOptions}
+                      selectedValues={filterData.course.values}
+                      onChange={(values) => handleCriteriaChange('course', values)}
+                      icon="fas fa-graduation-cap"
+                      isOpen={dropdownStates.course}
+                      onToggle={() => toggleDropdown('course')}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <MultiSelectCheckbox
+                      title="Year"
+                      options={yearOptions}
+                      selectedValues={filterData.year.values}
+                      onChange={(values) => handleCriteriaChange('year', values)}
+                      icon="fas fa-calendar-alt"
+                      isOpen={dropdownStates.year}
+                      onToggle={() => toggleDropdown('year')}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <MultiSelectCheckbox
+                      title="Session/Semester"
+                      options={sessionOptions}
+                      selectedValues={filterData.session.values}
+                      onChange={(values) => handleCriteriaChange('session', values)}
+                      icon="fas fa-calendar"
+                      isOpen={dropdownStates.session}
+                      onToggle={() => toggleDropdown('session')}
+                    />
+                  </div>
                 </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger"
-                    onClick={() => {
-                      setFilterData({
-                        course: { type: "includes", values: [] },
-                        year: { type: "includes", values: [] },
-                        session: { type: "includes", values: [] }
-                      });
-                      setSearchTerm('');
-                      setAppliedSearchTerm('');
-                    }}
-                  >
-                    <i className="fas fa-times me-1"></i>
-                    Clear All Filters
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => setShowFilterModal(false)}
-                  >
-                    Apply Filters
-                  </button>
-                </div>
+              </div>
+              <div className="modal-footer modern-modal-footer">
+                <button
+                  type="button"
+                  className="toolbar-btn toolbar-btn-ghost danger"
+                  onClick={() => {
+                    setFilterData({
+                      course: { type: "includes", values: [] },
+                      year: { type: "includes", values: [] },
+                      session: { type: "includes", values: [] }
+                    });
+                    setSearchTerm('');
+                    setAppliedSearchTerm('');
+                  }}
+                >
+                  <i className="fas fa-times me-1"></i>
+                  Clear All Filters
+                </button>
+                <button type="button" className="primary-gradient-btn" onClick={() => setShowFilterModal(false)}>
+                  Apply Filters
+                </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       {/* MultiSelectCheckbox CSS Styles */}
       <style>
         {`
+.upload-candidates-page {
+  --upload-primary: #fc2b5a;
+  --upload-primary-dark: #a5003a;
+  --upload-ink: #172033;
+  --upload-muted: #667085;
+  --upload-border: #e6eaf2;
+  --upload-surface: #ffffff;
+  --upload-soft: #f8f9fc;
+  --upload-accent-gradient: linear-gradient(135deg, rgb(252, 43, 90) 0%, rgb(165, 0, 58) 100%);
+  --upload-hero-gradient: linear-gradient(135deg, rgb(252, 43, 90) 0%, rgb(165, 0, 58) 100%);
+  padding-bottom: 24px;
+}
+
+.upload-header-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.95fr);
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.page-title-card {
+  padding: 24px 26px;
+  border-radius: 24px;
+  background: var(--upload-hero-gradient);
+  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.14);
+  color: #fff;
+}
+
+.upload-hero-copy h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.65rem, 2.2vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.upload-hero-copy p {
+  margin: 0;
+  max-width: 620px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: rgba(255,255,255,0.82);
+}
+
+.upload-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.18);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.upload-hero-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.upload-hero-metrics.compact .upload-metric-card {
+  min-width: 145px;
+  padding: 12px 14px;
+}
+
+.upload-metric-card {
+  min-width: 160px;
+  padding: 13px 15px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.16);
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.68);
+  margin-bottom: 6px;
+}
+
+.upload-metric-card strong {
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.upload-toolbar-card,
+.card-like {
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid var(--upload-border);
+  box-shadow: 0 14px 40px rgba(16, 24, 40, 0.08);
+}
+
+.upload-toolbar-card {
+  width: 100%;
+  padding: 20px;
+  color: var(--upload-ink);
+}
+
+.toolbar-label,
+.section-kicker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar-label {
+  margin-bottom: 10px;
+  color: #667085;
+}
+
+.search-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid var(--upload-border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: #f9fafb;
+}
+
+.search-shell i {
+  color: #98a2b3;
+}
+
+.search-shell input {
+  flex: 1 1 220px;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--upload-ink);
+  font-size: 0.92rem;
+}
+
+.toolbar-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.toolbar-btn,
+.toolbar-action-pill,
+.primary-gradient-btn {
+  border: none;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.toolbar-btn:hover,
+.toolbar-action-pill:hover,
+.primary-gradient-btn:hover {
+  transform: translateY(-1px);
+}
+
+.toolbar-btn {
+  padding: 10px 14px;
+  font-size: 0.88rem;
+}
+
+.toolbar-btn-primary,
+.primary-gradient-btn {
+  color: #fff;
+  background: var(--upload-accent-gradient);
+  box-shadow: 0 12px 26px rgba(23, 32, 51, 0.22);
+}
+
+.toolbar-btn-ghost {
+  background: #fff;
+  color: var(--upload-ink);
+  border: 1px solid var(--upload-border);
+}
+
+.toolbar-btn-ghost.danger {
+  color: #c0364c;
+}
+
+.toolbar-action-pill {
+  padding: 11px 14px;
+  font-size: 0.88rem;
+  background: #fff;
+  border: 1px solid var(--upload-border);
+  color: var(--upload-ink);
+}
+
+.toolbar-action-pill.success {
+  background: #f3faf8;
+  color: #0d7f72;
+  border-color: #ccefe7;
+}
+
+.toolbar-count {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--upload-accent-gradient);
+  color: #fff;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  margin-bottom: 18px;
+  font-weight: 600;
+}
+
+.upload-status-banner.success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #abefc6;
+}
+
+.upload-status-banner.error {
+  background: #fef3f2;
+  color: #b42318;
+  border: 1px solid #fecdca;
+}
+
+.upload-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.upload-panel,
+.records-panel {
+  padding: 18px 20px;
+  background: var(--upload-surface);
+  border: 1px solid var(--upload-border);
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.section-head.compact {
+  margin-bottom: 0;
+}
+
+.section-kicker {
+  margin-bottom: 8px;
+  color: var(--upload-primary);
+}
+
+.section-head h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--upload-ink);
+  letter-spacing: -0.03em;
+}
+
+.section-head p {
+  margin: 8px 0 0;
+  color: var(--upload-muted);
+  line-height: 1.55;
+  font-size: 0.88rem;
+}
+
+.soft-badge,
+.records-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: #fff5f7;
+  border: 1px solid #ffd4de;
+  color: var(--upload-primary-dark);
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.upload-form-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.upload-panel-head {
+  margin-bottom: 12px;
+}
+
+.upload-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) 260px;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.file-drop-shell {
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px dashed #d8dfec;
+  background: linear-gradient(180deg, #fffafb 0%, #fff 100%);
+}
+
+.file-drop-shell.compact {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.file-drop-shell.compact .stylish-file-input {
+  grid-column: 1 / -1;
+}
+
+.file-drop-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--upload-accent-gradient);
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 0;
+  box-shadow: 0 10px 20px rgba(23, 32, 51, 0.14);
+}
+
+.file-drop-copy h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--upload-ink);
+}
+
+.file-drop-copy p {
+  margin: 4px 0 0;
+  color: var(--upload-muted);
+  line-height: 1.45;
+  font-size: 0.82rem;
+}
+
+.stylish-file-input {
+  width: 100%;
+  border: 1px solid var(--upload-border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--upload-ink);
+  font-size: 0.84rem;
+  min-height: 50px;
+}
+
+.stylish-file-input::file-selector-button {
+  margin-right: 14px;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #eef2ff;
+  color: #25324b;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-submit-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.upload-side-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff7fa 0%, #fff 100%);
+  border: 1px solid #ffdbe5;
+}
+
+.upload-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--upload-muted);
+  font-size: 0.82rem;
+}
+
+.upload-hints span {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 9px;
+  line-height: 1.4;
+}
+
+.upload-hints i {
+  color: var(--upload-primary);
+  margin-top: 2px;
+}
+
+.primary-gradient-btn {
+  padding: 11px 18px;
+  min-height: 46px;
+}
+
+.upload-submit-btn {
+  width: 100%;
+  border-radius: 14px;
+  font-size: 0.94rem;
+}
+
+.mini-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.38);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: uploadSpin 0.8s linear infinite;
+}
+
+.records-panel-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.tab-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tab-pill {
+  border: 1px solid var(--upload-border);
+  background: #f8fafc;
+  color: #475467;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-weight: 600;
+  font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.tab-pill.active {
+  background: var(--upload-accent-gradient);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 12px 24px rgba(23, 32, 51, 0.18);
+}
+
+.table-card-shell {
+  border: 1px solid var(--upload-border);
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.modern-table-wrap {
+  border-top: 1px solid #f1f5f9;
+}
+
+.modern-data-table thead th {
+  background: #f8fafc;
+  color: #475467;
+  border-bottom: 1px solid #e9eef5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.modern-data-table tbody td {
+  border-color: #eef2f7;
+  color: #344054;
+  vertical-align: middle;
+  font-size: 0.88rem;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.modern-data-table tbody tr:hover {
+  background: #fff7f9;
+}
+
+.table-loading-shell,
+.empty-state-shell {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--upload-muted);
+}
+
+.empty-state-shell i {
+  font-size: 1.75rem;
+  color: var(--upload-primary);
+  margin-bottom: 12px;
+}
+
+.empty-state-shell p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.pagination .page-link {
+  border: 1px solid var(--upload-border);
+  color: #475467;
+  border-radius: 10px !important;
+  margin-left: 6px;
+  min-width: 38px;
+  text-align: center;
+}
+
+.pagination .page-item.active .page-link {
+  background: var(--upload-accent-gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(23, 32, 51, 0.18);
+}
+
+.modern-filter-modal {
+  border: none;
+  border-radius: 24px;
+  overflow: visible;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+}
+
+.modern-modal-header,
+.modern-modal-footer {
+  border: none;
+  padding: 22px 24px;
+}
+
+.modern-modal-header {
+  background: linear-gradient(135deg, #fff5f7 0%, #fff 100%);
+}
+
+.modal-title {
+  color: var(--upload-ink);
+  font-weight: 800;
+}
+
+.modal-subtitle {
+  color: var(--upload-muted);
+  font-size: 0.92rem;
+  margin-top: 6px;
+}
+
+.modern-modal-footer {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@keyframes uploadSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .multi-select-container-new {
   position: relative;
   width: 100%;
@@ -1300,25 +1931,25 @@ const UploadCandidates = () => {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  background: white !important;
-  border: 1px solid #ced4da !important;
-  border-radius: 0.375rem !important;
-  padding: 0.375rem 0.75rem !important;
+  background: #fff !important;
+  border: 1px solid #dde3ee !important;
+  border-radius: 14px !important;
+  padding: 0.75rem 0.9rem !important;
   font-size: 0.875rem !important;
-  min-height: 38px !important;
+  min-height: 48px !important;
   transition: all 0.2s ease !important;
   cursor: pointer !important;
   width: 100% !important;
 }
 
 .multi-select-trigger:hover {
-  border-color: #86b7fe !important;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+  border-color: rgba(252, 43, 90, 0.35) !important;
+  box-shadow: 0 0 0 4px rgba(252, 43, 90, 0.08) !important;
 }
 
 .multi-select-trigger.open {
-  border-color: #86b7fe !important;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+  border-color: rgba(252, 43, 90, 0.42) !important;
+  box-shadow: 0 0 0 4px rgba(252, 43, 90, 0.12) !important;
 }
 
 .select-display-text {
@@ -1350,10 +1981,10 @@ const UploadCandidates = () => {
   right: 0;
   z-index: 1000;
   background: white;
-  border: 1px solid #ced4da;
+  border: 1px solid #dde3ee;
   border-top: none;
-  border-radius: 0 0 0.375rem 0.375rem;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
   max-height: 320px;
   overflow: hidden;
   animation: slideDown 0.2s ease;
@@ -1408,8 +2039,8 @@ const UploadCandidates = () => {
 }
 
 .options-search {
-  padding: 0.5rem;
-  border-bottom: 1px solid #e9ecef;
+  padding: 0.75rem;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .options-list-new {
@@ -1451,13 +2082,13 @@ const UploadCandidates = () => {
 }
 
 .option-item-new:hover {
-  background-color: #f8f9fa;
+  background-color: #fff7f9;
 }
 
 .option-item-new input[type="checkbox"] {
   margin: 0 0.5rem 0 0 !important;
   cursor: pointer;
-  accent-color: #0d6efd;
+  accent-color: #fc2b5a;
 }
 
 .option-label-new {
@@ -1469,8 +2100,8 @@ const UploadCandidates = () => {
 
 .options-footer {
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid #e9ecef;
-  background: #f8f9fa;
+  border-top: 1px solid #eef2f7;
+  background: #fafbfc;
   text-align: center;
 }
 
@@ -1493,22 +2124,22 @@ const UploadCandidates = () => {
 
 .multi-select-trigger:focus {
   outline: none;
-  border-color: #86b7fe;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  border-color: rgba(252, 43, 90, 0.42);
+  box-shadow: 0 0 0 4px rgba(252, 43, 90, 0.12);
 }
 
 .option-item-new input[type="checkbox"]:focus {
-  outline: 2px solid #86b7fe;
+  outline: 2px solid rgba(252, 43, 90, 0.35);
   outline-offset: 2px;
 }
 
 .option-item-new input[type="checkbox"]:checked + .option-label-new {
   font-weight: 500;
-  color: #0d6efd;
+  color: #fc2b5a;
 }
 
 .badge.bg-primary {
-  background-color: #0d6efd !important;
+  background-color: #fc2b5a !important;
   font-size: 0.75rem;
   padding: 0.25em 0.4em;
 }
@@ -1550,6 +2181,52 @@ const UploadCandidates = () => {
 }
 
 @media (max-width: 768px) {
+  .upload-header-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title-card {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .upload-panel,
+  .records-panel {
+    padding: 18px;
+  }
+
+  .records-panel-top,
+  .section-head,
+  .upload-submit-row,
+  .modern-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tab-pill-row,
+  .toolbar-actions-row {
+    flex-direction: column;
+  }
+
+  .tab-pill,
+  .toolbar-action-pill,
+  .primary-gradient-btn,
+  .toolbar-btn {
+    width: 100%;
+  }
+
+  .upload-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .file-drop-shell.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .search-shell {
+    align-items: stretch;
+  }
+
   .multi-select-options-new {
     max-height: 250px;
   }

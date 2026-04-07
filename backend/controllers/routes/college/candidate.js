@@ -68,6 +68,7 @@ const {
 	StatusLogs,
 	ReEnquire,
 	PreVerification,
+	B2cFollowup,
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const { statusLogHelper } = require("../../../helpers/college");
@@ -2392,7 +2393,10 @@ router.get("/appliedJobs/:candidateId", async (req, res) => {
 router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 	try {
 		const { startDate, endDate } = req.query;
-		// console.log("Query params:", req.query);
+		const includeVisits =
+			req.query.includeVisits === 'true' ||
+			req.query.includeVisits === '1' ||
+			req.query.includeVisits === 'yes';
 
 		const collegeId = req.college?._id;
 		// console.log("collegeId", collegeId)
@@ -2405,92 +2409,202 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 
 		// console.log("College ID:", collegeId);
 
-		// Get ALL CandidateVisitCalender data (for debugging)
-		const allVisits = await CandidateVisitCalender.find({}).populate({
-			path: 'appliedCourse',
+		const dayKeyIST = (d) => {
+			if (!d) return '';
+			const dt = new Date(d);
+			return new Intl.DateTimeFormat('en-CA', {
+				timeZone: 'Asia/Kolkata',
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+			}).format(dt);
+		};
+
+		let calendarData = [];
+
+		if (includeVisits) {
+			const allVisits = await CandidateVisitCalender.find({}).populate({
+				path: 'appliedCourse',
+				model: 'AppliedCourses',
+				populate: [
+					{
+						path: '_candidate',
+						model: 'CandidateProfile',
+						select: 'name mobile email',
+					},
+					{
+						path: '_course',
+						model: 'courses',
+						select: 'name college',
+					},
+					{
+						path: '_center',
+						model: 'Center',
+						select: 'name',
+					},
+					{
+						path: 'batch',
+						model: 'Batch',
+						select: 'name',
+					},
+				],
+			}).populate('updatedBy');
+
+			const collegeStr = String(collegeId);
+			const scopedVisits = allVisits.filter((visit) => {
+				const c = visit.appliedCourse?._course?.college;
+				return c && String(c) === collegeStr;
+			});
+
+			let filteredVisits = scopedVisits;
+			if (startDate && endDate) {
+				filteredVisits = scopedVisits.filter((visit) => {
+					const visitDate = new Date(visit.visitDate);
+					const start = new Date(startDate);
+					const end = new Date(endDate);
+					return visitDate >= start && visitDate <= end;
+				});
+			}
+
+			calendarData = filteredVisits
+				.map((visit) => {
+					const appliedCourse = visit.appliedCourse;
+					if (!appliedCourse) return null;
+					const candidate = appliedCourse._candidate;
+					const course = appliedCourse._course;
+					const center = appliedCourse._center;
+					const batch = appliedCourse.batch;
+
+					return {
+						id: visit._id,
+						sourceType: 'visit',
+						title: `${candidate?.name || 'Unknown'} - ${visit.visitType}`,
+						start: visit.visitDate,
+						end: visit.visitDate,
+						visitType: visit.visitType,
+						visitDate: visit.visitDate,
+						status: visit.status,
+						appliedCourseId: appliedCourse._id,
+						candidateId: appliedCourse._candidate,
+						candidateName: candidate?.name || 'Unknown',
+						candidateMobile: candidate?.mobile || 'Unknown',
+						candidateEmail: candidate?.email || 'Unknown',
+						courseId: appliedCourse._course,
+						courseName: course?.name || 'Unknown Course',
+						centerName: center?.name || 'Unknown Center',
+						batchName: batch?.name || 'No Batch',
+						createdAt: visit.createdAt,
+						updatedAt: visit.updatedAt,
+						remarks: visit.remarks,
+						updatedBy: visit.updatedBy?.name || 'Unknown',
+						statusUpdatedAt: visit.statusUpdatedAt,
+					};
+				})
+				.filter(Boolean);
+		}
+
+		// B2C CRM follow-ups (same college, date range)
+		const rangeFilter =
+			startDate && endDate
+				? { followupDate: { $gte: new Date(startDate), $lte: new Date(endDate) } }
+				: {};
+		const b2cFollowups = await B2cFollowup.find({
+			collegeId,
+			...rangeFilter,
+		}).populate({
+			path: 'appliedCourseId',
 			model: 'AppliedCourses',
 			populate: [
 				{
 					path: '_candidate',
 					model: 'CandidateProfile',
-					select: 'name mobile email'
+					select: 'name mobile email',
 				},
 				{
 					path: '_course',
 					model: 'courses',
-					select: 'name'
+					select: 'name college',
 				},
 				{
 					path: '_center',
 					model: 'Center',
-					select: 'name'
+					select: 'name',
 				},
 				{
 					path: 'batch',
 					model: 'Batch',
-					select: 'name'
-				}
-			]
-		}).populate('updatedBy');
-
-		// console.log("allVisits", allVisits)
-
-		// ✅ Apply date filtering if startDate and endDate are provided
-		let filteredVisits = allVisits;
-		if (startDate && endDate) {
-			// console.log("🔍 Filtering by date range:", { startDate, endDate });
-			filteredVisits = allVisits.filter(visit => {
-				const visitDate = new Date(visit.visitDate);
-				const start = new Date(startDate);
-				const end = new Date(endDate);
-				const isInRange = visitDate >= start && visitDate <= end;
-				// console.log(`Visit ${visit._id}: ${visit.visitDate} - In range: ${isInRange}`);
-				return isInRange;
-			});
-			// console.log(`📊 Filtered visits: ${filteredVisits.length} out of ${allVisits.length}`);
-		}
-
-		// Format data for frontend calendar
-		const calendarData = filteredVisits.map(visit => {
-			const appliedCourse = visit.appliedCourse;
-			const candidate = appliedCourse._candidate;
-			const course = appliedCourse._course;
-			const center = appliedCourse._center;
-			const batch = appliedCourse.batch;
-
-			return {
-				id: visit._id,
-				title: `${candidate?.name || 'Unknown'} - ${visit.visitType}`,
-				start: visit.visitDate,
-				end: visit.visitDate,
-				visitType: visit.visitType,
-				visitDate: visit.visitDate,
-				status: visit.status,
-				appliedCourseId: appliedCourse._id,
-				candidateId: appliedCourse._candidate,
-				candidateName: candidate?.name || 'Unknown',
-				candidateMobile: candidate?.mobile || 'Unknown',
-				candidateEmail: candidate?.email || 'Unknown',
-				courseId: appliedCourse._course,
-				courseName: course?.name || 'Unknown Course',
-				centerName: center?.name || 'Unknown Center',
-				batchName: batch?.name || 'No Batch',
-				createdAt: visit.createdAt,
-				updatedAt: visit.updatedAt,
-				remarks: visit.remarks,
-				updatedBy: visit.updatedBy?.name || 'Unknown',
-				statusUpdatedAt: visit.statusUpdatedAt
-			};
+					select: 'name',
+				},
+			],
 		});
 
-		// console.log("Formatted Calendar Data:", calendarData);
+		const seenB2cIds = new Set();
+		const b2cCalendarData = b2cFollowups
+			.map((f) => {
+				const ac = f.appliedCourseId;
+				if (!ac) return null;
+				const idStr = String(f._id);
+				if (seenB2cIds.has(idStr)) return null;
+				seenB2cIds.add(idStr);
+				const candidate = ac._candidate;
+				const course = ac._course;
+				const center = ac._center;
+				const batch = ac.batch;
+				const endSlot = new Date(f.followupDate);
+				endSlot.setMinutes(endSlot.getMinutes() + 30);
 
+				return {
+					id: f._id,
+					sourceType: 'b2c_followup',
+					googleCalendarEventId: f.googleCalendarEventId || null,
+					title: `${candidate?.name || 'Unknown'} — B2C Follow-up`,
+					start: f.followupDate,
+					end: endSlot,
+					visitType: 'Follow-up',
+					visitDate: f.followupDate,
+					status: f.status,
+					appliedCourseId: ac._id,
+					candidateName: candidate?.name || 'Unknown',
+					candidateMobile: candidate?.mobile || 'Unknown',
+					candidateEmail: candidate?.email || 'Unknown',
+					courseName: course?.name || 'Unknown Course',
+					centerName: center?.name || 'Unknown Center',
+					batchName: batch?.name || 'No Batch',
+					remarks: f.remarks,
+					followupStatus: f.status,
+					createdAt: f.createdAt,
+					updatedAt: f.updatedAt,
+				};
+			})
+			.filter(Boolean);
+
+		// Same applied course + same calendar day: keep B2C row, drop visit (no duplicate chips)
+		const b2cCourseDay = new Set(
+			b2cCalendarData.map((row) => `${String(row.appliedCourseId)}|${dayKeyIST(row.visitDate)}`)
+		);
+		let merged = [...b2cCalendarData];
+		if (includeVisits && calendarData.length) {
+			const extraVisits = calendarData.filter((v) => {
+				const key = `${String(v.appliedCourseId)}|${dayKeyIST(v.visitDate)}`;
+				return !b2cCourseDay.has(key);
+			});
+			merged = [...merged, ...extraVisits];
+		}
+
+		const seenIds = new Set();
+		merged = merged.filter((row) => {
+			const k = `${row.sourceType}-${String(row.id)}`;
+			if (seenIds.has(k)) return false;
+			seenIds.add(k);
+			return true;
+		});
 
 		return res.json({
 			status: true,
-			message: 'Calendar visit data fetched successfully',
-			data: calendarData,
-			totalVisits: calendarData.length
+			message: 'Calendar data fetched successfully',
+			data: merged,
+			totalVisits: merged.length,
+			includeVisits,
 		});
 
 	} catch (error) {
@@ -3029,39 +3143,51 @@ router.patch('/updatecalendarevent', [isCollege], async (req, res) => {
 		const { eventId, status, remarks } = req.body;
 		const user = req.user;
 
-		// console.log("eventId", req.body)
-
-		const candidateVisitCalender = await CandidateVisitCalender.findById(eventId)
-		if (!candidateVisitCalender) {
-			return res.status(404).json({
-				status: false,
-				message: 'Candidate visit calender not found'
-			})
+		const candidateVisitCalender = await CandidateVisitCalender.findById(eventId);
+		if (candidateVisitCalender) {
+			const updatedBy = user._id;
+			const statusUpdatedAt = new Date();
+			let visitStatus = status;
+			if (status === 'completed') visitStatus = 'reached';
+			if (!['pending', 'reached', 'cancelled'].includes(visitStatus)) {
+				visitStatus = candidateVisitCalender.status;
+			}
+			candidateVisitCalender.status = visitStatus;
+			candidateVisitCalender.updatedBy = updatedBy;
+			candidateVisitCalender.statusUpdatedAt = statusUpdatedAt;
+			candidateVisitCalender.remarks = remarks;
+			await candidateVisitCalender.save();
+			return res.status(200).json({
+				status: true,
+				message: 'Candidate visit calendar updated successfully',
+			});
 		}
 
-		const updatedBy = user._id;
-		const statusUpdatedAt = new Date();
+		const b2cFollowup = await B2cFollowup.findById(eventId);
+		if (b2cFollowup) {
+			let fuStatus = b2cFollowup.status;
+			if (status === 'completed' || status === 'reached') fuStatus = 'done';
+			else if (status === 'cancelled') fuStatus = 'missed';
+			b2cFollowup.status = fuStatus;
+			b2cFollowup.remarks = remarks;
+			b2cFollowup.updatedBy = user._id;
+			b2cFollowup.statusUpdatedAt = new Date();
+			await b2cFollowup.save();
+			return res.status(200).json({
+				status: true,
+				message: 'B2C follow-up updated successfully',
+			});
+		}
 
-		candidateVisitCalender.status = status;
-		candidateVisitCalender.updatedBy = updatedBy;
-		candidateVisitCalender.statusUpdatedAt = statusUpdatedAt;
-		candidateVisitCalender.remarks = remarks;
-		await candidateVisitCalender.save();
-
-		// console.log("candidateVisitCalender", candidateVisitCalender)
-
-		return res.status(200).json({
-			status: true,
-			message: 'Candidate visit calender updated successfully'
-		})
-
-
-
-	}
-	catch (err) {
+		return res.status(404).json({
+			status: false,
+			message: 'Event not found',
+		});
+	} catch (err) {
 		console.error('Error in updatecalendarevent:', err);
+		return res.status(500).json({ status: false, message: err?.message || 'Update failed' });
 	}
-})
+});
 
 
 router.get('/misreport/:batchId', [isCollege], async (req, res) => {

@@ -4,7 +4,7 @@ const { google } = require('googleapis')
 const multer  = require('multer')
 var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
-const { User } = require("../models");
+const { User, TrainerTimeTable } = require("../models");
 const {
 	commonFunc,
 	educationlist,
@@ -139,6 +139,77 @@ commonRoutes.post("/getgoogleauth", async (req, res) => {
 });
 
 
+commonRoutes.post("/gettrainergoogleauth", async (req, res) => {
+  try {
+    const { code, redirectUri, user } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        error: 'Authorization code is required'
+      });
+    }
+
+    const payload = {
+      ...req.body,
+      redirectUri,
+      user: (user && user._id) ? user : req.user
+    };
+
+    const userData = await getGoogleAuthToken(payload);
+
+	if (userData.error) {
+		return res.status(400).json({
+			error: userData.error
+		});
+	}
+
+    res.json({
+      success: true,
+      data: userData
+    });
+
+  } catch (error) {
+    console.error('Google OAuth Error:', error);
+    res.status(500).json({
+      error: 'Failed to exchange authorization code',
+      message: error.message
+    });
+  }
+});
+
+commonRoutes.get("/live-class/:id", async (req, res) => {
+  try {
+    const liveClass = await TrainerTimeTable.findOne({
+      _id: req.params.id,
+      isDeleted: { $ne: true }
+    }).select(
+      "title subject date startTime endTime trainerId courseId courseName batchId batchName roomName liveClassPlatform googleMeetLink joinPath status"
+    ).populate("trainerId", "name");
+
+    if (!liveClass) {
+      return res.status(404).json({
+        status: false,
+        message: "Live class not found"
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      data: {
+        ...liveClass.toObject(),
+        trainerName: liveClass?.trainerId?.name || "",
+        joinPath: liveClass.joinPath || `/live-class/${liveClass._id}`
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching live class details:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Error fetching live class details",
+      error: error.message
+    });
+  }
+});
 
 commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 	try {
@@ -157,8 +228,8 @@ commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 
 		const events = await getAllGoogleCalendarEvents({
 			user,
-			timeMin: timeMin.toISOString(),
-			timeMax: timeMax.toISOString()
+			startDate: timeMin.toISOString(),
+			endDate: timeMax.toISOString(),
 		});
 
 		if (events.error) {

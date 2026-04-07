@@ -35,9 +35,11 @@ const MultiSelectCheckbox = ({
   };
 
   // Filter options based on search term
-  const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
@@ -620,7 +622,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
           setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -1389,13 +1394,26 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       );
 
       if (response.data.success) {
-        // If KYC was updated, show a success message
-          // if (response.data.kycUpdated) {
-          //   alert('All documents verified! KYC status has been updated.');
-          // } else {
-          // }
-        alert(`Document ${status.toLowerCase()} successfully!`);
-
+        let msg = `Document ${status.toLowerCase()} successfully!`;
+        if (response.data.documentVerifiedWhatsAppSent) {
+          msg += ' All mandatory documents are verified; document_verified WhatsApp was sent to the student.';
+        } else if (response.data.documentVerifiedWhatsAppSkippedNoPhone && status === 'Verified') {
+          msg += ' All mandatory documents are verified, but WhatsApp was not sent (no mobile/WhatsApp on profile).';
+        } else if (response.data.documentVerifiedWhatsAppError) {
+          msg += ` All mandatory documents are verified, but WhatsApp failed: ${response.data.documentVerifiedWhatsAppError}`;
+        } else if (response.data.allMandatoryDocsVerified && status === 'Verified') {
+          msg += ' All mandatory documents are now verified.';
+        }
+        if (status === 'Rejected') {
+          if (response.data.documentRejectedWhatsAppSent) {
+            msg += ' document_rejected_ WhatsApp was sent to the student.';
+          } else if (response.data.documentRejectedWhatsAppSkippedNoPhone) {
+            msg += ' WhatsApp was not sent (no mobile/WhatsApp on profile).';
+          } else if (response.data.documentRejectedWhatsAppError) {
+            msg += ` WhatsApp failed: ${response.data.documentRejectedWhatsAppError}`;
+          }
+        }
+        alert(msg);
 
         // Refresh the profile data
         await fetchProfileData();
@@ -1420,6 +1438,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
     setKycMarkingProfileId(profile._id);
     try {
+      const course = profile._course;
+      const mandatoryFromCourse = (course?.docsRequired || []).filter(
+        (d) => d.mandatory === true && d.status !== false
+      );
+      const rawUploads = profile.uploadedDocs || [];
+
       const response = await axios.post(
         `${backendUrl}/college/kycDone/${profile._id}`,
         {},
@@ -1429,10 +1453,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         alert('KYC marked as done successfully.');
         await fetchProfileData();
       } else {
+        // console.warn('[KYC mark done] success:false', response.data);
         alert(response.data.message || 'Failed to mark KYC done');
       }
     } catch (error) {
-      const msg = error.response?.data?.message || error.message || 'Failed to mark KYC done';
+      const errData = error.response?.data;
+      const msg = errData?.message || error.message || 'Failed to mark KYC done';
+           
       alert(msg);
     } finally {
       setKycMarkingProfileId(null);

@@ -62,14 +62,16 @@ const {
 } = require("../../../models");
 const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const LeadCategory = require("../../../models/b2b/leadCategory");
-const Lead = require("../../../models/b2b/lead");
+const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
 
-const router = express.Router();
+function createB2BRouter(LeadModel = defaultLeadModel) {
+	const Lead = LeadModel;
+	const router = express.Router();
 
 
 
@@ -227,11 +229,18 @@ router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 // Delete Type of B2B (soft delete)
 router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
-		const deletedType = await TypeOfB2B.findByIdAndUpdate(
-			req.params.id,
-			{ isActive: false },
-			{ new: true }
-		);
+		const typeId = req.params.id;
+
+		const linkedLeadsCount = await Lead.countDocuments({ typeOfB2B: typeId });
+
+		if (linkedLeadsCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This B2B type is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedType = await TypeOfB2B.findByIdAndDelete(typeId);
 
 		if (!deletedType) {
 			return res.status(404).json({
@@ -407,11 +416,18 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 // Delete Lead Category (soft delete)
 router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
-		const deletedCategory = await LeadCategory.findByIdAndUpdate(
-			req.params.id,
-			{ isActive: false },
-			{ new: true }
-		);
+		const categoryId = req.params.id;
+
+		const linkedLeadsCount = await Lead.countDocuments({ leadCategory: categoryId });
+
+		if (linkedLeadsCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This category is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedCategory = await LeadCategory.findByIdAndDelete(categoryId);
 
 		if (!deletedCategory) {
 			return res.status(404).json({
@@ -3119,4 +3135,73 @@ router.post('/refer-leads', isCollege, async (req, res) => {
 	}
 });
 
-module.exports = router;
+router.get('/followups-reminder-data', isCollege, async (req, res) => {
+	try {
+		const { startDate, endDate } = req.query;
+		if (!startDate || !endDate) {
+			return res.status(400).json({
+				status: false,
+				message: 'startDate and endDate are required',
+			});
+		}
+
+		const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
+
+		let leadFilter = {};
+		if (!isAdmin()) {
+			const teamMembers = await getAllTeamMembers(req.user._id);
+			if (!teamMembers || teamMembers.length === 0) {
+				return res.json({ status: true, data: [] });
+			}
+			const or = teamMembers.flatMap((member) => [
+				{ leadAddedBy: member },
+				{ leadOwner: member },
+			]);
+			leadFilter = { $or: or };
+		}
+
+		const leads = await Lead.find(leadFilter).select('_id').lean();
+		const leadIds = leads.map((l) => l._id);
+		if (leadIds.length === 0) {
+			return res.json({ status: true, data: [] });
+		}
+
+		const start = new Date(startDate);
+		const end = new Date(endDate);
+
+		const followups = await FollowUp.find({
+			leadId: { $in: leadIds },
+			status: 'Pending',
+			scheduledDate: { $exists: true, $ne: null, $gte: start, $lte: end },
+		})
+			.populate('leadId', 'businessName concernPersonName')
+			.lean();
+
+		const data = followups.map((f) => ({
+			id: f._id,
+			sourceType: 'b2b_followup',
+			start: f.scheduledDate,
+			followupStatus: f.status,
+			candidateName:
+				f.leadId?.businessName ||
+				f.leadId?.concernPersonName ||
+				'B2B lead',
+			title: f.description || 'B2B follow-up',
+		}));
+
+		return res.json({ status: true, data });
+	} catch (error) {
+		console.error('Error fetching B2B followups reminder data:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to fetch B2B follow-ups',
+			error: error.message,
+		});
+	}
+});
+
+	return router;
+}
+
+module.exports = createB2BRouter();
+module.exports.createB2BRouter = createB2BRouter;

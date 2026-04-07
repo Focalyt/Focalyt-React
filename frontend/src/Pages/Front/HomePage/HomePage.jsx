@@ -408,7 +408,7 @@ const HomePage = () => {
                           <li className="nav-item" role="presentation">
                             <button className="nav-link " id="purchasing-tab-nav" data-bs-toggle="tab"
                               data-bs-target="#purchasing-tab-pane" type="button" role="tab"
-                              aria-controls="purchasing-tab-pane" aria-selected="false" />
+                              aria-controls="purchasing-tab-pane" aria-selected="false" >
                             <div className="mobile-bg">
                               <div className="feature-widget-7">
                                 <div className="feature-widget-7__icon-wrapper my-auto">
@@ -420,6 +420,7 @@ const HomePage = () => {
                                 </div>
                               </div>
                             </div>
+                            </button>
                           </li>
                           <li className="nav-item" role="presentation">
                             <button className="nav-link " id="technical-tab-nav" data-bs-toggle="tab"
@@ -820,7 +821,7 @@ const HomePage = () => {
                             <li className="nav-item" role="presentation">
                               <button className="nav-link " id="purchasing-tab-nav" data-bs-toggle="tab"
                                 data-bs-target="#purchasing-tab-pane2" type="button" role="tab"
-                                aria-controls="purchasing-tab-pane2" aria-selected="false" />
+                                aria-controls="purchasing-tab-pane2" aria-selected="false">
                               <div className="mobile-bg">
                                 <div className="feature-widget-7">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
@@ -832,6 +833,7 @@ const HomePage = () => {
                                   </div>
                                 </div>
                               </div>
+                              </button>
                             </li>
                             <li className="nav-item" role="presentation">
                               <button className="nav-link " id="technical-tab-nav" data-bs-toggle="tab"

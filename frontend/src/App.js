@@ -101,6 +101,7 @@ import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
 import Target from './Pages/App/College/Target/Target';
+import Lrp from './Pages/App/College/LRP/Lrp';
 
 
 import CompanyLayout from './Component/Layouts/App/Company';
@@ -126,6 +127,7 @@ import AttendanceManagement from './Component/Layouts/App/College/ProjectManagem
 import Whatapp from './Pages/App/College/Whatapp/Whatapp';
 import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
 import B2BSales from './Pages/App/College/B2B/B2BSales';
+import B2BSalesCopy from './Pages/App/College/B2B/B2BSales_copy';
 import StatusB2C from './Pages/App/College/Status/statusB2C'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
@@ -151,6 +153,7 @@ import ViewTrainerCourses from  './Pages/App/Trainer/CourseManagement/ViewCourse
 import TrainerDashboard from './Pages/App/Trainer/Dashboard/Dashboard';
 import BatchMangement from './Pages/App/Trainer/BatchManagement/BatchMangement';
 import TimeTable from './Pages/App/Trainer/TimeTable/Timetable';
+import LiveClassRoom from './Pages/App/Trainer/LiveClassRoom/LiveClassRoom';
 import Students from './Pages/App/Trainer/Students/Students';
 import DailyDiary from './Pages/App/Trainer/DailyDiary/DailyDiary';
 import Center from './Pages/App/Trainer/Center/Center';
@@ -215,6 +218,7 @@ const Layout = () => {
         <Route path="/userAgreement" element={<UserAgreement/>}/>
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
+        <Route path="/live-class/:id" element={<LiveClassRoom />} />
         <Route path="/candidate" element={<CandidateLayout />}>
 
           <Route path="dashboard" element={<CandidateDashboard />} />
@@ -298,6 +302,7 @@ const Layout = () => {
           <Route path='whatapp' element={<Whatapp/>}/>
           <Route path='whatappTemplate' element={<WhatappTemplate/>}/>
           <Route path='sales' element={<B2BSales/>}/>
+          <Route path='sales_copy' element={<B2BSalesCopy/>}/>
           <Route path='statusdesignb2c' element={<StatusB2C/>}/>
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
@@ -311,6 +316,7 @@ const Layout = () => {
           <Route path='whatsappWallet' element={<WhatsappWallet/>}/>
           <Route path='emailTemplate' element={<EmailTemplate/>}/>
           <Route path='target' element={<Target/>}/>
+          <Route path='lrp' element={<Lrp/>}/>
         </Route>
 
         {/* company  */}

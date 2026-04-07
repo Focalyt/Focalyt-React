@@ -292,13 +292,13 @@ function CompanyPartners() {
                         background-clip: text;
                     }
 
-                    .partner-card {
-                        border-color: rgba(252, 43, 90, 0.2);
-                        background: linear-gradient(135deg, rgba(30, 30, 40, 0.9) 0%, rgba(40, 40, 55, 0.8) 100%);
-                        box-shadow: 0 4px 20px rgba(252, 43, 90, 0.15),
-                                    0 2px 8px rgba(0, 0, 0, 0.3),
-                                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                    }
+                    // .partner-card {
+                    //     border-color: rgba(252, 43, 90, 0.2);
+                    //     background: linear-gradient(135deg, rgba(30, 30, 40, 0.9) 0%, rgba(40, 40, 55, 0.8) 100%);
+                    //     box-shadow: 0 4px 20px rgba(252, 43, 90, 0.15),
+                    //                 0 2px 8px rgba(0, 0, 0, 0.3),
+                    //                 inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                    // }
 
                     .partner-card:hover {
                         // background: linear-gradient(135deg, rgba(40, 40, 55, 1) 0%, rgba(50, 50, 65, 0.95) 100%);
@@ -309,20 +309,20 @@ function CompanyPartners() {
                     }
 
                     .partner-name {
-                        color: #e2e8f0;
+                        color: #a1a1a1;
                     }
 
                     .partner-card:hover .partner-name {
                         color: #FC2B5A;
                     }
 
-                    .marquee-fade-left {
-                        background: linear-gradient(to right, rgba(15, 15, 20, 1), transparent);
-                    }
+                    // .marquee-fade-left {
+                    //     background: linear-gradient(to right, rgba(15, 15, 20, 1), transparent);
+                    // }
 
-                    .marquee-fade-right {
-                        background: linear-gradient(to left, rgba(15, 15, 20, 1), transparent);
-                    }
+                    // .marquee-fade-right {
+                    //     background: linear-gradient(to left, rgba(15, 15, 20, 1), transparent);
+                    // }
                 }
 
                 `}

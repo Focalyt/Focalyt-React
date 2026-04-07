@@ -101,7 +101,7 @@ const SearchCourses = () => {
           </div>
         </div>
 
-        <ul className="nav nav-tabs justify-content-center " id="courseTabs">
+        {/* <ul className="nav nav-tabs justify-content-center " id="courseTabs">
           <li className="nav-item">
             <Link className="nav-link active" to="/search-courses">
               Search Courses
@@ -117,7 +117,7 @@ const SearchCourses = () => {
               Applied Courses
             </Link>
           </li>
-        </ul>
+        </ul> */}
 
         <section className="searchjobspage mt-3">
           <div className="row justify-content-sm-center justify-content-md-start">

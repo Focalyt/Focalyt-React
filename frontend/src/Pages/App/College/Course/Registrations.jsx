@@ -37,9 +37,11 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
-  const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   // Get display text for selected items
   const getDisplayText = () => {
@@ -776,7 +778,10 @@ const CRMDashboard = () => {
             setCenterOptions(centersMapped);
           }
           
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -1723,6 +1728,20 @@ const CRMDashboard = () => {
   // Form state for candidate add leads
   const [centerId, setCenterId] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+  const courseDropdownRef = useRef(null);
+  const [isCenterDropdownOpen, setIsCenterDropdownOpen] = useState(false);
+  const centerDropdownRef = useRef(null);
+  const [isQualificationDropdownOpen, setIsQualificationDropdownOpen] = useState(false);
+  const qualificationDropdownRef = useRef(null);
+  const [isCounselorDropdownOpen, setIsCounselorDropdownOpen] = useState(false);
+  const counselorDropdownRef = useRef(null);
+  const [selectSearch, setSelectSearch] = useState({
+    course: '',
+    center: '',
+    qualification: '',
+    counselor: '',
+  });
   const [counselorId, setCounselorId] = useState('');
   const [registeredBy, setRegisteredBy] = useState('');
 
@@ -1762,6 +1781,57 @@ const CRMDashboard = () => {
   const [centers, setCenters] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
+  const updateSelectSearch = (field, value) => {
+    setSelectSearch((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const filteredSortedCourses = useMemo(() => {
+    const query = selectSearch.course.trim().toLowerCase();
+    return [...courses]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((course) => !query || (course?.name || '').toLowerCase().includes(query));
+  }, [courses, selectSearch.course]);
+
+  const filteredSortedCenters = useMemo(() => {
+    const query = selectSearch.center.trim().toLowerCase();
+    return [...centers]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((center) => !query || (center?.name || '').toLowerCase().includes(query));
+  }, [centers, selectSearch.center]);
+
+  const filteredSortedQualifications = useMemo(() => {
+    const query = selectSearch.qualification.trim().toLowerCase();
+    return [...qualifications]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((qualification) => !query || (qualification?.name || '').toLowerCase().includes(query));
+  }, [qualifications, selectSearch.qualification]);
+
+  const filteredSortedCounselors = useMemo(() => {
+    const query = selectSearch.counselor.trim().toLowerCase();
+    return [...counselorOptions]
+      .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+      .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
+  }, [counselorOptions, selectSearch.counselor]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
+        setIsCourseDropdownOpen(false);
+      }
+      if (centerDropdownRef.current && !centerDropdownRef.current.contains(event.target)) {
+        setIsCenterDropdownOpen(false);
+      }
+      if (qualificationDropdownRef.current && !qualificationDropdownRef.current.contains(event.target)) {
+        setIsQualificationDropdownOpen(false);
+      }
+      if (counselorDropdownRef.current && !counselorDropdownRef.current.contains(event.target)) {
+        setIsCounselorDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   //course history
   const [courseHistory, setCourseHistory] = useState([]);
@@ -1776,13 +1846,14 @@ const CRMDashboard = () => {
   const fetchFormData = async () => {
     try {
       setLoadingData(true);
-      // Fetch courses
-      const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json',
-        }
-      });
+
+      // const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
+      //   headers: {
+      //     'x-auth': token,
+      //     'Content-Type': 'application/json',
+      //   }
+      // });
+      const coursesResponse = await axios.get(`${backendUrl}/courses`);
 
       // Fetch qualifications
       const qualificationsResponse = await axios.get(`${backendUrl}/candidate/api/highestQualifications`, {
@@ -1794,8 +1865,11 @@ const CRMDashboard = () => {
 
 
 
-      if (coursesResponse.data.success) {
-        setCourses(coursesResponse.data.data);
+      if (Array.isArray(coursesResponse?.data?.courses)) {
+        setCourses(coursesResponse.data.courses);
+      } else if (coursesResponse.data.success) {
+        const activeCourses = (coursesResponse.data.data || []).filter((course) => course?.status === true);
+        setCourses(activeCourses);
       }
 
 
@@ -1850,7 +1924,43 @@ const CRMDashboard = () => {
     e.preventDefault();
 
     try {
+      // Frontend validation (to avoid silent backend 500s)
+      const errors = [];
+      const name = (candidateFormData.name || '').trim();
+      const mobile = String(candidateFormData.mobile || '').trim();
+      const whatsapp = String(candidateFormData.whatsapp || '').trim();
+      const email = (candidateFormData.email || '').trim();
+      const sex = (candidateFormData.sex || '').trim();
+      const highestQualification = candidateFormData.highestQualification || '';
+      const dobRaw = candidateFormData.dob;
+
+      if (!courseId) errors.push('Please select Course');
+      if (!centerId) errors.push('Please select Center');
+      if (!counselorId) errors.push('Please select Counselor');
+      if (!registeredBy) errors.push('Please select Source');
+
+      if (!name) errors.push('Please enter Name');
+      if (!mobile) errors.push('Please enter Mobile number');
+      if (mobile && !/^\d{10}$/.test(mobile)) errors.push('Mobile number must be 10 digits');
+      if (!whatsapp) errors.push('Please enter WhatsApp number');
+      if (whatsapp && !/^\d{10}$/.test(whatsapp)) errors.push('WhatsApp number must be 10 digits');
+      if (!sex) errors.push('Please select Gender');
+      if (!dobRaw) errors.push('Please select Date of Birth');
+      if (!highestQualification) errors.push('Please select Highest Qualification');
+      if (email && !/^\S+@\S+\.\S+$/.test(email)) errors.push('Please enter a valid Email');
+
+      if (errors.length > 0) {
+        setFormErrors({ addLead: errors });
+        alert(errors.join('\n'));
+        return;
+      }
+
       setIsSubmitting(true);
+
+      const dob =
+        dobRaw instanceof Date && !isNaN(dobRaw.getTime())
+          ? dobRaw.toISOString()
+          : dobRaw;
 
       // Prepare the data according to the API structure
       const requestData = {
@@ -1858,13 +1968,13 @@ const CRMDashboard = () => {
         centerId,
         counselorId,
         candidateData: {
-          name: candidateFormData.name,
-          mobile: candidateFormData.mobile,
-          email: candidateFormData.email,
-          sex: candidateFormData.sex,
-          dob: candidateFormData.dob,
-          whatsapp: candidateFormData.whatsapp,
-          highestQualification: candidateFormData.highestQualification,
+          name,
+          mobile,
+          email,
+          sex,
+          dob,
+          whatsapp,
+          highestQualification,
           personalInfo: {
             currentAddress: {
               fullAddress: candidateFormData.personalInfo.currentAddress.fullAddress,
@@ -1894,6 +2004,12 @@ const CRMDashboard = () => {
       if (response.data.status) {
         alert("Lead added successfully");
 
+        // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
+        setActiveCrmFilter(0);
+        const newFilterData = { ...(filterData || {}) };
+        delete newFilterData.leadStatus;
+        setFilterData(newFilterData);
+
         // Reset all form fields
         setCandidateFormData({
           name: '',
@@ -1922,9 +2038,20 @@ const CRMDashboard = () => {
 
         // Reset form selection fields
         setCourseId('');
+        setIsCourseDropdownOpen(false);
+        setIsCenterDropdownOpen(false);
+        setIsQualificationDropdownOpen(false);
+        setIsCounselorDropdownOpen(false);
+        setSelectSearch({ course: '', center: '', qualification: '', counselor: '' });
         setCenterId('');
         setCounselorId('');
         setRegisteredBy('');
+
+        // After adding, refresh list from first page so the new lead is visible immediately
+        setCurrentPage(1);
+        await fetchProfileData(newFilterData, 1);
+
+        closePanel();
       }
       else {
         alert(response.data.message);
@@ -1932,12 +2059,10 @@ const CRMDashboard = () => {
 
     } catch (error) {
       console.error('Error submitting form:', error);
+      alert(error?.response?.data?.message || error?.message || 'Failed to add lead');
     } finally {
 
       setIsSubmitting(false);
-      closePanel();
-
-      fetchProfileData();
     }
   };
 
@@ -2304,7 +2429,7 @@ const CRMDashboard = () => {
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
-  const [followupDate, setFollowupDate] = useState('');
+  const [followupDate, setFollowupDate] = useState(null);
   const [followupTime, setFollowupTime] = useState('');
   const [remarks, setRemarks] = useState('');
 
@@ -2600,51 +2725,9 @@ const CRMDashboard = () => {
     return isRequired ? 'border-danger' : '';
   };
 
-  const createGoogleCalendarEventForFollowup = async (followupDateTime) => {
-    try {
-      if (!userData.googleAuthToken?.accessToken) {
-        return;
-      }
-
-      const scheduledDateTime = new Date(followupDateTime);
-
-      const event = {
-        summary: `B2C Follow-up: ${selectedProfile?._candidate?.name || 'Unknown'}`,
-        description: `Follow-up with ${selectedProfile?._candidate?.name || 'Unknown'}\n\nMobile: ${selectedProfile?._candidate?.mobile || 'N/A'}\nEmail: ${selectedProfile?._candidate?.email || 'N/A'}\nCourse: ${selectedProfile?._course?.name || 'N/A'}\nCenter: ${selectedProfile?._center?.name || 'N/A'}\n\nRemarks: ${remarks || 'No remarks'}`,
-        start: {
-          dateTime: scheduledDateTime.toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        end: {
-          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 60 },
-          ],
-        },
-      };
-
-      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-        user: userData,
-        event,
-      });
-
-      if (response.data.success) {
-        console.log('Followup added to Google Calendar');
-      } else {
-        console.error('Failed to add to Google Calendar:', response.data.message);
-      }
-    } catch (error) {
-      console.error('Error in createGoogleCalendarEventForFollowup:', error);
-    }
-  };
-
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
+    let shouldClosePanel = false;
 
     try {
       if (showPanel === 'bulkstatuschange') {
@@ -2722,11 +2805,12 @@ const CRMDashboard = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
+          shouldClosePanel = true;
 
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
@@ -2804,6 +2888,7 @@ const CRMDashboard = () => {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
           followup: followupDateTime ? followupDateTime.toISOString() : null,
+          googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken),
           remarks: (remarks || '').trim()
         };
 
@@ -2836,14 +2921,10 @@ console.log('API Response:', response.data);
         if (response.data.success) {
           alert('Status updated successfully!');
 
-          if (followupDateTime && userData.googleAuthToken?.accessToken) {
-            await createGoogleCalendarEventForFollowup(followupDateTime);
-          }
-
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
@@ -2913,13 +2994,15 @@ console.log('API Response:', response.data);
             appliedCourseId: selectedProfile._id,
             followupDate: followupDateTime ? followupDateTime.toISOString() : null,
             remarks: remarks || '',
-            folloupType: 'update'
+            folloupType: 'update',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
           }
           : {
             appliedCourseId: selectedProfile._id,
             followupDate: followupDateTime ? followupDateTime.toISOString() : null,
             remarks: remarks || '',
-            folloupType: 'new'
+            folloupType: 'new',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
           };
 
         // Check if backend URL and token exist
@@ -2947,10 +3030,9 @@ console.log('API Response:', response.data);
         // Backend returns status: true (not success: true)
         if (response.data.status === true || response.data.success === true) {
           alert('Followup updated successfully!');
+          shouldClosePanel = true;
+          closePanel();
 
-          if (userData.googleAuthToken?.accessToken && followupDateTime) {
-            await createGoogleCalendarEventForFollowup(followupDateTime);
-          }
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update followup');
@@ -2978,11 +3060,15 @@ console.log('API Response:', response.data);
       }
     }
     finally {
-      setSelectedStatus('');
-      setSelectedSubStatus(null);
-      setFollowupDate('');
-      setFollowupTime('');
-      setRemarks('');
+      if (shouldClosePanel) {
+        closePanel();
+      } else {
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate(null);
+        setFollowupTime('');
+        setRemarks('');
+      }
 
       // Refresh data and close panel
       await fetchProfileData();
@@ -3142,6 +3228,7 @@ console.log('API Response:', response.data);
     const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
     const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
 
+    const fd = formDataRef.current || formData;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
@@ -3157,11 +3244,11 @@ console.log('API Response:', response.data);
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      ...(fd.projects.values.length > 0 && { projects: JSON.stringify(fd.projects.values) }),
+      ...(fd.verticals.values.length > 0 && { verticals: JSON.stringify(fd.verticals.values) }),
+      ...(fd.course.values.length > 0 && { course: JSON.stringify(fd.course.values) }),
+      ...(fd.center.values.length > 0 && { center: JSON.stringify(fd.center.values) }),
+      ...(fd.counselor.values.length > 0 && { counselor: JSON.stringify(fd.counselor.values) })
     });
 
     try {
@@ -3999,12 +4086,12 @@ console.log('API Response:', response.data);
                 const minutes = String(existing.getMinutes()).padStart(2, '0');
                 setFollowupTime(`${hours}:${minutes}`);
               } else {
-                setFollowupDate('');
+                setFollowupDate(null);
                 setFollowupTime('');
               }
               setRemarks(fullProfile.followup.remarks || '');
             } else {
-              setFollowupDate('');
+              setFollowupDate(null);
               setFollowupTime('');
               setRemarks('');
             }
@@ -4039,6 +4126,10 @@ console.log('API Response:', response.data);
       setShowBulkInputs(false);
       setBulkMode(null);
     }
+    setIsCourseDropdownOpen(false);
+    setIsCenterDropdownOpen(false);
+    setIsQualificationDropdownOpen(false);
+    setIsCounselorDropdownOpen(false);
     setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
@@ -4046,6 +4137,9 @@ console.log('API Response:', response.data);
     setSelectedProfile(null);
     setSelectedStatus(null)
     setSelectedSubStatus(null)
+    setFollowupDate(null);
+    setFollowupTime('');
+    setRemarks('');
     if (!isMobile) {
       setMainContentClass('col-12');
     } else {
@@ -7524,13 +7618,21 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Course<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={courseDropdownRef}>
+                  <input
+                    type="text"
                     id="course"
-                    required
-                    value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search course..."
+                    value={selectSearch.course}
+                    onFocus={() => setIsCourseDropdownOpen(true)}
+                    onClick={() => setIsCourseDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('course', e.target.value);
+                      setCourseId('');
+                      setCenterId('');
+                      setIsCourseDropdownOpen(true);
+                    }}
                     disabled={loadingData}
                     style={{
                       height: '48px',
@@ -7539,16 +7641,60 @@ useEffect(() => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
-
+                      border: '1px solid #e9ecef'
                     }}
+                  />
+                  <input type="hidden" required value={courseId} readOnly />
 
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map((course) => (
-                      <option key={course._id} value={course._id}>{course.name}</option>
-                    ))}
-                  </select>
+                  {isCourseDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCourses.length ? (
+                        filteredSortedCourses.map((course) => (
+                          <button
+                            key={course._id}
+                            type="button"
+                            onClick={() => {
+                              setCourseId(course._id);
+                              updateSelectSearch('course', course.name || '');
+                              updateSelectSearch('center', '');
+                              setCenterId('');
+                              setIsCourseDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {course.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No course found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7556,13 +7702,20 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Training Center<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={centerDropdownRef}>
+                  <input
+                    type="text"
                     id="trainingCenter"
-                    required
-                    value={centerId}
-                    onChange={(e) => setCenterId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search training center..."
+                    value={selectSearch.center}
+                    onFocus={() => courseId && setIsCenterDropdownOpen(true)}
+                    onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('center', e.target.value);
+                      setCenterId('');
+                      if (courseId) setIsCenterDropdownOpen(true);
+                    }}
                     disabled={!courseId}
                     style={{
                       height: '48px',
@@ -7571,15 +7724,58 @@ useEffect(() => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
+                      border: '1px solid #e9ecef'
                     }}
-                  >
+                  />
+                  <input type="hidden" required value={centerId} readOnly />
 
-                    <option>Select Center</option>
-                    {centers.map((center) => (
-                      <option key={center._id} value={center._id}>{center.name}</option>
-                    ))}
-                  </select>
+                  {isCenterDropdownOpen && courseId && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCenters.length ? (
+                        filteredSortedCenters.map((center) => (
+                          <button
+                            key={center._id}
+                            type="button"
+                            onClick={() => {
+                              setCenterId(center._id);
+                              updateSelectSearch('center', center.name || '');
+                              setIsCenterDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {center.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No center found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7787,14 +7983,21 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Highest Qualification<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={qualificationDropdownRef}>
+                  <input
+                    type="text"
                     id="highestQualification"
-                    value={candidateFormData.highestQualification}
-                    onChange={(e) => handleInputChange('highestQualification', e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search highest qualification..."
+                    value={selectSearch.qualification}
+                    onFocus={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onClick={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('qualification', e.target.value);
+                      handleInputChange('highestQualification', '');
+                      if (!loadingData) setIsQualificationDropdownOpen(true);
+                    }}
                     disabled={loadingData}
-                    required
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -7804,12 +8007,56 @@ useEffect(() => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">{loadingData ? 'Loading qualifications...' : 'Select Highest Qualification'}</option>
-                    {!loadingData && qualifications.map((qualification) => (
-                      <option key={qualification._id} value={qualification._id}>{qualification.name}</option>
-                    ))}
-                  </select>
+                  />
+                  <input type="hidden" required value={candidateFormData.highestQualification || ''} readOnly />
+
+                  {isQualificationDropdownOpen && !loadingData && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedQualifications.length ? (
+                        filteredSortedQualifications.map((qualification) => (
+                          <button
+                            key={qualification._id}
+                            type="button"
+                            onClick={() => {
+                              handleInputChange('highestQualification', qualification._id);
+                              updateSelectSearch('qualification', qualification.name || '');
+                              setIsQualificationDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {qualification.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No qualification found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7817,12 +8064,20 @@ useEffect(() => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Counselor Name<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={counselorDropdownRef}>
+                  <input
+                    type="text"
                     id="counselorName"
-                    value={counselorId}
-                    onChange={(e) => setCounselorId(e.target.value)}
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search counselor..."
+                    value={selectSearch.counselor}
+                    onFocus={() => setIsCounselorDropdownOpen(true)}
+                    onClick={() => setIsCounselorDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('counselor', e.target.value);
+                      setCounselorId('');
+                      setIsCounselorDropdownOpen(true);
+                    }}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -7832,12 +8087,55 @@ useEffect(() => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">Select Counselor name</option>
-                    {counselorOptions.map((counselor, index) => (
-                      <option key={index} value={counselor.value}>{counselor.label}</option>
-                    ))}
-                  </select>
+                  />
+
+                  {isCounselorDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCounselors.length ? (
+                        filteredSortedCounselors.map((counselor) => (
+                          <button
+                            key={counselor.value}
+                            type="button"
+                            onClick={() => {
+                              setCounselorId(counselor.value);
+                              updateSelectSearch('counselor', counselor.label || '');
+                              setIsCounselorDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {counselor.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No counselor found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mb-3">
@@ -12901,67 +13199,67 @@ useEffect(() => {
                                                   const backendCounts = profile?.docCounts || {};
                                                   return (
                                                     <>
-                                                      <div className="stat-card total-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-file-alt"></i>
+                                                      <div className="stat-card total-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-file-alt docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.totalRequired || 0}</h4>
                                                           <p>Total Required</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                      <div className="stat-card uploaded-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-cloud-upload-alt docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.uploadedCount || 0}</h4>
                                                           <p>Uploaded</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-arrow-up"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card pending-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-clock"></i>
+                                                      <div className="stat-card pending-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-clock docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                           <p>Pending Review</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-exclamation-triangle"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card verified-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-check-circle"></i>
+                                                      <div className="stat-card verified-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-check-circle docIcon"></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.verifiedCount || 0}</h4>
                                                           <p>Approved</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-thumbs-up"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-times-circle"></i>
+                                                      <div className="stat-card rejected-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-times-circle docIcon "></i>
                                                         </div>
                                                         <div className="stat-info">
                                                           <h4>{backendCounts.RejectedCount || 0}</h4>
                                                           <p>Rejected</p>
                                                         </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
+                                                        <div className="stat-trend d-md-block ">
                                                           <i className="fas fa-arrow-down"></i>
                                                         </div>
                                                       </div>
@@ -22177,13 +22475,24 @@ max-width: 600px;
     white-space: nowrap;
     width: 100%;
   }
+    .docIcon{
+padding:12px;
+}
 
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
     .CButton {
       font-size: 13px;
       padding: 2px;
       white-space:nowrap;
     }
+      ..docDetails{
+         display: block !important;
+        text-align: -webkit-center;
+        position: relative;
+        height: 177px;
+        width: 105px;
+        padding: 13px;
+    } 
   }
 
 

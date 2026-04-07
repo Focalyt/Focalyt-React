@@ -130,6 +130,44 @@ function TypeB2b() {
         }
     };
 
+    // Handle delete
+    const handleDelete = async (typeId, typeName) => {
+        const confirmed = window.confirm(`Are you sure you want to delete "${typeName}"?`);
+
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+
+            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
+                method: 'DELETE',
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.status) {
+                setB2bTypes(prev => prev.filter(type => type._id !== typeId));
+
+                if (editingId === typeId) {
+                    resetForm();
+                }
+
+                showAlert('B2B type deleted successfully!', 'success');
+            } else {
+                showAlert(data.message || 'Failed to delete B2B type', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting B2B type:', error);
+            showAlert('Failed to delete B2B type', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Handle edit button click
     const handleEdit = (type) => {
         setFormData({
@@ -327,14 +365,26 @@ function TypeB2b() {
                                                                     </div>
                                                                 </td>
                                                                 <td>
-                                                                    <button
-                                                                        className="btn btn-sm btn-outline-primary"
-                                                                        onClick={() => handleEdit(type)}
-                                                                        title="Edit B2B Type"
-                                                                    >
-                                                                        <i className="fas fa-edit me-1"></i>
-                                                                        Edit
-                                                                    </button>
+                                                                    <div className="d-flex gap-2">
+                                                                        <button
+                                                                            className="btn btn-sm btn-outline-primary"
+                                                                            onClick={() => handleEdit(type)}
+                                                                            title="Edit B2B Type"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <i className="fas fa-edit me-1"></i>
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                            onClick={() => handleDelete(type._id, type.name)}
+                                                                            title="Delete B2B Type"
+                                                                            disabled={loading}
+                                                                        >
+                                                                            <i className="fas fa-trash me-1"></i>
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))

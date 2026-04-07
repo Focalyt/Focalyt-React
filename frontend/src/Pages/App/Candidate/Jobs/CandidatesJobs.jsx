@@ -998,7 +998,7 @@ const CandidatesJobs = () => {
               <div className="row justify-content-sm-center justify-content-md-start">
                 {jobs && jobs.length > 0 ? (
                   jobs.map((job, index) => (
-                    <div className="col-lg-4 col-md-4 col-sm-9" key={job._id || index}>
+                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-10 mx-auto" key={job._id || index}>
                       <div className="cr_nw_in">
                         <a
                           href="#"
@@ -1025,7 +1025,7 @@ const CandidatesJobs = () => {
                             <span className="job_cate">{job.title || 'NA'}</span>
                             <div className="row">
                               {/* Salary */}
-                              <div className="col-md-6">
+                              <div className="col-6">
                                 <div className="course_spec">
                                   <div className="spe_icon">
                                     <i className="la la-money"></i>
@@ -1043,7 +1043,7 @@ const CandidatesJobs = () => {
                               </div>
 
                               {/* Experience */}
-                              <div className="col-md-6">
+                              <div className="col-6">
                                 <div className="course_spec">
                                   <div className="spe_icon">
                                     <i className="la la-shield"></i>
@@ -1062,7 +1062,7 @@ const CandidatesJobs = () => {
                               </div>
 
                               {/* Qualification */}
-                              <div className="col-md-6">
+                              <div className="col-6">
                                 <div className="course_spec">
                                   <div className="spe_icon">
                                     <i className="la la-shield"></i>
@@ -1079,7 +1079,7 @@ const CandidatesJobs = () => {
                               </div>
 
                               {/* Location */}
-                              <div className="col-md-6">
+                              <div className="col-6">
                                 <div className="course_spec">
                                   <div className="spe_icon">
                                     <i className="la la-map"></i>
@@ -1097,7 +1097,7 @@ const CandidatesJobs = () => {
 
                           {/* Action Buttons */}
                           <div className="act_btn mt-2 row">
-                            <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-2 mb-2">
+                            <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-2 mb-2">
                               <Link
                                 className="apply-thisjob text-left apply-padding same-plane call-btn px-1"
                                 to={`/candidate/job/${job._id}`}
@@ -1106,7 +1106,7 @@ const CandidatesJobs = () => {
                                 <i className="la la-phone plane-font"></i> Call Now
                               </Link>
                             </div>
-                            <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+                            <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
                               <Link
                                 className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
                                 to={`/candidate/job/${job._id}`}
@@ -1114,7 +1114,7 @@ const CandidatesJobs = () => {
                                 style={{ fontWeight: 'bold' }}
                               >
                                 <i className="la la-paper-plane"></i>
-                                Apply for Job / नौकरी के लिए आवेदन
+                                Apply for Job 
                               </Link>
                             </div>
                             <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 offset-xl-3 offset-lg-3 mt-3">
@@ -1853,9 +1853,9 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
     padding: 0.75rem;
   }
 
-  .forsmallscrn {
-    display: block !important;
-  }
+  // .forsmallscrn {
+  //   display: block !important;
+  // }
 
   .forlrgscreen {
     display: none;
@@ -3008,9 +3008,9 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
     padding: 0.75rem;
   }
 
-  .forsmallscrn {
-    display: block !important;
-  }
+  // .forsmallscrn {
+  //   display: block !important;
+  // }
 
   .forlrgscreen {
     display: none;

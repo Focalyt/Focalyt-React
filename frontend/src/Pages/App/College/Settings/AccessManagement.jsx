@@ -179,6 +179,28 @@ const AccessManagement = () => {
     }
   };
 
+  const handleUserStatusChange = async (userId, status) => {
+    try {
+      if (!token) {
+        alert('Authentication required. Please login again.');
+        return;
+      }
+
+      const response = await axios.put(
+        `${backendUrl}/college/users/${userId}/status`,
+        { status },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data.success) {
+        await fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Failed to update user status');
+    }
+  };
+
   const handleCreateRole = () => {
     setAddMode('role');
     setShowAddRole(true);
@@ -372,6 +394,7 @@ const fetchBatches = async () => {
             users={users}
             handleAddUser={handleAddUser}
             handleEditUser={handleEditUser}
+            onStatusChange={handleUserStatusChange}
             onDeleteUser={handleDeleteUser}
             onRestoreUser={handleRestoreUser}
             allRoles={allRoles}

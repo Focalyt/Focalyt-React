@@ -4,6 +4,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { Link } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
@@ -169,6 +170,7 @@ const useNavHeight = (dependencies = []) => {
   const [navHeight, setNavHeight] = useState(140); // Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
@@ -180,8 +182,9 @@ const useNavHeight = (dependencies = []) => {
   const calculateWidth = useCallback(() => {
 
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -224,17 +227,19 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width };
+  return { navRef, navHeight, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateWidth = useCallback(() => {
 
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
@@ -272,7 +277,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { widthRef, width };
+  return { widthRef, width, leftOffset };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -625,6 +630,7 @@ const B2BSales = () => {
         alert('✅ Follow-up saved and scheduled successfully!');
       }
 
+      window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
       alert('❌ Error processing request');
@@ -1700,7 +1706,7 @@ const B2BSales = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
+  const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -2261,7 +2267,7 @@ const B2BSales = () => {
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn updateStatus"
                 >
                   Update Status
                 </button>
@@ -2270,7 +2276,7 @@ const B2BSales = () => {
           ) : !isgoogleLoginLoading && (
             <div className="d-flex justify-content-center align-items-center h-100">
               <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>
+                <button className="btn googleLogin" onClick={handleGoogleLogin}>
                   Login with Google to Update Status
                 </button>
               </div>
@@ -2612,7 +2618,7 @@ const B2BSales = () => {
                   (showPanel === 'RefferAllLeads' && (selectedProfiles.length === 0 && !input1Value))
                 }
                 style={{ 
-                  backgroundColor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : '#fd7e14', 
+                  background: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', 
                   border: 'none', 
                   padding: '8px 24px', 
                   fontSize: '14px',
@@ -2858,7 +2864,18 @@ const B2BSales = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '5px' }}
+            <nav
+              ref={navRef}
+              className=""
+              style={{
+                zIndex: 11,
+                backgroundColor: 'white',
+                position: 'fixed',
+                width: `${width}px`,
+                left: `${leftOffset}px`,
+                boxShadow: '0 4px 25px 0 #0000001a',
+                paddingBlock: '5px'
+              }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
@@ -2948,8 +2965,8 @@ const B2BSales = () => {
                             onClick={applyFilters}
                             disabled={!filters.search}
                             style={{
-                              backgroundColor: '#007bff',
-                              borderColor: '#007bff',
+                              background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
+                              borderColor: 'rgb(250, 85, 121)',
                               color: 'white',
                               fontWeight: '500',
                               padding: '8px 16px',
@@ -2964,17 +2981,18 @@ const B2BSales = () => {
                         </div>
 
                         <button
-                          className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          className={`btn btn-sm filterBadge ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
                           onClick={() => setShowFilters(!showFilters)}
                           style={{
-                            backgroundColor: showFilters ? '#007bff' : '#ffffff',
-                            color: showFilters ? '#ffffff' : '#6c757d',
+                            background: showFilters ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
+                            color: showFilters ? '#ffffff' : 'rgb(250, 85, 121)',
                             fontWeight: '500',
                             padding: '8px 16px',
                             borderRadius: '6px',
                             fontSize: '13px',
                             transition: 'all 0.2s ease',
-                            borderWidth: '1.5px'
+                            borderWidth: '1.5px',
+                            borderColor: 'rgb(250, 85, 121)'
                           }}
                         >
                           <i className="fas fa-filter me-1"></i>
@@ -2982,13 +3000,15 @@ const B2BSales = () => {
                         
                         {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                           <>
-                            <button className="btn btn-sm btn-outline-primary" style={{
+                            <button className="btn btn-sm " style={{
                               padding: "6px 12px",
                               fontSize: "11px",
                               fontWeight: "600",
                               display: "flex",
                               alignItems: "center",
-                              gap: "4px"
+                              gap: "4px",
+                              color: 'rgb(250, 85, 121)',
+                              borderColor: 'rgb(250, 85, 121)'
                             }}
                               onClick={handleOpenLeadModal}
                             >
@@ -2996,14 +3016,16 @@ const B2BSales = () => {
                               Add Lead
                             </button>
                             <button 
-                              className="btn btn-sm btn-outline-primary" 
+                              className="btn btn-sm" 
                               style={{
                                 padding: "6px 12px",
                                 fontSize: "11px",
                                 fontWeight: "600",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "4px"
+                                gap: "4px",
+                                 color: 'rgb(250, 85, 121)',
+                              borderColor: 'rgb(250, 85, 121)'
                               }}
                               onClick={() => {
                                 setShowBulkInputs(true);
@@ -3019,7 +3041,7 @@ const B2BSales = () => {
                         )}
                         {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                           <button 
-                            className="btn btn-sm btn-outline-primary" 
+                            className="btn btn-sm " 
                             disabled={loadingLeads || leads.length === 0}
                             style={{
                               padding: "6px 12px",
@@ -3027,7 +3049,9 @@ const B2BSales = () => {
                               fontWeight: "600",
                               display: "flex",
                               alignItems: "center",
-                              gap: "4px"
+                              gap: "4px",
+                              color: 'rgb(250, 85, 121)',
+                              borderColor: 'rgb(250, 85, 121)'
                             }}
                             onClick={() => {
                               setShowBulkInputs(true);
@@ -3120,6 +3144,25 @@ const B2BSales = () => {
                   {/* Mobile Layout */}
                   <div className="col-12 d-md-none mt-2">
                     <div className="row g-2">
+                      <div className="col-12">
+                        <Link
+                          to="/institute/lrp"
+                          className="btn w-100 btn-outline-secondary"
+                          style={{
+                            padding: '10px 12px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <i className="fas fa-clipboard-list" style={{ fontSize: '14px' }}></i>
+                          Report
+                        </Link>
+                      </div>
                       {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
                         <>
                           <div className="col-6">
@@ -3458,7 +3501,7 @@ const B2BSales = () => {
                           >
                             <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
                               <div className="d-flex align-items-center">
-                                <i className="fas fa-chart-line me-1" style={{ color: '#007bff', fontSize: '12px' }}></i>
+                                <i className="fas fa-chart-line me-1 text-white" style={{ color: '#007bff', fontSize: '12px' }}></i>
                                 <div>
                                   <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
                                   <small style={{ color: '#ffffff', fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
@@ -3656,10 +3699,10 @@ const B2BSales = () => {
                         {/* Card Header */}
                         <div className="lead-header">
                           <div className="lead-title-section">
-                            <h5 className="lead-business-name">
+                            {/* <h5 className="lead-business-name">
                               {lead.businessName || 'Business Name Not Available'}
-                            </h5>
-                            <p className="lead-contact-person">
+                            </h5> */}
+                            <p className="lead-contact-person text-capitalize text-white">
                               <i className="fas fa-user me-2"></i>
                               {lead.concernPersonName || 'Contact Person Not Available'}
                             </p>
@@ -3693,6 +3736,26 @@ const B2BSales = () => {
                             </div>
                           </div>
                           <div className="lead-badges">
+
+                          <Link
+                          to="/institute/lrp"
+                          className="btn btn-sm btn-outline-secondary text-white border-1 border-white dayReport"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            textDecoration: 'none',
+                            
+                          }}
+                          title="Day Report"
+                        >
+                          <i className="fas fa-clipboard-list" style={{ fontSize: '10px' }}></i>
+                          Report
+                        </Link>
+
                             {lead.leadCategory?.name && (
                               <span className="lead-badge category">
                                 {lead.leadCategory.name}
@@ -3714,7 +3777,7 @@ const B2BSales = () => {
                               <div className="d-flex align-items-center">
                                 <i className="fas fa-tag text-primary me-2"></i>
                                 <span className="fw-bold text-dark">Status:</span>
-                                <span className="ms-2 badge bg-primary">
+                                <span className="ms-2 badge StatusBadge">
                                   {lead.status?.title || lead.status?.name || 'No Status'}
                                 </span>
                                 {lead.subStatus && (
@@ -3728,10 +3791,14 @@ const B2BSales = () => {
                               </div>
                               {canUpdateLead(lead) ? (
                                 <button
-                                  className="btn btn-sm btn-outline-primary"
+                                  className="btn btn-sm btn-outline-primary StatusChange"
                                   onClick={() => openEditPanel(lead, 'StatusChange')}
                                   title="Change Status"
-                                >
+                                  style={{ borderColor: 'rgb(250, 85, 121)', color: 'rgb(250, 85, 121)' }}
+                                 
+                                 
+                                
+                              >
                                   <i className="fas fa-edit me-1"></i>
                                   Change Status
                                 </button>
@@ -3981,7 +4048,7 @@ const B2BSales = () => {
         >
           <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxHeight: '90vh' }}>
             <div className="modal-content border-0 shadow" style={{ maxHeight: '90vh' }}>
-              <div className="modal-header bg-primary text-white">
+              <div className="modal-header bg-header text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
                   Filter Leads
@@ -3997,7 +4064,7 @@ const B2BSales = () => {
                   <div className="col-md-4">
                     <label className="form-label fw-medium text-dark mb-2">
                       <i className="fas fa-tag text-success me-2"></i>
-                      Lead Category
+                      Lead Source
                     </label>
                     <select
                       className="form-select border-0 bg-light"
@@ -4143,7 +4210,7 @@ const B2BSales = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn applyFilters"
                   onClick={() => {
                     applyFilters();
                     setShowFilters(false);
@@ -4165,7 +4232,7 @@ const B2BSales = () => {
             <div className="modal-dialog modal-lg modal-dialog-centered">
               <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
                 {/* Modal Header */}
-                <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
+                <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
                   <h5 className="modal-title d-flex align-items-center">
                     <i className="fas fa-user-plus me-2"></i>
                     Add New B2B Lead
@@ -4184,7 +4251,7 @@ const B2BSales = () => {
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
                         <i className="fas fa-tag text-primary me-1"></i>
-                        Lead Category <span className="text-danger">*</span>
+                        Lead Source <span className="text-danger">*</span>
                       </label>
                       <select
                         className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
@@ -4192,7 +4259,7 @@ const B2BSales = () => {
                         value={leadFormData.leadCategory}
                         onChange={handleLeadInputChange}
                       >
-                        <option value="">Select Lead Category</option>
+                        <option value="">Select Lead Source</option>
                         {leadCategoryOptions.filter(category => category).map(category => (
                           <option key={category.value} value={category.value}>
                             {category.label}
@@ -4514,7 +4581,7 @@ const B2BSales = () => {
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
               {/* Modal Header */}
-              <div className="modal-header" style={{ backgroundColor: '#28a745', color: 'white' }}>
+              <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
                 <h5 className="modal-title d-flex align-items-center">
                   <i className="fas fa-file-upload me-2"></i>
                   Bulk Upload B2B Leads
@@ -4537,7 +4604,7 @@ const B2BSales = () => {
                   <ul className="mb-0 small">
                     <li>Upload CSV or Excel file (.xlsx, .xls, .csv)</li>
                     <li>Maximum file size: 10MB</li>
-                    <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Category, Type of B2B</li>
+                    <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
                    
                   </ul>
                 </div>
@@ -4582,11 +4649,10 @@ const B2BSales = () => {
                 <div className="mb-4">
                   <button
                     type="button"
-                    className="btn btn-outline-primary btn-sm"
+                    className="btn sampledownload btn-sm"
                     onClick={() => {
-                      // Create sample CSV content with proper format
-                      // Note: Lead Category and Type of B2B names should match system values
-                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Category,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
+                      
+                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Source,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
 ABC Company,John Doe,9876543210,john@abc.com,Corporate,Partner,123 Main Street,Mumbai,Maharashtra,Manager,9876543210,0221234567,Owner Name,Sample remark
 XYZ Corp,Jane Smith,9876543211,jane@xyz.com,Individual,Client,456 Park Avenue,Delhi,Delhi,Director,9876543211,0111234567,Owner Name,Another remark
 Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park,Bangalore,Karnataka,CEO,9876543212,0801234567,Owner Name,Technology company`;
@@ -4645,7 +4711,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
                   </button>
                   <button
                     type="button"
-                    className="btn btn-success px-4"
+                    className="btn uploadLeads px-4 text-white"
                     onClick={handleBulkUpload}
                     disabled={!bulkUploadFile || bulkUploadLoading}
                   >
@@ -4671,6 +4737,31 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
       <style>{`
+      .dayReport:hover{
+      background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%) !important;
+      }
+      .StatusBadge , .applyFilters , .uploadLeads{
+      background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%) !important;
+      color: white
+      }
+      .StatusChange:hover , .filterBadge:hover{
+      background: transparent;
+      }
+      .sampledownload{
+       background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%) !important;
+      color: white
+      }
+      .updateStatus{
+      background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%) !important;
+      color: white
+      }
+      .sampledownload:hover , .updateStatus:hover{
+      background: transparent;
+      color: #fff;
+      }
+      .bg-header{
+      background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%) !important;
+      }
   .modal .pac-container {
     z-index: 99999 !important;
     position: fixed !important;
@@ -4715,7 +4806,8 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   /* Header Section */
   .lead-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    // background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
     color: white;
     padding: 1rem;
     position: relative;
@@ -5002,7 +5094,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .action-btn.status {
-    background: linear-gradient(135deg, #ffc107, #e0a800);
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
     padding: 0.5rem;
     min-width: 40px;
   }
@@ -5153,7 +5245,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   /* Status-specific colors */
   .status-count-card.total {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
     color: white;
   }
 
@@ -5175,12 +5267,12 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   .status-count-card.selected {
     transform: translateY(-4px);
     box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
-    border: 2px solid #007bff !important;
+    border: 2px solid rgb(250, 85, 121) !important;
     background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
   }
 
   .status-count-card.selected.total {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
   }
 
   /* Status Section Styles */

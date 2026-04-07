@@ -196,6 +196,31 @@ const trainerTimeTableSchema = new Schema({
     cancellationReason: {
         type: String,
         trim: true,
+    },
+    googleCalendarEventId: {
+        type: String,
+        trim: true
+    },
+    googleMeetLink: {
+        type: String,
+        trim: true
+    },
+    googleMeetCode: {
+        type: String,
+        trim: true
+    },
+    roomName: {
+        type: String,
+        trim: true
+    },
+    joinPath: {
+        type: String,
+        trim: true
+    },
+    liveClassPlatform: {
+        type: String,
+        enum: ['none', 'google_meet', 'jitsi'],
+        default: 'none'
     }
     
 }, { 

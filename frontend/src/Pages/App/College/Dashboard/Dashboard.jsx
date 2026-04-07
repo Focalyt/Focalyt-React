@@ -362,21 +362,34 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
-  const filteredOptions = options.filter(option => {
-    const label = String(option?.label ?? '');
-    return label.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const optionsSafe = Array.isArray(options) ? options : [];
+  const normalizeLabel = (option) => String(option?.label ?? '').trim();
+
+  const sortedOptions = useMemo(() => {
+    return [...optionsSafe].sort((a, b) =>
+      normalizeLabel(a).localeCompare(normalizeLabel(b), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+    );
+  }, [optionsSafe]);
+
+  const filteredOptions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return sortedOptions;
+    return sortedOptions.filter(option => normalizeLabel(option).toLowerCase().includes(q));
+  }, [sortedOptions, searchTerm]);
 
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
       return `${t('select')} ${title}`;
     } else if (selectedValues.length === 1) {
-      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      const selectedOption = optionsSafe.find(opt => opt.value === selectedValues[0]);
       return selectedOption ? selectedOption.label : selectedValues[0];
     } else if (selectedValues.length <= 2) {
       const selectedLabels = selectedValues.map(val => {
-        const option = options.find(opt => opt.value === val);
+        const option = optionsSafe.find(opt => opt.value === val);
         return option ? option.label : val;
       });
       return selectedLabels.join(', ');
@@ -653,6 +666,7 @@ const LeadAnalyticsDashboard = () => {
   });
 
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+  const [isFunnelDashboard , setIsFunnelDashboard] = useState(true);
 
   const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
 
@@ -769,7 +783,7 @@ const LeadAnalyticsDashboard = () => {
       setFilterData(newFilterData);
 
 
-      fetchProfileData(newFilterData);
+      fetchProfileData(newFilterData, formData);
 
     } catch (error) {
       console.error('Filter change error:', error);
@@ -871,7 +885,7 @@ const LeadAnalyticsDashboard = () => {
   }, [filterData, startDate, endDate])
 
 
-  const fetchStats = async (filters = filterData) => {
+  const fetchStats = async (filters = filterData, criteria = formData) => {
     try {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
@@ -891,14 +905,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
       // Use the new dashboard API with date filtering
       const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
         headers: {
@@ -923,7 +937,7 @@ const LeadAnalyticsDashboard = () => {
     fetchSourceLeads();
   }, [filterData, startDate, endDate])
 
-  const fetchSourceLeads = async (filters = filterData) => {
+  const fetchSourceLeads = async (filters = filterData, criteria = formData) => {
     try {
       setIsLoading(true);
 
@@ -941,14 +955,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
 
       const response = await axios.get(`${backendUrl}/college/digitalLead/sourceLeadsData?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -1021,7 +1035,7 @@ const LeadAnalyticsDashboard = () => {
     fetchFollowupCountsByCounselor();
   }, [token, startDate, endDate, formData, filterData]);
 
-  const fetchProfileData = async (filters = filterData) => {
+  const fetchProfileData = async (filters = filterData, criteria = formData) => {
     try {
       setIsLoading(true);
 
@@ -1045,14 +1059,14 @@ const LeadAnalyticsDashboard = () => {
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(criteria?.projects?.values?.length > 0 && { projects: JSON.stringify(criteria.projects.values) }),
+        ...(criteria?.verticals?.values?.length > 0 && { verticals: JSON.stringify(criteria.verticals.values) }),
+        ...(criteria?.course?.values?.length > 0 && { course: JSON.stringify(criteria.course.values) }),
+        ...(criteria?.center?.values?.length > 0 && { center: JSON.stringify(criteria.center.values) }),
+        ...(criteria?.counselor?.values?.length > 0 && { counselor: JSON.stringify(criteria.counselor.values) })
       });
       // If no date filter is selected, send no parameters (will return all data)
-      console.log(formData.counselor.values, 'queryParams')
+      console.log(criteria?.counselor?.values, 'queryParams')
       // Use the new dashboard API with date filtering
       const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
         headers: {
@@ -1295,8 +1309,21 @@ const LeadAnalyticsDashboard = () => {
     appliedCoursesData[0]._leadStatus.substatuses = [{ title: 'Test Substatus' }];
   }
 
-  // Data is now filtered by backend, so we use it directly
-  const filteredData = appliedCoursesData;
+  const filteredData = useMemo(() => {
+    if (!Array.isArray(appliedCoursesData)) return [];
+
+    let nextData = appliedCoursesData.filter(Boolean);
+
+    if (formData?.center?.values?.length > 0) {
+      const selectedCenterIds = new Set(formData.center.values.map(String));
+      nextData = nextData.filter((lead) => {
+        const centerId = lead?._center?._id;
+        return centerId && selectedCenterIds.has(String(centerId));
+      });
+    }
+
+    return nextData;
+  }, [appliedCoursesData, formData]);
 
   // Get daily admissions data
   const getDailyAdmissions = () => {
@@ -2308,6 +2335,340 @@ const LeadAnalyticsDashboard = () => {
 
 
   const [activeSection, setActiveSection] = useState('main'); // 'main' | 'ai' | 'counselor'
+  const [b2cHoveredCol, setB2cHoveredCol] = useState(null);
+  const [b2cSheetHoveredCol, setB2cSheetHoveredCol] = useState(null);
+  const [showB2cAiReview, setShowB2cAiReview] = useState(false);
+  const [b2cAiReview, setB2cAiReview] = useState(null);
+
+
+  const legacyB2cFunnelDashboardRows = useMemo(() => ([
+    { group: 'College Data', month: 'January', totalCandidate: 32, selectedDocs: 28, hot: 6, warm: 1, notConnected: 1, notEligible: 0, notInterested: 7, docsPending: 0, dropOut: 0, batchDetails: 'Batch-1', atCenter: 25 },
+    { group: 'College Data', month: 'February', totalCandidate: 8, selectedDocs: 8, hot: 11, warm: 3, notConnected: 3, notEligible: 0, notInterested: 6, docsPending: 0, dropOut: 0, batchDetails: 'Batch-2', atCenter: 0 },
+    { group: 'College Data', month: 'March', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-3', atCenter: 0 },
+    { group: 'College Data', month: 'April', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-4', atCenter: 0 },
+    { group: 'College Data', month: 'May', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-5', atCenter: 0 },
+    { group: 'College Data', month: 'June', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-6', atCenter: 0 },
+    { group: 'College Data', month: 'July', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: '', atCenter: 0 },
+
+    { group: 'Digital', month: 'January', totalCandidate: 10, selectedDocs: 3, hot: 0, warm: 0, notConnected: 0, notEligible: 0, notInterested: 0, docsPending: 0, dropOut: 0, batchDetails: 'Batch-1', atCenter: 5 },
+    { group: 'Digital', month: 'February', totalCandidate: 25, selectedDocs: 18, hot: 11, warm: 3, notConnected: 1, notEligible: 0, notInterested: 0, docsPending: 0, dropOut: 0, batchDetails: 'Batch-2', atCenter: 0 },
+    { group: 'Digital', month: 'March', totalCandidate: '', selectedDocs: 8, hot: 0, warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-3', atCenter: 0 },
+    { group: 'Digital', month: 'April', totalCandidate: '', selectedDocs: '', hot: 0, warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-4', atCenter: 0 },
+    { group: 'Digital', month: 'May', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: 'Batch-5', atCenter: 0 },
+    { group: 'Digital', month: 'June', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: '', atCenter: 0 },
+    { group: 'Digital', month: 'July', totalCandidate: '', selectedDocs: '', hot: '', warm: '', notConnected: '', notEligible: '', notInterested: '', docsPending: '', dropOut: '', batchDetails: '', atCenter: 0 },
+  ]), []);
+
+  const legacyB2cFunnelSheetRows = useMemo(() => ([
+    { id: 1, leadOwner: 'Amit', leadSource: 'College Data', batchDetails: 'Batch-1', studentName: 'Riya Sharma', contactNo: '98XXXXXX12', status: 'DOCUMENTS', feedbackCall: 'Call Tomorrow', newRemarks: 'Interested, docs pending', documents: 'Aadhar, 10th Marksheet' },
+    { id: 2, leadOwner: 'Neha', leadSource: 'Digital', batchDetails: 'Batch-1', studentName: 'Mohit Verma', contactNo: '99XXXXXX34', status: 'HOT', feedbackCall: 'Connected', newRemarks: 'Ready for KYC', documents: 'Aadhar' },
+    { id: 3, leadOwner: 'Sahil', leadSource: 'College Data', batchDetails: 'Batch-2', studentName: 'Pooja Singh', contactNo: '97XXXXXX56', status: 'WARM', feedbackCall: 'Follow-up', newRemarks: 'Needs counseling', documents: '-' },
+    { id: 4, leadOwner: 'Amit', leadSource: 'Digital', batchDetails: 'Batch-2', studentName: 'Arjun Patel', contactNo: '96XXXXXX78', status: 'NOT INTERESTED', feedbackCall: 'Closed', newRemarks: 'Not interested now', documents: '-' },
+    { id: 5, leadOwner: 'Neha', leadSource: 'College Data', batchDetails: 'Batch-1', studentName: 'Kunal Jain', contactNo: '95XXXXXX90', status: 'DOCUMENTS', feedbackCall: 'WhatsApp', newRemarks: 'Waiting for docs', documents: 'Aadhar, Photo' },
+  ]), []);
+
+  void legacyB2cFunnelDashboardRows;
+  void legacyB2cFunnelSheetRows;
+
+  const b2cStatusColumns = useMemo(
+    () => allStatuses.filter(status => status && status !== 'Untouch Leads'),
+    [allStatuses]
+  );
+
+  const getB2cLeadSource = (lead) => {
+    const rawSource =
+      lead?._candidate?.sourceInfo?.sourceName ||
+      lead?._candidate?.sourceInfo?.source ||
+      lead?._candidate?.sourceInfo?.sourceType ||
+      lead?.leadSource ||
+      lead?.source ||
+      lead?.lead_type ||
+      lead?.registrationType ||
+      lead?.registeredBy?.source ||
+      lead?.registeredBy?.name ||
+      lead?.registeredBy?.type ||
+      '';
+
+    if (!rawSource) return 'Unknown';
+
+    const normalizedSource = String(rawSource).trim().toLowerCase();
+    if (normalizedSource.includes('digital')) return 'Digital';
+    if (normalizedSource.includes('college')) return 'College Data';
+    if (normalizedSource.includes('portal')) return 'Portal';
+    return String(rawSource).trim();
+  };
+
+  const getB2cCenterName = (lead) => {
+    return lead?._center?.name || lead?.centerName || 'Unknown';
+  };
+
+  const getB2cProjectName = (lead) => {
+    const project = lead?._course?.project;
+
+    if (Array.isArray(project)) {
+      return project.map((item) => item?.name).filter(Boolean).join(', ') || 'Unknown Project';
+    }
+
+    return project?.name || lead?.projectName || 'Unknown Project';
+  };
+
+  const getB2cMonthLabel = (lead) => {
+    const sourceDate = lead?.createdAt || lead?.updatedAt || lead?.admissionDate || lead?.date;
+    const parsedDate = sourceDate ? new Date(sourceDate) : null;
+
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) return 'Unknown';
+
+    return parsedDate.toLocaleString('en-US', { month: 'long' });
+  };
+
+  const getLatestCounsellorName = (lead) => {
+    if (Array.isArray(lead?.leadAssignment) && lead.leadAssignment.length > 0) {
+      return lead.leadAssignment[lead.leadAssignment.length - 1]?.counsellorName || 'Unknown';
+    }
+
+    return lead?.counsellorName || lead?.counselorName || 'Unknown';
+  };
+
+  const getB2cDocumentsText = (lead) => {
+    if (!Array.isArray(lead?.uploadedDocs) || lead.uploadedDocs.length === 0) {
+      return '-';
+    }
+
+    const pendingDocs = lead.uploadedDocs
+      .filter(doc => doc && doc.status !== 'Verified')
+      .map(doc => doc.Name || doc.name)
+      .filter(Boolean);
+
+    if (pendingDocs.length > 0) {
+      return pendingDocs.join(', ');
+    }
+
+    const allDocs = lead.uploadedDocs
+      .map(doc => doc?.Name || doc?.name)
+      .filter(Boolean);
+
+    return allDocs.length > 0 ? allDocs.join(', ') : '-';
+  };
+
+  const b2cFunnelDashboardRows = useMemo(() => {
+    const groupedRows = {};
+
+    filteredData.forEach((lead) => {
+      const group = getB2cCenterName(lead) !== 'Unknown'
+        ? getB2cCenterName(lead)
+        : getB2cLeadSource(lead);
+      const month = getB2cMonthLabel(lead);
+      const status = (lead?._leadStatus?.title || '').trim();
+      const groupKey = `${group}__${month}`;
+
+      if (!groupedRows[groupKey]) {
+        groupedRows[groupKey] = {
+          group,
+          month,
+          totalCandidate: 0,
+          atCenter: 0,
+        };
+
+        b2cStatusColumns.forEach((statusLabel) => {
+          groupedRows[groupKey][statusLabel] = 0;
+        });
+      }
+
+      groupedRows[groupKey].totalCandidate += 1;
+
+      if (status && b2cStatusColumns.includes(status)) {
+        groupedRows[groupKey][status] += 1;
+      }
+
+      if (lead?.inZeroPeriod || lead?.batchAssigned) {
+        groupedRows[groupKey].atCenter += 1;
+      }
+    });
+
+    const monthOrder = {
+      January: 1,
+      February: 2,
+      March: 3,
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+      Unknown: 99,
+    };
+
+    return Object.values(groupedRows).sort((a, b) => {
+      if (a.group !== b.group) {
+        return a.group.localeCompare(b.group);
+      }
+
+      return (monthOrder[a.month] || 99) - (monthOrder[b.month] || 99);
+    });
+  }, [filteredData, b2cStatusColumns]);
+
+  const b2cDashboardTitle = useMemo(() => {
+    const projectNames = Array.from(
+      new Set(
+        filteredData
+          .map((lead) => getB2cProjectName(lead))
+          .filter((name) => name && name !== 'Unknown Project')
+      )
+    );
+
+    const centerNames = Array.from(
+      new Set(
+        filteredData
+          .map((lead) => getB2cCenterName(lead))
+          .filter((name) => name && name !== 'Unknown')
+      )
+    );
+
+    const projectLabel = projectNames.length > 0 ? projectNames.join(', ') : 'Project';
+    const centerLabel = centerNames.length > 0 ? centerNames.join(', ') : 'Center';
+
+    return `DASHBOARD ${projectLabel} (${centerLabel})`;
+  }, [filteredData]);
+
+  const b2cFunnelSheetRows = useMemo(() => (
+    filteredData.map((lead, index) => ({
+      id: index + 1,
+      leadOwner: getLatestCounsellorName(lead),
+      center: getB2cCenterName(lead),
+      leadSource: getB2cLeadSource(lead),
+      studentName:
+        lead?._candidate?.name ||
+        lead?.candidateName ||
+        lead?.name ||
+        'Unknown',
+      contactNo:
+        lead?._candidate?.mobile ||
+        lead?.candidateMobile ||
+        lead?.mobile ||
+        '-',
+      status: (lead?._leadStatus?.title || 'Unknown').trim() || 'Unknown',
+      feedbackCall: lead?.nextAction?.title || lead?.nextActionDate || '-',
+      newRemarks: lead?.remarks || lead?.remark || lead?.comment || '-',
+      documents: getB2cDocumentsText(lead),
+    }))
+  ), [filteredData]);
+
+  const runB2cAiSupervisorReview = () => {
+    const normalize = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const total = Array.isArray(filteredData) ? filteredData.length : 0;
+    const rows = Array.isArray(b2cFunnelDashboardRows) ? b2cFunnelDashboardRows : [];
+    const statusCols = Array.isArray(b2cStatusColumns) ? b2cStatusColumns : [];
+
+    const issues = [];
+    const recommendations = [];
+
+    if (total === 0) {
+      issues.push({
+        severity: 'error',
+        code: 'NO_DATA',
+        message: 'No leads found for the current filters. Funnel cannot be reviewed.'
+      });
+      recommendations.push('Try removing filters or widening date range, then run the review again.');
+    }
+
+    if (statusCols.length === 0) {
+      issues.push({
+        severity: 'error',
+        code: 'NO_STATUS_COLUMNS',
+        message: 'No status columns detected. Check if `_leadStatus.title` is present in the API response.'
+      });
+      recommendations.push('Ensure every lead has `_leadStatus.title`, and that statuses are configured in the system.');
+    }
+
+    const unknownMonthRows = rows.filter(r => normalize(r?.month) === 'unknown');
+    if (unknownMonthRows.length > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'UNKNOWN_MONTH',
+        message: `${unknownMonthRows.length} funnel rows have month = "Unknown" (missing/invalid lead dates).`
+      });
+      recommendations.push('Ensure leads have valid `createdAt` (preferred) so month-wise funnel is accurate.');
+    }
+
+    const groupSet = new Set(rows.map(r => String(r?.group || '').trim()).filter(Boolean));
+    if (groupSet.size === 0 && total > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'UNKNOWN_GROUP',
+        message: 'Could not derive Center/Lead Source grouping for many leads.'
+      });
+      recommendations.push('Ensure leads have `_center.name` or a valid source field so grouping is meaningful.');
+    }
+
+    // Status distribution from filteredData
+    const statusCounts = {};
+    (Array.isArray(filteredData) ? filteredData : []).forEach((lead) => {
+      const title = String(lead?._leadStatus?.title || 'Unknown').trim() || 'Unknown';
+      statusCounts[title] = (statusCounts[title] || 0) + 1;
+    });
+
+    const topStatuses = Object.entries(statusCounts)
+      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+      .slice(0, 5)
+      .map(([k, v]) => ({ status: k, count: v }));
+
+    // Closure stage sanity
+    const normCols = statusCols.map(normalize);
+    const hasClosure = normCols.some(s =>
+      s.includes('admission') ||
+      s.includes('converted') ||
+      s.includes('closed') ||
+      s.includes('enrolled') ||
+      s.includes('registration done')
+    );
+    if (!hasClosure && statusCols.length > 0) {
+      issues.push({
+        severity: 'warn',
+        code: 'NO_CLOSURE_STAGE',
+        message: 'No obvious closure stage found in status columns (e.g., Admission/Converted/Closed).'
+      });
+      recommendations.push('Add a clear closure status (Admission Done / Converted) so funnel conversion can be measured.');
+    }
+
+    // At Center ratio
+    const atCenterTotal = rows.reduce((s, r) => s + (Number(r?.atCenter) || 0), 0);
+    const candidateTotal = rows.reduce((s, r) => s + (Number(r?.totalCandidate) || 0), 0);
+    const atCenterRate = candidateTotal > 0 ? (atCenterTotal / candidateTotal) * 100 : 0;
+    if (candidateTotal > 0 && atCenterRate < 5) {
+      issues.push({
+        severity: 'warn',
+        code: 'LOW_AT_CENTER',
+        message: `At Center is low (${atCenterRate.toFixed(1)}%). Check if \`inZeroPeriod\` / \`batchAssigned\` flags are populated.`
+      });
+      recommendations.push('Verify backend is setting `inZeroPeriod` or `batchAssigned` correctly for B2C leads.');
+    }
+
+    const errorCount = issues.filter(i => i.severity === 'error').length;
+    const warnCount = issues.filter(i => i.severity === 'warn').length;
+    let score = 100 - (errorCount * 30 + warnCount * 10);
+    if (score < 0) score = 0;
+
+    const verdict = errorCount > 0 ? 'needs_changes' : warnCount > 2 ? 'review' : 'approved';
+
+    setB2cAiReview({
+      verdict,
+      score,
+      issues,
+      recommendations,
+      snapshot: {
+        totalLeads: total,
+        statusColumnCount: statusCols.length,
+        groupCount: groupSet.size,
+        atCenterRate: Number(atCenterRate.toFixed(1)),
+        topStatuses
+      }
+    });
+    setShowB2cAiReview(true);
+  };
 
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -2502,6 +2863,8 @@ const LeadAnalyticsDashboard = () => {
               </button>
             </div>
           )}
+
+
 
           {/* Key Metrics Cards */}
           <div className="row g-3 mb-4">
@@ -2764,6 +3127,279 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* B2C Funnel  */}
+           <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 className="h5 fw-semibold mb-0 d-flex align-items-center gap-2">
+                  <Target className="text-primary" size={20} />
+                  B2C Funnel 
+                </h2>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-dark btn-sm"
+                    onClick={runB2cAiSupervisorReview}
+                    title="AI Supervisor review for current funnel"
+                  >
+                    AI Supervisor Review
+                  </button>
+                </div>
+              </div>
+
+              {showB2cAiReview && (
+                <div
+                  className="modal fade show"
+                  style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}
+                  role="dialog"
+                  aria-modal="true"
+                >
+                  <div className="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div className="modal-content">
+                      <div className="modal-header">
+                        <h5 className="modal-title">B2C Funnel AI Supervisor Review</h5>
+                        <button type="button" className="btn-close" onClick={() => setShowB2cAiReview(false)} aria-label="Close"></button>
+                      </div>
+                      <div className="modal-body">
+                        {!b2cAiReview ? (
+                          <div className="text-muted">No review generated yet.</div>
+                        ) : (
+                          <>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                              <span className={`badge ${
+                                b2cAiReview.verdict === 'approved' ? 'bg-success' :
+                                b2cAiReview.verdict === 'review' ? 'bg-warning text-dark' :
+                                'bg-danger'
+                              }`}>
+                                {String(b2cAiReview.verdict).toUpperCase()}
+                              </span>
+                              <span className="badge bg-primary">Score: {b2cAiReview.score}</span>
+                              <span className="badge bg-light text-dark">Leads: {b2cAiReview.snapshot?.totalLeads ?? 0}</span>
+                              <span className="badge bg-light text-dark">Statuses: {b2cAiReview.snapshot?.statusColumnCount ?? 0}</span>
+                              <span className="badge bg-light text-dark">Groups: {b2cAiReview.snapshot?.groupCount ?? 0}</span>
+                              <span className="badge bg-light text-dark">At Center: {b2cAiReview.snapshot?.atCenterRate ?? 0}%</span>
+                            </div>
+
+                            {Array.isArray(b2cAiReview.issues) && b2cAiReview.issues.length > 0 ? (
+                              <div className="mb-3">
+                                <h6 className="fw-semibold mb-2">Issues</h6>
+                                <ul className="mb-0">
+                                  {b2cAiReview.issues.map((it, idx) => (
+                                    <li key={idx}>
+                                      <span className={`fw-semibold ${it.severity === 'error' ? 'text-danger' : 'text-warning'}`}>
+                                        {String(it.severity).toUpperCase()}
+                                      </span>
+                                      {it.code ? <span className="text-muted"> ({it.code})</span> : null}
+                                      {' — '}
+                                      {it.message}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <div className="alert alert-success mb-3">
+                                No critical issues detected for the current funnel.
+                              </div>
+                            )}
+
+                            {Array.isArray(b2cAiReview.recommendations) && b2cAiReview.recommendations.length > 0 && (
+                              <div className="mb-3">
+                                <h6 className="fw-semibold mb-2">Recommendations</h6>
+                                <ul className="mb-0">
+                                  {b2cAiReview.recommendations.map((rec, idx) => (
+                                    <li key={idx}>{rec}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {Array.isArray(b2cAiReview.snapshot?.topStatuses) && b2cAiReview.snapshot.topStatuses.length > 0 && (
+                              <div className="mb-0">
+                                <h6 className="fw-semibold mb-2">Top statuses (current filters)</h6>
+                                <div className="table-responsive">
+                                  <table className="table table-sm table-bordered mb-0">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>Status</th>
+                                        <th className="text-end">Count</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {b2cAiReview.snapshot.topStatuses.map((row, idx) => (
+                                        <tr key={idx}>
+                                          <td>{row.status}</td>
+                                          <td className="text-end">{row.count}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={() => setShowB2cAiReview(false)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="table-responsive mb-4 b2c-table-wrap">
+                <table className="table table-bordered align-middle mb-0 b2c-dashboard-table" style={{ minWidth: 'max-content' }}>
+                  <thead>
+                    <tr>
+                      <th colSpan={b2cStatusColumns.length + 3} className="text-center fw-bold b2c-sticky-title" style={{ background: '#ffeb3b' }}>
+                        {b2cDashboardTitle}
+                      </th>
+                    </tr>
+                    <tr className="table-light">
+                      <th
+                        data-col="group"
+                        onMouseEnter={() => setB2cHoveredCol('group')}
+                        onMouseLeave={() => setB2cHoveredCol(null)}
+                        className={b2cHoveredCol === 'group' ? 'b2c-col-hover' : ''}
+                        style={{ minWidth: 140 }}
+                      >
+                        Center
+                      </th>
+                      <th
+                        data-col="month"
+                        onMouseEnter={() => setB2cHoveredCol('month')}
+                        onMouseLeave={() => setB2cHoveredCol(null)}
+                        className={b2cHoveredCol === 'month' ? 'b2c-col-hover' : ''}
+                        style={{ minWidth: 110 }}
+                      >
+                        Months
+                      </th>
+                      {[
+                        { key: 'totalCandidate', label: 'Total Candidate' },
+                        ...b2cStatusColumns.map((status) => ({ key: status, label: status })),
+                        { key: 'atCenter', label: 'At Center' },
+                      ].map(({ key, label }) => (
+                        <th
+                          key={key}
+                          data-col={key}
+                          className={`text-center ${b2cHoveredCol === key ? 'b2c-col-hover' : ''}`}
+                          onMouseEnter={() => setB2cHoveredCol(key)}
+                          onMouseLeave={() => setB2cHoveredCol(null)}
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b2cFunnelDashboardRows.map((row, idx) => {
+                      const prev = b2cFunnelDashboardRows[idx - 1];
+                      const showGroup = !prev || prev.group !== row.group;
+                      const groupRowSpan = showGroup
+                        ? b2cFunnelDashboardRows.filter(r => r.group === row.group).length
+                        : 0;
+
+                      return (
+                        <tr key={`${row.group}-${row.month}-${idx}`}>
+                          {showGroup && (
+                            <td
+                              rowSpan={groupRowSpan}
+                              data-col="group"
+                              className={`fw-semibold ${b2cHoveredCol === 'group' ? 'b2c-col-hover' : ''}`}
+                              style={{ background: '#e3f2fd' }}
+                              onMouseEnter={() => setB2cHoveredCol('group')}
+                              onMouseLeave={() => setB2cHoveredCol(null)}
+                            >
+                              {row.group}
+                            </td>
+                          )}
+                          <td
+                            data-col="month"
+                            className={`fw-medium ${b2cHoveredCol === 'month' ? 'b2c-col-hover' : ''}`}
+                            onMouseEnter={() => setB2cHoveredCol('month')}
+                            onMouseLeave={() => setB2cHoveredCol(null)}
+                          >
+                            {row.month}
+                          </td>
+                          <td data-col="totalCandidate" className={`text-center ${b2cHoveredCol === 'totalCandidate' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('totalCandidate')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.totalCandidate}</td>
+                          {b2cStatusColumns.map((status) => (
+                            <td
+                              key={status}
+                              data-col={status}
+                              className={`text-center ${b2cHoveredCol === status ? 'b2c-col-hover' : ''}`}
+                              onMouseEnter={() => setB2cHoveredCol(status)}
+                              onMouseLeave={() => setB2cHoveredCol(null)}
+                            >
+                              {row[status] || 0}
+                            </td>
+                          ))}
+                          <td data-col="atCenter" className={`text-center ${b2cHoveredCol === 'atCenter' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cHoveredCol('atCenter')} onMouseLeave={() => setB2cHoveredCol(null)}>{row.atCenter}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="table-responsive b2c-table-wrap">
+                <table className="table table-hover align-middle mb-0 b2c-sheet-table" style={{ minWidth: 'max-content' }}>
+                  <thead className="table-light">
+                    <tr>
+                        {[
+                          { key: 'id', label: 'Sr. No.', className: 'text-center', style: { minWidth: 70 } },
+                          { key: 'leadOwner', label: 'Lead Owner', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'center', label: 'Center', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'leadSource', label: 'Lead Source', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'studentName', label: 'Student Name', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'contactNo', label: 'Contact No', style: { minWidth: 140, maxWidth: 140, width: 140 } },
+                          { key: 'status', label: 'Status', style: { minWidth: 150, maxWidth: 150, width: 150 } },
+                          { key: 'newRemarks', label: 'New Remarks', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                          { key: 'documents', label: 'Documents', style: { minWidth: 170, maxWidth: 170, width: 170 } },
+                        ].map((h) => (
+                        <th
+                          key={h.key}
+                          data-col={h.key}
+                          style={h.style}
+                          className={`${h.className || ''} ${b2cSheetHoveredCol === h.key ? 'b2c-col-hover' : ''}`}
+                          onMouseEnter={() => setB2cSheetHoveredCol(h.key)}
+                          onMouseLeave={() => setB2cSheetHoveredCol(null)}
+                        >
+                          {h.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b2cFunnelSheetRows.map((r) => (
+                      <tr key={r.id}>
+                        <td data-col="id" className={`text-center fw-semibold ${b2cSheetHoveredCol === 'id' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('id')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.id}</td>
+                        <td data-col="leadOwner" className={b2cSheetHoveredCol === 'leadOwner' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('leadOwner')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>{r.leadOwner}</td>
+                        <td data-col="center" className={b2cSheetHoveredCol === 'center' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('center')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.center}><div className="b2c-cell-text">{r.center}</div></td>
+                        <td data-col="leadSource" className={b2cSheetHoveredCol === 'leadSource' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('leadSource')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.leadSource}><div className="b2c-cell-text">{r.leadSource}</div></td>
+                        <td data-col="studentName" className={`fw-medium ${b2cSheetHoveredCol === 'studentName' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('studentName')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.studentName}><div className="b2c-cell-text">{r.studentName}</div></td>
+                        <td data-col="contactNo" className={b2cSheetHoveredCol === 'contactNo' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('contactNo')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.contactNo}><div className="b2c-nowrap-text">{r.contactNo}</div></td>
+                        <td data-col="status" className={b2cSheetHoveredCol === 'status' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('status')} onMouseLeave={() => setB2cSheetHoveredCol(null)}>
+                          <span className={`badge ${r.status === 'HOT' ? 'bg-danger' :
+                            r.status === 'WARM' ? 'bg-warning text-dark' :
+                              r.status === 'DOCUMENTS' ? 'bg-primary' :
+                                r.status === 'NOT INTERESTED' ? 'bg-secondary' :
+                                  'bg-light text-dark'
+                            }`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td data-col="newRemarks" className={b2cSheetHoveredCol === 'newRemarks' ? 'b2c-col-hover' : ''} onMouseEnter={() => setB2cSheetHoveredCol('newRemarks')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.newRemarks}><div className="b2c-cell-text">{r.newRemarks}</div></td>
+                        <td data-col="documents" className={`text-muted ${b2cSheetHoveredCol === 'documents' ? 'b2c-col-hover' : ''}`} onMouseEnter={() => setB2cSheetHoveredCol('documents')} onMouseLeave={() => setB2cSheetHoveredCol(null)} title={r.documents}><div className="b2c-cell-text">{r.documents}</div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div> 
 
           {/* Main Analytics Matrix */}
           <div className="card shadow-sm mb-4">
@@ -3927,6 +4563,75 @@ const LeadAnalyticsDashboard = () => {
           vertical-align: middle;
           border: 1px solid #dee2e6;
         }
+
+        /* B2C Funnel dummy tables: freeze header + column hover */
+        .b2c-table-wrap {
+          max-height: 420px;
+          overflow-y: auto;
+          border: 1px solid #dee2e6;
+          border-radius: 0.375rem;
+          background: #fff;
+        }
+
+        .b2c-dashboard-table thead th,
+        .b2c-sheet-table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 5;
+          background: #f8f9fa;
+          box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+        }
+
+        .b2c-sheet-table {
+          table-layout: fixed;
+        }
+
+        .b2c-sheet-table thead th {
+          white-space: nowrap;
+          text-align: center;
+          overflow: visible;
+        }
+
+        .b2c-sheet-table td {
+          height: 79px;
+          max-height: 79px;
+          vertical-align: middle;
+          white-space: nowrap;
+          text-align: center;
+        }
+
+        .b2c-cell-text {
+          min-width: 169px;
+          max-width: 170px;
+          width: 170px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
+        }
+
+        .b2c-nowrap-text {
+          white-space: nowrap;
+          display: block;
+        }
+
+        /* First title row in dashboard table sits above header row */
+        .b2c-dashboard-table thead .b2c-sticky-title {
+          top: 0;
+          z-index: 6;
+          background: #ffeb3b !important;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .b2c-dashboard-table thead tr.table-light th {
+          top: 44px; /* approximate height of title row */
+          z-index: 5;
+        }
+
+        .b2c-col-hover {
+          background: #e8f4ff !important;
+          transition: background 120ms ease;
+        }
         
         .clickable-cell {
           cursor: pointer;
@@ -4435,7 +5140,9 @@ const LeadAnalyticsDashboard = () => {
                     <button
                       className="btn btn-primary"
                       onClick={() => {
-                        fetchProfileData(filterData);
+                        fetchProfileData(filterData, formData);
+                        fetchStats(filterData, formData);
+                        fetchSourceLeads(filterData, formData);
                         setIsFilterCollapsed(true);
                       }}
                     >
@@ -4449,6 +5156,8 @@ const LeadAnalyticsDashboard = () => {
           </div>
         </div>
       )}
+
+      
 
       <style>
         {

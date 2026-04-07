@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
+
+const getDefaultLiveClassForm = () => ({
+    title: '',
+    subject: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    description: '',
+    createGoogleMeet: false
+});
 
 function TimeTable() {
     // State Management
@@ -15,6 +26,7 @@ function TimeTable() {
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const token = JSON.parse(sessionStorage.getItem('token'));
+    const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem('user') || '{}'));
     const [courses, setCourses] = useState([]);
     const [batches, setBatches] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState('');
@@ -36,6 +48,11 @@ function TimeTable() {
     // Media Viewer Modal States
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [viewerMedia, setViewerMedia] = useState(null);
+    const [liveClassForm, setLiveClassForm] = useState(getDefaultLiveClassForm());
+    const [liveClasses, setLiveClasses] = useState([]);
+    const [liveClassesLoading, setLiveClassesLoading] = useState(false);
+    const [liveClassSubmitting, setLiveClassSubmitting] = useState(false);
+    const [isGoogleLoginLoading, setIsGoogleLoginLoading] = useState(false);
 
 
     // Form States
@@ -79,6 +96,9 @@ function TimeTable() {
     useEffect(() => {
         if (selectedCourse && selectedBatch) {
             fetchCurriculum();
+            fetchLiveClasses();
+        } else {
+            setLiveClasses([]);
         }
     }, [selectedCourse, selectedBatch]);
 
@@ -203,6 +223,192 @@ function TimeTable() {
             setCurriculum([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLiveClasses = async () => {
+        setLiveClassesLoading(true);
+        try {
+            const response = await axios.get(`${backendUrl}/college/trainerTimeTable`, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data?.status && Array.isArray(response.data.data)) {
+                setLiveClasses(response.data.data);
+            } else {
+                setLiveClasses([]);
+            }
+        } catch (error) {
+            console.error('Error fetching live classes:', error);
+            setLiveClasses([]);
+        } finally {
+            setLiveClassesLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        try {
+            setIsGoogleLoginLoading(true);
+
+            const authCode = await getGoogleAuthCode({
+                scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar']
+            });
+
+            const refreshToken = await getGoogleRefreshToken({
+                code: authCode,
+                user: userData,
+                endpoint: '/api/gettrainergoogleauth'
+            });
+
+            if (!refreshToken?.data) {
+                throw new Error('Google Calendar token was not returned');
+            }
+
+            const updatedUser = {
+                ...userData,
+                googleAuthToken: refreshToken.data
+            };
+
+            setUserData(updatedUser);
+            sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+            sessionStorage.setItem('user', JSON.stringify(updatedUser));
+            alert('Google Calendar connected successfully.');
+        } catch (error) {
+            console.error('Google login failed:', error);
+            alert(error.message || 'Failed to connect Google Calendar');
+        } finally {
+            setIsGoogleLoginLoading(false);
+        }
+    };
+
+    const handleGoogleLogout = () => {
+        const updatedUser = { ...userData };
+        delete updatedUser.googleAuthToken;
+        setUserData(updatedUser);
+        sessionStorage.removeItem('googleAuthToken');
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        alert('Google Calendar disconnected successfully.');
+    };
+
+    const handleLiveClassInputChange = (field, value) => {
+        setLiveClassForm(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const buildPortalLiveClassUrl = (session) => {
+        const joinPath = session?.joinPath || `/live-class/${session?._id}`;
+        return `${window.location.origin}${joinPath}`;
+    };
+
+    const resetLiveClassForm = () => {
+        setLiveClassForm(getDefaultLiveClassForm());
+    };
+
+    const buildLiveClassWhatsappMessage = (session) => {
+        const sessionDate = session?.date
+            ? new Date(session.date).toLocaleDateString('en-IN')
+            : 'N/A';
+        const sessionTime = `${session?.startTime || 'N/A'} - ${session?.endTime || 'N/A'}`;
+
+        return [
+            'Live class invite',
+            `Title: ${session?.title || 'Live Class'}`,
+            `Subject: ${session?.subject || 'N/A'}`,
+            `Course: ${session?.courseName || courses.find(course => course._id === selectedCourse)?.name || 'N/A'}`,
+            `Batch: ${session?.batchName || batches.find(batch => batch._id === selectedBatch)?.name || 'N/A'}`,
+            `Date: ${sessionDate}`,
+            `Time: ${sessionTime}`,
+            '',
+            `Join link: ${session?.googleMeetLink || ''}`
+        ].join('\n');
+    };
+
+    const handleShareLiveClassOnWhatsapp = (session) => {
+        const joinUrl = session?.googleMeetLink || buildPortalLiveClassUrl(session);
+        if (!joinUrl) {
+            alert('Live class link is not available for this session.');
+            return;
+        }
+
+        const queryParams = new URLSearchParams({
+            source: 'trainer-live-class',
+            draft: `${buildLiveClassWhatsappMessage(session)}\nPortal class link: ${joinUrl}`
+        });
+
+        window.location.assign(`/institute/whatsappChat?${queryParams.toString()}`);
+    };
+
+    const handleCopyLiveClassLink = async (session) => {
+        try {
+            const link = session?.googleMeetLink || buildPortalLiveClassUrl(session);
+            await navigator.clipboard.writeText(link);
+            alert('Live class link copied successfully.');
+        } catch (error) {
+            console.error('Failed to copy live class link:', error);
+            alert('Unable to copy live class link.');
+        }
+    };
+
+    const handleCreateLiveClass = async (e) => {
+        e.preventDefault();
+
+        if (!selectedCourse || !selectedBatch) {
+            alert('Please select course and batch first.');
+            return;
+        }
+
+        if (liveClassForm.createGoogleMeet && !userData.googleAuthToken?.accessToken) {
+            alert('Please connect Google Calendar before creating a Google Meet class.');
+            return;
+        }
+
+        if (liveClassForm.startTime >= liveClassForm.endTime) {
+            alert('End time must be later than start time.');
+            return;
+        }
+
+        setLiveClassSubmitting(true);
+        try {
+            const selectedCourseData = courses.find(course => course._id === selectedCourse);
+            const selectedBatchData = batches.find(batch => batch._id === selectedBatch);
+
+            const payload = {
+                trainerId: userData._id,
+                trainerName: userData.name || '',
+                batchId: selectedBatch,
+                batchName: selectedBatchData?.name || '',
+                courseId: selectedCourse,
+                courseName: selectedCourseData?.name || '',
+                subject: liveClassForm.subject,
+                date: liveClassForm.date,
+                startTime: liveClassForm.startTime,
+                endTime: liveClassForm.endTime,
+                title: liveClassForm.title,
+                description: liveClassForm.description,
+                color: '#198754',
+                scheduleType: 'single',
+                createGoogleMeet: liveClassForm.createGoogleMeet,
+                liveClassPlatform: liveClassForm.createGoogleMeet ? 'google_meet' : 'jitsi'
+            };
+
+            const response = await axios.post(`${backendUrl}/college/scheduledTimeTable`, payload, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data?.status) {
+                alert(response.data.message || 'Live class created successfully.');
+                resetLiveClassForm();
+                fetchLiveClasses();
+            } else {
+                alert(response.data?.message || 'Failed to create live class');
+            }
+        } catch (error) {
+            console.error('Error creating live class:', error);
+            alert(error?.response?.data?.message || 'Failed to create live class');
+        } finally {
+            setLiveClassSubmitting(false);
         }
     };
 
@@ -629,6 +835,14 @@ function TimeTable() {
         setViewerMedia(null);
     };
 
+    const filteredLiveClasses = liveClasses
+        .filter((session) => session.courseId === selectedCourse && session.batchId === selectedBatch)
+        .sort((a, b) => {
+            const firstDate = new Date(`${a.date}T${a.startTime || '00:00'}`);
+            const secondDate = new Date(`${b.date}T${b.startTime || '00:00'}`);
+            return firstDate - secondDate;
+        });
+
 
     return (
         <div className="curriculum-container">
@@ -700,6 +914,245 @@ function TimeTable() {
                     </button>
                 )}
             </div>
+
+            {selectedCourse && selectedBatch && (
+                <div className="live-class-card">
+                    <div className="live-class-header">
+                        <div>
+                            <h3 className="live-class-title">
+                                <i className="fas fa-video me-2"></i>
+                                Live Classes In LMS
+                            </h3>
+                            <p className="live-class-subtitle">
+                                Create trainer live sessions and let students join directly inside the LMS.
+                            </p>
+                        </div>
+                        <div className="live-class-actions">
+                            <span className={`google-status-badge ${userData.googleAuthToken?.accessToken ? 'connected' : 'disconnected'}`}>
+                                <i className={`fas ${userData.googleAuthToken?.accessToken ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
+                                {userData.googleAuthToken?.accessToken ? 'Google Calendar Connected' : 'Google Calendar Not Connected'}
+                            </span>
+                            {userData.googleAuthToken?.accessToken ? (
+                                <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleGoogleLogout}>
+                                    Disconnect
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="btn btn-success btn-sm"
+                                    onClick={handleGoogleLogin}
+                                    disabled={isGoogleLoginLoading}
+                                >
+                                    <i className="fab fa-google me-2"></i>
+                                    {isGoogleLoginLoading ? 'Connecting...' : 'Connect Google Calendar'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleCreateLiveClass}>
+                        <div className="live-class-form-grid">
+                            <div className="form-group">
+                                <label>Class Title *</label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={liveClassForm.title}
+                                    onChange={(e) => handleLiveClassInputChange('title', e.target.value)}
+                                    placeholder="e.g., Telecom Orientation Session"
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Subject *</label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={liveClassForm.subject}
+                                    onChange={(e) => handleLiveClassInputChange('subject', e.target.value)}
+                                    placeholder="e.g., Communication Basics"
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Class Date *</label>
+                                <input
+                                    type="date"
+                                    className="form-control"
+                                    value={liveClassForm.date}
+                                    onChange={(e) => handleLiveClassInputChange('date', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Start Time *</label>
+                                <input
+                                    type="time"
+                                    className="form-control"
+                                    value={liveClassForm.startTime}
+                                    onChange={(e) => handleLiveClassInputChange('startTime', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>End Time *</label>
+                                <input
+                                    type="time"
+                                    className="form-control"
+                                    value={liveClassForm.endTime}
+                                    onChange={(e) => handleLiveClassInputChange('endTime', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group checkbox-group">
+                                <label>Optional Meet Backup</label>
+                                <label className="live-class-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={liveClassForm.createGoogleMeet}
+                                        onChange={(e) => handleLiveClassInputChange('createGoogleMeet', e.target.checked)}
+                                    />
+                                    <span>Also create Google Meet link for this live class</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Description</label>
+                            <textarea
+                                className="form-control"
+                                rows="3"
+                                value={liveClassForm.description}
+                                onChange={(e) => handleLiveClassInputChange('description', e.target.value)}
+                                placeholder="Add class agenda, topic coverage, or instructions for students"
+                            />
+                        </div>
+
+                        {liveClassForm.createGoogleMeet && !userData.googleAuthToken?.accessToken && (
+                            <div className="live-class-note warning">
+                                Connect Google Calendar only if you want a Google Meet backup. LMS live class will still work without it.
+                            </div>
+                        )}
+
+                        {!liveClassForm.createGoogleMeet && (
+                            <div className="live-class-note">
+                                Jitsi room will be created for this session and students will join inside your LMS portal.
+                            </div>
+                        )}
+
+                        <div className="live-class-submit">
+                            <button type="submit" className="btn btn-success" disabled={liveClassSubmitting}>
+                                <i className="fas fa-calendar-plus me-2"></i>
+                                {liveClassSubmitting ? 'Creating Live Class...' : 'Create Live Class'}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div className="live-class-list">
+                        <div className="live-class-list-header">
+                            <h4>Scheduled Live Classes</h4>
+                            <span className="live-class-count">{filteredLiveClasses.length} session(s)</span>
+                        </div>
+
+                        {liveClassesLoading ? (
+                            <div className="live-class-empty">Loading live classes...</div>
+                        ) : filteredLiveClasses.length === 0 ? (
+                            <div className="live-class-empty">No live classes created for this course and batch yet.</div>
+                        ) : (
+                            <div className="table-responsive">
+                                <table className="table table-bordered align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Subject</th>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Platform</th>
+                                            <th>Join</th>
+                                            <th>Share</th>
+                                            <th>Copy Link</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLiveClasses.map((session) => (
+                                            <tr key={session._id}>
+                                                <td>{session.title}</td>
+                                                <td>{session.subject}</td>
+                                                <td>{new Date(session.date).toLocaleDateString('en-IN')}</td>
+                                                <td>{session.startTime} - {session.endTime}</td>
+                                                <td>
+                                                    {session.liveClassPlatform === 'jitsi' ? (
+                                                        <div>
+                                                            <div className="platform-tag google-meet">Jitsi LMS</div>
+                                                            <small className="text-muted d-block mt-1">{session.roomName}</small>
+                                                        </div>
+                                                    ) : session.googleMeetLink ? (
+                                                        <div>
+                                                            <div className="platform-tag google-meet">Google Meet</div>
+                                                            {session.googleMeetCode && (
+                                                                <small className="text-muted d-block mt-1">Code: {session.googleMeetCode}</small>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted">Manual session</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {session.liveClassPlatform === 'jitsi' ? (
+                                                        <a
+                                                            href={session.joinPath || `/live-class/${session._id}`}
+                                                            className="btn btn-primary btn-sm"
+                                                        >
+                                                            Join In LMS
+                                                        </a>
+                                                    ) : session.googleMeetLink ? (
+                                                        <a
+                                                            href={session.googleMeetLink}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="btn btn-primary btn-sm"
+                                                        >
+                                                            Join Meet
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-muted">No link</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {session.liveClassPlatform === 'jitsi' || session.googleMeetLink ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-success btn-sm"
+                                                            onClick={() => handleShareLiveClassOnWhatsapp(session)}
+                                                        >
+                                                            Share on WhatsApp
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-muted">No link</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {session.liveClassPlatform === 'jitsi' || session.googleMeetLink ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline-primary btn-sm"
+                                                            onClick={() => handleCopyLiveClassLink(session)}
+                                                        >
+                                                            Copy Link
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-muted">No link</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Statistics */}
             {selectedCourse && selectedBatch && (
@@ -1513,6 +1966,149 @@ function TimeTable() {
                     font-weight: 600;
                     color: #2c3e50;
                     margin-bottom: 0.5rem;
+                }
+
+                .live-class-card {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 16px;
+                    padding: 1.5rem;
+                    margin-bottom: 2rem;
+                    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+                }
+
+                .live-class-header {
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 1rem;
+                    align-items: flex-start;
+                    margin-bottom: 1.5rem;
+                }
+
+                .live-class-title {
+                    font-size: 1.25rem;
+                    font-weight: 700;
+                    margin: 0;
+                    color: #0f172a;
+                }
+
+                .live-class-subtitle {
+                    margin: 0.4rem 0 0;
+                    color: #64748b;
+                }
+
+                .live-class-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                }
+
+                .google-status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    border-radius: 999px;
+                    padding: 0.5rem 0.85rem;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                }
+
+                .google-status-badge.connected {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+
+                .google-status-badge.disconnected {
+                    background: #fef3c7;
+                    color: #92400e;
+                }
+
+                .live-class-form-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 1rem;
+                }
+
+                .checkbox-group {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: flex-end;
+                }
+
+                .live-class-checkbox {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.6rem;
+                    margin: 0;
+                    min-height: 42px;
+                }
+
+                .live-class-note {
+                    border-radius: 12px;
+                    padding: 0.85rem 1rem;
+                    margin-bottom: 1rem;
+                    font-size: 0.95rem;
+                }
+
+                .live-class-note.warning {
+                    background: #fff7ed;
+                    border: 1px solid #fdba74;
+                    color: #9a3412;
+                }
+
+                .live-class-submit {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 1rem;
+                }
+
+                .live-class-list {
+                    margin-top: 1.5rem;
+                }
+
+                .live-class-list-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-bottom: 1rem;
+                }
+
+                .live-class-list-header h4 {
+                    margin: 0;
+                    font-size: 1rem;
+                    font-weight: 700;
+                }
+
+                .live-class-count {
+                    color: #64748b;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                }
+
+                .live-class-empty {
+                    padding: 1rem;
+                    border: 1px dashed #cbd5e1;
+                    border-radius: 12px;
+                    color: #64748b;
+                    text-align: center;
+                    background: #f8fafc;
+                }
+
+                .platform-tag {
+                    display: inline-flex;
+                    align-items: center;
+                    border-radius: 999px;
+                    padding: 0.25rem 0.7rem;
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                }
+
+                .platform-tag.google-meet {
+                    background: #dbeafe;
+                    color: #1d4ed8;
                 }
 
                 .stats-row {
@@ -2434,6 +3030,21 @@ function TimeTable() {
                     .selection-bar {
                         flex-direction: column;
                         align-items: stretch;
+                    }
+
+                    .live-class-header,
+                    .live-class-actions,
+                    .live-class-list-header {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .live-class-submit {
+                        justify-content: stretch;
+                    }
+
+                    .live-class-submit .btn {
+                        width: 100%;
                     }
 
                     .stats-row {

@@ -132,8 +132,10 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
   // Filter options based on search term
-  const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredOptions = [...options]
+  .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+  .filter(option =>
+    (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
   // Get display text for selected items
   const getDisplayText = () => {
@@ -280,13 +282,13 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   const candidateRef = useRef();
 
-  // const fetchProfile = (id) => {
-  //   if (candidateRef.current) {
-  //     console.log('start fetching', id)
-  //     candidateRef.current.fetchProfile(id);
-  //     fetchProfileData();
-  //   }
-  // };
+  const fetchProfile = (id) => {
+    if (candidateRef.current) {
+      console.log('start fetching', id);
+      candidateRef.current.fetchProfile(id);
+      fetchProfileData();
+    }
+  };
 
 
   // const handleSaveCV = async () => {
@@ -508,7 +510,11 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
           setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          // setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -1521,6 +1527,13 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setSelectedProfile(profile)
     setOpenModalId(profile._id);
   }
+
+  useEffect(() => {
+    // console.log('useeffect', selectedProfile);
+    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+      fetchProfile(selectedProfile._candidate._id);
+    }
+  }, [selectedProfile]);
 
 
 
