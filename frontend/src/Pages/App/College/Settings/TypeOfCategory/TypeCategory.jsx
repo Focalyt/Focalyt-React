@@ -13,6 +13,7 @@ function TypeCategory() {
         hasDocuments: 'no', // 'yes' | 'no' (kept as string for radio inputs)
         documents: [] // [{ name: string, isMandatory: boolean }]
     });
+    const [questions, setQuestions] = useState([]); 
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -209,6 +210,7 @@ function TypeCategory() {
         setFormData({ name: '', description: '', hasDocuments: 'no', documents: [] });
         setIsEditing(false);
         setEditingId(null);
+        setQuestions([]);
     };
 
     const handleHasDocumentsChange = (value) => {
@@ -240,6 +242,53 @@ function TypeCategory() {
             ...prev,
             documents: (prev.documents || []).map((d, i) => (i === idx ? { ...d, ...patch } : d))
         }));
+    };
+
+    const addQuestion = () => {
+        setQuestions((prev) => [
+            ...(prev || []),
+            { question: '', type: 'text', required: true, options: ['Option 1', 'Option 2'] }
+        ]);
+    };
+
+    const removeQuestion = (idx) => {
+        setQuestions((prev) => (prev || []).filter((_, i) => i !== idx));
+    };
+
+    const updateQuestion = (idx, patch) => {
+        setQuestions((prev) => (prev || []).map((q, i) => (i === idx ? { ...q, ...patch } : q)));
+    };
+
+    const addRadioOption = (qIdx) => {
+        setQuestions((prev) =>
+            (prev || []).map((q, i) => {
+                if (i !== qIdx) return q;
+                const nextOptions = Array.isArray(q.options) ? [...q.options] : [];
+                nextOptions.push(`Option ${nextOptions.length + 1}`);
+                return { ...q, options: nextOptions };
+            })
+        );
+    };
+
+    const updateRadioOption = (qIdx, optIdx, value) => {
+        setQuestions((prev) =>
+            (prev || []).map((q, i) => {
+                if (i !== qIdx) return q;
+                const nextOptions = Array.isArray(q.options) ? [...q.options] : [];
+                nextOptions[optIdx] = value;
+                return { ...q, options: nextOptions };
+            })
+        );
+    };
+
+    const removeRadioOption = (qIdx, optIdx) => {
+        setQuestions((prev) =>
+            (prev || []).map((q, i) => {
+                if (i !== qIdx) return q;
+                const nextOptions = (Array.isArray(q.options) ? q.options : []).filter((_, oi) => oi !== optIdx);
+                return { ...q, options: nextOptions };
+            })
+        );
     };
 
     // Show alert
@@ -457,7 +506,7 @@ function TypeCategory() {
                                                                             disabled={loading || (formData.documents || []).length <= 1}
                                                                             title={(formData.documents || []).length <= 1 ? 'At least one document is required' : 'Remove document'}
                                                                         >
-                                                                            <i class="fa-solid fa-xmark"></i>
+                                                                            <i className="fa-solid fa-xmark"></i>
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -465,6 +514,135 @@ function TypeCategory() {
                                                         </div>
                                                     </div>
                                                 )}
+
+                                                {/* UI-only Questions Builder */}
+                                                <div className="col-xl-12 mb-1 mt-1">
+                                                    <div className="d-flex align-items-center justify-content-between">
+                                                        <label className="mb-0">Questions </label>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-outline-primary"
+                                                            onClick={addQuestion}
+                                                            disabled={loading}
+                                                        >
+                                                            + Add Question
+                                                        </button>
+                                                    </div>
+
+                                                    {(questions || []).length > 0 && (
+                                                        <div className="mt-1">
+                                                            {(questions || []).map((q, qIdx) => (
+                                                                <div className="border rounded p-1 mb-1" key={`q_${qIdx}`}>
+                                                                    <div className="row g-1 align-items-end">
+                                                                        <div className="col-xl-6 col-lg-6 col-md-12">
+                                                                            <label>Question</label>
+                                                                            <input
+                                                                                className="form-control"
+                                                                                value={q?.question || ''}
+                                                                                onChange={(e) => updateQuestion(qIdx, { question: e.target.value })}
+                                                                                placeholder="Enter question"
+                                                                                disabled={loading}
+                                                                                maxLength={150}
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="col-xl-3 col-lg-3 col-md-6">
+                                                                            <label>Type</label>
+                                                                            <select
+                                                                                className="form-control"
+                                                                                value={q?.type || 'text'}
+                                                                                onChange={(e) => {
+                                                                                    const nextType = e.target.value;
+                                                                                    updateQuestion(qIdx, {
+                                                                                        type: nextType,
+                                                                                        options:
+                                                                                            nextType === 'radio'
+                                                                                                ? (Array.isArray(q?.options) && q.options.length > 0 ? q.options : ['Option 1', 'Option 2'])
+                                                                                                : []
+                                                                                    });
+                                                                                }}
+                                                                                disabled={loading}
+                                                                            >
+                                                                                <option value="text">Text</option>
+                                                                                <option value="number">Number</option>
+                                                                                <option value="radio">Radio</option>
+                                                                            </select>
+                                                                        </div>
+
+                                                                        <div className="col-xl-2 col-lg-2 col-md-4">
+                                                                            <label className="d-block">Required</label>
+                                                                            <div className="form-check form-switch mt-50">
+                                                                                <input
+                                                                                    className="form-check-input"
+                                                                                    type="checkbox"
+                                                                                    checked={Boolean(q?.required)}
+                                                                                    onChange={() => updateQuestion(qIdx, { required: !Boolean(q?.required) })}
+                                                                                    disabled={loading}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="col-xl-1 col-lg-1 col-md-2 d-flex justify-content-end">
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-outline-danger"
+                                                                                onClick={() => removeQuestion(qIdx)}
+                                                                                disabled={loading}
+                                                                                title="Remove question"
+                                                                            >
+                                                                                <i className="fa-solid fa-xmark"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {q?.type === 'radio' && (
+                                                                        <div className="mt-1">
+                                                                            <div className="d-flex align-items-center justify-content-between">
+                                                                                <label className="mb-0">Radio Options</label>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn btn-sm btn-outline-success"
+                                                                                    onClick={() => addRadioOption(qIdx)}
+                                                                                    disabled={loading}
+                                                                                >
+                                                                                    + Add Option
+                                                                                </button>
+                                                                            </div>
+
+                                                                            <div className="mt-1">
+                                                                                {(Array.isArray(q?.options) ? q.options : []).map((opt, optIdx) => (
+                                                                                    <div className="row g-1 align-items-end mb-50" key={`q_${qIdx}_opt_${optIdx}`}>
+                                                                                        <div className="col-xl-10 col-lg-10 col-md-10">
+                                                                                            <input
+                                                                                                className="form-control"
+                                                                                                value={opt || ''}
+                                                                                                onChange={(e) => updateRadioOption(qIdx, optIdx, e.target.value)}
+                                                                                                placeholder={`Option ${optIdx + 1}`}
+                                                                                                disabled={loading}
+                                                                                                maxLength={80}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div className="col-xl-2 col-lg-2 col-md-2 d-flex justify-content-end">
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="btn btn-sm btn-outline-danger"
+                                                                                                onClick={() => removeRadioOption(qIdx, optIdx)}
+                                                                                                disabled={loading || (Array.isArray(q?.options) ? q.options.length : 0) <= 2}
+                                                                                                title={(Array.isArray(q?.options) ? q.options.length : 0) <= 2 ? 'Keep at least 2 options' : 'Remove option'}
+                                                                                            >
+                                                                                                <i className="fa-solid fa-xmark"></i>
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
 
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
                                                     <button

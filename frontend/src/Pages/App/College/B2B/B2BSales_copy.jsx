@@ -3963,6 +3963,7 @@ const B2BSales = () => {
                                         readOnly
                                         value={lead.concernPersonName || lead.businessName || ''}
                                         placeholder="Name"
+                                        title={lead.concernPersonName || lead.businessName || 'NA'}
                                       />
                                     </div>
                                     <div className="lead-header-v2__input-wrap">
@@ -3973,6 +3974,7 @@ const B2BSales = () => {
                                         readOnly
                                         value={lead.mobile || ''}
                                         placeholder="Mobile no"
+                                        title={lead.mobile || 'NA'}
                                       />
                                     </div>
                                   </div>
@@ -3986,6 +3988,7 @@ const B2BSales = () => {
                                         readOnly
                                         value={lead.email || ''}
                                         placeholder="Email"   style={{fontSize:'9px'}}
+                                        title={lead.email || lead.email || 'NA'}
                                       />
                                     </div>
                                   </div>

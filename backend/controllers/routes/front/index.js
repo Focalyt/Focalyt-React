@@ -566,6 +566,9 @@ router.get("/event", async (req, res) => {
 
 router.get("/coursedetails/:id", async (req, res) => {
 	const { id } = req.params
+	if (!id || !ObjectId.isValid(id)) {
+		return res.status(400).json({ message: "Invalid course id" });
+	}
 	let course = await Courses.findOne({ _id: id })
 	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
 	console.log(fullUrl);
