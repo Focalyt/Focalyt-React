@@ -6,6 +6,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { toast } from 'react-toastify';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import useWebsocket from '../../../../utils/websocket';
@@ -3029,13 +3030,13 @@ console.log('API Response:', response.data);
 
         // Backend returns status: true (not success: true)
         if (response.data.status === true || response.data.success === true) {
-          alert('Followup updated successfully!');
+          toast.success('Followup updated successfully!');
           shouldClosePanel = true;
           closePanel();
 
         } else {
           console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update followup');
+          toast.error(response.data.message || 'Failed to update followup');
         }
 
       }

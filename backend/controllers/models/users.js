@@ -46,6 +46,7 @@ const userSchema = new Schema(
 				can_assign_leads_b2b: { type: Boolean, default: false },
 				can_delete_leads_b2b: { type: Boolean, default: false },
 				can_approve_leads_b2b: { type: Boolean, default: false },
+				can_change_lead_status_b2b: { type: Boolean, default: false },
 
 				can_view_leads: { type: Boolean, default: false },
 				can_add_leads: { type: Boolean, default: false },
@@ -53,6 +54,7 @@ const userSchema = new Schema(
 				can_assign_leads: { type: Boolean, default: false },
 				can_delete_leads: { type: Boolean, default: false },
 				can_approve_leads: { type: Boolean, default: false },
+				can_change_lead_status: { type: Boolean, default: false },
 				// KYC Verification
 				can_view_kyc: { type: Boolean, default: false },
 				can_verify_reject_kyc: { type: Boolean, default: false },

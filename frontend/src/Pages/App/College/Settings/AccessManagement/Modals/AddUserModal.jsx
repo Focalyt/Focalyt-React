@@ -22,6 +22,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_add_leads_b2b: false,
       can_edit_leads_b2b: false,
       can_assign_leads_b2b: false,
+      can_approve_leads_b2b: false,
+      can_change_lead_status_b2b: false,
       can_delete_leads_b2b: false,
 
       // Lead Management
@@ -29,6 +31,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_add_leads: false,
       can_edit_leads: false,
       can_assign_leads: false,
+      can_approve_leads: false,
+      can_change_lead_status: false,
       can_delete_leads: false,
 
       // KYC Verification
@@ -72,12 +76,16 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_edit_leads_b2b: true,
         can_assign_leads_b2b: true,
         can_delete_leads_b2b: true,
+        can_approve_leads_b2b: true,
+        can_change_lead_status_b2b: true,
 
         can_view_leads: true,
         can_add_leads: true,
         can_edit_leads: true,
         can_assign_leads: true,
         can_delete_leads: true,
+        can_approve_leads: true,
+        can_change_lead_status: true,
         can_view_kyc: true,
         can_verify_reject_kyc: true,
         can_request_kyc: true,
@@ -111,6 +119,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_edit_leads: false,
         can_assign_leads: false,
         can_delete_leads: false,
+        can_approve_leads: false,
+        can_change_lead_status: false,
         can_view_kyc: true,
         can_verify_reject_kyc: false,
         can_request_kyc: false,
@@ -160,62 +170,78 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
   };
 
   const handlePermissionChange = (permission, value) => {
-    let updatedPermissions = {
-      ...userForm.permissions,
-      [permission]: value
-    };
+    setUserForm((prev) => {
+      let updatedPermissions = {
+        ...prev.permissions,
+        [permission]: value
+      };
 
+      // KYC Dependencies
+      if (permission === 'can_verify_reject_kyc' && value === true) {
+        updatedPermissions.can_view_kyc = true;
+      }
+      if (permission === 'can_request_kyc' && value === true) {
+        updatedPermissions.can_view_kyc = true;
+      }
+      if (permission === 'can_view_kyc' && value === false) {
+        updatedPermissions.can_verify_reject_kyc = false;
+        updatedPermissions.can_request_kyc = false;
+      }
 
-    // KYC Dependencies
-    if (permission === 'can_verify_reject_kyc' && value === true) {
-      updatedPermissions.can_view_kyc = true;
-    }
-    if (permission === 'can_request_kyc' && value === true) {
-      updatedPermissions.can_view_kyc = true;
-    }
-    if (permission === 'can_view_kyc' && value === false) {
-      updatedPermissions.can_verify_reject_kyc = false;
-      updatedPermissions.can_request_kyc = false;
-    }
+      // Lead Management (B2C) Dependencies
+      if (['can_add_leads', 'can_edit_leads', 'can_assign_leads', 'can_delete_leads', 'can_approve_leads', 'can_change_lead_status'].includes(permission) && value === true) {
+        updatedPermissions.can_view_leads = true;
+      }
+      if (permission === 'can_view_leads' && value === false) {
+        updatedPermissions.can_add_leads = false;
+        updatedPermissions.can_edit_leads = false;
+        updatedPermissions.can_assign_leads = false;
+        updatedPermissions.can_approve_leads = false;
+        updatedPermissions.can_change_lead_status = false;
+        updatedPermissions.can_delete_leads = false;
+      }
 
-    // Lead Management Dependencies
-    if (['can_add_leads', 'can_edit_leads', 'can_assign_leads', 'can_delete_leads'].includes(permission) && value === true) {
-      updatedPermissions.can_view_leads = true;
-    }
-    if (permission === 'can_view_leads' && value === false) {
-      updatedPermissions.can_add_leads = false;
-      updatedPermissions.can_edit_leads = false;
-      updatedPermissions.can_assign_leads = false;
-      updatedPermissions.can_delete_leads = false;
-    }
+      // Training Management Dependencies
+      if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch'].includes(permission) && value === true) {
+        updatedPermissions.can_view_training = true;
+      }
+      if (permission === 'can_view_training' && value === false) {
+        updatedPermissions.can_add_vertical = false;
+        updatedPermissions.can_add_project = false;
+        updatedPermissions.can_add_center = false;
+        updatedPermissions.can_add_course = false;
+        updatedPermissions.can_add_batch = false;
+        updatedPermissions.can_assign_batch = false;
+      }
 
-    // Training Management Dependencies
-    if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch'].includes(permission) && value === true) {
-      updatedPermissions.can_view_training = true;
-    }
-    if (permission === 'can_view_training' && value === false) {
-      updatedPermissions.can_add_vertical = false;
-      updatedPermissions.can_add_project = false;
-      updatedPermissions.can_add_center = false;
-      updatedPermissions.can_add_course = false;
-      updatedPermissions.can_add_batch = false;
-      updatedPermissions.can_assign_batch = false;
-    }
+      // User Management Dependencies
+      if (['can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles'].includes(permission) && value === true) {
+        updatedPermissions.can_view_users = true;
+      }
+      if (permission === 'can_view_users' && value === false) {
+        updatedPermissions.can_add_users = false;
+        updatedPermissions.can_edit_users = false;
+        updatedPermissions.can_delete_users = false;
+        updatedPermissions.can_manage_roles = false;
+      }
 
-    // User Management Dependencies
-    if (['can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles'].includes(permission) && value === true) {
-      updatedPermissions.can_view_users = true;
-    }
-    if (permission === 'can_view_users' && value === false) {
-      updatedPermissions.can_add_users = false;
-      updatedPermissions.can_edit_users = false;
-      updatedPermissions.can_delete_users = false;
-      updatedPermissions.can_manage_roles = false;
-    }
+      // Lead Management (B2B) Dependencies
+      if (['can_add_leads_b2b', 'can_edit_leads_b2b', 'can_assign_leads_b2b', 'can_delete_leads_b2b', 'can_approve_leads_b2b', 'can_change_lead_status_b2b'].includes(permission) && value === true) {
+        updatedPermissions.can_view_leads_b2b = true;
+      }
+      if (permission === 'can_view_leads_b2b' && value === false) {
+        updatedPermissions.can_add_leads_b2b = false;
+        updatedPermissions.can_edit_leads_b2b = false;
+        updatedPermissions.can_assign_leads_b2b = false;
+        updatedPermissions.can_approve_leads_b2b = false;
+        updatedPermissions.can_change_lead_status_b2b = false;
+        updatedPermissions.can_delete_leads_b2b = false;
+      }
 
-    setUserForm({
-      ...userForm,
-      permissions: updatedPermissions
+      return {
+        ...prev,
+        permissions: updatedPermissions
+      };
     });
   };
 
@@ -512,6 +538,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_edit_leads_b2b: '✏️ Edit Leads',
                       can_assign_leads_b2b: '🔄 Assign Leads',
                       can_approve_leads_b2b: '🔄 Approve Leads',
+                      can_change_lead_status_b2b: '🔄 Change Lead Status',
                       can_delete_leads_b2b: '🗑️ Delete Leads'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">
@@ -547,6 +574,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_edit_leads: '✏️ Edit Leads',
                       can_assign_leads: '🔄 Assign Leads',
                       can_approve_leads: '🔄 Approve Leads',
+                      can_change_lead_status: '🔄 Change Lead Status',
                       can_delete_leads: '🗑️ Delete Leads'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">

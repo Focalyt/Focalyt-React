@@ -970,12 +970,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('sales_b2b')}</span>
                       </a>
                     </li>
-                    <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowupb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />
                         <span className="menu-title">{t('follow_up')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
                       <Link
                         to="/institute/b2bfollowup"
@@ -1199,18 +1199,23 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('access_management')}</span>
                     </Link>
                   </li>
+              {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_change_lead_status_b2b) && (
+
                   <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faSitemap} />
                       <span className="menu-title">{t('status_design_b2b')}</span>
                     </Link>
                   </li>
+              )}
+              {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_change_lead_status) && (
                   <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesignb2c" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
                       <span className="menu-title">{t('status_design_b2c')}</span>
                     </Link>
                   </li>
+              )}
                   <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
                     <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />
@@ -1499,7 +1504,7 @@ function CollegeLayout({ children }) {
 }
         }
         html body .content .content-wrapper {
-    margin-top: 6rem;
+    margin-top: 5rem;
     padding: 1.8rem 2.2rem 0;
 }
   .breadcrumb {
@@ -1976,8 +1981,8 @@ function CollegeLayout({ children }) {
 
 @media(max-width:768px){
 html body .content .content-wrapper {
-    margin-top: 6rem;
-    // padding: 1.8rem 2.2rem 0;
+    margin-top: 3rem;
+    padding: 1.8rem 1.2rem 0;
 }
  
 }   

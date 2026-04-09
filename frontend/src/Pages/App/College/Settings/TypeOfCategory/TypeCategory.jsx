@@ -9,7 +9,9 @@ function TypeCategory() {
     const [categories, setCategories] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
-        description: ''
+        description: '',
+        hasDocuments: 'no', // 'yes' | 'no' (kept as string for radio inputs)
+        documents: [] // [{ name: string, isMandatory: boolean }]
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +59,19 @@ function TypeCategory() {
             return;
         }
 
+        if (formData.hasDocuments === 'yes') {
+            if (!Array.isArray(formData.documents) || formData.documents.length === 0) {
+                showAlert('Please add at least one document', 'error');
+                return;
+            }
+
+            const hasEmptyDocName = formData.documents.some((d) => !String(d?.name || '').trim());
+            if (hasEmptyDocName) {
+                showAlert('Please enter document name for all documents', 'error');
+                return;
+            }
+        }
+
         try {
             setLoading(true);
 
@@ -72,7 +87,11 @@ function TypeCategory() {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    ...formData,
+                    // If user selected "No", ensure documents are not sent accidentally
+                    documents: formData.hasDocuments === 'yes' ? formData.documents : []
+                })
             });
 
             const data = await response.json();
@@ -172,7 +191,14 @@ function TypeCategory() {
     const handleEdit = (category) => {
         setFormData({
             name: category.name,
-            description: category.description || ''
+            description: category.description || '',
+            hasDocuments: Array.isArray(category?.documents) && category.documents.length > 0 ? 'yes' : 'no',
+            documents: Array.isArray(category?.documents)
+                ? category.documents.map((d) => ({
+                    name: d?.name || '',
+                    isMandatory: Boolean(d?.isMandatory)
+                }))
+                : []
         });
         setIsEditing(true);
         setEditingId(category._id);
@@ -180,9 +206,40 @@ function TypeCategory() {
 
     // Reset form
     const resetForm = () => {
-        setFormData({ name: '', description: '' });
+        setFormData({ name: '', description: '', hasDocuments: 'no', documents: [] });
         setIsEditing(false);
         setEditingId(null);
+    };
+
+    const handleHasDocumentsChange = (value) => {
+        setFormData((prev) => ({
+            ...prev,
+            hasDocuments: value,
+            documents: value === 'yes'
+                ? (Array.isArray(prev.documents) && prev.documents.length > 0 ? prev.documents : [{ name: '', isMandatory: true }])
+                : []
+        }));
+    };
+
+    const addDocumentRow = () => {
+        setFormData((prev) => ({
+            ...prev,
+            documents: [...(prev.documents || []), { name: '', isMandatory: true }]
+        }));
+    };
+
+    const removeDocumentRow = (idx) => {
+        setFormData((prev) => ({
+            ...prev,
+            documents: (prev.documents || []).filter((_, i) => i !== idx)
+        }));
+    };
+
+    const updateDocumentRow = (idx, patch) => {
+        setFormData((prev) => ({
+            ...prev,
+            documents: (prev.documents || []).map((d, i) => (i === idx ? { ...d, ...patch } : d))
+        }));
     };
 
     // Show alert
@@ -201,7 +258,7 @@ function TypeCategory() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
+                                {isEditing ? 'Edit B2B Source' : 'Add B2B Source'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -209,7 +266,7 @@ function TypeCategory() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
+                                        {isEditing ? 'Edit B2B Source' : 'Add B2B Source'}
                                     </li>
                                 </ol>
                             </div>
@@ -239,7 +296,7 @@ function TypeCategory() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
+                                        {isEditing ? 'Edit B2B Source' : 'Add B2B Source'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -278,6 +335,136 @@ function TypeCategory() {
                                                         disabled={loading}
                                                     />
                                                 </div>
+
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        Documents Required?
+                                                    </label>
+                                                    <div className="d-flex gap-3 mt-50">
+                                                        <div className="form-check">
+                                                            <input
+                                                                className="form-check-input"
+                                                                type="radio"
+                                                                name="hasDocuments"
+                                                                id="hasDocumentsYes"
+                                                                value="yes"
+                                                                checked={formData.hasDocuments === 'yes'}
+                                                                onChange={() => handleHasDocumentsChange('yes')}
+                                                                disabled={loading}
+                                                            />
+                                                            <label className="form-check-label" htmlFor="hasDocumentsYes">
+                                                                Yes
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="form-check">
+                                                            <input
+                                                                className="form-check-input"
+                                                                type="radio"
+                                                                name="hasDocuments"
+                                                                id="hasDocumentsNo"
+                                                                value="no"
+                                                                checked={formData.hasDocuments === 'no'}
+                                                                onChange={() => handleHasDocumentsChange('no')}
+                                                                disabled={loading}
+                                                            />
+                                                            <label className="form-check-label" htmlFor="hasDocumentsNo">
+                                                                No
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {formData.hasDocuments === 'yes' && (
+                                                    <div className="col-xl-12 mb-1">
+                                                        <div className="d-flex align-items-center justify-content-between">
+                                                            <label className="mb-0">
+                                                                Add Documents
+                                                                <span className="asterisk" style={{ color: 'red' }}>*</span>
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-success"
+                                                                onClick={addDocumentRow}
+                                                                disabled={loading}
+                                                            >
+                                                                + Add Document
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="mt-1">
+                                                            {(formData.documents || []).map((doc, idx) => (
+                                                                <div className="row g-1 align-items-end mb-1" key={`${idx}`}>
+                                                                    <div className="col-xl-6 col-lg-6 col-md-12">
+                                                                        <label>
+                                                                            Document Name
+                                                                            <span className="asterisk" style={{ color: 'red' }}>*</span>
+                                                                        </label>
+                                                                        <input
+                                                                            className="form-control"
+                                                                            value={doc?.name || ''}
+                                                                            onChange={(e) => updateDocumentRow(idx, { name: e.target.value })}
+                                                                            placeholder="Enter document name"
+                                                                            disabled={loading}
+                                                                            maxLength={80}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-xl-4 col-lg-4 col-md-10">
+                                                                        <label>
+                                                                            Mandatory?
+                                                                            <span className="asterisk" style={{ color: 'red' }}>*</span>
+                                                                        </label>
+                                                                        <div className="d-flex gap-3 mt-50">
+                                                                            <div className="form-check">
+                                                                                <input
+                                                                                    className="form-check-input"
+                                                                                    type="radio"
+                                                                                    name={`docMandatory_${idx}`}
+                                                                                    id={`docMandatoryYes_${idx}`}
+                                                                                    value="yes"
+                                                                                    checked={Boolean(doc?.isMandatory) === true}
+                                                                                    onChange={() => updateDocumentRow(idx, { isMandatory: true })}
+                                                                                    disabled={loading}
+                                                                                />
+                                                                                <label className="form-check-label" htmlFor={`docMandatoryYes_${idx}`}>
+                                                                                    Yes
+                                                                                </label>
+                                                                            </div>
+                                                                            <div className="form-check">
+                                                                                <input
+                                                                                    className="form-check-input"
+                                                                                    type="radio"
+                                                                                    name={`docMandatory_${idx}`}
+                                                                                    id={`docMandatoryNo_${idx}`}
+                                                                                    value="no"
+                                                                                    checked={Boolean(doc?.isMandatory) === false}
+                                                                                    onChange={() => updateDocumentRow(idx, { isMandatory: false })}
+                                                                                    disabled={loading}
+                                                                                />
+                                                                                <label className="form-check-label" htmlFor={`docMandatoryNo_${idx}`}>
+                                                                                    No
+                                                                                </label>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="col-xl-2 col-lg-2 col-md-2 d-flex justify-content-end">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                            onClick={() => removeDocumentRow(idx)}
+                                                                            disabled={loading || (formData.documents || []).length <= 1}
+                                                                            title={(formData.documents || []).length <= 1 ? 'At least one document is required' : 'Remove document'}
+                                                                        >
+                                                                            <i class="fa-solid fa-xmark"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
                                                     <button
@@ -321,7 +508,7 @@ function TypeCategory() {
                                     <div className="col-xl-6">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All Categories</h4>
+                                                <h4 className="card-title">All Sources</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -338,7 +525,7 @@ function TypeCategory() {
                                             <table className="table table-hover-animation mb-0 table-hover">
                                                 <thead>
                                                     <tr>
-                                                        <th>Category</th>
+                                                        <th>Source</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
