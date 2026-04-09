@@ -18,6 +18,7 @@ const { sendMail } = require("../../helpers");
 // const companyRoutes = require('./company');
 const candidateRoutes = require('./candidate');
 const corporateRoutes = require('./corporate');
+const liveClassRoutes = require('./liveClass');
 const { baseUrl } = require("../../config");
 const router = express.Router();
 const fetch = require("cross-fetch");
@@ -42,6 +43,7 @@ router.use('/college', collegeRoutes);
 router.use('/chatapi', authChat, chatRoutes);
 // router.use('/panel/company', companyRoutes);
 router.use('/company', corporateRoutes);
+router.use('/api/live-class', liveClassRoutes);
 router.get('/policy', async (req, res) => {
   try {
     return res.render(`${req.vPath}/front/policy`);

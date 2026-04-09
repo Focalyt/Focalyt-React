@@ -8,7 +8,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUser, faBookOpen, faPlusCircle, faListCheck, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
-  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn,
+  faVideo
 } from "@fortawesome/free-solid-svg-icons";
 import { faList, faTrendingUp } from '@fortawesome/free-solid-svg-icons';
 
@@ -211,6 +212,14 @@ function TrainerLayout({ children }){
                 </li>
                
               </ul>
+            </li>
+
+            {/* Live Class Menu Item */}
+            <li className={`nav-item ${location.pathname === '/trainer/live-class' || location.pathname.startsWith('/trainer/live-class/') ? 'active' : ''}`}>
+              <Link to="/trainer/live-class" onClick={() => handleSidebarClose()}>
+                <FontAwesomeIcon icon={faVideo} />
+                <span className="menu-title">Live Class</span>
+              </Link>
             </li>
              
             <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>

@@ -117,8 +117,14 @@ module.exports.Placement = require("./Placement");
 module.exports.JobOffer = require("./jobOffer");
 module.exports.UploadCandidates = require("./uploadCandidates");
 module.exports.RewardClaim = require("./RewardClaim");
+
+
+// Live Class Models
+module.exports.LiveClass = require("./liveClass");
+module.exports.ClassAttendance = require("./classAttendance");
+module.exports.ClassRecording = require("./classRecording");
+module.exports.ClassChatMessage = require("./classChatMessage");
+
 module.exports.ReferralShareOffer = require("./referralShareOffer");
 module.exports.BotTraining = require("./botTraining");
 module.exports.BotTrainingRule = require("./botTrainingRule");
-module.exports.BatchMonitor = require("./batchMonitor");
-module.exports.LRP = require("./lrp");
