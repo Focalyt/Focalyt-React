@@ -385,7 +385,7 @@ function TypeCategory() {
                                                     />
                                                 </div>
 
-                                                <div className="col-xl-8 mb-1">
+                                                {/* <div className="col-xl-8 mb-1">
                                                     <label>
                                                         Documents Required?
                                                     </label>
@@ -513,10 +513,10 @@ function TypeCategory() {
                                                             ))}
                                                         </div>
                                                     </div>
-                                                )}
+                                                )} */}
 
                                                 {/* UI-only Questions Builder */}
-                                                <div className="col-xl-12 mb-1 mt-1">
+                                                {/* <div className="col-xl-12 mb-1 mt-1">
                                                     <div className="d-flex align-items-center justify-content-between">
                                                         <label className="mb-0">Questions </label>
                                                         <button
@@ -642,7 +642,7 @@ function TypeCategory() {
                                                             ))}
                                                         </div>
                                                     )}
-                                                </div>
+                                                </div> */}
 
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
                                                     <button
