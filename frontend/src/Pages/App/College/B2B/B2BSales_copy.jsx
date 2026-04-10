@@ -3830,125 +3830,111 @@ const B2BSales = () => {
                         {/* Card Header */}
                         <div className="lead-header lead-header-v2">
                           {isMobile ? (
-                            <div className="lead-header-mob">
-                              {/* <h5 className="lead-business-name">
-                                {lead.businessName || 'Business Name Not Available'}
-                              </h5> */}
-                              <div className="lead-header-mob__row1">
-                                <div className="lead-header-mob__name" title={lead.concernPersonName || lead.businessName || ''}>
-                                  <i className="fas fa-user me-2" aria-hidden="true"></i>
-                                  <span className="text-capitalize">
+                            <div className="lhm">
+
+                              {/* Row 1 — Name + Refer/History pills + Status */}
+                              <div className="lhm__row1">
+
+                                <div className="lhm__name" title={lead.concernPersonName || lead.businessName || ''}>
+                                  <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
+                                  <span className="text-capitalize lhm__name-text">
                                     {lead.concernPersonName || lead.businessName || '—'}
                                   </span>
                                 </div>
 
-                                <div className="lead-header-v2__status-stack">
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm m-0"
-                                    style={{
-                                      cursor: 'pointer',
-                                      border: '1px solid rgba(255,255,255,0.35)',
-                                      borderRadius: '0px',
-                                      borderTopRightRadius: '8px',
-                                      borderTopLeftRadius: '8px',
-                                      height: '22px',
-                                      fontSize: '10px',
-                                      background: 'rgba(255,255,255,0.18)',
-                                      color: '#fff'
-                                    }}
-                                    value={lead.status?.title || lead.status?.name || 'Untouch Lead'}
-                                    readOnly
-                                    onClick={() => openEditPanel(lead, 'StatusChange')}
-                                  />
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm m-0"
-                                    value={lead.subStatus?.title || 'Untouch Lead'}
-                                    style={{
-                                      cursor: 'default',
-                                      border: '1px solid rgba(255,255,255,0.35)',
-                                      borderRadius: '0px',
-                                      borderBottomRightRadius: '8px',
-                                      borderBottomLeftRadius: '8px',
-                                      height: '22px',
-                                      fontSize: '10px',
-                                      background: 'rgba(255,255,255,0.18)',
-                                      color: '#fff'
-                                    }}
-                                    readOnly
-                                  />
+                                <div className="lhm__pills">
+                                  <button type="button" className="lhm__pill lhm__pill--refer"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}>
+                                    <i className="fas fa-share-alt" aria-hidden="true"></i> Refer
+                                  </button>
+                                  <button type="button" className="lhm__pill lhm__pill--history"
+                                    onClick={() => openleadHistoryPanel(lead)}>
+                                    <i className="fas fa-history" aria-hidden="true"></i> History
+                                  </button>
                                 </div>
+
+                                <div className="lhm__status-block" onClick={() => openEditPanel(lead, 'StatusChange')}>
+                                  <div className="lhm__status-row">
+                                    <span className="lhm__status-label">Status</span>
+                                    <span className="lhm__status-val">
+                                      {lead.status?.title || lead.status?.name || 'Untouch Lead'}
+                                    </span>
+                                  </div>
+                                  <div className="lhm__status-row">
+                                    <span className="lhm__status-label">Sub</span>
+                                    <span className="lhm__status-val">
+                                      {lead.subStatus?.title || 'Untouch Lead'}
+                                    </span>
+                                  </div>
+                                </div>
+
                               </div>
 
-                              <div className="lead-header-mob__row2">
-                                <div className="lead-header-mob__phone" title={lead.mobile || ''}>
-                                  <i className="fas fa-phone me-2" aria-hidden="true"></i>
-                                  <span className='me-2 pe-2'>{lead.mobile || '—'}</span>
+                              {/* Row 2 — Phone + More + Expand */}
+                              <div className="lhm__row2">
+                                <div className="lhm__phone" title={lead.mobile || ''}>
+                                  <i className="fas fa-phone" aria-hidden="true"></i>
+                                  <span>{lead.mobile || '—'}</span>
                                 </div>
 
-                                {lead.email && (
-                                  <div className="lead-header-mob__email" title={lead.email}>
-                                    <i className="fas fa-envelope me-2" aria-hidden="true"></i>
-                                    <span>{lead.email}</span>
-                                  </div>
-                                )}
-
-                                <div className="lead-header-mob__actions">
-
-
-                                  <button
-                                    type="button"
-                                    className="lead-header-mob__icon-btn lead-header-mob__more-btn"
-                                    onClick={() => setMobileMoreLead(lead)}
-                                    title="More"
-                                    aria-label="More"
-                                  >
-                                    <span>More</span>
+                                <div className="lhm__actions">
+                                  <button type="button" className="lhm__action-btn lhm__action-btn--more"
+                                    onClick={() => setMobileMoreLead(lead)} aria-label="More">
+                                    More
                                   </button>
-
-                                  <button
-                                    type="button"
-                                    className="lead-header-mob__icon-btn"
+                                  <button type="button" className="lhm__action-btn"
                                     onClick={() => toggleLeadDetails(leadIndex)}
-                                    aria-label="Expand/Collapse"
-                                    title={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}
-                                  >
-                                    {leadDetailsVisible === leadIndex ? (
-                                      <i className="fas fa-chevron-up" aria-hidden="true"></i>
-                                    ) : (
-                                      <i className="fas fa-chevron-down" aria-hidden="true"></i>
-                                    )}
+                                    aria-label={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}>
+                                    <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
                                   </button>
                                 </div>
                               </div>
 
-                              <div className="lead-header-mob__top">
-                                <div className="lead-header-mob__floats">
-                                  <div className="lead-header-mob__float">
-                                    <div className="lead-header-mob__float-label">Lead Source</div>
-                                    <div className="lead-header-mob__float-value" title={lead.leadCategory?.name || ''}>
-                                      {lead.leadCategory?.name || '—'}
-                                    </div>
+                              {/* Row 3 — Followup Calling + Followup Visit */}
+                              <div className="lhm__row3">
+                                {/* Followup Calling */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Followup Calling</span>
+                                  <div className="lhm__followup-cards">
+                                    {[
+                                      { label: 'Done',    value: 0, bg: '#12b3ff' },
+                                      { label: 'Planned', value: 0, bg: '#f59e0b' },
+                                      { label: 'Missed',  value: 0, bg: '#7c3d14' },
+                                    ].map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
                                   </div>
-                                  <div className="lead-header-mob__float">
-                                    <div className="lead-header-mob__float-label">B2B Type</div>
-                                    <div className="lead-header-mob__float-value" title={lead.typeOfB2B?.name || ''}>
-                                      {lead.typeOfB2B?.name || '—'}
-                                    </div>
+                                  <div className="lhm__followup-date">
+                                    <span>Next Follow-up Date:-</span><span>10-04-2026</span>
                                   </div>
                                 </div>
 
-                                <div className="lead-header-mob__approval">
-                                  <button
-                                    type="button"
-                                    className="lead-header-mob__approval-btn lead-header-mob__approval-btn--approve"
-                                    onClick={() => alert('Approve action not wired yet')}
-                                  >
-                                    Approve
-                                  </button>
+                                {/* Followup Visit */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Followup Visit</span>
+                                  <div className="lhm__followup-cards">
+                                    {[
+                                      { label: 'Done',    value: 0, bg: '#4b5563' },
+                                      { label: 'Planned', value: 0, bg: '#4b5563' },
+                                      { label: 'Missed',  value: 0, bg: '#7c3d14' },
+                                    ].map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="lhm__followup-date">
+                                    <span>Next Follow-up Date:-</span><span>10-04-2026</span>
+                                  </div>
                                 </div>
                               </div>
+
                             </div>
                           ) : (
                             <div className="lead-header-v2__row">
@@ -3979,7 +3965,7 @@ const B2BSales = () => {
                                     </div>
                                   </div>
 
-                                  <div className="lead-header-v2__input-row">
+                                  {/* <div className="lead-header-v2__input-row">
                                     <div className="lead-header-v2__input-wrap">
                                       <i className="fas fa-envelope lead-header-v2__input-icon" aria-hidden="true"  style={{fontSize:'9px'}}></i>
                                       <input
@@ -3991,49 +3977,57 @@ const B2BSales = () => {
                                         title={lead.email || lead.email || 'NA'}
                                       />
                                     </div>
-                                  </div>
+                                  </div> */}
                                 </div>
                               </div>
 
                               <div className="lead-header-v2__right">
-                                <div className="d-flex gap-2 align-items-start">
-                                  <div className="lead-header-v2__status-stack">
+                                {/* Refer / History pills — stacked vertically, no white box */}
+                                <div className="lead-header-v2__pills">
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                  >
+                                    <i className="fas fa-share-alt" aria-hidden="true"></i>
+                                    Refer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openleadHistoryPanel(lead)}
+                                  >
+                                    <i className="fas fa-history" aria-hidden="true"></i>
+                                    History
+                                  </button>
+                                </div>
+
+                                {/* Performance block — label paired with each input */}
+                                <div className="lead-header-v2__perf-block" style={{width:'20%'
+                                }}>
+                                  <span className="lead-header-v2__perf-title">Performance</span>
+                                  <div className="lead-header-v2__perf-row">
+                                    <span className="lead-header-v2__perf-label">Status</span>
                                     <input
                                       type="text"
-                                      className="form-control form-control-sm m-0"
-                                      style={{
-                                        cursor: 'pointer',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '0px',
-                                        borderTopRightRadius: '5px',
-                                        borderTopLeftRadius: '5px',
-                                        height: '20px',
-                                        fontSize: '10px'
-                                      }}
+                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
                                       value={lead.status?.title || lead.status?.name || 'Untouch Lead'}
                                       readOnly
-                                      onClick={() => {
-                                        openEditPanel(lead, 'StatusChange');
-                                      }}
-                                    />
-                                    <input
-                                      type="text"
-                                      className="form-control form-control-sm m-0"
-                                      value={lead.subStatus?.title || 'Untouch Lead'}
-                                      style={{
-                                        cursor: 'pointer',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '0px',
-                                        borderBottomRightRadius: '5px',
-                                        borderBottomLeftRadius: '5px',
-                                        height: '20px',
-                                        fontSize: '10px'
-                                      }}
-                                      readOnly
+                                      onClick={() => openEditPanel(lead, 'StatusChange')}
                                     />
                                   </div>
-
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                  <div className="lead-header-v2__perf-row">
+                                    <span className="lead-header-v2__perf-label">Sub-Status</span>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
+                                      value={lead.subStatus?.title || 'Untouch Lead'}
+                                      readOnly
+                                      style={{fontSize:'8px'}}
+                                    />
+                                  </div>
+                                  {/* mobile expand/options — keep hidden on desktop */}
+                                  <div className="d-md-none d-sm-block d-block mt-1">
                                     <div className="btn-group">
                                       <button
                                         type="button"
@@ -4058,55 +4052,65 @@ const B2BSales = () => {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="lead-header-v2__kv-tab">
-                                  <div className="lead-header-v2__kv">
-                                    <div className="lead-header-v2__kv-label text-center">Lead Source</div>
-                                    <div className="lead-header-v2__kv-value">{lead.leadCategory?.name || '—'}</div>
-                                  </div>
 
-                                  <div className="lead-header-v2__kv lead-header-v2__kv--b2b">
-                                    <div className="lead-header-v2__kv-label text-center">B2B Type</div>
-                                    <div className="lead-header-v2__kv-value">{lead.typeOfB2B?.name || '—'}</div>
+                                {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
+                                <div className="lead-header-v2__dash">
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Followup Calling</span>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {[
+                                          { key: 'fc-done',    label: 'Done',    value: 0, bg: '#12b3ff' },
+                                          { key: 'fc-planned', label: 'Planned', value: 0, bg: '#f59e0b' },
+                                          { key: 'fc-missed',  label: 'Missed',  value: 0, bg: '#7c3d14' }
+                                        ].map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="ActionsDates">
+                                        <span>Next Follow-up Date:-</span> <span>10-04-2026</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Followup Visit</span>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {[
+                                          { key: 'fv-done',    label: 'Done',    value: 0, bg: '#4b5563' },
+                                          { key: 'fv-planned', label: 'Planned', value: 0, bg: '#4b5563' },
+                                          { key: 'fv-missed',  label: 'Missed',  value: 0, bg: '#7c3d14' }
+                                        ].map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="ActionsDates">
+                                        <span>Next Follow-up Date:-</span> <span>10-04-2026</span>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
 
-                                <Link
-                                  to="/institute/lrp"
-                                  className="lead-header-v2__iconbtn lead-header-v2__iconbtn--report d-none d-md-inline-flex"
-                                  style={{ textDecoration: 'none' }}
-                                  title="Report"
-                                  aria-label="Report"
-                                >
-                                  <i className="fas fa-clipboard-list" aria-hidden="true"></i>
-                                  <span className="lead-header-v2__report-text">Lead Report</span>
-                                </Link>
-                                <button
-                                  type="button"
-                                  style={{
-                                    position: 'absolute',
-                                    top: `-10px`,
-                                    right: '10px',
-                                    background: '#16a34a',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    padding: '6px 10px',
-                                    fontWeight: 900,
-                                    fontSize: '12px',
-                                    lineHeight: 1,
-                                    boxShadow: '0 8px 18px rgba(0,0,0,0.18)'
-                                  }}
-                                >
-                                  Approve
-                                </button>
-                                {/* <div className="lead-header-v2__approval">
-                                <button type="button" className="lead-header-v2__approval-btn">
-                                  Approved
-                                </button>
-                                <button type="button" className="lead-header-v2__approval-btn">
-                                  Pending
-                                </button>
-                              </div> */}
                                 <button
                                   type="button"
                                   className="lead-header-v2__chev d-none d-md-inline-flex"
@@ -4121,7 +4125,8 @@ const B2BSales = () => {
                         </div>
 
                         <div className="lead-meta-v2">
-                          <div className="lead-meta-v2__left">
+                          <div className="lead-meta-v2__panel lead-meta-v2__panel--detail">
+                            <div className="lead-meta-v2__panel-title">Lead Detail</div>
                             <div className="lead-meta-v2__grid">
                               <div className="lead-meta-v2__item">
                                 <div className="lead-meta-v2__label">Lead Age</div>
@@ -4129,66 +4134,66 @@ const B2BSales = () => {
                               </div>
                               <div className="lead-meta-v2__item">
                                 <div className="lead-meta-v2__label">Lead Owner</div>
-                                <div className="lead-meta-v2__value text-capitalize">{lead.leadOwner?.name || '—'}</div>
+                                <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
                               </div>
                               <div className="lead-meta-v2__item">
                                 <div className="lead-meta-v2__label">Added by</div>
-                                <div className="lead-meta-v2__value text-capitalize">{lead.leadAddedBy?.name || '—'}</div>
+                                <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
                               </div>
-                              <div className="lead-meta-v2__item lead-meta-v2__item--remark">
-                                <div className="lead-meta-v2__label">Remark</div>
-                                <div className="lead-meta-v2__value lead-meta-v2__value--remark" title={lead.remark || lead.remarks || ''}>
-                                  {lead.remark || lead.remarks || '—'}
-                                </div>
+                              <div className="lead-meta-v2__item">
+                                <div className="lead-meta-v2__label">Lead Source</div>
+                                <div className="lead-meta-v2__value text-capitalize"  title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
                               </div>
-                              <div className="lead-meta-v2__item lead-meta-v2__item--remark">
-                                <div className="lead-meta-v2__label">Bussiness Name</div>
-                                <div className="lead-meta-v2__value lead-meta-v2__value--remark" title={lead.businessName || lead.businessName || ''}>
-                                
-                                    {lead.businessName || 'Business Name Not Available'}
-                                 
-                                </div>
+                              <div className="lead-meta-v2__item">
+                                <div className="lead-meta-v2__label">B2B Type</div>
+                                <div className="lead-meta-v2__value text-capitalize" title={lead.typeOfB2B?.name || '—'}>{lead.typeOfB2B?.name || '—'}</div>
                               </div>
+                            
                             </div>
                           </div>
 
-                          <div className="lead-meta-v2__right">
-                          
-                            <div className="lead-meta-v2__actions">
+
+                          <div className="lead-meta-v2__panel lead-meta-v2__panel--actions">
+                            <div className="lead-meta-v2__panel-title">Action Button</div>
+                            <div className="lead-meta-v2__action-grid">
                               <button
                                 type="button"
-                                className="lead-meta-v2__action-btn"
-                                onClick={() => openRefferPanel(lead, 'Reffer')}
+                                className="lead-meta-v2__icon-action"
+                                onClick={() => openEditPanel(lead, 'StatusChange')}
+                                disabled={!canUpdateLead(lead)}
+                                title={canUpdateLead(lead) ? 'Change Status' : "You don't have permission to change status"}
                               >
-                                <i className="fas fa-share-alt"></i>
-                                Refer
+                                <div className="lead-meta-v2__icon-action-label">Change Status</div>
+                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
+                                  <i className="fas fa-edit"></i>
+                                </div>
                               </button>
+
                               <button
                                 type="button"
-                                className="lead-meta-v2__action-btn"
-                                onClick={() => openleadHistoryPanel(lead)}
-                              >
-                                <i className="fas fa-history"></i>
-                                History
-                              </button>
-                              <button
-                                type="button"
-                                className="lead-meta-v2__action-btn"
-                                onClick={() => openProfileEditPanel(lead)}
-                              >
-                                <i className="fas fa-file-alt"></i>
-                                Details
-                              </button>
-                              <button
-                                type="button"
-                                className="lead-meta-v2__action-btn lead-meta-v2__action-btn--followup"
+                                className="lead-meta-v2__icon-action"
                                 onClick={() => openEditPanel(lead, 'SetFollowup')}
                                 disabled={!canUpdateLead(lead)}
                                 title={canUpdateLead(lead) ? 'Set Follow-up' : "You don't have permission to set follow-up"}
                               >
-                                <i className="fas fa-calendar-plus"></i>
-                                Followup
+                                <div className="lead-meta-v2__icon-action-label">Set Followup</div>
+                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
+                                  <i className="fas fa-calendar-plus"></i>
+                                </div>
                               </button>
+
+                              <Link
+                                to="/institute/lrp"
+                                className="lead-meta-v2__icon-action"
+                                style={{ textDecoration: 'none' }}
+                                title="Add Report"
+                                aria-label="Add Report"
+                              >
+                                <div className="lead-meta-v2__icon-action-label">Add Report</div>
+                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
+                                  <i className="fas fa-clipboard-list"></i>
+                                </div>
+                              </Link>
                             </div>
                           </div>
                         </div>
@@ -4278,6 +4283,22 @@ const B2BSales = () => {
               transition: 'transform 0.3s ease',
               borderRadius: '8px 0 0 8px'
             }}>
+
+              {/* Floating lead identity badge — always visible at top of panel */}
+              {selectedProfile && (
+                <div className="panel-lead-badge">
+                  <div className="panel-lead-badge__name">
+                    <i className="fas fa-user-circle" aria-hidden="true"></i>
+                    <span className="text-capitalize">{selectedProfile.concernPersonName || selectedProfile.businessName || '—'}</span>
+                  </div>
+                  {selectedProfile.mobile && (
+                    <div className="panel-lead-badge__phone">
+                      <i className="fas fa-phone" aria-hidden="true"></i>
+                      <span>{selectedProfile.mobile}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {renderStatusChangePanel()}
               {renderFollowupPanel()}
@@ -4896,7 +4917,7 @@ const B2BSales = () => {
                     </div>
 
                     {/* Remark */}
-                    <div className="col-12">
+                    {/* <div className="col-12">
                       <label className="form-label fw-bold">
                         <i className="fas fa-comment text-primary me-1"></i>
                         Remark
@@ -4908,7 +4929,7 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                         placeholder="Enter remark"
                       />
-                    </div>
+                    </div> */}
 
 
 
@@ -5202,6 +5223,12 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     gap:10px;
     min-width: 150px;
     flex: 0 0 150px;
+        position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    padding: 10px 10px 8px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(6px);
   }
 
   .lead-header-v2__inputs{
@@ -5216,6 +5243,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     gap:10px;
     align-items:center;
     flex-wrap: nowrap;
+    flex-direction: column;
   }
 
   .lead-header-v2__input-wrap{
@@ -5227,9 +5255,9 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     border: 1px solid rgba(255,255,255,0.35);
     border-radius: 10px;
     padding: 6px 10px;
-    flex: 1 1 0;
-    min-width: 150px;
-    width: 250px;
+    // flex: 1 1 0;
+    // min-width: 150px;
+    // width: 250px;
   }
 
   .lead-header-v2__input-icon{
@@ -5336,6 +5364,174 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     position: relative;
   }
 
+  .lead-header-v2__dash{
+    display:flex;
+    align-items:stretch;
+    gap:10px;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .lead-header-v2__dash-col{
+    width: clamp(220px, 18vw, 270px);
+    min-width: 200px;
+    flex: 0 0 auto;
+    display: flex;
+  }
+
+  /* Header followup mini-cards (match fig-1 look) */
+  .lead-header-v2 .b2b-dash-section{
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 10px 10px 8px;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(6px);
+  }
+
+  .lead-header-v2 .b2b-dash-section__label{
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card{
+    border-radius: 8px;
+    padding: 6px 6px 5px;
+    min-height: 44px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__label{
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.05;
+    opacity: 0.98;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__divider{
+    width: 72%;
+    max-width: 56px;
+    height: 1px;
+    margin: 6px 0;
+    background: rgba(255,255,255,0.95);
+    flex-shrink: 0;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__value{
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: 0.3px;
+  }
+
+  .lead-header-v2 .ActionsDates{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.95);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .lead-header-v2 .ActionsDates span:last-child{
+    color: #fff;
+  }
+
+  /* Pills wrapper in card header (Refer / History) — no white background */
+  .lead-header-v2__pills{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Performance block: title + label-input rows */
+  .lead-header-v2__perf-block{
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+    min-width: 148px;
+        position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    padding: 10px 10px 8px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(6px);
+  }
+.lead-header-v2__perf-title{
+position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+}
+  .lead-header-v2__perf-title{
+    font-size: 11px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.95);
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+
+  .lead-header-v2__perf-row{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lead-header-v2__perf-label{
+    font-size: 10px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
+    min-width: 58px;
+  }
+
+  .lead-header-v2__perf-input{
+    cursor: pointer;
+    height: 22px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(255,255,255,0.35) !important;
+    background: rgba(255,255,255,0.18) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    padding: 0 6px !important;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .lead-header-v2__perf-input::placeholder{
+    color: rgba(255,255,255,0.75);
+  }
+
+  /* Legacy — keep status-stack for mobile header */
   .lead-header-v2__status-stack{
     width: clamp(92px, 11vw, 120px);
     flex: 0 0 auto;
@@ -5344,6 +5540,262 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   .lead-header-v2__status-stack input{
     width: 100%;
+  }
+
+  /* ══════════════════════════════════════════
+     LHM — Redesigned mobile lead card header
+     ══════════════════════════════════════════ */
+  .lhm{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── Row 1: Name | Pills | Status ── */
+  .lhm__row1{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lhm__name{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+
+  .lhm__name-icon{
+    font-size: 15px;
+    color: #fff;
+    opacity: 0.9;
+    flex-shrink: 0;
+  }
+
+  .lhm__name-text{
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Refer + History — stacked, compact */
+  .lhm__pills{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .lhm__pill{
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: none;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    line-height: 1;
+  }
+
+  .lhm__pill--refer{
+    background: #ff3b30;
+  }
+
+  .lhm__pill--history{
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.35);
+  }
+
+  /* Status block — tappable, shows status + sub-status */
+  .lhm__status-block{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 5px 8px;
+    cursor: pointer;
+    min-width: 88px;
+  }
+
+  .lhm__status-row{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .lhm__status-label{
+    font-size: 9px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+    min-width: 26px;
+  }
+
+  .lhm__status-val{
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70px;
+  }
+
+  /* ── Row 2: Phone | More | Expand ── */
+  .lhm__row2{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lhm__phone{
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .lhm__phone i{
+    font-size: 12px;
+    opacity: 0.85;
+    flex-shrink: 0;
+  }
+
+  .lhm__actions{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .lhm__action-btn{
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-width: 34px;
+  }
+
+  .lhm__action-btn--more{
+    background: rgba(255,255,255,0.22);
+  }
+
+  /* ── Row 3: Followup Calling + Followup Visit ── */
+  .lhm__row3{
+    display: flex;
+    gap: 8px;
+  }
+
+  .lhm__followup-box{
+    flex: 1 1 0;
+    min-width: 0;
+    background: rgba(255,255,255,0.13);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 10px 8px 7px;
+    position: relative;
+  }
+
+  .lhm__followup-title{
+    position: absolute;
+    top: -9px;
+    left: 8px;
+    background: rgba(11,94,215,0.95);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 999px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0 7px;
+    line-height: 17px;
+    white-space: nowrap;
+  }
+
+  .lhm__followup-cards{
+    display: flex;
+    gap: 5px;
+  }
+
+  .lhm__stat-card{
+    flex: 1 1 0;
+    border-radius: 7px;
+    padding: 5px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+
+  .lhm__stat-label{
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .lhm__stat-divider{
+    display: block;
+    width: 65%;
+    height: 1px;
+    background: rgba(255,255,255,0.85);
+    margin: 3px 0;
+  }
+
+  .lhm__stat-val{
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .lhm__followup-date{
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    font-size: 9.5px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
   }
 
   /* Mobile header (Option A) */
@@ -5612,30 +6064,6 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     .lead-header-mob .lead-header-v2__status-stack{ width: clamp(120px, 42vw, 160px); }
   }
 
-  /* When a right-side panel is open, allow header to reflow instead of overlapping */
-  .b2b-panel-open .lead-header-v2__row{
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
-  .b2b-panel-open .lead-header-v2__left{
-    flex: 1 1 260px;
-    min-width: 220px;
-  }
-
-  .b2b-panel-open .lead-header-v2__input-row{
-    flex-wrap: wrap;
-  }
-
-  .b2b-panel-open .lead-header-v2__right{
-    flex: 1 1 420px;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 8px;
-    overflow: visible;
-    white-space: normal;
-  }
-
   .b2b-panel-open .lead-header-v2__approval{
     flex-wrap: wrap;
   }
@@ -5723,70 +6151,162 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .lead-meta-v2{
-    padding: 12px 14px 6px;
+    padding: 12px 14px 10px;
     background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
   }
 
-  .lead-meta-v2__left{
-    display:flex;
-    gap:10px;
-    flex: 1 1 auto;
+  .lead-meta-v2__panel{
+    position: relative;
+    border: 1px solid rgba(17, 24, 39, 0.35);
+    border-radius: 10px;
+    background: #fff;
+    padding: 18px 14px 12px;
     min-width: 0;
   }
 
-  .lead-meta-v2__right{
+  .lead-meta-v2__panel-title{
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 0 10px;
+    font-weight: 900;
+    color: #111827;
+    font-size: 16px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .lead-meta-v2__panel--detail{
+    flex: 1 1 auto;
+  }
+
+  .lead-meta-v2__panel--actions{
     flex: 0 0 auto;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    align-items:flex-end;
-    justify-content:flex-start;
-    min-width: 240px;
+    min-width: 360px;
   }
 
   .lead-meta-v2__grid{
     display:grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 18px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px 18px;
     align-items:flex-start;
   }
 
-  /* Remark should sit beside "Added by" in 2x2 grid */
-
-  .lead-meta-v2__actions{
+  .lead-meta-v2__mid{
+    flex: 0 0 auto;
     display:flex;
-    flex-wrap: wrap;
-    gap:10px;
-    align-items:stretch;
-    justify-content:flex-end;
+    gap: 12px;
+    align-items:center;
+    justify-content:center;
+    padding: 0 6px;
+    flex-direction:column;
   }
 
-  .lead-meta-v2__action-btn{
+  .lead-meta-v2__pill{
     border:none;
-    border-radius: 10px;
-    padding: 8px 12px;
+    border-radius: 999px;
+    padding: 8px 14px;
     background: #ff3b30;
     color: #fff;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 13px;
-    display:flex;
+    display:inline-flex;
     align-items:center;
     gap:8px;
     box-shadow: 0 6px 14px rgba(255, 59, 48, 0.22);
     line-height: 1;
-    width: 100%;
-    justify-content:center;
+    white-space: nowrap;
   }
 
-  /* 2 buttons per row */
-  .lead-meta-v2__actions .lead-meta-v2__action-btn{
-    flex: 1 1 calc(50% - 10px);
-    width: auto;
+  .lead-meta-v2__pill i{
+    font-size: 13px;
+  }
+
+  .lead-meta-v2__pill:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Mobile "More actions" modal buttons (still use this class) */
+  .lead-meta-v2__action-btn{
+    border:none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #ff3b30;
+    color: #fff;
+    font-weight: 900;
+    font-size: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.22);
+    line-height: 1;
+    width: 100%;
+  }
+
+  .lead-meta-v2__action-btn i{ font-size: 13px; }
+
+  .lead-meta-v2__action-btn:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .lead-meta-v2__action-grid{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  .lead-meta-v2__icon-action{
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 8px;
     min-width: 0;
   }
 
-  .lead-meta-v2__action-btn i{
+  .lead-meta-v2__icon-action:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .lead-meta-v2__icon-action-label{
     font-size: 13px;
+    font-weight: 700;
+    color: #ff3b7d;
+    line-height: 1.1;
+    text-align:center;
+    white-space: nowrap;
+  }
+
+  .lead-meta-v2__icon-action-btn{
+    width: 44px;
+    height: 36px;
+    border-radius: 10px;
+    background: #ff3b30;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.28);
+  }
+
+  .lead-meta-v2__icon-action-btn i{
+    font-size: 14px;
   }
 
   .lead-meta-v2__label{
@@ -5797,17 +6317,13 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .lead-meta-v2__value{
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 800;
     color: #111827;
     line-height: 1.1;
-  }
-
-  .lead-meta-v2{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .lead-meta-v2__followup{
@@ -5844,6 +6360,184 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     box-shadow:none;
   }
 
+  /* When the desktop right panel opens, main content narrows.
+     Keep header "cute + compact": top row (pills + performance), second row (dash cards). */
+  /* ── Panel-open: keep header in ONE compact row, no wrapping ── */
+  .b2b-panel-open .lead-header-v2{
+    padding: 8px 10px;
+  }
+
+  .b2b-panel-open .lead-header-v2__row{
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Left: hide name/phone when panel is open — no space, no overlap */
+  .b2b-panel-open .lead-header-v2__left{
+    display: none;
+  }
+
+  /* Right: take full width, single flex row, no wrap */
+  .b2b-panel-open .lead-header-v2__right{
+    flex: 1 1 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    overflow: visible;
+    white-space: normal;
+    justify-content: flex-start;
+  }
+
+  /* Pills: stay vertical, smaller */
+  .b2b-panel-open .lead-header-v2__pills{
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .b2b-panel-open .lead-header-v2__pills .lead-meta-v2__pill{
+    padding: 6px 10px;
+    font-size: 11px;
+    gap: 5px;
+  }
+
+  /* Performance block: compact */
+  .b2b-panel-open .lead-header-v2__perf-block{
+    flex-shrink: 0;
+    min-width: 130px;
+    gap: 4px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-title{
+    font-size: 10px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-label{
+    font-size: 9px;
+    min-width: 52px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-input{
+    height: 20px !important;
+    font-size: 9px !important;
+    padding: 0 5px !important;
+    border-radius: 5px !important;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-row{
+    gap: 5px;
+  }
+
+  /* Dash: side-by-side, narrower columns */
+  .b2b-panel-open .lead-header-v2__dash{
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .b2b-panel-open .lead-header-v2__dash-col{
+    width: clamp(160px, 14vw, 195px);
+    min-width: 155px;
+    flex: 0 0 auto;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-section{
+    padding: 8px 7px 6px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-section__label{
+    font-size: 10px;
+    top: -9px;
+    padding: 0 6px;
+    background: rgba(11, 94, 215, 0.95);
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card{
+    min-height: 38px;
+    padding: 4px 4px 4px;
+    border-radius: 7px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__label{
+    font-size: 9.5px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__divider{
+    margin: 3px 0;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__value{
+    font-size: 13px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .ActionsDates{
+    margin-top: 4px;
+    padding-top: 4px;
+    font-size: 9.5px;
+    gap: 4px;
+  }
+
+  /* Slightly softer "cute" feel (safe changes only) */
+  .lead-header-v2 .b2b-dash-stat-card{
+    box-shadow: 0 8px 18px rgba(0,0,0,0.16);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(0,0,0,0.20);
+  }
+
+  /* ── Floating lead identity badge at top of desktop action panel ── */
+  .panel-lead-badge{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 100%);
+    border-radius: 8px 0 0 0;
+    flex-wrap: wrap;
+  }
+
+  .panel-lead-badge__name,
+  .panel-lead-badge__phone{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .panel-lead-badge__name i,
+  .panel-lead-badge__phone i{
+    font-size: 12px;
+    opacity: 0.85;
+  }
+
+  .panel-lead-badge__phone{
+    font-size: 12px;
+    opacity: 0.92;
+    border-left: 1px solid rgba(255,255,255,0.35);
+    padding-left: 14px;
+  }
+
+  .lead-meta-v2__icon-action-btn{
+    transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  }
+
+  .lead-meta-v2__icon-action:hover .lead-meta-v2__icon-action-btn{
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    box-shadow: 0 10px 22px rgba(255, 59, 48, 0.30);
+  }
+
   @media (max-width: 768px){
     .lead-header-v2__left{ min-width: auto; }
     /* Mobile/tablet: allow the header to wrap instead of squeezing/overlapping */
@@ -5861,10 +6555,11 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     .lead-header-v2__approval{ justify-content:flex-start; flex-wrap: wrap; }
     .lead-header-v2__kv{ min-width: 120px; width: auto; }
     .lead-header-v2__status-stack{ width: 120px; }
-    .lead-meta-v2{ flex-direction:column; }
-    .lead-meta-v2__right{ min-width: 0; align-items:flex-start; }
-    .lead-meta-v2__actions{ justify-content:flex-start; }
+    .lead-meta-v2{ flex-direction:column; align-items: stretch; }
+    .lead-meta-v2__panel--actions{ min-width: 0; }
+    .lead-meta-v2__mid{ justify-content:flex-start; padding: 2px 0 0; }
     .lead-meta-v2__grid{ grid-template-columns: 1fr 1fr; }
+    .lead-meta-v2__action-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .lead-meta-v2__followup{ align-items:flex-start; }
   }
 
