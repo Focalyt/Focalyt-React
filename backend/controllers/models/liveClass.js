@@ -152,6 +152,5 @@ liveClassSchema.index({ courseId: 1 });
 liveClassSchema.index({ trainerId: 1 });
 liveClassSchema.index({ status: 1 });
 liveClassSchema.index({ scheduledDate: 1 });
-liveClassSchema.index({ roomId: 1 }, { unique: true, sparse: true });
 
 module.exports = model("LiveClass", liveClassSchema);

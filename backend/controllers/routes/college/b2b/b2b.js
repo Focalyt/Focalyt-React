@@ -323,7 +323,7 @@ router.get('/lead-categories/:id', isCollege, async (req, res) => {
 // Create new Lead Category
 router.post('/lead-categories', isCollege, async (req, res) => {
 	try {
-		const { name, description } = req.body;
+		const { name, description, documents, questions } = req.body;
 
 		// Validate required fields
 		if (!name) {
@@ -332,6 +332,31 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 				message: 'Name is required'
 			});
 		}
+
+		const safeDocuments = Array.isArray(documents)
+			? documents
+				.map((d) => ({
+					name: String(d?.name || '').trim(),
+					isMandatory: Boolean(d?.isMandatory)
+				}))
+				.filter((d) => d.name)
+			: [];
+
+		const safeQuestions = Array.isArray(questions)
+			? questions.map((q) => {
+				const t = q?.type;
+				const type = ['text', 'number', 'radio'].includes(t) ? t : 'text';
+				const options = Array.isArray(q?.options)
+					? q.options.map((o) => String(o || '').trim()).filter(Boolean)
+					: [];
+				return {
+					question: String(q?.question || '').trim(),
+					type,
+					required: Boolean(q?.required),
+					options: type === 'radio' ? options : []
+				};
+			}).filter((q) => q.question)
+			: [];
 
 		// Check if name already exists
 		const existingCategory = await LeadCategory.findOne({ name });
@@ -345,6 +370,8 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 		const newCategory = new LeadCategory({
 			name,
 			description,
+			documents: safeDocuments,
+			questions: safeQuestions,
 			addedBy: req.user._id
 		});
 
@@ -369,7 +396,7 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 // Update Lead Category
 router.put('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
-		const { name, description, isActive } = req.body;
+		const { name, description, isActive, documents, questions } = req.body;
 
 		// Check if name already exists (excluding current record)
 		if (name) {
@@ -385,9 +412,41 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 			}
 		}
 
+		const updatePayload = {};
+		if (name !== undefined) updatePayload.name = name;
+		if (description !== undefined) updatePayload.description = description;
+		if (isActive !== undefined) updatePayload.isActive = isActive;
+		if (documents !== undefined) {
+			updatePayload.documents = Array.isArray(documents)
+				? documents
+					.map((d) => ({
+						name: String(d?.name || '').trim(),
+						isMandatory: Boolean(d?.isMandatory)
+					}))
+					.filter((d) => d.name)
+				: [];
+		}
+		if (questions !== undefined) {
+			updatePayload.questions = Array.isArray(questions)
+				? questions.map((q) => {
+					const t = q?.type;
+					const type = ['text', 'number', 'radio'].includes(t) ? t : 'text';
+					const options = Array.isArray(q?.options)
+						? q.options.map((o) => String(o || '').trim()).filter(Boolean)
+						: [];
+					return {
+						question: String(q?.question || '').trim(),
+						type,
+						required: Boolean(q?.required),
+						options: type === 'radio' ? options : []
+					};
+				}).filter((q) => q.question)
+				: [];
+		}
+
 		const updatedCategory = await LeadCategory.findByIdAndUpdate(
 			req.params.id,
-			{ name, description, isActive },
+			updatePayload,
 			{ new: true, runValidators: true }
 		).populate('addedBy', 'name email');
 

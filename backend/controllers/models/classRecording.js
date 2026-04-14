@@ -153,6 +153,5 @@ classRecordingSchema.index({ batchId: 1 });
 classRecordingSchema.index({ courseId: 1 });
 classRecordingSchema.index({ trainerId: 1 });
 classRecordingSchema.index({ status: 1 });
-classRecordingSchema.index({ recordingId: 1 }, { unique: true });
 
 module.exports = model("ClassRecording", classRecordingSchema);

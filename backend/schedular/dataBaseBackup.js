@@ -7,12 +7,6 @@ const cron = require('node-cron');
 // console.log("Local URI:", process.env.MIPIE_MONGODB_URI);
 // console.log("Cloud URI:", process.env.MIPIE_BACKUP_MONGODB_URI);
 
-// Schedule a task to run at 2 AM every day
-cron.schedule('0 2 * * *', () => {
-  // console.log('Starting scheduled database backup at 2 AM...');
-  backupAndRestore();
-});
-
 // Function to take backup of local MongoDB and restore to Cloud MongoDB
 function backupAndRestore() {
   const backupPath = path.join(__dirname, 'mmt-backup'); // Ensure absolute path for backup
@@ -39,6 +33,24 @@ function backupAndRestore() {
 }
 
 
+function dataBaseBackupScheduler() {
+  const backupCronTask = cron.schedule(
+    '0 2 * * *',
+    () => {
+      console.log('[dataBaseBackup] Cron fired at', new Date().toISOString());
+      backupAndRestore();
+    },
+    { timezone: 'Asia/Kolkata', name: 'dataBaseBackup' }
+  );
+  try {
+    const next = backupCronTask.getNextRun && backupCronTask.getNextRun();
+    console.log('[dataBaseBackup] Scheduled daily 02:00 Asia/Kolkata. Next run:', next ? next.toISOString() : next);
+  } catch (e) {
+    console.log('[dataBaseBackup] Scheduled daily 02:00 Asia/Kolkata.');
+  }
+}
+
+module.exports = dataBaseBackupScheduler;
 
 // const path = require('path');
 // const fs = require('fs');

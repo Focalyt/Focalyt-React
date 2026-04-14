@@ -19,6 +19,35 @@ function TypeCategory() {
     const [editingId, setEditingId] = useState(null);
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
+    /** Payload shape matches backend `leadCategory` schema: documents[], questions[{ question, type, required, options }] */
+    const buildQuestionsPayload = (list) => {
+        const allowedTypes = ['text', 'number', 'radio'];
+        return (list || [])
+            .map((q) => {
+                const type = allowedTypes.includes(q?.type) ? q.type : 'text';
+                const options = Array.isArray(q?.options)
+                    ? q.options.map((o) => String(o ?? '').trim()).filter(Boolean)
+                    : [];
+                return {
+                    question: String(q?.question ?? '').trim(),
+                    type,
+                    required: Boolean(q?.required),
+                    options: type === 'radio' ? options : []
+                };
+            })
+            .filter((q) => q.question);
+    };
+
+    const buildDocumentsPayload = () => {
+        if (formData.hasDocuments !== 'yes') return [];
+        return (formData.documents || [])
+            .map((d) => ({
+                name: String(d?.name ?? '').trim(),
+                isMandatory: Boolean(d?.isMandatory)
+            }))
+            .filter((d) => d.name);
+    };
+
     // Fetch all categories on component mount
     useEffect(() => {
         fetchCategories();
@@ -73,6 +102,20 @@ function TypeCategory() {
             }
         }
 
+        for (const q of questions || []) {
+            const qt = String(q?.question ?? '').trim();
+            if (!qt) continue;
+            if (q?.type === 'radio') {
+                const opts = (Array.isArray(q?.options) ? q.options : [])
+                    .map((o) => String(o ?? '').trim())
+                    .filter(Boolean);
+                if (opts.length < 2) {
+                    showAlert('Each radio question must have at least two non-empty options', 'error');
+                    return;
+                }
+            }
+        }
+
         try {
             setLoading(true);
 
@@ -82,17 +125,20 @@ function TypeCategory() {
 
             const method = isEditing ? 'PUT' : 'POST';
 
+            const payload = {
+                name: formData.name.trim(),
+                description: formData.description || '',
+                documents: buildDocumentsPayload(),
+                questions: buildQuestionsPayload(questions)
+            };
+
             const response = await fetch(url, {
                 method,
                 headers: {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    ...formData,
-                    // If user selected "No", ensure documents are not sent accidentally
-                    documents: formData.hasDocuments === 'yes' ? formData.documents : []
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -201,6 +247,23 @@ function TypeCategory() {
                 }))
                 : []
         });
+        setQuestions(
+            Array.isArray(category?.questions) && category.questions.length > 0
+                ? category.questions.map((q) => {
+                    const type = ['text', 'number', 'radio'].includes(q?.type) ? q.type : 'text';
+                    const rawOpts = Array.isArray(q?.options) ? q.options : [];
+                    return {
+                        question: q?.question || '',
+                        type,
+                        required: q?.required !== false,
+                        options:
+                            type === 'radio'
+                                ? (rawOpts.length > 0 ? rawOpts : ['Option 1', 'Option 2'])
+                                : []
+                    };
+                })
+                : []
+        );
         setIsEditing(true);
         setEditingId(category._id);
     };
